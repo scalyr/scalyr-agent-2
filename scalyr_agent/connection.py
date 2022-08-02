@@ -23,6 +23,7 @@ __author__ = "imron@scalyr.com"
 import re
 import ssl
 import socket
+import logging
 
 import six
 import six.moves.http_client
@@ -445,8 +446,8 @@ class HTTPSConnectionWithTimeoutAndVerification(six.moves.http_client.HTTPSConne
         if hasattr(self, "_tunnel_host") and self._tunnel_host:
             self._tunnel()
 
-        def log_server_ssl_certificate(py_post_equal_279):
-            # type: (bool) -> None
+        def log_server_ssl_certificate(py_post_equal_279, log_level=logging.WARN):
+            # type: (bool, int) -> None
             """
             Utility method which establishes new connection to the server using the same parameters
             as the original parameter and logs the server certificate in PEM format.
@@ -454,6 +455,9 @@ class HTTPSConnectionWithTimeoutAndVerification(six.moves.http_client.HTTPSConne
             NOTE: This method intentionally doesn't perform certificate validation - we just want to
             retrieve raw certificate and log it to make it easier to troubleshoot certificate
             validation failure related issues.
+
+            :param log_level: Log level to use. On validation failure we want to log it under WARN,
+                              but on successful connection, we want to log it under DEBUG.
             """
             # NOTE: We can't use ssl.get_server_certificate() since this will establish a new
             # connection and won't use the same parameters as the original connection (it also won't
@@ -492,19 +496,26 @@ class HTTPSConnectionWithTimeoutAndVerification(six.moves.http_client.HTTPSConne
                 # will be returned so we need to use binary_form to still get cert back for logging
                 # purposes - https://docs.python.org/3/library/ssl.html#ssl.SSLSocket.getpeercert
                 der_cert = sock.getpeercert(binary_form=True)
-                pem_cert = ssl.DER_cert_to_PEM_cert(der_cert)
+                pem_cert = ssl.DER_cert_to_PEM_cert(der_cert).strip()
 
-                log.warn(
+                log.log(
+                    log_level,
                     "SSL certificate for %s (%s:%s):\n%s"
-                    % (self.host, self.host, self.port, pem_cert)
+                    % (self.host, self.host, self.port, pem_cert),
                 )
             except Exception as e:
-                log.warn(
-                    "Failed to retrieve certificate for %s: %s" % (self.host, str(e))
+                log.log(
+                    log_level,
+                    "Failed to retrieve certificate for %s: %s" % (self.host, str(e)),
                 )
             finally:
                 if sock:
-                    sock.close()
+                    # sock.close() can throw OSError so we wrap it with try/catch
+                    # https://docs.python.org/3/library/socket.html#socket.socket.close
+                    try:
+                        sock.close()
+                    except Exception:
+                        pass
 
         # Now ask the ssl library to wrap the socket and verify the server certificate if we have a ca_file.
         if self.__ca_file:
@@ -541,8 +552,14 @@ class HTTPSConnectionWithTimeoutAndVerification(six.moves.http_client.HTTPSConne
                     )
                 except Exception as e:
                     # On exception we log server certificate for easier troubleshooting
-                    log_server_ssl_certificate(True)
+                    log_server_ssl_certificate(
+                        py_post_equal_279=True, log_level=logging.WARN
+                    )
                     raise e
+                else:
+                    log_server_ssl_certificate(
+                        py_post_equal_279=True, log_level=logging.DEBUG
+                    )
 
                 # Additional asserts / guards
                 assert (
@@ -569,8 +586,14 @@ class HTTPSConnectionWithTimeoutAndVerification(six.moves.http_client.HTTPSConne
                     )
                 except Exception as e:
                     # On exception we log server certificate for easier troubleshooting
-                    log_server_ssl_certificate(False)
+                    log_server_ssl_certificate(
+                        py_post_equal_279=False, log_level=logging.WARN
+                    )
                     raise e
+                else:
+                    log_server_ssl_certificate(
+                        py_post_equal_279=True, log_level=logging.DEBUG
+                    )
 
                 # Additional asserts / guards
                 assert self.sock.ca_certs, "ca_certs is falsy"
