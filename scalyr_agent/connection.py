@@ -23,6 +23,7 @@ __author__ = "imron@scalyr.com"
 import re
 import ssl
 import socket
+import logging
 
 import six
 import six.moves.http_client
@@ -445,6 +446,77 @@ class HTTPSConnectionWithTimeoutAndVerification(six.moves.http_client.HTTPSConne
         if hasattr(self, "_tunnel_host") and self._tunnel_host:
             self._tunnel()
 
+        def log_server_ssl_certificate(py_post_equal_279, log_level=logging.WARN):
+            # type: (bool, int) -> None
+            """
+            Utility method which establishes new connection to the server using the same parameters
+            as the original parameter and logs the server certificate in PEM format.
+
+            NOTE: This method intentionally doesn't perform certificate validation - we just want to
+            retrieve raw certificate and log it to make it easier to troubleshoot certificate
+            validation failure related issues.
+
+            :param log_level: Log level to use. On validation failure we want to log it under WARN,
+                              but on successful connection, we want to log it under DEBUG.
+            """
+            # NOTE: We can't use ssl.get_server_certificate() since this will establish a new
+            # connection and won't use the same parameters as the original connection (it also won't
+            # send SNI so a different cert may be returned).
+            # We also can't use sock.getpeercert() directly since for the original non-logging
+            # socket, ca validation is turned on (as it should always be!) and it will throw in
+            # case of invalid cert - this method is here purely for logging purposes so we can log
+            # problematic cert on failed cert validation so for logging purposes we don't want to
+            # perform any cert validation.
+            # It's worth noting that here we can't re-use original sock either and need to create a
+            # new connection - not ideal since a different cert may be returned for a new
+            # connection, but at least SNI is used and we use the same parameters as we do for
+            # normal non-logging connection.
+            sock = None
+
+            try:
+                sock = socket.create_connection((self.host, self.port), self.__timeout)
+
+                if py_post_equal_279:
+                    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+                    ssl_context.options |= ssl.OP_NO_SSLv2
+                    ssl_context.options |= ssl.OP_NO_SSLv3
+                    ssl_context.options |= ssl.OP_NO_TLSv1
+                    ssl_context.options |= ssl.OP_NO_TLSv1_1
+                    ssl_context.verify_mode = ssl.CERT_NONE
+                    ssl_context.check_hostname = False
+
+                    sock = ssl_context.wrap_socket(
+                        sock, do_handshake_on_connect=True, server_hostname=self.host
+                    )
+
+                else:
+                    sock = ssl.wrap_socket(sock, cert_reqs=ssl.CERT_NONE)
+
+                # NOTE: In case binary_form is False and validation wasn't perform an empty dict
+                # will be returned so we need to use binary_form to still get cert back for logging
+                # purposes - https://docs.python.org/3/library/ssl.html#ssl.SSLSocket.getpeercert
+                der_cert = sock.getpeercert(binary_form=True)
+                pem_cert = ssl.DER_cert_to_PEM_cert(der_cert).strip()
+
+                log.log(
+                    log_level,
+                    "SSL certificate for %s (%s:%s):\n%s"
+                    % (self.host, self.host, self.port, pem_cert),
+                )
+            except Exception as e:
+                log.log(
+                    log_level,
+                    "Failed to retrieve certificate for %s: %s" % (self.host, str(e)),
+                )
+            finally:
+                if sock:
+                    # sock.close() can throw OSError so we wrap it with try/catch
+                    # https://docs.python.org/3/library/socket.html#socket.socket.close
+                    try:
+                        sock.close()
+                    except Exception:
+                        pass
+
         # Now ask the ssl library to wrap the socket and verify the server certificate if we have a ca_file.
         if self.__ca_file:
             if PY_post_equal_279:
@@ -472,9 +544,22 @@ class HTTPSConnectionWithTimeoutAndVerification(six.moves.http_client.HTTPSConne
                         )
                     raise e
 
-                self.sock = ssl_context.wrap_socket(
-                    self.sock, do_handshake_on_connect=True, server_hostname=self.host
-                )
+                try:
+                    self.sock = ssl_context.wrap_socket(
+                        self.sock,
+                        do_handshake_on_connect=True,
+                        server_hostname=self.host,
+                    )
+                except Exception as e:
+                    # On exception we log server certificate for easier troubleshooting
+                    log_server_ssl_certificate(
+                        py_post_equal_279=True, log_level=logging.WARN
+                    )
+                    raise e
+                else:
+                    log_server_ssl_certificate(
+                        py_post_equal_279=True, log_level=logging.DEBUG
+                    )
 
                 # Additional asserts / guards
                 assert (
@@ -495,9 +580,20 @@ class HTTPSConnectionWithTimeoutAndVerification(six.moves.http_client.HTTPSConne
             else:
                 # server_hostname argument was added in 2.7.9 so before that version we won't send
                 # SNI and also use ssl.wrap_socket instead of ssl.SSLContext
-                self.sock = ssl.wrap_socket(
-                    self.sock, ca_certs=self.__ca_file, cert_reqs=ssl.CERT_REQUIRED
-                )
+                try:
+                    self.sock = ssl.wrap_socket(
+                        self.sock, ca_certs=self.__ca_file, cert_reqs=ssl.CERT_REQUIRED
+                    )
+                except Exception as e:
+                    # On exception we log server certificate for easier troubleshooting
+                    log_server_ssl_certificate(
+                        py_post_equal_279=False, log_level=logging.WARN
+                    )
+                    raise e
+                else:
+                    log_server_ssl_certificate(
+                        py_post_equal_279=True, log_level=logging.DEBUG
+                    )
 
                 # Additional asserts / guards
                 assert self.sock.ca_certs, "ca_certs is falsy"
