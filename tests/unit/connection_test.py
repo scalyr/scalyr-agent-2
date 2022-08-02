@@ -52,7 +52,10 @@ class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
     def tearDown(self):
         socket.create_connection = ORIGINAL_SOCKET_CREATE_CONNECTION
 
-    def test_connect_valid_cert_and_hostname_success(self):
+    @mock.patch("scalyr_agent.connection.log")
+    def test_connect_valid_cert_and_hostname_success(self, mock_log):
+        self.assertEqual(mock_log.log.call_count, 0)
+
         connection = self._get_connection_cls(server="https://agent.scalyr.com:443")
 
         conn = connection._ScalyrHttpConnection__connection  # pylint: disable=no-member
@@ -64,6 +67,13 @@ class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
         else:
             self.assertEqual(conn.sock.cert_reqs, ssl.CERT_REQUIRED)
             self.assertEqual(conn.sock.ca_certs, CA_FILE)
+
+        self.assertEqual(mock_log.log.call_count, 1)
+        self.assertEqual(mock_log.log.call_args_list[0][0][0], logging.DEBUG)
+        self.assertTrue(
+            "SSL certificate for agent.scalyr.com"
+            in mock_log.log.call_args_list[0][0][1]
+        )
 
     @mock.patch("scalyr_agent.connection.log")
     def test_connect_valid_cert_invalid_hostname_failure(self, mock_log):
