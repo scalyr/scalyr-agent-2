@@ -215,7 +215,7 @@ class ScalyrMonitor(StoppableThread):
 
     def get_stop_agent_on_failure(self):
         """
-        Returns bollen value which indicates that the agent can not run without this monitor and
+        Returns boolean value which indicates that the agent can not run without this monitor and
         has to fail if monitor fails.
         """
         return self._config["stop_agent_on_failure"]
