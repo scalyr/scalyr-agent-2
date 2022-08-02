@@ -1,4 +1,4 @@
-# Copyright 2105 Scalyr Inc.
+# Copyright 2011-2022 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import threading
 import time
 
 import six
+import xmltodict
 
 try:
     import win32api
@@ -136,6 +137,14 @@ define_config_option(
     "Optional (defaults to ``None``). The domain to which the remote user account belongs.  This option is only valid on Windows Vista and above.",
     default=None,
     convert_to=six.text_type,
+)
+
+define_config_option(
+    __monitor__,
+    "json",
+    "Optional (defaults to ``False``). Format events as json? Supports inclusion of all event fields. This option is only valid on Windows Vista and above.",
+    default=False,
+    convert_to=bool,
 )
 
 
@@ -306,7 +315,6 @@ class NewApi(Api):
                 {"channel": ["Application", "System", "Security"], "query": "*"}
             ]
 
-        self.__bookmark_lock = threading.Lock()
         self.__channels = channels
         self.__channel_list = []
         self._session = None
@@ -319,7 +327,8 @@ class NewApi(Api):
                     seen[channel] = 1
                     self.__channel_list.append(channel)
 
-        self.__bookmarks = {}
+        self._bookmarks = {}
+        self._bookmark_lock = threading.Lock()
 
     def _open_remote_session_if_necessary(self, server, config):
         """
@@ -379,12 +388,12 @@ class NewApi(Api):
                 bookmark = None
                 try:
                     # unless we have a bookmark for this channel
-                    self.__bookmark_lock.acquire()
-                    if channel in self.__bookmarks:
+                    self._bookmark_lock.acquire()
+                    if channel in self._bookmarks:
                         flags = win32evtlog.EvtSubscribeStartAfterBookmark
-                        bookmark = self.__bookmarks[channel]
+                        bookmark = self._bookmarks[channel]
                 finally:
-                    self.__bookmark_lock.release()
+                    self._bookmark_lock.release()
 
                 error_message = None
                 try:
@@ -427,7 +436,7 @@ class NewApi(Api):
             checkpoints["bookmarks"] = {}
 
         for channel, bookmarkXml in six.iteritems(checkpoints["bookmarks"]):
-            self.__bookmarks[channel] = win32evtlog.EvtCreateBookmark(bookmarkXml)
+            self._bookmarks[channel] = win32evtlog.EvtCreateBookmark(bookmarkXml)
 
         # subscribe to the events
         self._subscribe_to_events()
@@ -439,14 +448,14 @@ class NewApi(Api):
     def update_checkpoints(self):
         self._checkpoints["api"] = "new"
 
-        self.__bookmark_lock.acquire()
+        self._bookmark_lock.acquire()
         try:
-            for channel, bookmark in six.iteritems(self.__bookmarks):
+            for channel, bookmark in six.iteritems(self._bookmarks):
                 self._checkpoints["bookmarks"][channel] = win32evtlog.EvtRender(
                     bookmark, win32evtlog.EvtRenderBookmark
                 )
         finally:
-            self.__bookmark_lock.release()
+            self._bookmark_lock.release()
 
     def stop(self):
         """
@@ -625,18 +634,96 @@ class NewApi(Api):
 
         self._logger.emit_value("EventLog", provider, extra_fields=vals)
 
-        self.__bookmark_lock.acquire()
+        self._bookmark_lock.acquire()
         try:
             if "Channel" in vals:
                 channel = vals["Channel"]
-                bookmark = None
-                if channel not in self.__bookmarks:
-                    self.__bookmarks[channel] = win32evtlog.EvtCreateBookmark(None)
-
-                bookmark = self.__bookmarks[channel]
-                win32evtlog.EvtUpdateBookmark(bookmark, event)
+                if channel not in self._bookmarks:
+                    self._bookmarks[channel] = win32evtlog.EvtCreateBookmark(None)
+                win32evtlog.EvtUpdateBookmark(self._bookmarks[channel], event)
         finally:
-            self.__bookmark_lock.release()
+            self._bookmark_lock.release()
+
+
+class NewJsonApi(NewApi):
+    def __init__(self, config, logger, channels):
+        super(NewJsonApi, self).__init__(config, logger, channels)
+
+        self._render_context = win32evtlog.EvtCreateRenderContext(
+            win32evtlog.EvtRenderContextSystem
+        )
+
+    def log_event(self, event):
+        values = win32evtlog.EvtRender(
+            event, win32evtlog.EvtRenderEventValues, Context=self._render_context
+        )
+
+        metadata = win32evtlog.EvtOpenPublisherMetadata(
+            values[win32evtlog.EvtSystemProviderName][0]
+        )
+
+        event_json = xmltodict.parse(
+            win32evtlog.EvtFormatMessage(
+                metadata, event, win32evtlog.EvtFormatMessageXml
+            )
+        )
+
+        # Dataset does not currently support arrays/lists, hence must convert to dicts/objects.
+        event_json = _convert_json_array_to_object(event_json)
+
+        # If safe, strip off the @ / # prefixes xmltodict uses to prevent conflicts.
+        # Ref: json.dumps(xmltodict.parse('<entry>foo<text>bar</text></entry>'))
+        #        => '{"entry": {"text": "bar", "#text": "foo"}}'
+        event_json = _strip_xmltodict_prefixes(event_json)
+
+        # Populate the record here with fields that would normally be added by the log formatter,
+        # this avoids having to unmarshal and remarshal later in the log formatter.
+        # Refer to the use of DummyFormatter in WindowEventLogMonitor.open_metric_log().
+        event_json["timestamp"] = event_json["Event"]["System"]["TimeCreated"][
+            "SystemTime"
+        ]
+        event_json["name"] = self._logger.name
+        self._logger.emit_value("unused", scalyr_util.json_encode(event_json))
+
+        self._bookmark_lock.acquire()
+        try:
+            channel = values[win32evtlog.EvtSystemChannel][0]
+            if channel not in self._bookmarks:
+                self._bookmarks[channel] = win32evtlog.EvtCreateBookmark(None)
+            win32evtlog.EvtUpdateBookmark(self._bookmarks[channel], event)
+        finally:
+            self._bookmark_lock.release()
+
+
+def _convert_json_array_to_object(x):
+    if isinstance(x, list):
+        return {str(i): _convert_json_array_to_object(x[i]) for i in range(len(x))}
+    elif isinstance(x, dict):
+        return {k: _convert_json_array_to_object(v) for k, v in x.items()}
+    else:
+        return x
+
+
+def _strip_xmltodict_prefixes(x):
+    if isinstance(x, dict):
+        rv = {}
+
+        # Sort backwards to ensure non-prefixed keys are handled first
+        for k in sorted(x.keys(), reverse=True):
+            dest_key = k
+            if k[0] == "@" and k[1:] not in rv:
+                dest_key = k[1:]
+            elif k == "#text" and "Text" not in rv:
+                dest_key = "Text"
+
+            rv[dest_key] = _strip_xmltodict_prefixes(x[k])
+
+        return rv
+
+    elif isinstance(x, list):
+        return [_strip_xmltodict_prefixes(y) for y in x]
+    else:
+        return x
 
 
 class WindowEventLogMonitor(ScalyrMonitor):
@@ -726,7 +813,6 @@ and System sources:
         self.__api = self.__get_api(sources, event_types, channels)
 
     def __load_checkpoints(self):
-
         checkpoints = None
         try:
             checkpoints = scalyr_util.read_file_as_json(
@@ -789,7 +875,11 @@ and System sources:
                     "Sources and Events not supported with the new EvtLog API.  Please use the 'channels' configuration option instead"
                 )
 
-            result = NewApi(self._config, self._logger, channels)
+            api_class = NewJsonApi if self._config.get("json") else NewApi
+            result = api_class(self._config, self._logger, channels)
+
+            if api_class == NewJsonApi:
+                self.log_config["parser"] = "dottedJson"
         else:
             if channels:
                 msg = (
@@ -808,6 +898,21 @@ and System sources:
             result = OldApi(self._config, self._logger, source_list, event_filter)
 
         return result
+
+    def open_metric_log(self):
+        class DummyFormatter:
+            def format(self, record):
+                return record.message[len("unused ") + 1 : -1].replace('\\"', '"')
+
+        rv = super(WindowEventLogMonitor, self).open_metric_log()
+        if not rv:
+            return rv
+
+        if isinstance(self.__api, NewJsonApi):
+            scalyr_logging.MetricLogHandler.get_handler_for_path(
+                self.log_config["path"]
+            ).setFormatter(DummyFormatter())
+        return True
 
     def run(self):
         self.__load_checkpoints()
@@ -829,7 +934,7 @@ and System sources:
         self.__update_checkpoints()
 
     def _check_and_emit_info_and_warning_messages(self):
-        if isinstance(self.__api, NewApi):
+        if isinstance(self.__api, (NewApi, NewJsonApi)):
             self._logger.info("Using new Evt API")
 
             maximum_records = self._config.get("maximum_records_per_source")
