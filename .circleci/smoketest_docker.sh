@@ -80,7 +80,7 @@ contname_verifier="ci-agent-${log_mode}-${CIRCLE_BUILD_NUM}-verifier"
 # Kill leftover containers
 function kill_and_delete_docker_test_containers() {
     echo ""
-    echo "Killing and deleting all test containers..."
+    echo "::group::Killing and deleting all test containers..."
     echo ""
 
     for cont in $contname_agent $contname_uploader $contname_verifier
@@ -95,31 +95,34 @@ function kill_and_delete_docker_test_containers() {
 
     echo ""
     echo "Containers deleted..."
-    echo ""
+    echo "::endgroup::"
 }
 
 kill_and_delete_docker_test_containers
 echo `pwd`
 
 # Build agent docker image packager with fake version
+echo "::group::Building docker image"
 fakeversion=`cat VERSION`
 fakeversion="${fakeversion}.ci"
 echo $fakeversion > ./VERSION
-echo "Building docker image"
 agent_image="scalyr-agent-${log_mode}"
 
 # We only build linux/amd64 image since Circle CI machine image has some issues with arm. This is
 # fine since we only test amd64 image on Circle CI.
 python3 build_package_new.py "${log_mode}-debian" --tag "local_image" --coverage --platforms linux/amd64
 docker image ls
+echo "::endgroup::"
 
 
 # Launch Agent container (which begins gathering stdout logs)
+echo "::group::Launch Agent container (which begins gathering stdout logs)"
 docker run -d --name ${contname_agent} \
 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} \
 -v /var/run/docker.sock:/var/scalyr/docker.sock \
 ${jsonlog_containers_mount} ${syslog_driver_portmap} \
 "${agent_image}:local_image"
+echo "::endgroup::"
 
 # Capture agent short container ID
 agent_hostname=$(docker ps --format "{{.ID}}" --filter "name=$contname_agent")
@@ -128,12 +131,14 @@ echo "Agent container ID == ${agent_hostname}"
 # Launch Uploader container (only writes to stdout, but needs to query Scalyr to verify agent liveness)
 # You MUST provide scalyr server, api key and importantly, the agent_hostname container ID for the agent-liveness
 # query to work (uploader container waits for agent to be alive before uploading data)
+echo "::group::Launch Uploader container"
 docker run ${syslog_driver_option}  -d --name ${contname_uploader} ${smoketest_image} \
 bash -c "${smoketest_script} ${contname_uploader} ${max_wait} \
 --mode uploader \
 --scalyr_server ${SCALYR_SERVER} \
 --read_api_key ${READ_API_KEY} \
 --agent_hostname ${agent_hostname}"
+echo "::endgroup::"
 
 # Capture uploader short container ID
 uploader_hostname=$(docker ps --format "{{.ID}}" --filter "name=$contname_uploader")
@@ -142,28 +147,28 @@ echo "Using smoketest.py script from ${SMOKE_TESTS_SCRIPT_BRANCH} branch and URL
 
 function print_debugging_info_on_exit() {
     echo ""
-    echo "Docker logs for ${contname_agent} container"
+    echo "::group::Docker logs for ${contname_agent} container"
     echo ""
     docker logs "${contname_agent}" || true
-    echo ""
+    echo "::endgroup::"
 
     # NOTE: We can't tail other two containers since they use syslog driver which
     # sends data to agent container.
     # TODO: Set agent debug level to 5
 
     echo ""
-    echo "Cating /var/log/scalyr-agent-2/agent_syslog.log log file"
+    echo "::group::Cating /var/log/scalyr-agent-2/agent_syslog.log log file"
     echo ""
     docker cp ${contname_agent}:/var/log/scalyr-agent-2/agent_syslog.log . || true
     cat agent_syslog.log || true
-    echo ""
+    echo "::endgroup::"
 
     echo ""
-    echo "Cating /var/log/scalyr-agent-2/docker_monitor.log log file"
+    echo "::group::Cating /var/log/scalyr-agent-2/docker_monitor.log log file"
     echo ""
     docker cp ${contname_agent}:/var/log/scalyr-agent-2/docker_monitor.log . || true
     cat docker_monitor.log || true
-    echo ""
+    echo "::endgroup::"
 
     kill_and_delete_docker_test_containers || true
 }
@@ -174,7 +179,10 @@ trap print_debugging_info_on_exit EXIT
 
 # Launch synchronous Verifier image (writes to stdout and also queries Scalyr)
 # Like the Uploader, the Verifier also waits for agent to be alive before uploading data
-docker run ${syslog_driver_option} -it --name ${contname_verifier} ${smoketest_image} \
+echo ""
+echo "::group::Begin synchronous verifier"
+echo ""
+docker run ${syslog_driver_option} -t --name ${contname_verifier} ${smoketest_image} \
 bash -c "${DOWNLOAD_SMOKE_TESTS_SCRIPT_COMMAND} ; ${smoketest_script} ${contname_verifier} ${max_wait} \
 --mode verifier \
 --scalyr_server ${SCALYR_SERVER} \
@@ -182,6 +190,7 @@ bash -c "${DOWNLOAD_SMOKE_TESTS_SCRIPT_COMMAND} ; ${smoketest_script} ${contname
 --agent_hostname ${agent_hostname} \
 --uploader_hostname ${uploader_hostname} \
 --debug true"
+echo "::endgroup::"
 
 echo ""
 echo "Stopping agent."
