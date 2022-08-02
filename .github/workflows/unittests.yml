@@ -32,6 +32,9 @@ jobs:
   unittests:
     name: Unittests - Python ${{ matrix.python-version }} - ${{ matrix.platform }}
     runs-on: ${{ matrix.platform }}-latest
+    defaults:
+      run:
+        shell: bash
     needs: pre_job
     strategy:
       fail-fast: false
