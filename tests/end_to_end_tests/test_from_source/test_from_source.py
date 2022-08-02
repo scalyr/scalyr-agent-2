@@ -36,8 +36,11 @@ from agent_build.tools.constants import SOURCE_ROOT
 
 log = logging.getLogger(__name__)
 
-# Make all test cases in this module use this fixtures.
-pytestmark = pytest.mark.usefixtures("shutdown_old_agent_processes", "dump_log")
+
+pytestmark = [
+    # Make all test cases in this module use these fixtures.
+    pytest.mark.usefixtures("shutdown_old_agent_processes", "dump_log"),
+]
 
 
 @pytest.fixture(scope="session")
@@ -172,6 +175,7 @@ def _write_counter_messages_to_test_log(upload_test_log_path: pl.Path):
             test_log_write_file.flush()
 
 
+@pytest.mark.timeout(200)
 def test_basic(
     scalyr_api_key,
     scalyr_server,
@@ -217,6 +221,7 @@ def test_basic(
     agent_commander.stop()
 
 
+@pytest.mark.timeout(40)
 def test_with_failing_essential_monitor(
     scalyr_api_key,
     scalyr_server,
@@ -249,10 +254,10 @@ def test_with_failing_essential_monitor(
     log.info("Starting agent.")
     agent_commander.start()
 
-    assert agent_commander.is_running_and_healthy
+    assert agent_commander.is_running
 
     log.info('Wait until agent crashes because of the fail of the "essential" monitor.')
-    while agent_commander.is_running_and_healthy:
+    while agent_commander.is_running:
         time.sleep(0.1)
 
     log_content = agent_paths.agent_log_path.read_text()

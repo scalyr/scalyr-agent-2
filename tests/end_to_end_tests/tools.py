@@ -55,11 +55,30 @@ class AgentCommander:
         self.executable_args = executable_args
         self.agent_paths = agent_paths
 
-    def _check_call_command(self, command_args: List[str]):
-        subprocess.check_call([*self.executable_args, *command_args])
+    def _check_call_command(self, command_args: List[str], **kwargs):
+        """
+        Wrap around 'subprocess.check_call' but only for the agent commands.
+        All remaining arguments the same as for the 'subprocess.check_call'
+        :param command_args: Agent's command line arguments.
+        :param kwargs: Other subprocess.check_call parameters.
+        """
+        subprocess.check_call([*self.executable_args, *command_args], **kwargs)
 
-    def _check_output_command(self, command_args: List[str]) -> bytes:
-        output = subprocess.check_output([*self.executable_args, *command_args])
+    def _check_output_command(
+        self,
+        command_args: List[str],
+        **kwargs,
+    ) -> bytes:
+        """
+        Wrap around 'subprocess.check_output' but only for the agent commands.
+        All remaining arguments the same as for the 'subprocess.check_output'
+        :param command_args: Agent's command line arguments.
+        :param kwargs: Other subprocess.check_call parameters.
+        :return: Process' output in bytes.
+        """
+        output = subprocess.check_output(
+            [*self.executable_args, *command_args], **kwargs
+        )
         return output
 
     def start(self, no_fork: bool = False):
@@ -79,12 +98,19 @@ class AgentCommander:
         return json.loads(output)
 
     @property
-    def is_running_and_healthy(self) -> bool:
+    def is_running(self) -> bool:
         try:
-            self._check_output_command(["status"]).decode()
+            self._check_output_command(["status"], stderr=subprocess.PIPE)
         except subprocess.CalledProcessError as e:
-            if "The agent does not appear to be running." in e.stdout.decode():
+            if (
+                e.returncode == 4
+                and "The agent does not appear to be running." in e.stdout.decode()
+            ):
                 return False
+            else:
+                raise Exception(
+                    f"Agent's 'status' command failed with unexpected error: {e}"
+                )
 
         return True
 
