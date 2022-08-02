@@ -26,14 +26,24 @@ class FailingMonitor(ScalyrMonitor):
 
     def _initialize(self):
         self._fail_time = time.time() + 30
+        self.to_fail_increment_counter = False
         self.set_sample_interval(3)
 
     def gather_sample(self):
         if time.time() >= self._fail_time:
-            raise Exception("bad stuff.")
+            self.to_fail_increment_counter = True
+            raise Exception(f"Monitor '{self.monitor_id}' bad error.")
 
-        self._logger.info("Not dead, yet...")
+        self._logger.info(f"Monitor '{self.monitor_id}' is not dead, yet...")
+        self._logger.emit_value("dummy", "dummy")
 
     def increment_counter(self, reported_lines=0, errors=0):
         # This exception has to lead to stop of the whole monitor.
-        raise Exception("more bad stuff.")
+        if self.to_fail_increment_counter:
+            # Since the 'increment_counter' is the only place where we can conveniently fail the whole monitor
+            # We have to be sure that the error which has to be raised here is only occur in monitors thread.
+            # It's important, since the 'increment_counter' is also used by the AgentLogger, and we don't want
+            # that this synthetic error happens in logger.
+            self.to_fail_increment_counter = False
+            self._logger.error(f"Monitor '{self.monitor_id}' Dead.")
+            raise Exception(f"Monitor '{self.monitor_id}' critical error.")

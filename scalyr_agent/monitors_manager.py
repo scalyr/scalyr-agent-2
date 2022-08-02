@@ -141,6 +141,7 @@ class MonitorsManager(StoppableThread):
 
             status = MonitorStatus()
             status.monitor_name = monitor.monitor_name
+            status.monitor_id = monitor.monitor_id
             status.monitor_short_hash = monitor.short_hash
             status.reported_lines = monitor.reported_lines()
             status.errors = monitor.errors()

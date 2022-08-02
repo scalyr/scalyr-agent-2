@@ -243,6 +243,7 @@ def test_with_failing_essential_monitor(
             "monitors": [
                 {
                     "module": "monitors.essential_failing_monitor",
+                    "id": "essential",
                     "stop_agent_on_failure": True,
                 }
             ],
@@ -261,9 +262,14 @@ def test_with_failing_essential_monitor(
         time.sleep(0.1)
 
     log_content = agent_paths.agent_log_path.read_text()
-    assert "Not dead, yet..." in log_content
 
-    assert "Stopping monitor essential_failing_monitor()" in log_content
+    assert "Monitor 'essential' is not dead, yet..." in log_content
+
+    assert "Monitor died from due to exception" in log_content
+    assert "Exception: Monitor 'essential' bad error." in log_content
+    assert "Exception: Monitor 'essential' critical error." in log_content
+
+    assert "Stopping monitor essential_failing_monitor(essential)" in log_content
     assert "Save consolidated checkpoints into file" in log_content
     assert "Copying manager is finished."
 
@@ -271,10 +277,94 @@ def test_with_failing_essential_monitor(
         "Main run method for agent failed due to exception :stack_trace:" in log_content
     )
     assert (
-        "Exception: Monitor 'essential_failing_monitor()' with short hash"
+        "Exception: Monitor 'essential_failing_monitor(essential)' with short hash"
         in log_content
     )
     assert (
         "is not running, stopping the agent because it is configured not to run without this monitor"
         in log_content
     )
+
+
+@pytest.mark.timeout(40)
+def test_with_failing_non_essential_monitors(
+    scalyr_api_key,
+    scalyr_server,
+    scalyr_api_read_key,
+    server_host,
+    agent_paths,
+    agent_commander,
+    default_config,
+):
+    """
+    Test the 'stop_agent_on_failure' option is set to False or default.
+    Agent, for the backward compatibility reasons, must not fail with those "non-essential" monitors.
+    """
+    test_monitors_path = pl.Path(__file__).parent / "fixtures"
+
+    default_config.update(
+        {
+            "additional_monitor_module_paths": str(test_monitors_path),
+            "monitors": [
+                {
+                    "module": "monitors.essential_failing_monitor",
+                    "id": "not_essential",
+                    "stop_agent_on_failure": False,
+                },
+                {
+                    "module": "monitors.essential_failing_monitor",
+                    "id": "not_essential_default",
+                },
+            ],
+        }
+    )
+
+    agent_paths.agent_config_path.write_text(json.dumps(default_config))
+
+    log.info("Starting agent.")
+    agent_commander.start()
+
+    assert agent_commander.is_running
+
+    log.info("Wait until all monitors crash and are not alive in agent's status")
+    while True:
+        status = agent_commander.get_status_json()
+        tracked_monitors = {}
+        for ms in status["monitor_manager_status"]["monitors_status"]:
+            if ms["monitor_id"] in ["not_essential", "not_essential_default"]:
+                tracked_monitors[ms["monitor_id"]] = ms
+
+        assert (
+            len(tracked_monitors) == 2
+        ), f"Not all required monitors are presented in agent's status. Presented {tracked_monitors}"
+
+        alive_monitors = {
+            ms_id: ms for ms_id, ms in tracked_monitors.items() if ms["is_alive"]
+        }
+
+        if len(alive_monitors) == 0:
+            log.info("All expected monitors are dead.")
+            break
+
+        log.info(
+            f"Monitors {list(alive_monitors.keys())} are still alive, retry later."
+        )
+        time.sleep(5)
+
+    log_content = agent_paths.agent_log_path.read_text()
+
+    assert "Monitor 'not_essential' is not dead, yet..." in log_content
+    assert "Monitor 'not_essential_default' is not dead, yet..." in log_content
+
+    assert "Monitor died from due to exception" in log_content
+    assert "Exception: Monitor 'not_essential' bad error." in log_content
+    assert "Exception: Monitor 'not_essential_default' bad error." in log_content
+    assert "Exception: Monitor 'not_essential' critical error." in log_content
+    assert "Exception: Monitor 'not_essential_default' critical error." in log_content
+
+    # Since those monitors are not "essential", agent won't stop it's work.
+    assert agent_commander.is_running
+
+    agent_commander.stop()
+
+    assert not agent_commander.is_running
