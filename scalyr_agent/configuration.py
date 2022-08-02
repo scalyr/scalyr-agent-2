@@ -3905,6 +3905,15 @@ class Configuration(object):
             monitor_entry, "log_path", module_name + ".log", description
         )
 
+        # Verify option which tells that agent has to fail if that monitor stops.
+        self.__verify_or_set_optional_bool(
+            monitor_entry,
+            field="stop_agent_on_failure",
+            default_value=False,
+            config_description=description,
+            apply_defaults=True,
+        )
+
     def __verify_workers_entry_and_set_defaults(self, worker_entry, entry_index=None):
         """
         Verify the copying manager workers entry. and set defaults.
