@@ -24,6 +24,7 @@ import os
 import sys
 import ssl
 import socket
+import logging
 
 import mock
 
@@ -88,17 +89,18 @@ class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
                     r"of '\*.scalyr.com', 'scalyr.com'"
                 )  # NOQA
 
-            self.assertEqual(mock_log.warn.call_count, 0)
+            self.assertEqual(mock_log.log.call_count, 0)
             self.assertRaisesRegexp(
                 Exception,
                 expected_msg,
                 self._get_connection_cls,
                 server="https://agent.invalid.scalyr.com:443",
             )
-            self.assertEqual(mock_log.warn.call_count, 1)
+            self.assertEqual(mock_log.log.call_count, 1)
+            self.assertEqual(mock_log.log.call_args_list[0][0][0], logging.WARN)
             self.assertTrue(
                 "SSL certificate for agent.invalid.scalyr.com"
-                in mock_log.warn.call_args_list[0][0][0]
+                in mock_log.log.call_args_list[0][0][1]
             )
         finally:
             socket.create_connection = ORIGINAL_SOCKET_CREATE_CONNECTION
@@ -106,16 +108,17 @@ class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
     @mock.patch("scalyr_agent.connection.log")
     def test_connect_invalid_cert_failure(self, mock_log):
         expected_msg = r"Original error: \[SSL: CERTIFICATE_VERIFY_FAILED\]"
-        self.assertEqual(mock_log.warn.call_count, 0)
+        self.assertEqual(mock_log.log.call_count, 0)
         self.assertRaisesRegexp(
             Exception,
             expected_msg,
             self._get_connection_cls,
             server="https://example.com:443",
         )
-        self.assertEqual(mock_log.warn.call_count, 1)
+        self.assertEqual(mock_log.log.call_count, 1)
+        self.assertEqual(mock_log.log.call_args_list[0][0][0], logging.WARN)
         self.assertTrue(
-            "SSL certificate for example.com" in mock_log.warn.call_args_list[0][0][0]
+            "SSL certificate for example.com" in mock_log.log.call_args_list[0][0][1]
         )
 
     def _get_connection_cls(self, server):
