@@ -1,6 +1,14 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.33 "in development" - August 27, 2022
+<!---
+Packaged by Dominic LoBue <dominicl@sentinelone.com> on Jul 27, 2022 12:29 -0800
+--->
+
+Other:
+* Update agent packages to also bundle new LetsEncrypt CA root certificate (ISRG Root X2). Some of the environments use LetsEncrypt issued certificates.
+
 ## 2.1.32 "Occao" - July 27, 2022
 
 <!---
