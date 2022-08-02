@@ -660,9 +660,9 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
             monitor_not_to_fail = monitors_ids["not_to_fail"]
             monitor_not_to_fail_default = monitors_ids["not_to_fail_default"]
 
-            assert monitor_to_fail.stop_agent_on_failure is True
-            assert monitor_not_to_fail.stop_agent_on_failure is False
-            assert monitor_not_to_fail_default.stop_agent_on_failure is False
+            assert monitor_to_fail.get_stop_agent_on_failure() is True
+            assert monitor_not_to_fail.get_stop_agent_on_failure() is False
+            assert monitor_not_to_fail_default.get_stop_agent_on_failure() is False
 
             assert monitor_to_fail is monitors_manager.find_monitor_by_short_hash(
                 short_hash=monitor_to_fail.short_hash
