@@ -30,8 +30,8 @@ jobs:
           github_token: ${{ github.token }}
 
   unittests:
-    name: Unittests - Python ${{ matrix.python-version }}
-    runs-on: ubuntu-latest
+    name: Unittests - Python ${{ matrix.python-version }} - ${{ matrix.platform }}
+    runs-on: ${{ matrix.platform }}-latest
     needs: pre_job
     strategy:
       fail-fast: false
@@ -43,6 +43,10 @@ jobs:
           - "3.8"
           - "3.9"
           - "3.10"
+        platform:
+          - ubuntu
+          - macos
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
@@ -76,4 +80,4 @@ jobs:
         if: ${{ always() }}
         with:
           junit_files: "test-results/junit*.xml"
-          comment_title: Test Results - Python ${{ matrix.python-version }}
+          comment_title: Test Results - Python ${{ matrix.python-version }} - ${{ matrix.platform }}
