@@ -73,11 +73,19 @@ jobs:
           name: pytest-results-${{ matrix.python-version }}
           path: test-results/junit*.xml
         # Use always() to always run this step to publish test results when there are test failures
-        if: ${{ always() }}
+        if: ${{ success() || failure() }}
 
-      - name: Publish Test Results
+      - name: Publish Test Results (for linux)
         uses: EnricoMi/publish-unit-test-result-action@v2
-        if: ${{ always() }}
+        if: ${{ matrix.platform == 'ubuntu' && ( success() || failure() ) }}
+        with:
+          junit_files: "test-results/junit*.xml"
+          comment_title: Test Results - Python ${{ matrix.python-version }} - ${{ matrix.platform }}
+
+      - name: Publish Test Results (for not linux)
+        # the regular version of this action runs in a docker container.
+        uses: EnricoMi/publish-unit-test-result-action/composite@v2
+        if: ${{ matrix.platform != 'ubuntu' && ( success() || failure() ) }}
         with:
           junit_files: "test-results/junit*.xml"
           comment_title: Test Results - Python ${{ matrix.python-version }} - ${{ matrix.platform }}
