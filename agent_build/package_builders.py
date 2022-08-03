@@ -345,7 +345,7 @@ class PackageBuilder(abc.ABC):
     def _add_config(
         base_config_source_path: Union[str, pl.Path],
         output_path: Union[str, pl.Path],
-        additional_config_paths: List[pl.Path] = None
+        additional_config_paths: List[pl.Path] = None,
     ):
         """
         Copy config folder from the specified path to the target path.
@@ -360,11 +360,7 @@ class PackageBuilder(abc.ABC):
 
         # Copy additional config files.
         for a_config_path in additional_config_paths or []:
-            shutil.copytree(
-                a_config_path,
-                output_path,
-                dirs_exist_ok=True
-            )
+            shutil.copytree(a_config_path, output_path, dirs_exist_ok=True)
 
         # Make sure config file has 640 permissions
         config_file_path = output_path / "agent.json"
@@ -734,7 +730,7 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
         base_image_deployment_step_cls: Type[deployments.BuildDockerBaseImageStep],
         variant: str = None,
         no_versioned_file_name: bool = False,
-        additional_config_paths: List[pl.Path] = None
+        additional_config_paths: List[pl.Path] = None,
     ):
         """
         :param config_path: Path to the configuration directory which will be copied to the image.
@@ -776,7 +772,7 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
         self._add_config(
             base_config_source_path=self.config_path,
             output_path=self._package_root_path / "etc/scalyr-agent-2",
-            additional_config_paths=self.additional_config_paths
+            additional_config_paths=self.additional_config_paths,
         )
 
     def _build(self):
@@ -1075,6 +1071,15 @@ class K8sWithOpenMetricsMonitorPackageBuilder(K8sPackageBuilder):
     RESULT_IMAGE_NAMES = ["scalyr-k8s-agent-with-openmetrics-monitor"]
 
 
+class K8sRestartAgentOnMonitorsDeath(K8sPackageBuilder):
+    """
+    An image with enabled feature to shut down the agent if kubernetes monitor is also down.
+    """
+
+    PACKAGE_TYPE = constants.PackageType.K8S
+    RESULT_IMAGE_NAMES = ["scalyr-k8s-restart-agent-on-monitor-death"]
+
+
 class DockerJsonPackageBuilder(ContainerPackageBuilder):
     """
     An image for running on Docker configured to fetch logs via the file system (the container log
@@ -1181,7 +1186,9 @@ K8S_CONTAINER_RESTART_AGENT_ON_MONITOR_DEATH_DEBIAN = (
         name="k8s-restart-agent-on-monitor-death-debian",
         config_path=_CONFIGS_PATH / "k8s-config",
         base_image_deployment_step_cls=deployments.BuildDebianDockerBaseImageStep,
-        additional_config_paths=[_CONFIGS_PATH / "k8s-config-restart-agent-on-monitor-death"],
+        additional_config_paths=[
+            _CONFIGS_PATH / "k8s-config-restart-agent-on-monitor-death"
+        ],
     )
 )
 K8S_CONTAINER_RESTART_AGENT_ON_MONITOR_DEATH_ALPINE = (
@@ -1189,6 +1196,8 @@ K8S_CONTAINER_RESTART_AGENT_ON_MONITOR_DEATH_ALPINE = (
         name="k8s-restart-agent-on-monitor-death-alpine",
         config_path=_CONFIGS_PATH / "k8s-config",
         base_image_deployment_step_cls=deployments.BuildAlpineDockerBaseImageStep,
-        additional_config_paths=[_CONFIGS_PATH / "k8s-config-restart-agent-on-monitor-death"],
+        additional_config_paths=[
+            _CONFIGS_PATH / "k8s-config-restart-agent-on-monitor-death"
+        ],
     )
 )
