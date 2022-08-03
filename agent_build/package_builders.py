@@ -360,7 +360,7 @@ class PackageBuilder(abc.ABC):
 
         # Copy additional config files.
         for a_config_path in additional_config_paths or []:
-            shutil.copytree(a_config_path, output_path, dirs_exist_ok=True)
+            shutil.copytree(a_config_path, output_path, dirs_exist_ok=True)  # NOQA
 
         # Make sure config file has 640 permissions
         config_file_path = output_path / "agent.json"
