@@ -8,14 +8,6 @@ from agent_build.package_builders import ContainerImageBuilder, DOCKER_IMAGE_PAC
 from agent_build.tools.build_in_docker import LocalRegistryContainer
 
 
-def pytest_addoption(parser):
-    parser.addoption(
-        "--image-builder-name",
-        dest="image_builder_name",
-        required=True,
-        choices=DOCKER_IMAGE_PACKAGE_BUILDERS.keys()
-    )
-
 
 @pytest.fixture(scope="session")
 def image_builder_cls(request) -> Type[ContainerImageBuilder]:
@@ -26,6 +18,7 @@ def image_builder_cls(request) -> Type[ContainerImageBuilder]:
 @pytest.fixture(scope="session")
 def agent_image_registry_port():
     return 5050
+
 
 @pytest.fixture(scope="session")
 def image_name(image_builder_cls):

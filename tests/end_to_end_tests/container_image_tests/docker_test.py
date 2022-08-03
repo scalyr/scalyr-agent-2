@@ -59,6 +59,7 @@ def build_agent_image(builder_path: pl.Path):
 def agent_container_name():
     return "scalyr-agent"
 
+
 @pytest.fixture(scope="session")
 def docker_server_hostname(image_name, test_session_suffix):
     return f"{image_name}-test-{test_session_suffix}"

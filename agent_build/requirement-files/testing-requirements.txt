@@ -40,3 +40,4 @@ futures==3.3.0; python_version <= '2.7'
 more-itertools==8.5.0; python_version >= '3.0'
 more-itertools==5.0.0; python_version <= '2.7'
 distro==1.6.0
+PyYAML==6.0; python_version >= '3.6'

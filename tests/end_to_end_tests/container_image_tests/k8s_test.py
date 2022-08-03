@@ -26,20 +26,26 @@ import yaml
 from agent_build.tools.common import check_output_with_log, check_call_with_log
 from agent_build.tools.constants import SOURCE_ROOT
 from tests.end_to_end_tests.tools import get_testing_logger
-from tests.end_to_end_tests.log_verify import check_agent_log_for_errors, check_requests_stats_in_agent_log, verify_test_log_file_upload, verify_logs
+from tests.end_to_end_tests.log_verify import verify_logs
 
 
 log = get_testing_logger(__name__)
 
-
-def pytest_generate_tests(metafunc):
-    """
-    parametrize test case according to which image has to be tested.
-    """
-    image_builder_name = metafunc.config.getoption("image_builder_name")
-    metafunc.parametrize(
-        ["image_builder_cls"], [[image_builder_name]], indirect=True
+pytestmark = [
+    pytest.mark.parametrize(
+        ["image_builder_cls"], [["k8s-debian"]], indirect=True
     )
+]
+
+
+# def pytest_generate_tests(metafunc):
+#     """
+#     parametrize test case according to which image has to be tested.
+#     """
+#     image_builder_name = metafunc.config.getoption("image_builder_name")
+#     metafunc.parametrize(
+#         ["image_builder_cls"], [[image_builder_name]], indirect=True
+#     )
 
 
 def _run_kubectl(cmd_args: List[str]):
@@ -108,8 +114,8 @@ def prepare_scalyr_api_key_secret(scalyr_api_key, scalyr_namespace):
 
 
 @pytest.fixture(scope="session")
-def cluster_name(image_name, test_session_suffix):
-    return f"{image_name}-test-{test_session_suffix}"
+def cluster_name(agent_image, image_builder_cls, test_session_suffix):
+    return f"{image_builder_cls}-test-{test_session_suffix}"
 
 
 @pytest.fixture(scope="session")
@@ -123,7 +129,7 @@ def prepare_agent_configmap(cluster_name, tmp_path_factory, scalyr_namespace):
     configmap_source_manifest_path = SOURCE_ROOT / "k8s/no-kustomize/scalyr-agent-2-configmap.yaml"
 
     with configmap_source_manifest_path.open("r") as f:
-        manifest = yaml.load(f)
+        manifest = yaml.load(f, yaml.Loader)
 
     # Slightly modify default config map.
     manifest["data"]["SCALYR_K8S_CLUSTER_NAME"] = cluster_name
@@ -131,7 +137,7 @@ def prepare_agent_configmap(cluster_name, tmp_path_factory, scalyr_namespace):
     config_map_path = tmp_path_factory.mktemp("agent-configmap") / configmap_source_manifest_path.name
 
     with config_map_path.open("w") as f:
-        yaml.dump(manifest, f)
+        yaml.dump(manifest, f, yaml.Dumper)
 
     _run_kubectl([
         "apply",
@@ -172,7 +178,7 @@ def agent_manifest_path(full_image_name, tmp_path_factory):
     yield scalyr_agent_manifest_path
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def start_test_log_writer_pod(minikube):
     """
     Return function which created pod that writes counter messages which are needed to verify ingestion to Scalyr server.
@@ -208,7 +214,7 @@ def start_test_log_writer_pod(minikube):
     ])
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def create_agent_daemonset(
     agent_manifest_path, minikube
 ):
@@ -223,6 +229,8 @@ def create_agent_daemonset(
     # Create agent's daemonset.
     def create():
         check_output_with_log(["kubectl", "apply", "-f", str(agent_manifest_path)])
+
+        a=10
 
         # Get name of the created pod.
         pod_name = (
@@ -272,6 +280,33 @@ def _get_agent_log_content(pod_name: str):
     "prepare_scalyr_api_key_secret",
     "prepare_agent_configmap",
 )
+def test_nothing_prepare_fixtures(
+    agent_manifest_path,
+    scalyr_api_read_key,
+    scalyr_server,
+    cluster_name,
+
+):
+    """
+    Dummy test
+    :param agent_manifest_path:
+    :param scalyr_api_read_key:
+    :param scalyr_server:
+    :param cluster_name:
+    :param create_agent_daemonset:
+    :param start_test_log_writer_pod:
+    :return:
+    """
+    pass
+
+
+@pytest.mark.usefixtures(
+    "minikube",
+    "prepare_scalyr_agent_service_account",
+    "prepare_scalyr_api_key_secret",
+    "prepare_agent_configmap",
+)
+@pytest.mark.timeout(200)
 def test(
     agent_manifest_path,
     scalyr_api_read_key,

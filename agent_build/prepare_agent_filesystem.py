@@ -632,9 +632,10 @@ def build_agent_base_files(
 
         agent_main_executable_path = bin_path / "scalyr-agent-2"
         agent_main_executable_path.symlink_to(
-            pl.Path("..", "py", "scalyr_agent", "agent_main_arg_parse.py")
+            pl.Path("..", "py", "scalyr_agent", "agent_main.py")
         )
 
+        # Copy wrapper script for removed 'scalyr-agent-2-config' executable for backward compatibility.
         shutil.copy2(
             SOURCE_ROOT / "agent_build/linux/scalyr-agent-2-config",
             bin_path,

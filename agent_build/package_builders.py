@@ -524,13 +524,13 @@ class DockerApiContainerBuilder(ContainerImageBuilder):
 class K8sContainerBuilder(ContainerImageBuilder):
     PACKAGE_TYPE =PackageType.K8S
     CONFIG_PATH = SOURCE_ROOT / "docker" / "k8s-config"
-    RESULT_IMAGE_NAMES =["scalyr-k8s-agent"]
+    RESULT_IMAGE_NAMES = ["scalyr-k8s-agent"]
 
 
 class K8sWithOpenmetricsContainerBuilder(ContainerImageBuilder):
     PACKAGE_TYPE = PackageType.K8S_WITH_OPENMETRICS
     CONFIG_PATH = SOURCE_ROOT / "docker" / "k8s-config-with-openmetrics-monitor"
-    RESULT_IMAGE_NAMES =["scalyr-k8s-agent-with-openmetrics-monitor"]
+    RESULT_IMAGE_NAMES = ["scalyr-k8s-agent-with-openmetrics-monitor"]
 
 
 # Instantiate builder steps for base images.
