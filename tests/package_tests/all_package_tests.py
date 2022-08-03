@@ -312,6 +312,8 @@ for builder in [
     package_builders.K8S_CONTAINER_BUILDER_ALPINE,
     package_builders.K8S_CONTAINER_WITH_OPENMETRICS_MONITOR_BUILDER_DEBIAN,
     package_builders.K8S_CONTAINER_WITH_OPENMETRICS_MONITOR_BUILDER_ALPINE,
+    package_builders.K8S_CONTAINER_RESTART_AGENT_ON_MONITOR_DEATH_DEBIAN,
+    package_builders.K8S_CONTAINER_RESTART_AGENT_ON_MONITOR_DEATH_ALPINE
 ]:
     test = DockerImagePackageTest(
         base_name=f"{builder.name}_test",
