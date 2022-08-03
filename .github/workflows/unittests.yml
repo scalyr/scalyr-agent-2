@@ -68,7 +68,9 @@ jobs:
           pip install "tox==$TOX_VERSION" "tox-gh-actions==$TOX_GH_ACTIONS_VERSION"
 
       - name: Run Unit Tests
-        run: tox -e "py${{ matrix.python-version }}-unit-tests"
+        run: tox
+        env:
+          PLATFORM: ${{ matrix.platform }}
 
       - name: Upload pytest test results
         uses: actions/upload-artifact@v3
