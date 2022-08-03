@@ -343,15 +343,28 @@ class PackageBuilder(abc.ABC):
 
     @staticmethod
     def _add_config(
-        config_source_path: Union[str, pl.Path], output_path: Union[str, pl.Path]
+        base_config_source_path: Union[str, pl.Path],
+        output_path: Union[str, pl.Path],
+        additional_config_paths: List[pl.Path] = None
     ):
         """
         Copy config folder from the specified path to the target path.
+        :param base_config_source_path: Path to the base config directory to copy.
+        :param additional_config_paths: List of paths to config directories to copy to the result config directory.
+            New files are places along with files from the 'base_config_source_path' or overwrite them.
         """
-        config_source_path = pl.Path(config_source_path)
+        base_config_source_path = pl.Path(base_config_source_path)
         output_path = pl.Path(output_path)
         # Copy config
-        shutil.copytree(config_source_path, output_path)
+        shutil.copytree(base_config_source_path, output_path)
+
+        # Copy additional config files.
+        for a_config_path in additional_config_paths or []:
+            shutil.copytree(
+                a_config_path,
+                output_path,
+                dirs_exist_ok=True
+            )
 
         # Make sure config file has 640 permissions
         config_file_path = output_path / "agent.json"
@@ -721,6 +734,7 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
         base_image_deployment_step_cls: Type[deployments.BuildDockerBaseImageStep],
         variant: str = None,
         no_versioned_file_name: bool = False,
+        additional_config_paths: List[pl.Path] = None
     ):
         """
         :param config_path: Path to the configuration directory which will be copied to the image.
@@ -728,6 +742,8 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
         tweak to the name is required. This is used to produce different packages even for the same package type (such
         as 'rpm').
         :param no_versioned_file_name:  True if the version number should not be embedded in the artifact's file name.
+        :param additional_config_paths: List of paths to config directories to copy to the result config directory.
+            New files are placed along with files from the 'config_path' or overwrite them.
         """
         self._name = name
         self.dockerfile_path = __SOURCE_ROOT__ / "agent_build/docker/Dockerfile"
@@ -742,6 +758,7 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
         self.base_image_deployment_step_cls = base_image_deployment_step_cls
 
         self.config_path = config_path
+        self.additional_config_paths = additional_config_paths or []
 
     @property
     def name(self) -> str:
@@ -757,8 +774,9 @@ class ContainerPackageBuilder(LinuxFhsBasedPackageBuilder):
 
         # Copy config
         self._add_config(
-            config_source_path=self.config_path,
+            base_config_source_path=self.config_path,
             output_path=self._package_root_path / "etc/scalyr-agent-2",
+            additional_config_paths=self.additional_config_paths
         )
 
     def _build(self):
@@ -1154,5 +1172,23 @@ K8S_CONTAINER_WITH_OPENMETRICS_MONITOR_BUILDER_ALPINE = (
         name="k8s-with-openmetrics-monitor-alpine",
         config_path=_CONFIGS_PATH / "k8s-config-with-openmetrics-monitor",
         base_image_deployment_step_cls=deployments.BuildAlpineDockerBaseImageStep,
+    )
+)
+
+# Those builds for a temporary testing of the "stop_agent_on_failure" option for the k8s image build.
+K8S_CONTAINER_RESTART_AGENT_ON_MONITOR_DEATH_DEBIAN = (
+    K8sWithOpenMetricsMonitorPackageBuilder(
+        name="k8s-restart-agent-on-monitor-death-debian",
+        config_path=_CONFIGS_PATH / "k8s-config",
+        base_image_deployment_step_cls=deployments.BuildDebianDockerBaseImageStep,
+        additional_config_paths=[_CONFIGS_PATH / "k8s-config-restart-agent-on-monitor-death"],
+    )
+)
+K8S_CONTAINER_RESTART_AGENT_ON_MONITOR_DEATH_ALPINE = (
+    K8sWithOpenMetricsMonitorPackageBuilder(
+        name="k8s-restart-agent-on-monitor-death-alpine",
+        config_path=_CONFIGS_PATH / "k8s-config",
+        base_image_deployment_step_cls=deployments.BuildAlpineDockerBaseImageStep,
+        additional_config_paths=[_CONFIGS_PATH / "k8s-config-restart-agent-on-monitor-death"],
     )
 )
