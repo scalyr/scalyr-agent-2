@@ -1,4 +1,4 @@
-# Copyright 2011 Scalyr Inc.
+# Copyright 2011-2022 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,16 +15,22 @@
 from __future__ import absolute_import
 
 import mock
+import pytest
+import sys
 
-import scalyr_agent.builtin_monitors.windows_event_log_monitor
-from scalyr_agent.builtin_monitors.windows_event_log_monitor import (
-    WindowEventLogMonitor,
-)
+if sys.platform == "Windows":
+    import scalyr_agent.builtin_monitors.windows_event_log_monitor
+    from scalyr_agent.builtin_monitors.windows_event_log_monitor import (
+        WindowEventLogMonitor,
+    )
 
 from scalyr_agent.test_base import ScalyrTestCase
+from scalyr_agent.test_base import skipIf
 
 
+@pytest.mark.windows_platform
 class WindowsEventLogMonitorTest(ScalyrTestCase):
+    @skipIf(sys.platform != "Windows", "Skipping tests under non-Windows platform")
     def test_emit_warning_on_maximum_records_per_source_config_option_new_api(self):
         monitor_config = {
             "module": "windows_event_log_monitor",
@@ -82,4 +88,106 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
             '"maximum_records_per_source" config option is set to '
             "a non-default value (10). This config option has no "
             "affect when using new evt API."
+        )
+
+    @skipIf(sys.platform != "Windows", "Skipping tests under non-Windows platform")
+    def test_newjsonapi_backwards_compatible(self):
+        monitor_config = {
+            "module": "windows_event_log_monitor",
+            "sources": "Application, Security, System",
+            "event_types": "All",
+        }
+        scalyr_agent.builtin_monitors.windows_event_log_monitor.windll = mock.Mock()
+        mock_logger = mock.Mock()
+
+        monitor = WindowEventLogMonitor(monitor_config, mock_logger)
+        self.assertTrue(
+            isinstance(
+                monitor._WindowEventLogMonitor__api,
+                scalyr_agent.builtin_monitors.windows_event_log_monitor.NewApi,
+            )
+        )
+
+        monitor_config["json"] = True
+
+        monitor = WindowEventLogMonitor(monitor_config, mock_logger)
+        self.assertTrue(
+            isinstance(
+                monitor._WindowEventLogMonitor__api,
+                scalyr_agent.builtin_monitors.windows_event_log_monitor.NewJsonApi,
+            )
+        )
+
+    @skipIf(sys.platform != "Windows", "Skipping tests under non-Windows platform")
+    def test_convert_json_array_to_object(self):
+        self.assertEqual(
+            scalyr_agent.builtin_monitors.windows_event_log_monitor._convert_json_array_to_object(
+                ["a", "b", "c"]
+            ),
+            {"0": "a", "1": "b", "2": "c"},
+        )
+
+        self.assertEqual(
+            scalyr_agent.builtin_monitors.windows_event_log_monitor._convert_json_array_to_object(
+                ["a", ["b1", "b2"], "c"]
+            ),
+            {"0": "a", "1": {"0": "b1", "1": "b2"}, "2": "c"},
+        )
+
+        self.assertEqual(
+            scalyr_agent.builtin_monitors.windows_event_log_monitor._convert_json_array_to_object(
+                {"a": "aa", "b": "bb", "c": "cc"}
+            ),
+            {"a": "aa", "b": "bb", "c": "cc"},
+        )
+
+        self.assertEqual(
+            scalyr_agent.builtin_monitors.windows_event_log_monitor._convert_json_array_to_object(
+                {"a": "aa", "b": ["b1", "b2"], "c": "cc"}
+            ),
+            {"a": "aa", "b": {"0": "b1", "1": "b2"}, "c": "cc"},
+        )
+
+    @skipIf(sys.platform != "Windows", "Skipping tests under non-Windows platform")
+    def test_strip_xmltodict_prefixes(self):
+        self.assertEqual(
+            scalyr_agent.builtin_monitors.windows_event_log_monitor._strip_xmltodict_prefixes(
+                {"@a": "a", "#text": "t"}
+            ),
+            {"a": "a", "Text": "t"},
+        )
+
+        self.assertEqual(
+            scalyr_agent.builtin_monitors.windows_event_log_monitor._strip_xmltodict_prefixes(
+                {"@a": "a", "a": "b"}
+            ),
+            {"@a": "a", "a": "b"},
+        )
+
+        self.assertEqual(
+            scalyr_agent.builtin_monitors.windows_event_log_monitor._strip_xmltodict_prefixes(
+                {"a": "b", "@a": "a"}
+            ),
+            {"@a": "a", "a": "b"},
+        )
+
+        self.assertEqual(
+            scalyr_agent.builtin_monitors.windows_event_log_monitor._strip_xmltodict_prefixes(
+                {"#text": "t", "Text": "b"}
+            ),
+            {"#text": "t", "Text": "b"},
+        )
+
+        self.assertEqual(
+            scalyr_agent.builtin_monitors.windows_event_log_monitor._strip_xmltodict_prefixes(
+                {"@a": "a", "b": {"@b": "b"}}
+            ),
+            {"a": "a", "b": {"b": "b"}},
+        )
+
+        self.assertEqual(
+            scalyr_agent.builtin_monitors.windows_event_log_monitor._strip_xmltodict_prefixes(
+                [{"@a": "a", "#text": "t"}]
+            ),
+            [{"a": "a", "Text": "t"}],
         )

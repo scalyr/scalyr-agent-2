@@ -24,13 +24,13 @@ const readline = require('readline')
 async function checkAndGetCache(
     name,
     cacheDir,
-    cacheVersionSuffix
+    finalCacheSuffix
 ) {
     //
     // Check if there is an existing cache for the given deployment step name.
     //
     const cachePath = path.join(cacheDir, name)
-    const key = `${name}-${cacheVersionSuffix}`
+    const key = `${name}-${finalCacheSuffix}`
 
     // try to restore the cache.
     const result = await cache.restoreCache([cachePath], key)
@@ -49,14 +49,14 @@ async function checkAndSaveCache(
     name,
     cacheDir,
     isHit,
-    cacheVersionSuffix
+    finalCacheSuffix
 ) {
     //
     // Save the cache directory for a particular deployment step if it hasn't been saved yet.
     //
 
     const fullPath = path.join(cacheDir, name)
-    const cacheKey = `${name}-${cacheVersionSuffix}`
+    const cacheKey = `${name}-${finalCacheSuffix}`
 
     // Skip files. Deployment cache can be only the directory.
     if (!fs.lstatSync(fullPath).isDirectory()) {
@@ -106,7 +106,7 @@ async function performDeployment() {
     const deploymentName = core.getInput("deployment-name");
     const cacheVersionSuffix = core.getInput("cache-version-suffix");
     const cacheDir = path.resolve(path.join("agent_build_output", "deployment_cache"));
-
+    const cacheKeyRunnerPart = core.getInput("cache-key-runner-part")
     if (!fs.existsSync(cacheDir)) {
         fs.mkdirSync(cacheDir,{recursive: true})
     }
@@ -126,13 +126,15 @@ async function performDeployment() {
 
     const cacheHits = {}
 
+    const finalCacheSuffix = `${cacheKeyRunnerPart}-${cacheVersionSuffix}`
+
     // Run through deployment names and look if the is any existing cache for them.
     for (let name of deployment_cache_names) {
         console.log(name);
         cacheHits[name] = await checkAndGetCache(
             name,
             cacheDir,
-            cacheVersionSuffix
+            finalCacheSuffix
         )
     }
 
@@ -152,7 +154,7 @@ async function performDeployment() {
             name,
             cacheDir,
             cacheHits[name],
-            cacheVersionSuffix,
+            finalCacheSuffix,
         )
     }
 }

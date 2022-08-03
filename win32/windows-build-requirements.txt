@@ -4,3 +4,4 @@ git+https://github.com/pyinstaller/pyinstaller.git@3940e5fc5f9e02bce9f1af53c70a4
 pywin32==304
 orjson==3.6.7
 six==1.16.0
+xmltodict==0.13.0

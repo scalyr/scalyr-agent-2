@@ -586,6 +586,10 @@ class MonitorStatus(BaseAgentStatus):
     def __init__(self):
         # The name of the monitor.
         self.monitor_name = None
+        # monitor's identifier
+        self.monitor_id = None
+        # monitors unique short_hash
+        self.monitor_short_hash = None
         # The total number of metric lines reported by the monitor.
         self.reported_lines = 0
         # The total number of errors produced by the monitor.

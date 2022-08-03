@@ -1,84 +1,30 @@
+# Copyright 2014-2022 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import dataclasses
+import json
 import pathlib as pl
-import logging
-import inspect
-import functools
-
-from agent_build.tools.constants import SOURCE_ROOT
-
-
-def _get_source_related_frames():
-    """
-    Return only those frames from the call stack which caller module files are from the source code.
-    """
-    result = []
-    for frame in inspect.stack():
-        file_path = pl.Path(frame.filename)
-        if str(file_path).startswith(str(SOURCE_ROOT)):
-            result.append(frame)
-
-    return result
-
-
-def get_testing_logger(name: str):
-    logger = logging.getLogger(name=name)
-
-    # Save position in stack that has to be without indents.
-    base_stack_pos = len(_get_source_related_frames())
-
-    original_make_record = logger.makeRecord
-
-    @functools.wraps(logger.makeRecord)
-    def indent_make_record(name, level, fn, lno, msg, *args, **kwargs):
-        stack_pos = len(_get_source_related_frames())
-        indent = "  " * ((stack_pos - base_stack_pos) - 1)
-        msg = f"{indent}{msg}"
-        return original_make_record(name, level, fn, lno, msg, *args, **kwargs)
-
-    logger.makeRecord = indent_make_record
-
-    return logger
-
-
-
-
-# class IndentFormatter(logging.Formatter):
-#     """
-#     Custom logger formatter that takes into account current position in the call stack to
-#     indent log records that are done in nested functions to make logs more structured.
-#     """
-#     def __init__( self, fmt=None, datefmt=None, style='%', validate=True):
-#         logging.Formatter.__init__(self, fmt=fmt, datefmt=datefmt, style=style, validate=validate)
-#         self.baseline = len(self._get_source_related_frames())
-#
-#     @staticmethod
-#     def _get_source_related_frames():
-#         """
-#         Return only those frames from the call stack which caller module files are from the source code.
-#         """
-#         result = []
-#         for frame in  inspect.stack():
-#             file_path = pl.Path(frame.filename)
-#             if str(file_path).startswith(str(SOURCE_ROOT)):
-#                 result.append(frame)
-#
-#         return result
-#
-#     def format( self, rec):
-#         stack = self._get_source_related_frames()
-#         rec.message = f"    {rec.message}"*(len(stack)-self.baseline)
-#         out = logging.Formatter.format(self, rec)
-#         return out
-
-# def set_indented_formatter_logger(logger: logging.Logger):
-#     handler = logging.StreamHandler()
-#     formatter = IndentFormatter()
-#     handler.setFormatter(formatter)
-#     logger.addHandler(handler)
+import subprocess
+from typing import List
 
 
 @dataclasses.dataclass
 class AgentPaths:
+    """
+    Container class that stores all essential agent paths.
+    """
+
     configs_dir: pl.Path
     logs_dir: pl.Path
     install_root: pl.Path
@@ -90,3 +36,83 @@ class AgentPaths:
         self.pid_file = self.logs_dir / "agent.pid"
         self.agent_config_path = self.configs_dir / "agent.json"
         self.agent_d_path = self.configs_dir / "agent.d"
+
+
+class AgentCommander:
+    """
+    Simple wrapper around Scalyr agent's command line interface.
+    """
+
+    def __init__(
+        self,
+        executable_args: List[str],
+        agent_paths: AgentPaths,
+    ):
+        """
+        :param executable_args: Path to executables, may vary from how we want to run the agent.
+        :param agent_paths: Helper class with all paths that are specific for the current agent installation.
+        """
+        self.executable_args = executable_args
+        self.agent_paths = agent_paths
+
+    def _check_call_command(self, command_args: List[str], **kwargs):
+        """
+        Wrap around 'subprocess.check_call' but only for the agent commands.
+        All remaining arguments the same as for the 'subprocess.check_call'
+        :param command_args: Agent's command line arguments.
+        :param kwargs: Other subprocess.check_call parameters.
+        """
+        subprocess.check_call([*self.executable_args, *command_args], **kwargs)
+
+    def _check_output_command(
+        self,
+        command_args: List[str],
+        **kwargs,
+    ) -> bytes:
+        """
+        Wrap around 'subprocess.check_output' but only for the agent commands.
+        All remaining arguments the same as for the 'subprocess.check_output'
+        :param command_args: Agent's command line arguments.
+        :param kwargs: Other subprocess.check_call parameters.
+        :return: Process' output in bytes.
+        """
+        output = subprocess.check_output(
+            [*self.executable_args, *command_args], **kwargs
+        )
+        return output
+
+    def start(self, no_fork: bool = False):
+        cmd = ["start"]
+        if no_fork:
+            cmd.append("--no-fork")
+
+        self._check_call_command(cmd)
+
+    def get_status(self) -> str:
+        return self._check_output_command(["status", "-v"]).decode()
+
+    def get_status_json(self) -> dict:
+        output = self._check_output_command(
+            ["status", "-v", "--format", "json"]
+        ).decode()
+        return json.loads(output)
+
+    @property
+    def is_running(self) -> bool:
+        try:
+            self._check_output_command(["status"], stderr=subprocess.PIPE)
+        except subprocess.CalledProcessError as e:
+            if (
+                e.returncode == 4
+                and "The agent does not appear to be running." in e.stdout.decode()
+            ):
+                return False
+            else:
+                raise Exception(
+                    f"Agent's 'status' command failed with unexpected error: {e}"
+                )
+
+        return True
+
+    def stop(self):
+        self._check_call_command(["stop"])

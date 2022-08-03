@@ -20,7 +20,6 @@ import dataclasses
 import enum
 import json
 import pathlib as pl
-import shlex
 import tarfile
 import abc
 import shutil
@@ -40,6 +39,10 @@ from agent_build.tools.environment_deployments.deployments import ShellScriptDep
 from agent_build.prepare_agent_filesystem import build_linux_lfs_agent_files, get_install_info, create_change_logs
 from agent_build.tools.constants import SOURCE_ROOT
 from agent_build.tools.common import check_output_with_log
+from agent_build.tools.common import shlex_join
+
+__PARENT_DIR__ = pl.Path(__file__).absolute().parent
+__SOURCE_ROOT__ = __PARENT_DIR__.parent
 
 
 _AGENT_BUILD_PATH = SOURCE_ROOT / "agent_build"
@@ -549,16 +552,16 @@ BASE_DOCKER_IMAGE_BUILD_STEP_ALPINE = BuildDockerBaseImageStep(
 # Debian based images.
 class DockerJsonContainerBuilderDebian(DockerJsonContainerBuilder):
     BASE_IMAGE_BUILDER_STEP = DEPLOYMENT_STEP = BASE_DOCKER_IMAGE_BUILD_STEP_DEBIAN
-    
+
 class DockerSyslogContainerBuilderDebian(DockerSyslogContainerBuilder):
     BASE_IMAGE_BUILDER_STEP = DEPLOYMENT_STEP = BASE_DOCKER_IMAGE_BUILD_STEP_DEBIAN
-    
+
 class DockerApiContainerBuilderDebian(DockerApiContainerBuilder):
     BASE_IMAGE_BUILDER_STEP = DEPLOYMENT_STEP = BASE_DOCKER_IMAGE_BUILD_STEP_DEBIAN
-    
+
 class K8sContainerBuilderDebian(K8sContainerBuilder):
     BASE_IMAGE_BUILDER_STEP = DEPLOYMENT_STEP = BASE_DOCKER_IMAGE_BUILD_STEP_DEBIAN
-    
+
 class K8sWithOpenmetricsContainerBuilderDebian(K8sWithOpenmetricsContainerBuilder):
     BASE_IMAGE_BUILDER_STEP = DEPLOYMENT_STEP = BASE_DOCKER_IMAGE_BUILD_STEP_DEBIAN
 

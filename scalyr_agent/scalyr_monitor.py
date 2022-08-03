@@ -121,6 +121,7 @@ class ScalyrMonitor(StoppableThread):
         # The logger instance that this monitor should use to report all information and metric values.
         self._logger = logger
         self.monitor_name = monitor_config["module"]
+
         # Includes just the monitor module name. For example, if the full module name is
         # "scalyr_agent.builtin_monitors.symlink_file_monitor", module name would be
         # "symlink_file_monitor"
@@ -211,6 +212,13 @@ class ScalyrMonitor(StoppableThread):
         self._initialize()
 
         StoppableThread.__init__(self, name="metric thread")
+
+    def get_stop_agent_on_failure(self):
+        """
+        Returns boolean value which indicates that the agent can not run without this monitor and
+        has to fail if monitor fails.
+        """
+        return self._config["stop_agent_on_failure"]
 
     @property
     def uid(self):

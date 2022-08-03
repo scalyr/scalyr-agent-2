@@ -35,8 +35,8 @@ The following libraries are included:
   * [idna](#idna)
   * [chardet](#chardet)
   * [urllib3](#urllib3)
-  * [python-dateutil][#dateutil]
-  * [repoze.lru][#repoze.lru]
+  * [python-dateutil](#dateutil)
+  * [repoze.lru](#repoze.lru)
 
 ## tcollector<a name="tcollector"> (LGPL v3)
 

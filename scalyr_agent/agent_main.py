@@ -1069,24 +1069,15 @@ class ScalyrAgent(object):
         else:
             return None
 
-    def __run(self, controller):
-        """Runs the Scalyr Agent 2.
-
-        This method will not return until a TERM signal is received or a fatal error occurs.
-
-        @param controller The controller that started this agent service.
-        @type controller: PlatformController
-
-        @return: the exit status code
-        @rtype: int
+    def _check_config_change(self, logs_initial_positions):  # type: (Dict) -> Generator
         """
+        Generator function which checks the config for changes and reloads it if needed.
+        It runs in its own infinite loop and yields on each iteration until the agent's main loop requests
+        for the next check.
 
-        self.__start_time = time.time()
-        controller.register_for_termination(self.__handle_terminate)
-
-        # Register handler for when we get an interrupt signal.  That indicates we should dump the status to
-        # a file because a user has run the 'detailed_status' command.
-        self.__controller.register_for_status_requests(self.__report_status_to_file)
+        @param logs_initial_positions: A dict mapping file paths to the offset with the file to begin copying.
+            That dist has to contain positions for all agent log files and has to be passed to the copying manager.
+        """
 
         # The stats we track for the lifetime of the agent.  This variable tracks the accumulated stats since the
         # last stat reset (the stats get reset every time we read a new configuration).
@@ -1103,86 +1094,310 @@ class ScalyrAgent(object):
         worker_thread = None
 
         try:
-            # noinspection PyBroadException
-            try:
-                self.__run_state = RunState()
-                self.__log_file_path = os.path.join(
-                    self.__config.agent_log_path, AGENT_LOG_FILENAME
+
+            scalyr_server = self.__config.scalyr_server
+
+            # NOTE: We call this twice - once before and once after creating the client and
+            # applying global config options. This way we ensure config options are also printed
+            # even if the agent fails to connect.
+            config_pre_global_apply = self.__config
+            self.__config.print_useful_settings()
+
+            # verify server certificates.
+            verify_server_certificate(self.__config)
+
+            def start_worker_thread(config, logs_initial_positions=None):
+                wt = self.__create_worker_thread(config)
+                # attach callbacks before starting monitors
+                wt.monitors_manager.set_user_agent_augment_callback(
+                    wt.copying_manager.augment_user_agent_for_workers_sessions
                 )
-                scalyr_logging.set_log_destination(
-                    use_disk=True,
-                    no_fork=self.__no_fork,
-                    stdout_severity=self.__config.stdout_severity,
-                    max_bytes=self.__config.log_rotation_max_bytes,
-                    backup_count=self.__config.log_rotation_backup_count,
-                    logs_directory=self.__config.agent_log_path,
-                    agent_log_file_path=AGENT_LOG_FILENAME,
+                # configure currently active monitor manager instance variable
+                set_monitors_manager(monitors_manager=wt.monitors_manager)
+                wt.start(logs_initial_positions)
+                return wt, wt.copying_manager, wt.monitors_manager
+
+            (
+                worker_thread,
+                self.__copying_manager,
+                self.__monitors_manager,
+            ) = start_worker_thread(
+                self.__config, logs_initial_positions=logs_initial_positions
+            )
+
+            # NOTE: It's important we call this after worker thread has been created since
+            # some of the global configuration options are only applied after creating a worker
+            # thread
+            self.__config.print_useful_settings(config_pre_global_apply)
+
+            current_time = time.time()
+
+            disable_all_config_updates_until = _update_disabled_until(
+                self.__config.disable_all_config_updates, current_time
+            )
+            disable_verify_config_until = _update_disabled_until(
+                self.__config.disable_verify_config, current_time
+            )
+            disable_config_equivalence_check_until = _update_disabled_until(
+                self.__config.disable_config_equivalence_check, current_time
+            )
+            disable_verify_can_write_to_logs_until = _update_disabled_until(
+                self.__config.disable_verify_can_write_to_logs, current_time
+            )
+            disable_config_reload_until = _update_disabled_until(
+                self.__config.disable_config_reload, current_time
+            )
+            disable_verify_config_create_monitors_manager_until = (
+                _update_disabled_until(
+                    self.__config.disable_verify_config_create_monitors_manager,
+                    current_time,
                 )
+            )
+            disable_verify_config_create_copying_manager_until = _update_disabled_until(
+                self.__config.disable_verify_config_create_copying_manager,
+                current_time,
+            )
 
-                self.__update_debug_log_level(
-                    self.__config.debug_level, self.__config.debug_level_logger_names
+            gc_interval = self.__config.garbage_collect_interval
+            last_gc_time = current_time
+
+            prev_server = scalyr_server
+
+            profiler = ScalyrProfiler(self.__config)
+
+            while True:
+
+                # Each iteration we return control to the agent's main loop.
+                yield
+
+                # The run state is switched to stopped and generator is
+                # called for the last time to acknowledge that.
+                if not self.__run_state.is_running():
+                    break
+
+                current_time = time.time()
+                self.__last_config_check_time = current_time
+
+                profiler.update(self.__config, current_time)
+
+                if self.__config.disable_overall_stats:
+                    log.log(scalyr_logging.DEBUG_LEVEL_0, "overall stats disabled")
+                else:
+                    # Log the overall stats once every 10 mins (by default)
+                    log_stats_delta = self.__config.overall_stats_log_interval
+                    if current_time > last_overall_stats_report_time + log_stats_delta:
+                        self.__overall_stats = self.__calculate_overall_stats(
+                            base_overall_stats,
+                        )
+                        self.__log_overall_stats(self.__overall_stats)
+                        last_overall_stats_report_time = current_time
+
+                if self.__config.disable_bandwidth_stats:
+                    log.log(scalyr_logging.DEBUG_LEVEL_0, "bandwidth stats disabled")
+                else:
+                    # Log the bandwidth-related stats once every minute:
+                    log_stats_delta = self.__config.bandwidth_stats_log_interval
+                    if current_time > last_bw_stats_report_time + log_stats_delta:
+                        self.__overall_stats = self.__calculate_overall_stats(
+                            base_overall_stats
+                        )
+
+                        self.__log_bandwidth_stats(
+                            self.__calculate_overall_stats(self.__overall_stats)
+                        )
+                        last_bw_stats_report_time = current_time
+
+                if self.__config.disable_copy_manager_stats:
+                    log.log(scalyr_logging.DEBUG_LEVEL_0, "copy manager stats disabled")
+                else:
+                    # Log the copy manager stats once every 5 mins (by default)
+                    log_stats_delta = self.__config.copying_manager_stats_log_interval
+                    if (
+                        current_time
+                        > last_copy_manager_stats_report_time + log_stats_delta
+                    ):
+                        self.__overall_stats = self.__calculate_overall_stats(
+                            base_overall_stats,
+                            copy_manager_warnings=True,
+                        )
+                        self.__log_copy_manager_stats(self.__overall_stats)
+                        last_copy_manager_stats_report_time = current_time
+
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_1,
+                    "Checking for any changes to config file",
                 )
+                new_config = None
+                try:
+                    if _check_disabled(
+                        current_time,
+                        disable_all_config_updates_until,
+                        "all config updates",
+                    ):
+                        continue
 
-                # We record where the log files(including multiprocess worker sessions logs) currently are
-                # so that we can (in the worse case) start copying them from those position.
-                logs_initial_positions = self.__get_log_files_initial_positions()
+                    new_config = self.__make_config(self.__config_file_path)
+                    # TODO:  By parsing the configuration file, we are doing a lot of work just to have it thrown
+                    # out in a few seconds when we discover it is equivalent to the previous one.  Maybe we should
+                    # rework the equivalence so that it can work on the raw files, but this is difficult since
+                    # we need to parse the main configuration file to at least get the fragment directory.  For
+                    # now, we will just wait this work.  We only do it once every 30 secs anyway.
 
-                start_up_msg = scalyr_util.get_agent_start_up_message()
-                log.info(start_up_msg)
-                log.log(scalyr_logging.DEBUG_LEVEL_1, start_up_msg)
+                    if _check_disabled(
+                        current_time, disable_verify_config_until, "verify config"
+                    ):
+                        continue
 
-                # Log warn message if non UTF-8 locale is used - this would cause issues when trying
-                # to monitor files with unicode characters inside the file names or inside the
-                # content
-                _, encoding, _ = scalyr_util.get_language_code_coding_and_locale()
-                if encoding.lower() not in ["utf-8", "utf8"]:
-                    if sys.platform.startswith("win"):
-                        log.warn(NON_UTF8_LOCALE_WARNING_WINDOWS_MESSAGE % (encoding))
+                    disable_create_monitors_manager = _check_disabled(
+                        current_time,
+                        disable_verify_config_create_monitors_manager_until,
+                        "verify config create monitors manager",
+                    )
+                    disable_create_copying_manager = _check_disabled(
+                        current_time,
+                        disable_verify_config_create_copying_manager_until,
+                        "verify config create copying manager",
+                    )
+                    disable_cache_config = (
+                        self.__config.disable_verify_config_cache_config
+                    )
+                    verified = self.__verify_config(
+                        new_config,
+                        disable_create_monitors_manager=disable_create_monitors_manager,
+                        disable_create_copying_manager=disable_create_copying_manager,
+                        disable_cache_config=disable_cache_config,
+                    )
+
+                    # Skip the rest of the loop if the config wasn't fully verified because
+                    # later code relies on the config being fully validated
+                    if not verified:
+                        continue
+
+                    if self.__config.disable_update_debug_log_level:
+                        log.log(
+                            scalyr_logging.DEBUG_LEVEL_0,
+                            "update debug_log_level disabled",
+                        )
                     else:
-                        log.warn(NON_UTF8_LOCALE_WARNING_LINUX_MESSAGE % (encoding))
+                        # Update the debug_level based on the new config.. we always update it.
+                        self.__update_debug_log_level(new_config.debug_level)
 
-                self.__controller.emit_init_log(log, self.__config.debug_init)
+                    # see if we need to perform a garbage collection
+                    if gc_interval > 0 and current_time > (last_gc_time + gc_interval):
+                        gc.collect()
+                        last_gc_time = current_time
+
+                    if self.__config.enable_gc_stats:
+                        # If GC stats are enabled, enable tracking uncollectable objects
+                        if gc.get_debug() == 0:
+                            log.log(
+                                scalyr_logging.DEBUG_LEVEL_5,
+                                "Enabling GC debug mode",
+                            )
+                            gc.set_debug(gc.DEBUG_UNCOLLECTABLE)
+                    else:
+                        if gc.get_debug() != 0:
+                            log.log(
+                                scalyr_logging.DEBUG_LEVEL_5,
+                                "Disabling GC debug mode",
+                            )
+                            gc.set_debug(0)
+
+                    if _check_disabled(
+                        current_time,
+                        disable_config_equivalence_check_until,
+                        "config equivalence check",
+                    ):
+                        continue
+
+                    if self.__current_bad_config is None and new_config.equivalent(
+                        self.__config, exclude_debug_level=True
+                    ):
+                        log.log(
+                            scalyr_logging.DEBUG_LEVEL_1,
+                            "Config was not different than previous",
+                        )
+                        continue
+
+                    if _check_disabled(
+                        current_time,
+                        disable_verify_can_write_to_logs_until,
+                        "verify check for writing to logs and data",
+                    ):
+                        continue
+
+                    self.__verify_can_write_to_logs_and_data(new_config)
+
+                except Exception as e:
+                    if self.__current_bad_config is None:
+                        log.error(
+                            "Bad configuration file seen.  Ignoring, using last known good configuration file.  "
+                            'Exception was "%s"',
+                            six.text_type(e),
+                            error_code="badConfigFile",
+                        )
+                    self.__current_bad_config = new_config
+                    log.log(
+                        scalyr_logging.DEBUG_LEVEL_1,
+                        "Config could not be read or parsed",
+                    )
+                    continue
+
+                if _check_disabled(
+                    current_time, disable_config_reload_until, "config reload"
+                ):
+                    continue
+
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_1,
+                    "Config was different than previous.  Reloading.",
+                )
+                # We are about to reset the current workers and ScalyrClientSession, so we will lose their
+                # contribution to the stats, so recalculate the base.
+                base_overall_stats = self.__calculate_overall_stats(base_overall_stats)
+                log.info("New configuration file seen.")
+                log.info("Stopping copying and metrics threads.")
+                worker_thread.stop()
+
+                worker_thread = None
+
+                new_config.print_useful_settings(self.__config)
+
+                self.__config = new_config
+                self.__controller.consume_config(new_config, new_config.file_path)
 
                 self.__start_or_stop_unsafe_debugging()
 
+                # get the server and the raw server to see if we forced https
                 scalyr_server = self.__config.scalyr_server
                 raw_scalyr_server = self.__config.raw_scalyr_server
-                self.__print_force_https_message(scalyr_server, raw_scalyr_server)
 
-                # NOTE: We call this twice - once before and once after creating the client and
-                # applying global config options. This way we ensure config options are also printed
-                # even if the agent fails to connect.
-                config_pre_global_apply = self.__config
-                self.__config.print_useful_settings()
+                # only print a message if this is the first time we have seen this scalyr_server
+                # and the server field is different from the raw server field
+                if scalyr_server != prev_server:
+                    self.__print_force_https_message(scalyr_server, raw_scalyr_server)
 
-                # verify server certificates.
-                verify_server_certificate(self.__config)
+                prev_server = scalyr_server
 
-                def start_worker_thread(config, logs_initial_positions=None):
-                    wt = self.__create_worker_thread(config)
-                    # attach callbacks before starting monitors
-                    wt.monitors_manager.set_user_agent_augment_callback(
-                        wt.copying_manager.augment_user_agent_for_workers_sessions
-                    )
-                    # configure currently active monitor manager instance variable
-                    set_monitors_manager(monitors_manager=wt.monitors_manager)
-                    wt.start(logs_initial_positions)
-                    return wt, wt.copying_manager, wt.monitors_manager
+                log.info("Starting new copying and metrics threads")
+
+                # get log files initial positions for new worker session log files if they were added in
+                # a new configuration.
+                logs_initial_positions = self.__get_log_files_initial_positions(
+                    only_new_files=True
+                )
 
                 (
                     worker_thread,
                     self.__copying_manager,
                     self.__monitors_manager,
                 ) = start_worker_thread(
-                    self.__config, logs_initial_positions=logs_initial_positions
+                    new_config, logs_initial_positions=logs_initial_positions
                 )
 
-                # NOTE: It's important we call this after worker thread has been created since
-                # some of the global configuration options are only applied after creating a worker
-                # thread
-                self.__config.print_useful_settings(config_pre_global_apply)
+                self.__current_bad_config = None
 
-                current_time = time.time()
+                gc_interval = self.__config.garbage_collect_interval
 
                 disable_all_config_updates_until = _update_disabled_until(
                     self.__config.disable_all_config_updates, current_time
@@ -1212,312 +1427,164 @@ class ScalyrAgent(object):
                     )
                 )
 
-                config_change_check_interval = (
-                    self.__config.config_change_check_interval
-                )
+                # Clear metrics functions related cache
+                clear_internal_cache()
 
-                gc_interval = self.__config.garbage_collect_interval
-                last_gc_time = current_time
-
-                prev_server = scalyr_server
-
-                profiler = ScalyrProfiler(self.__config)
-
-                while not self.__run_state.sleep_but_awaken_if_stopped(
-                    config_change_check_interval
-                ):
-                    current_time = time.time()
-                    self.__last_config_check_time = current_time
-
-                    profiler.update(self.__config, current_time)
-
-                    if self.__config.disable_overall_stats:
-                        log.log(scalyr_logging.DEBUG_LEVEL_0, "overall stats disabled")
-                    else:
-                        # Log the overall stats once every 10 mins (by default)
-                        log_stats_delta = self.__config.overall_stats_log_interval
-                        if (
-                            current_time
-                            > last_overall_stats_report_time + log_stats_delta
-                        ):
-                            self.__overall_stats = self.__calculate_overall_stats(
-                                base_overall_stats,
-                            )
-                            self.__log_overall_stats(self.__overall_stats)
-                            last_overall_stats_report_time = current_time
-
-                    if self.__config.disable_bandwidth_stats:
-                        log.log(
-                            scalyr_logging.DEBUG_LEVEL_0, "bandwidth stats disabled"
-                        )
-                    else:
-                        # Log the bandwidth-related stats once every minute:
-                        log_stats_delta = self.__config.bandwidth_stats_log_interval
-                        if current_time > last_bw_stats_report_time + log_stats_delta:
-                            self.__overall_stats = self.__calculate_overall_stats(
-                                base_overall_stats
-                            )
-
-                            self.__log_bandwidth_stats(
-                                self.__calculate_overall_stats(self.__overall_stats)
-                            )
-                            last_bw_stats_report_time = current_time
-
-                    if self.__config.disable_copy_manager_stats:
-                        log.log(
-                            scalyr_logging.DEBUG_LEVEL_0, "copy manager stats disabled"
-                        )
-                    else:
-                        # Log the copy manager stats once every 5 mins (by default)
-                        log_stats_delta = (
-                            self.__config.copying_manager_stats_log_interval
-                        )
-                        if (
-                            current_time
-                            > last_copy_manager_stats_report_time + log_stats_delta
-                        ):
-                            self.__overall_stats = self.__calculate_overall_stats(
-                                base_overall_stats,
-                                copy_manager_warnings=True,
-                            )
-                            self.__log_copy_manager_stats(self.__overall_stats)
-                            last_copy_manager_stats_report_time = current_time
-
-                    log.log(
-                        scalyr_logging.DEBUG_LEVEL_1,
-                        "Checking for any changes to config file",
-                    )
-                    new_config = None
-                    try:
-                        if _check_disabled(
-                            current_time,
-                            disable_all_config_updates_until,
-                            "all config updates",
-                        ):
-                            continue
-
-                        new_config = self.__make_config(self.__config_file_path)
-                        # TODO:  By parsing the configuration file, we are doing a lot of work just to have it thrown
-                        # out in a few seconds when we discover it is equivalent to the previous one.  Maybe we should
-                        # rework the equivalence so that it can work on the raw files, but this is difficult since
-                        # we need to parse the main configuration file to at least get the fragment directory.  For
-                        # now, we will just wait this work.  We only do it once every 30 secs anyway.
-
-                        if _check_disabled(
-                            current_time, disable_verify_config_until, "verify config"
-                        ):
-                            continue
-
-                        disable_create_monitors_manager = _check_disabled(
-                            current_time,
-                            disable_verify_config_create_monitors_manager_until,
-                            "verify config create monitors manager",
-                        )
-                        disable_create_copying_manager = _check_disabled(
-                            current_time,
-                            disable_verify_config_create_copying_manager_until,
-                            "verify config create copying manager",
-                        )
-                        disable_cache_config = (
-                            self.__config.disable_verify_config_cache_config
-                        )
-                        verified = self.__verify_config(
-                            new_config,
-                            disable_create_monitors_manager=disable_create_monitors_manager,
-                            disable_create_copying_manager=disable_create_copying_manager,
-                            disable_cache_config=disable_cache_config,
-                        )
-
-                        # Skip the rest of the loop if the config wasn't fully verified because
-                        # later code relies on the config being fully validated
-                        if not verified:
-                            continue
-
-                        if self.__config.disable_update_debug_log_level:
-                            log.log(
-                                scalyr_logging.DEBUG_LEVEL_0,
-                                "update debug_log_level disabled",
-                            )
-                        else:
-                            # Update the debug_level based on the new config.. we always update it.
-                            self.__update_debug_log_level(new_config.debug_level)
-
-                        # see if we need to perform a garbage collection
-                        if gc_interval > 0 and current_time > (
-                            last_gc_time + gc_interval
-                        ):
-                            gc.collect()
-                            last_gc_time = current_time
-
-                        if self.__config.enable_gc_stats:
-                            # If GC stats are enabled, enable tracking uncollectable objects
-                            if gc.get_debug() == 0:
-                                log.log(
-                                    scalyr_logging.DEBUG_LEVEL_5,
-                                    "Enabling GC debug mode",
-                                )
-                                gc.set_debug(gc.DEBUG_UNCOLLECTABLE)
-                        else:
-                            if gc.get_debug() != 0:
-                                log.log(
-                                    scalyr_logging.DEBUG_LEVEL_5,
-                                    "Disabling GC debug mode",
-                                )
-                                gc.set_debug(0)
-
-                        if _check_disabled(
-                            current_time,
-                            disable_config_equivalence_check_until,
-                            "config equivalence check",
-                        ):
-                            continue
-
-                        if self.__current_bad_config is None and new_config.equivalent(
-                            self.__config, exclude_debug_level=True
-                        ):
-                            log.log(
-                                scalyr_logging.DEBUG_LEVEL_1,
-                                "Config was not different than previous",
-                            )
-                            continue
-
-                        if _check_disabled(
-                            current_time,
-                            disable_verify_can_write_to_logs_until,
-                            "verify check for writing to logs and data",
-                        ):
-                            continue
-
-                        self.__verify_can_write_to_logs_and_data(new_config)
-
-                    except Exception as e:
-                        if self.__current_bad_config is None:
-                            log.error(
-                                "Bad configuration file seen.  Ignoring, using last known good configuration file.  "
-                                'Exception was "%s"',
-                                six.text_type(e),
-                                error_code="badConfigFile",
-                            )
-                        self.__current_bad_config = new_config
-                        log.log(
-                            scalyr_logging.DEBUG_LEVEL_1,
-                            "Config could not be read or parsed",
-                        )
-                        continue
-
-                    if _check_disabled(
-                        current_time, disable_config_reload_until, "config reload"
-                    ):
-                        continue
-
-                    log.log(
-                        scalyr_logging.DEBUG_LEVEL_1,
-                        "Config was different than previous.  Reloading.",
-                    )
-                    # We are about to reset the current workers and ScalyrClientSession, so we will lose their
-                    # contribution to the stats, so recalculate the base.
-                    base_overall_stats = self.__calculate_overall_stats(
-                        base_overall_stats
-                    )
-                    log.info("New configuration file seen.")
-                    log.info("Stopping copying and metrics threads.")
-                    worker_thread.stop()
-
-                    worker_thread = None
-
-                    new_config.print_useful_settings(self.__config)
-
-                    self.__config = new_config
-                    self.__controller.consume_config(new_config, new_config.file_path)
-
-                    self.__start_or_stop_unsafe_debugging()
-
-                    # get the server and the raw server to see if we forced https
-                    scalyr_server = self.__config.scalyr_server
-                    raw_scalyr_server = self.__config.raw_scalyr_server
-
-                    # only print a message if this is the first time we have seen this scalyr_server
-                    # and the server field is different from the raw server field
-                    if scalyr_server != prev_server:
-                        self.__print_force_https_message(
-                            scalyr_server, raw_scalyr_server
-                        )
-
-                    prev_server = scalyr_server
-
-                    log.info("Starting new copying and metrics threads")
-
-                    # get log files initial positions for new worker session log files if they were added in
-                    # a new configuration.
-                    logs_initial_positions = self.__get_log_files_initial_positions(
-                        only_new_files=True
-                    )
-
-                    (
-                        worker_thread,
-                        self.__copying_manager,
-                        self.__monitors_manager,
-                    ) = start_worker_thread(
-                        new_config, logs_initial_positions=logs_initial_positions
-                    )
-
-                    self.__current_bad_config = None
-                    config_change_check_interval = (
-                        self.__config.config_change_check_interval
-                    )
-                    gc_interval = self.__config.garbage_collect_interval
-
-                    disable_all_config_updates_until = _update_disabled_until(
-                        self.__config.disable_all_config_updates, current_time
-                    )
-                    disable_verify_config_until = _update_disabled_until(
-                        self.__config.disable_verify_config, current_time
-                    )
-                    disable_config_equivalence_check_until = _update_disabled_until(
-                        self.__config.disable_config_equivalence_check, current_time
-                    )
-                    disable_verify_can_write_to_logs_until = _update_disabled_until(
-                        self.__config.disable_verify_can_write_to_logs, current_time
-                    )
-                    disable_config_reload_until = _update_disabled_until(
-                        self.__config.disable_config_reload, current_time
-                    )
-                    disable_verify_config_create_monitors_manager_until = (
-                        _update_disabled_until(
-                            self.__config.disable_verify_config_create_monitors_manager,
-                            current_time,
-                        )
-                    )
-                    disable_verify_config_create_copying_manager_until = (
-                        _update_disabled_until(
-                            self.__config.disable_verify_config_create_copying_manager,
-                            current_time,
-                        )
-                    )
-
-                    # Clear metrics functions related cache
-                    clear_internal_cache()
-
-                # Log the stats one more time before we terminate.
-                self.__log_overall_stats(
-                    self.__calculate_overall_stats(base_overall_stats)
-                )
-
-            except Exception:
-                log.exception(
-                    "Main run method for agent failed due to exception",
-                    error_code="failedAgentMain",
-                )
+            # The previous while loop is over. That means that the agent stops it work.
+            # Log the stats one more time before we terminate.
+            self.__log_overall_stats(self.__calculate_overall_stats(base_overall_stats))
         finally:
             if worker_thread is not None:
                 worker_thread.stop()
 
+    def __run(self, controller):
+        """Runs the Scalyr Agent 2.
+
+        This method will not return until a TERM signal is received or a fatal error occurs.
+
+        @param controller The controller that started this agent service.
+        @type controller: PlatformController
+
+        @return: the exit status code
+        @rtype: int
+        """
+
+        self.__start_time = time.time()
+        controller.register_for_termination(self.__handle_terminate)
+
+        # Register handler for when we get an interrupt signal.  That indicates we should dump the status to
+        # a file because a user has run the 'detailed_status' command.
+        self.__controller.register_for_status_requests(self.__report_status_to_file)
+
+        # noinspection PyBroadException
+        try:
+
+            self.__run_state = RunState()
+            self.__log_file_path = os.path.join(
+                self.__config.agent_log_path, AGENT_LOG_FILENAME
+            )
+            scalyr_logging.set_log_destination(
+                use_disk=True,
+                no_fork=self.__no_fork,
+                stdout_severity=self.__config.stdout_severity,
+                max_bytes=self.__config.log_rotation_max_bytes,
+                backup_count=self.__config.log_rotation_backup_count,
+                logs_directory=self.__config.agent_log_path,
+                agent_log_file_path=AGENT_LOG_FILENAME,
+            )
+
+            self.__update_debug_log_level(
+                self.__config.debug_level, self.__config.debug_level_logger_names
+            )
+
+            # We record where the log files(including multiprocess worker sessions logs) currently are
+            # so that we can (in the worse case) start copying them from those position.
+            logs_initial_positions = self.__get_log_files_initial_positions()
+
+            start_up_msg = scalyr_util.get_agent_start_up_message()
+            log.info(start_up_msg)
+            log.log(scalyr_logging.DEBUG_LEVEL_1, start_up_msg)
+
+            # Log warn message if non UTF-8 locale is used - this would cause issues when trying
+            # to monitor files with unicode characters inside the file names or inside the
+            # content
+            _, encoding, _ = scalyr_util.get_language_code_coding_and_locale()
+            if encoding.lower() not in ["utf-8", "utf8"]:
+                if sys.platform.startswith("win"):
+                    log.warn(NON_UTF8_LOCALE_WARNING_WINDOWS_MESSAGE % (encoding))
+                else:
+                    log.warn(NON_UTF8_LOCALE_WARNING_LINUX_MESSAGE % (encoding))
+
+            self.__controller.emit_init_log(log, self.__config.debug_init)
+
+            self.__start_or_stop_unsafe_debugging()
+
+            raw_scalyr_server = self.__config.raw_scalyr_server
+            self.__print_force_https_message(
+                self.__config.scalyr_server, raw_scalyr_server
+            )
+
+            last_config_change_check_time = (
+                last_essential_monitors_check_time
+            ) = time.time()
+
+            # Create generator that has to check config for changes and, if so, reload everything which is needed
+            # according to a new configuration.
+            check_config_for_change_gen = self._check_config_change(
+                logs_initial_positions=logs_initial_positions
+            )
+
+            # Advance generator to the beginning of the first loop iteration.
+            next(check_config_for_change_gen)
+
+            try:
+                while not self.__run_state.sleep_but_awaken_if_stopped(0.1):
+
+                    # Check config for changes when it's time.
+                    if (
+                        time.time()
+                        >= last_config_change_check_time
+                        + self.__config.config_change_check_interval
+                    ):
+                        next(check_config_for_change_gen)
+                        last_config_change_check_time = time.time()
+
+                    # Check for essential monitors every 5 sec.
+                    if time.time() >= last_essential_monitors_check_time + 5:
+                        self._fail_if_essential_monitors_are_not_running()
+                        last_essential_monitors_check_time = time.time()
+
+                # The while loop is over, meaning that the agent is about to stop.
+                # Before fully exiting, we have to be sure that the config check generator has also finished and
+                # performed all its cleanups. Since the generator also looks at the '__run_state' to know when
+                # to finish, we just advance it once more with stopped run state.
+                try:
+                    next(check_config_for_change_gen)
+                except StopIteration:
+                    pass
+
+            finally:
+                # If there is an error from the outside of the check config generator, or the generator itself
+                # hasn't been exhausted for this moment, then close it, so it can do its cleanups.
+                # NOTE: the 'close' method is just ignored if generator is already exhausted.
+                check_config_for_change_gen.close()
+
+        except Exception:
+            log.exception(
+                "Main run method for agent failed due to exception",
+                error_code="failedAgentMain",
+            )
+        finally:
             # NOTE: We manually call close_handlers() here instead of registering it to call it as
             # part of run state stop routine.
             # The reason for that is that run state stop callbacks are called before we get here
             # which means that some messages which are produced after that and before fully shutting
             # down are lost and not logged.
             scalyr_logging.close_handlers()
+
+    def _fail_if_essential_monitors_are_not_running(self):
+        """
+        Searches for dead monitors in monitor manager's status and raises
+            error if dead "essential" monitors are found.
+
+        Essential means that the monitor has a special configuration option which tells
+        agent that it can not continue operating without this monitor.
+        """
+        monitor_manager_status = self.__monitors_manager.generate_status()
+        for monitor_status in monitor_manager_status.monitors_status:
+            if monitor_status.is_alive:
+                continue
+
+            stopped_monitor = self.__monitors_manager.find_monitor_by_short_hash(
+                monitor_status.monitor_short_hash
+            )
+            if stopped_monitor.get_stop_agent_on_failure():
+                raise Exception(
+                    "Monitor '{}' with short hash '{}' is not running, stopping the agent because it is configured "
+                    "not to run without this monitor.".format(
+                        monitor_status.monitor_name, monitor_status.monitor_short_hash
+                    )
+                )
 
     def __fail_if_already_running(self):
         """If the agent is already running, prints an appropriate error message and exits the process."""

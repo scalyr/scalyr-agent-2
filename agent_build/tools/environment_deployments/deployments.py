@@ -33,6 +33,7 @@ from agent_build.tools import common
 from agent_build.tools import constants
 from agent_build.tools import files_checksum_tracker
 from agent_build.tools import build_in_docker
+from agent_build.tools.common import shlex_join
 from agent_build.tools.build_in_docker import DockerContainer
 from agent_build.tools.constants import Architecture
 from agent_build.tools.constants import AGENT_BUILD_OUTPUT, SOURCE_ROOT
@@ -471,15 +472,14 @@ class ShellScriptDeploymentStep(DeploymentStep):
         if self.script_path.suffix == ".ps1":
             command_args = ["powershell", self.script_path]
         else:
-            shell = "/bin/bash"
-
+            shell = ["env", "bash"]
             # For the bash scripts, there is a special 'step_runner.sh' bash file that runs the given shell script
             # and also provides some helper functions such as caching.
             step_runner_script_path = _REL_DEPLOYMENT_STEPS_PATH / "step_runner.sh"
 
             # To run the shell script of the step we run the 'step_runner' and pass the target script as its argument.
             command_args = [
-                shell,
+                *shell,
                 str(step_runner_script_path),
                 str(self.script_path),
             ]
