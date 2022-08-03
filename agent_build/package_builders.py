@@ -1181,23 +1181,19 @@ K8S_CONTAINER_WITH_OPENMETRICS_MONITOR_BUILDER_ALPINE = (
 )
 
 # Those builds for a temporary testing of the "stop_agent_on_failure" option for the k8s image build.
-K8S_CONTAINER_RESTART_AGENT_ON_MONITOR_DEATH_DEBIAN = (
-    K8sRestartAgentOnMonitorsDeath(
-        name="k8s-restart-agent-on-monitor-death-debian",
-        config_path=_CONFIGS_PATH / "k8s-config",
-        base_image_deployment_step_cls=deployments.BuildDebianDockerBaseImageStep,
-        additional_config_paths=[
-            _CONFIGS_PATH / "k8s-config-restart-agent-on-monitor-death"
-        ],
-    )
+K8S_CONTAINER_RESTART_AGENT_ON_MONITOR_DEATH_DEBIAN = K8sRestartAgentOnMonitorsDeath(
+    name="k8s-restart-agent-on-monitor-death-debian",
+    config_path=_CONFIGS_PATH / "k8s-config",
+    base_image_deployment_step_cls=deployments.BuildDebianDockerBaseImageStep,
+    additional_config_paths=[
+        _CONFIGS_PATH / "k8s-config-restart-agent-on-monitor-death"
+    ],
 )
-K8S_CONTAINER_RESTART_AGENT_ON_MONITOR_DEATH_ALPINE = (
-    K8sRestartAgentOnMonitorsDeath(
-        name="k8s-restart-agent-on-monitor-death-alpine",
-        config_path=_CONFIGS_PATH / "k8s-config",
-        base_image_deployment_step_cls=deployments.BuildAlpineDockerBaseImageStep,
-        additional_config_paths=[
-            _CONFIGS_PATH / "k8s-config-restart-agent-on-monitor-death"
-        ],
-    )
+K8S_CONTAINER_RESTART_AGENT_ON_MONITOR_DEATH_ALPINE = K8sRestartAgentOnMonitorsDeath(
+    name="k8s-restart-agent-on-monitor-death-alpine",
+    config_path=_CONFIGS_PATH / "k8s-config",
+    base_image_deployment_step_cls=deployments.BuildAlpineDockerBaseImageStep,
+    additional_config_paths=[
+        _CONFIGS_PATH / "k8s-config-restart-agent-on-monitor-death"
+    ],
 )
