@@ -68,7 +68,7 @@ jobs:
           pip install "tox==$TOX_VERSION" "tox-gh-actions==$TOX_GH_ACTIONS_VERSION"
 
       - name: Run Unit Tests
-        run: tox
+        run: tox -vvv
         env:
           PLATFORM: ${{ matrix.platform }}
 
