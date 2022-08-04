@@ -42,7 +42,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install pycoverage
-        run: pip install coverage
+        run: pip install coverage==4.5.4
       - name: Download coverage reports
         uses: actions/download-artifact@v3
         with:
