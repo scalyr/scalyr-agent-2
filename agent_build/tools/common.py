@@ -16,6 +16,7 @@ import subprocess
 import shlex
 import logging
 import os
+from typing import List
 
 # If this environment variable is set, then commands output is not suppressed.
 DEBUG = bool(os.environ.get("AGENT_BUILD_DEBUG"))
@@ -45,6 +46,16 @@ def init_logging():
     )
 
 
+# Make shlex.join for Python 3.7
+if sys.version_info < (3, 8):
+
+    def shlex_join(cmd: List):
+        return " ".join(shlex.quote(arg) for arg in cmd)
+
+else:
+    shlex_join = shlex.join
+
+
 def subprocess_command_run_with_log(func):
     """
     Wrapper for 'subprocess.check_call' and 'subprocess.check_output' function that also logs
@@ -62,20 +73,20 @@ def subprocess_command_run_with_log(func):
             cmd_args = args[0]
         if isinstance(cmd_args, list):
             # Create command string.
-            cmd_str = shlex.join(cmd_args)
+            cmd_str = shlex_join(cmd_args)
         else:
             cmd_str = cmd_args
 
         number = _COMMAND_COUNTER
         _COMMAND_COUNTER += 1
-        logging.info(f" ### RUN COMMAND #{number}: '{cmd_str}'. ###", stacklevel=3)
+        logging.info(f" ### RUN COMMAND #{number}: '{cmd_str}'. ###")
         try:
             result = func(*args, **kwargs)
         except subprocess.CalledProcessError as e:
-            logging.info(f" ### COMMAND #{number} FAILED. ###\n", stacklevel=3)
+            logging.info(f" ### COMMAND #{number} FAILED. ###\n")
             raise e from None
         else:
-            logging.info(f" ### COMMAND #{number} ENDED. ###\n", stacklevel=3)
+            logging.info(f" ### COMMAND #{number} ENDED. ###\n")
             return result
 
     return wrapper

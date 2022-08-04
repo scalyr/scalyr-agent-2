@@ -27,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image-type: [ "docker-json", "docker-syslog", "docker-api", "k8s" ]
+        image-type: [ "docker-json", "docker-syslog", "docker-api", "k8s", "k8s-restart-agent-on-monitor-death"]
         image-distro-name: [ "debian", "alpine" ]
         python-version: [ "3.8.13" ]
 
@@ -72,7 +72,7 @@ jobs:
           driver-opts: network=host
 
       - name: Start minikube for the test of the kubernetes build
-        if: matrix.image-type == 'k8s' || matrix.image-type == 'k8s-with-openmetrics-monitor'
+        if: contains(matrix.image-type, 'k8s')
         shell: bash
         run: |
           minikube start

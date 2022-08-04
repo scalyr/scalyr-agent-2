@@ -3,3 +3,4 @@ git+https://github.com/scalyr/libcloud.git@paramiko_2_9_compatibility_requests_2
 #apache-libcloud==3.4.1
 paramiko==2.11.0
 Jinja2==3.0.3
+xmltodict==0.13.0

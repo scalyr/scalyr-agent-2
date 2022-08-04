@@ -1,0 +1,8 @@
+{
+  "monitors":[
+    {
+      "module": "scalyr_agent.builtin_monitors.kubernetes_monitor",
+      "stop_agent_on_failure": true
+    }
+  ]
+}
