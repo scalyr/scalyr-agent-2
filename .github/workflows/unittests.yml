@@ -29,6 +29,36 @@ jobs:
           cancel_others: 'true'
           github_token: ${{ github.token }}
 
+  coverage:
+    runs-on: ubuntu-latest
+    if: success() || failure()
+    needs:
+      - pre_job
+      - unittests
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        id: setup-python
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install pycoverage
+        run: pip install coverage
+      - name: Download coverage reports
+        uses: actions/download-artifact@v3
+        with:
+          path: reports
+
+      - name: Prepare Coverage Data for codecov.io
+        run: |
+          coverage combine reports/**/.coverage
+          coverage xml -i -o coverage.xml
+
+      - name: Upload Coverage to Codecov.io
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: true
+
   unittests:
     name: Unittests - Python ${{ matrix.python-version }} - ${{ matrix.platform }}
     runs-on: ${{ matrix.platform }}-latest
@@ -78,7 +108,9 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: pytest-results-${{ matrix.python-version }}-${{ matrix.platform }}
-          path: test-results/junit*.xml
+          path: |
+            test-results/junit*.xml
+            .coverage
         if: ${{ success() || failure() }}
 
       - name: Publish Test Results (for linux)
