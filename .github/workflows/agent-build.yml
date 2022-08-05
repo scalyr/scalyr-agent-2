@@ -234,7 +234,7 @@ jobs:
         shell: bash
         run: |
           python3 -m pytest  tests/end_to_end_tests/container_image_tests/k8s_test.py \
-              -k ${{ matrix.image-type }}-${{ matrix.image-distro }} \
+              -k ${{ matrix.pytest-params }} \
             --images-registry localhost:5000 \
             --scalyr-api-key ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }} \
             --scalyr-api-read-key ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }} \
