@@ -615,9 +615,11 @@ if __name__ == '__main__':
     }
     for distro in _DISTRO_BUILDERS.keys():
         matrix["include"].append({
-            "os": "ubuntu-22.04",
+            "image-distro": distro.value,
             "python-version": "3.8.13",
-            "image-distro": distro.value
+            "os": "ubuntu-22.04",
+
+
         })
 
     print(json.dumps(matrix))

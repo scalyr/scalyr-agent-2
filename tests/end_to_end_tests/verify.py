@@ -237,7 +237,7 @@ def verify_logs(
 
     log.info("Wait for agent log requests stats.")
     while not check_requests_stats_in_agent_log(content=get_agent_log_content()):
-        time.sleep(1)
+        time.sleep(10)
 
     log.info(
         "Verify that previously written test log file content has been uploaded to server."

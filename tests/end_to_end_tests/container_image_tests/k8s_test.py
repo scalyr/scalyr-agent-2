@@ -690,10 +690,10 @@ if __name__ == '__main__':
         container_runtime = p["container_runtime"]
 
         matrix["include"].append({
+            "pytest-params": f"{image_builder_name}-{kubernetes_version}-{minikube_driver}-{container_runtime}",
+            "image-distro": image_distro.value,
             "os": "ubuntu-22.04",
             "python-version": "3.8.13",
-            "pytest-params": f"{image_builder_name}-{kubernetes_version}-{minikube_driver}-{container_runtime}",
-            "image-distro": image_distro.value
         })
 
     print(json.dumps(matrix))
