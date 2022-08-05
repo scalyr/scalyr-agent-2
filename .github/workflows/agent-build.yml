@@ -110,15 +110,6 @@ jobs:
         image-distro: [ "debian" ]
         python-version: [ "3.8.13" ]
 
-    # Create local docker registry container where we put previously built images.
-    services:
-      registry:
-        image: registry:2
-        ports:
-          - 5000:5000
-        volumes:
-          - /tmp/output_registry:/var/lib/registry
-
     env:
       DOCKER_BUILDKIT: 1
       # Set this variable to tell the agent build code that it runs in CI/CD and it needs to use caching.
@@ -183,11 +174,21 @@ jobs:
           name:  ${{ matrix.image-distro }}-images-result-registry
           path: /tmp/output_registry
 
+      - name: "Start local registry with result images from artifacts."
+        run: |
+          docker run \
+            -d --rm --name registry \
+            -p 5000:5000 \
+            -v /tmp/output_registry:/var/lib/registry \
+            registry:2 
+
+
       - name: Run tests
         shell: bash
         run: |
           python3 -m pytest  tests/end_to_end_tests/container_image_tests/k8s_test.py \
               -k ${{ matrix.image-type }}-${{ matrix.image-distro }} \
+            --images-registry localhost:5000 \
             --scalyr-api-key ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }} \
             --scalyr-api-read-key ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }} \
             --test-session-suffix ${{ github.run_id }}-${{ github.run_attempt }}
