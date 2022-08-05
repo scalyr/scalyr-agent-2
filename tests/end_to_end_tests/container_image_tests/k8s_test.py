@@ -54,17 +54,17 @@ log = logging.getLogger(__name__)
 #     )
 # ]
 
-# DEFAULT_KUBERNETES_VERSION = {
-#         "kubernetes_version": "v1.17.17",
-#         "minikube_driver": "",
-#         "container_runtime": "docker"
-# }
-
 DEFAULT_KUBERNETES_VERSION = {
-        "kubernetes_version": "v1.22.7",
+        "kubernetes_version": "v1.17.17",
         "minikube_driver": "",
         "container_runtime": "docker"
 }
+
+# DEFAULT_KUBERNETES_VERSION = {
+#         "kubernetes_version": "v1.22.7",
+#         "minikube_driver": "",
+#         "container_runtime": "docker"
+# }
 
 KUBERNETES_VERSIONS_TO_TEST = [
     DEFAULT_KUBERNETES_VERSION,
