@@ -54,6 +54,10 @@ log = logging.getLogger(__name__)
 #     )
 # ]
 
+pytestmark = [
+    pytest.mark.usefixtures("dump_info")
+]
+
 DEFAULT_KUBERNETES_VERSION = {
         "kubernetes_version": "v1.17.17",
         "minikube_driver": "",
@@ -162,6 +166,42 @@ def pytest_generate_tests(metafunc):
         indirect=True
     )
 
+
+@pytest.fixture
+def dump_info(run_kubectl_output, minikube_test_profile):
+    info = f"""
+    minikube version: {check_output_with_log(["minikube", "version"]).decode()} 
+    kubectl version: {run_kubectl_output(["version"])}
+    
+    """
+    log.info(f"TEST INFO: {info}")
+    """
+        echo "kubectl version"
+        kubectl version
+        echo ""
+        echo "minikube addions"
+        echo ""
+        minikube addons list
+        echo ""
+        echo "kubectl get nodes"
+        echo ""
+        kubectl get nodes
+        echo ""
+        echo "kubectl cluster-info"
+        echo ""
+        kubectl cluster-info
+        echo ""
+        echo "kubectl get pods -A"
+        echo ""
+        kubectl get pods -A
+
+        export NODE_NAME=$(kubectl get nodes -o jsonpath="{.items[0].metadata.name}")
+        echo ""
+        echo "kubectl describe node"
+        echo ""
+        kubectl describe node ${NODE_NAME}
+    :return: 
+    """
 
 @pytest.fixture(scope="session")
 def kubernetes_version(request):

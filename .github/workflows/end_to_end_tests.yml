@@ -52,7 +52,7 @@ jobs:
 
     needs: pre_job
     # NOTE: We always want to run job on master branch
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' && (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
+    #if: ${{ needs.pre_job.outputs.should_skip != 'true' && (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
 
     strategy:
       fail-fast: false
@@ -567,7 +567,7 @@ jobs:
       - name: Perform the deployment of the test environment
         uses: ./.github/actions/perform-deployment
         with:
-          deployment-name: "test_environment"
+          deployment-name: "agent_build.__init__.BuildTestEnvironment"
 
       - name: Run tests
         shell: bash

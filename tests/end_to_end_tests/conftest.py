@@ -19,6 +19,7 @@ some common options and fixtures such as Scalyr credentials etc.
 """
 
 import json
+import logging
 import os
 import pathlib as pl
 import time
@@ -30,6 +31,7 @@ from agent_build.tools.constants import SOURCE_ROOT
 
 IN_CICD = os.environ.get("AGENT_BUILD_IN_CICD", False)
 
+log = logging.getLogger(__name__)
 
 def pytest_runtest_protocol(item, nextitem):
     """
@@ -37,12 +39,12 @@ def pytest_runtest_protocol(item, nextitem):
     makes logs of each test case collapsable on GitHub Actions.
     """
     if IN_CICD:
-        print(f"::group::{item.nodeid}")
+        logging.info(f"::group::{item.nodeid}")
 
     orig_pytest_runtest_protocol(item, nextitem)
 
     if IN_CICD:
-        print("::endgroup::")
+        log.info("::endgroup::")
     return True
 
 
