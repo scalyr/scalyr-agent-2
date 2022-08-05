@@ -44,6 +44,8 @@ jobs:
       - name: "Get build and test job matrices."
         id: get-job-matrices
         run: |
+          echo "$(python3 -m python3 -m agent_build.package_builders)"
+          echo "$(python3 -m tests.end_to_end_tests.container_image_tests.k8s_test)"
           echo "::set-output name=build-matrix-json::$(python3 -m python3 -m agent_build.package_builders)"
           echo "::set-output name=test-matrix-json::$(python3 -m tests.end_to_end_tests.container_image_tests.k8s_test)"
         
