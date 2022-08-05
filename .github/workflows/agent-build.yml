@@ -27,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        images-distro: [ "debian" ]
+        image-distro: [ "debian" ]
         python-version: [ "3.8.13" ]
 
     # Create local docker registry container where result images has to be pushed.
@@ -74,7 +74,7 @@ jobs:
         id: get-builder-fqdn
         run: |
           set -e
-          echo "::set-output name=fqdn::$(python3 build_package_new.py bulk-images-${{ matrix.images-distro }} --fqdn)"
+          echo "::set-output name=fqdn::$(python3 build_package_new.py bulk-images-${{ matrix.image-distro }} --fqdn)"
 
       - name: Perform the build of the base docker image in the deployment.
         uses: ./.github/actions/perform-deployment
@@ -83,9 +83,9 @@ jobs:
 
       # We build all images with tha same base image all at once and store all result images in a single
       # registry.
-      - name: Build All Images For The ${{ matrix.images-distro }}
+      - name: Build All Images For The ${{ matrix.image-distro }}
         run: |
-          python3 build_package_new.py bulk-images-${{ matrix.images-distro }} \
+          python3 build_package_new.py bulk-images-${{ matrix.image-distro }} \
             --registry localhost:5000 \
             --push
           
@@ -93,7 +93,7 @@ jobs:
       - name: 'Upload docker registry with result image as artifact.'
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.images-distro }}-images-result-registry
+          name: ${{ matrix.image-distro }}-images-result-registry
           path:  /tmp/output_registry
           retention-days: 1
 
@@ -180,7 +180,7 @@ jobs:
       - name: "Download result image in form of registry and put it in local registry's data root."
         uses: actions/download-artifact@v3
         with:
-          name:  ${{ matrix.images-distro }}-images-result-registry
+          name:  ${{ matrix.image-distro }}-images-result-registry
           path: /tmp/output_registry
 
       - name: Run tests
