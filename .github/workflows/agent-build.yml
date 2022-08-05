@@ -81,6 +81,24 @@ jobs:
         with:
           deployment-name: ${{ steps.get-builder-fqdn.outputs.fqdn }}
 
+      # Use GitHub's cache to share registry with next jobs.
+      # Since the result registry is not so small, it may be better to avoid using artifacts,
+      # at least on non-master branches
+      - name: 'Upload docker registry with result image to cache.'
+        uses: actions/cache@v3
+        id: restore-registry
+        with:
+          path: /tmp/output_registry
+          # use all available workflow identifiers to provide unique cache key.
+          key: ${{ matrix.image-distro }}-images-result-registry-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}
+
+      - name: Check availability of the images.
+        if: steps.cache.restore-registry.cache-hit != 'true'
+        uses: actions/github-script@v3
+        with:
+          script: |
+            core.setFailed('Result image registry is not found in cache.')
+
       # We build all images with tha same base image all at once and store all result images in a single
       # registry.
       - name: Build All Images For The ${{ matrix.image-distro }}
@@ -90,12 +108,13 @@ jobs:
             --push
           
 
-      - name: 'Upload docker registry with result image as artifact.'
-        uses: actions/upload-artifact@v3
-        with:
-          name: ${{ matrix.image-distro }}-images-result-registry
-          path:  /tmp/output_registry
-          retention-days: 1
+#      - name: 'Upload docker registry with result image as artifact.'
+#        uses: actions/upload-artifact@v3
+#        with:
+#          name: ${{ matrix.image-distro }}-images-result-registry
+#          path:  /tmp/output_registry
+#          retention-days: 1
+
 
   test-images:
     needs:
@@ -168,11 +187,17 @@ jobs:
 #           "${{ matrix.image-type }}-${{ matrix.image-distro-name }}_test" \
 #            --name-suffix "_${{ github.run_number }}${{ github.run_attempt }}" \
 
-      - name: "Download result image in form of registry and put it in local registry's data root."
-        uses: actions/download-artifact@v3
+#      - name: "Download result image in form of registry and put it in local registry's data root."
+#        uses: actions/download-artifact@v3
+#        with:
+#          name:  ${{ matrix.image-distro }}-images-result-registry
+#          path: /tmp/output_registry
+
+      - name: 'Restore target images from cache.'
+        uses: actions/cache@v3
         with:
-          name:  ${{ matrix.image-distro }}-images-result-registry
           path: /tmp/output_registry
+          key: ${{ matrix.image-distro }}-images-result-registry-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}
 
       - name: "Start local registry with result images from artifacts."
         run: |

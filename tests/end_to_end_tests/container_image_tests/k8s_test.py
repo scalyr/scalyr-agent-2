@@ -449,12 +449,12 @@ def test_agent_pod_fails_on_k8s_monitor_fail(
 
         last_state = agent_cont_status.get("lastState")
         if not last_state:
-            time.sleep(1)
+            time.sleep(10)
             continue
 
         terminated_state = last_state.get("terminated")
         if not terminated_state:
-            time.sleep(1)
+            time.sleep(10)
             continue
 
         log.info("Agent container terminated.")
