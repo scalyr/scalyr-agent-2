@@ -620,4 +620,4 @@ if __name__ == '__main__':
             "image-distro": distro.value
         })
 
-    print(json.dumps(matrix))
+    print(json.dumps(matrix, indent=4, sort_keys=True))

@@ -68,31 +68,31 @@ DEFAULT_KUBERNETES_VERSION = {
 
 KUBERNETES_VERSIONS_TO_TEST = [
     DEFAULT_KUBERNETES_VERSION,
-    # {
-    #     "kubernetes_version": "v1.20.15",
-    #     "minikube_driver": "",
-    #     "container_runtime": "docker"
-    # },
-    # {
-    #     "kubernetes_version": "v1.21.10",
-    #     "minikube_driver": "",
-    #     "container_runtime": "docker"
-    # },
-    # {
-    #     "kubernetes_version": "v1.22.7",
-    #     "minikube_driver": "",
-    #     "container_runtime": "docker"
-    # },
-    # {
-    #     "kubernetes_version": "v1.23.4",
-    #     "minikube_driver": "docker",
-    #     "container_runtime": "containerd"
-    # },
-    # {
-    #     "kubernetes_version": "v1.24.0",
-    #     "minikube_driver": "docker",
-    #     "container_runtime": "containerd"
-    # }
+    {
+        "kubernetes_version": "v1.20.15",
+        "minikube_driver": "",
+        "container_runtime": "docker"
+    },
+    {
+        "kubernetes_version": "v1.21.10",
+        "minikube_driver": "",
+        "container_runtime": "docker"
+    },
+    {
+        "kubernetes_version": "v1.22.7",
+        "minikube_driver": "",
+        "container_runtime": "docker"
+    },
+    {
+        "kubernetes_version": "v1.23.4",
+        "minikube_driver": "docker",
+        "container_runtime": "containerd"
+    },
+    {
+        "kubernetes_version": "v1.24.0",
+        "minikube_driver": "docker",
+        "container_runtime": "containerd"
+    }
 ]
 
 PARAMS = []
@@ -145,23 +145,23 @@ for builder_name in BUILDERS_TO_TEST:
 
 
 def pytest_generate_tests(metafunc):
+
+    param_names =  ["image_builder_name", "kubernetes_version", "minikube_driver", "container_runtime"]
+
+    final_params = []
+    for p in PARAMS:
+        final_params.append(
+            [p[name] for name in param_names]
+        )
+
+
+
     metafunc.parametrize(
-        ["image_builder_name", "kubernetes_version", "minikube_driver", "container_runtime"],
-        [list(r.values()) for r in PARAMS],
+        param_names,
+        final_params,
         indirect=True
     )
 
-
-
-def _run_kubectl(cmd_args: List[str]):
-    check_output_with_log([
-        "kubectl", *cmd_args
-    ])
-
-
-# @pytest.fixture(scope="session")
-# def kubernetes_info(request):
-#     return request.param.copy()
 
 @pytest.fixture(scope="session")
 def kubernetes_version(request):
@@ -177,47 +177,84 @@ def container_runtime(request):
     return request.param
 
 
-@pytest.fixture(scope="session")
-def minikube_test_profile_name(kubernetes_version, minikube_driver, container_runtime):
-    return f"agent-end-to-end-test-{kubernetes_version}-{minikube_driver}-{container_runtime}".replace(".", "-")
+# @pytest.fixture(scope="session")
+# def minikube_test_profile_name(kubernetes_version, minikube_driver, container_runtime):
+#     return
 
 
 @pytest.fixture(scope="session")
-def minikube_test_profile(minikube_test_profile_name, kubernetes_version, minikube_driver, container_runtime):
+def minikube_test_profile(kubernetes_version, minikube_driver, container_runtime):
+    profile_name = f"agent-end-to-end-test-{kubernetes_version}-{minikube_driver}-{container_runtime}".replace(".", "-")
     check_call_with_log([
-        "minikube", "delete", "-p", minikube_test_profile_name
+        "minikube", "delete", "-p", profile_name
     ])
     check_call_with_log([
         "minikube",
         "start",
-        "-p", minikube_test_profile_name,
+        "-p", profile_name,
         f"--driver={minikube_driver}",
         f"--kubernetes-version={kubernetes_version}",
         f"--container-runtime={container_runtime}"
     ])
 
-    yield
+    yield profile_name
 
     check_call_with_log([
-        "minikube", "delete", "-p", minikube_test_profile_name
+        "minikube", "delete", "-p", profile_name
     ])
 
 
-@pytest.fixture
-def minikube_test_cluster(minikube_test_profile):
-    check_call_with_log([
-        "minikube",
-        "start",
-        "-p", minikube_test_profile_name,
-    ])
-    return
+# @pytest.fixture
+# def minikube_test_cluster(minikube_test_profile):
+#     check_call_with_log([
+#         "minikube",
+#         "start",
+#         "-p", minikube_test_profile_name,
+#     ])
+#     return
 
 
-@pytest.fixture(scope="module")
-def scalyr_namespace(minikube_test_cluster):
+@pytest.fixture(scope="session")
+def run_kubectl(minikube_test_profile):
+    def run(cmd_args: List[str]):
+        check_call_with_log([
+            "minikube",
+            "-p",
+            minikube_test_profile,
+            "kubectl",
+            "--",
+            *cmd_args
+        ])
+
+    return run
+
+
+@pytest.fixture(scope="session")
+def run_kubectl_output(minikube_test_profile):
+    def run(
+            cmd_args: List[str],
+            stderr=None
+    ):
+        return check_output_with_log(
+            [
+                "minikube",
+                "-p",
+                minikube_test_profile,
+                "kubectl",
+                "--",
+                *cmd_args
+            ],
+            stderr=stderr
+        )
+
+    return run
+
+
+@pytest.fixture(scope="session")
+def scalyr_namespace(run_kubectl_output):
     try:
-        check_output_with_log(
-            ["kubectl", "create", "namespace", "scalyr"],
+        run_kubectl_output(
+            ["create", "namespace", "scalyr"],
             stderr=subprocess.PIPE
         )
     except subprocess.CalledProcessError as e:
@@ -260,7 +297,8 @@ def apply_agent_service_account(
         default_service_account,
         default_cluster_role,
         default_cluster_role_binding,
-        tmp_path_factory
+        tmp_path_factory,
+        run_kubectl
 ):
 
     def apply(
@@ -274,7 +312,7 @@ def apply_agent_service_account(
 
         # Do a cleanup in case if there are existing serviceaccount related objects.
         for obj in [service_account, cluster_role, cluster_role_binding]:
-            _run_kubectl([
+            run_kubectl([
                 "delete", "--ignore-not-found", obj["kind"], obj["metadata"]["name"]
             ])
 
@@ -284,15 +322,15 @@ def apply_agent_service_account(
             yaml.dump_all([service_account, cluster_role, cluster_role_binding], f)
 
         # Create agent's service account.
-        check_output_with_log(
-            ["kubectl", "apply", "-f", str(manifest_path)]
+        run_kubectl(
+            ["apply", "-f", str(manifest_path)]
         )
 
     yield apply
 
     # Do a cleanup.
     for obj in [default_service_account, default_cluster_role, default_cluster_role_binding]:
-        _run_kubectl([
+        run_kubectl([
             "delete", "--ignore-not-found", obj["kind"], obj["metadata"]["name"]
         ])
 
@@ -302,11 +340,11 @@ def apply_agent_service_account(
 
 
 @pytest.fixture(scope="session")
-def prepare_scalyr_api_key_secret(scalyr_api_key, scalyr_namespace):
+def prepare_scalyr_api_key_secret(scalyr_api_key, scalyr_namespace, run_kubectl):
 
-    _run_kubectl(["--namespace=scalyr", "delete", "--ignore-not-found", "secret", "scalyr-api-key"])
+    run_kubectl(["--namespace=scalyr", "delete", "--ignore-not-found", "secret", "scalyr-api-key"])
     # Define API key
-    _run_kubectl(
+    run_kubectl(
         [
             "--namespace=scalyr",
             "create",
@@ -317,23 +355,23 @@ def prepare_scalyr_api_key_secret(scalyr_api_key, scalyr_namespace):
         ]
     )
     yield
-    _run_kubectl(["--namespace=scalyr", "delete", "secret", "scalyr-api-key"])
+    run_kubectl(["--namespace=scalyr", "delete", "secret", "scalyr-api-key"])
 
 
 @pytest.fixture
-def cluster_name(image_builder_name, image_name, test_session_suffix, request):
+def cluster_name(minikube_test_profile,image_builder_name, image_name, test_session_suffix, request):
     # Upload agent's image to minikube cluster.
-    check_call_with_log(["minikube", "-p", minikube_test_profile_name, "image", "load", "--overwrite=true", image_name])
+    check_call_with_log(["minikube", "-p", minikube_test_profile, "image", "load", "--overwrite=true", image_name])
     return f"agent-image-test-{image_builder_name}-{request.node.nodeid}-{test_session_suffix}"
 
 
 @pytest.fixture
-def prepare_agent_configmap(prepare_scalyr_api_key_secret, cluster_name: str, tmp_path: pl.Path, scalyr_namespace: str):
+def prepare_agent_configmap(prepare_scalyr_api_key_secret, cluster_name: str, tmp_path: pl.Path, scalyr_namespace: str, run_kubectl):
     """
     Creates config map for the agent pod.
     """
     # Cleanup existing configmap.
-    _run_kubectl([
+    run_kubectl([
         "--namespace=scalyr", "delete", "--ignore-not-found", "configmap", "scalyr-config",
     ])
 
@@ -351,7 +389,7 @@ def prepare_agent_configmap(prepare_scalyr_api_key_secret, cluster_name: str, tm
     with manifest_output_path.open("w") as f:
         yaml.dump(manifest, f, yaml.Dumper)
 
-    _run_kubectl([
+    run_kubectl([
         "apply",
         "-f",
         str(manifest_output_path)
@@ -360,7 +398,7 @@ def prepare_agent_configmap(prepare_scalyr_api_key_secret, cluster_name: str, tm
     yield
 
     # Cleanup
-    _run_kubectl([
+    run_kubectl([
         "--namespace=scalyr", "delete", "--ignore-not-found", "-f", str(manifest_output_path)
     ])
 
@@ -391,25 +429,24 @@ def agent_manifest_path(image_name, tmp_path):
 
 
 @pytest.fixture
-def start_test_log_writer_pod(minikube_test_cluster):
+def start_test_log_writer_pod(run_kubectl, run_kubectl_output):
     """
     Return function which created pod that writes counter messages which are needed to verify ingestion to Scalyr server.
     """
     manifest_path = pl.Path(__file__).parent / "fixtures/log_writer_pod.yaml"
 
-    _run_kubectl([
+    run_kubectl([
         "delete", "--ignore-not-found", "deployment", "test-log-writer"
     ])
 
     def start():
-        _run_kubectl([
+        run_kubectl([
             "apply", "-f", str(manifest_path)
         ])
 
         # Get name of the created pod.
         pod_name = (
-            check_output_with_log([
-                "kubectl",
+            run_kubectl_output([
                 "get",
                 "pods",
                 "--selector=app=test-log-writer",
@@ -421,7 +458,7 @@ def start_test_log_writer_pod(minikube_test_cluster):
         return pod_name
 
     yield start
-    _run_kubectl([
+    run_kubectl([
         "delete", "--ignore-not-found", "-f", str(manifest_path)
     ])
 
@@ -429,24 +466,23 @@ def start_test_log_writer_pod(minikube_test_cluster):
 
 @pytest.fixture
 def create_agent_daemonset(
-    agent_manifest_path, prepare_agent_configmap, prepare_scalyr_api_key_secret, cluster_name, scalyr_namespace
+    agent_manifest_path, prepare_agent_configmap, prepare_scalyr_api_key_secret, cluster_name, scalyr_namespace, run_kubectl, run_kubectl_output
 ):
     """
     Return function which starts agent daemonset.
     """
 
-    _run_kubectl([
+    run_kubectl([
         "--namespace=scalyr", "delete", "--ignore-not-found", "daemonset", "scalyr-agent-2"
     ])
 
     # Create agent's daemonset.
     def create():
-        check_output_with_log(["kubectl", "apply", "-f", str(agent_manifest_path)])
+        run_kubectl(["apply", "-f", str(agent_manifest_path)])
 
         # Get name of the created pod.
         pod_name = (
-            check_output_with_log([
-                "kubectl",
+            run_kubectl_output([
                 "--namespace=scalyr",
                 "get",
                 "pods",
@@ -461,28 +497,30 @@ def create_agent_daemonset(
     yield create
 
     # Cleanup
-    _run_kubectl([
+    run_kubectl([
         "--namespace=scalyr", "delete", "--ignore-not-found", "-f", str(agent_manifest_path)
     ])
 
 
-def _get_agent_log_content(pod_name: str):
-    """
-    Read content of the agent log file in the agent pod.
-    """
+@pytest.fixture(scope="session")
+def get_agent_log_content(run_kubectl_output):
+    def get(pod_name: str):
+        """
+        Read content of the agent log file in the agent pod.
+        """
+        return run_kubectl_output([
+            "--namespace=scalyr",
+            "exec",
+            "-i",
+            pod_name,
+            "--container",
+            "scalyr-agent",
+            "--",
+            "cat",
+            "/var/log/scalyr-agent-2/agent.log"
+        ]).decode()
 
-    return  subprocess.check_output([
-        "kubectl",
-        "--namespace=scalyr",
-        "exec",
-        "-i",
-        pod_name,
-        "--container",
-        "scalyr-agent",
-        "--",
-        "cat",
-        "/var/log/scalyr-agent-2/agent.log"
-    ]).decode()
+    return get
 
 @pytest.mark.timeout(20000)
 def test_basiceeeee(
@@ -500,6 +538,7 @@ def test_basic(
     create_agent_daemonset,
     apply_agent_service_account,
     start_test_log_writer_pod,
+    get_agent_log_content
 
 ):
 
@@ -518,7 +557,7 @@ def test_basic(
     verify_logs(
         scalyr_api_read_key=scalyr_api_read_key,
         scalyr_server=scalyr_server,
-        get_agent_log_content=functools.partial(_get_agent_log_content, pod_name=agent_pod_name),
+        get_agent_log_content=functools.partial(get_agent_log_content, pod_name=agent_pod_name),
         # Since the test writer pod writes plain text counters, set this count getter.
         counter_getter=lambda e: int(e["message"].rstrip("\n")),
         counters_verification_query_filters=[
@@ -531,37 +570,47 @@ def test_basic(
     logging.info("Test passed!")
 
 
-def _get_pod_metadata(pod_name: str):
-    pod_metadata_output = check_output_with_log([
-        "kubectl", "-n=scalyr", "get", "pods", "--selector=app=scalyr-agent-2", "--field-selector", f"metadata.name={pod_name}", "-o", "jsonpath={.items[-1]}"
-    ]).decode()
+@pytest.fixture(scope="session")
+def get_pod_metadata(run_kubectl_output):
+    def get(pod_name: str):
+        pod_metadata_output = run_kubectl_output([
+            "-n=scalyr", "get", "pods", "--selector=app=scalyr-agent-2", "--field-selector", f"metadata.name={pod_name}", "-o", "jsonpath={.items[-1]}"
+        ]).decode()
 
-    return json.loads(pod_metadata_output)
+        return json.loads(pod_metadata_output)
 
+    return get
 
-def _get_pod_status(pod_name: str):
-    metadata = _get_pod_metadata(pod_name=pod_name)
-    return metadata["status"]
-
-
-def _get_pod_status_container_statuses(pod_name: str):
-    status = _get_pod_status(pod_name=pod_name)
-    return{s["name"]: s for s in status["containerStatuses"]}
 
 @pytest.fixture(scope="session")
-def ff():
-    return "1"
+def get_pod_status(get_pod_metadata):
+    def get(pod_name: str):
+        metadata = get_pod_metadata(pod_name=pod_name)
+        return metadata["status"]
+
+    return get
+
+
+@pytest.fixture(scope="session")
+def get_pod_status_container_statuses(get_pod_status):
+    def get(pod_name: str):
+        status = get_pod_status(pod_name=pod_name)
+        return{s["name"]: s for s in status["containerStatuses"]}
+
+    return get
+
 
 @pytest.mark.timeout(20000)
-@pytest.mark.skipif(ff == "1", reason="ggg")
 def test_agent_pod_fails_on_k8s_monitor_fail(
-    #image_builder_name,
+    image_builder_name,
     scalyr_api_read_key,
     scalyr_server,
     cluster_name,
     create_agent_daemonset,
     apply_agent_service_account,
     default_cluster_role,
+    get_pod_status_container_statuses,
+    get_agent_log_content
 
 ):
 
@@ -569,8 +618,8 @@ def test_agent_pod_fails_on_k8s_monitor_fail(
     Tests that agent exits on Kubernetes monitor's failure.
     We emulate failure of the kubernetes monitor by revoking permissions from the agent's service account.
     """
-    # if not image_builder_name.startswith("k8s-restart-agent-on-monitor-death"):
-    #     pytest.skip(f"This test now only for a special preview build '{image_builder_name}'")
+    if not image_builder_name.startswith("k8s-restart-agent-on-monitor-death"):
+        pytest.skip(f"This test now only for a special preview build '{image_builder_name}'")
 
     cluster_role = default_cluster_role.copy()
 
@@ -585,14 +634,14 @@ def test_agent_pod_fails_on_k8s_monitor_fail(
     agent_pod_name = create_agent_daemonset()
     time.sleep(10)
 
-    agent_log = _get_agent_log_content(pod_name=agent_pod_name)
+    agent_log = get_agent_log_content(pod_name=agent_pod_name)
 
     assert "Kubernetes monitor not started yet (will retry) due to error in cache initialization" in agent_log
     assert "Please ensure you have correctly configured the RBAC permissions for the scalyr-agent's service account" in agent_log
 
     while True:
         log.info("Wait for agent container crash...")
-        container_statuses = _get_pod_status_container_statuses(pod_name=agent_pod_name)
+        container_statuses = get_pod_status_container_statuses(pod_name=agent_pod_name)
         agent_cont_status = container_statuses["scalyr-agent"]
 
         last_state = agent_cont_status.get("lastState")
@@ -619,7 +668,7 @@ def test_agent_pod_fails_on_k8s_monitor_fail(
         cluster_role=default_cluster_role
     )
     time.sleep(5)
-    agent_log = _get_agent_log_content(pod_name=agent_pod_name)
+    agent_log = get_agent_log_content(pod_name=agent_pod_name)
 
     assert re.search(r"Kubernetes cache initialized in \d+\.\d+ seconds", agent_log)
     assert "kubernetes_monitor is using docker for listing containers" in agent_log
@@ -647,4 +696,4 @@ if __name__ == '__main__':
             "image-distro": image_distro.value
         })
 
-    print(json.dumps(matrix))
+    print(json.dumps(matrix, indent=4, sort_keys=True))
