@@ -73,7 +73,7 @@ def check_agent_log_for_errors(content: str):
             # There is an issue with dns resolution on GitHub actions side, so we skip some error messages.
             connection_error_mgs = '[error="client/connectionFailed"] Failed to connect to "https://agent.scalyr.com" due to errno=-3.'
 
-            if connection_error_mgs in messages:
+            if connection_error_mgs in message:
                 # If the traceback that follows after error message contains particular error message,
                 # then we are ok with that.
                 errors_to_ignore = [
@@ -87,7 +87,7 @@ def check_agent_log_for_errors(content: str):
                         break
 
             if to_fail:
-                raise AssertionError(f"Agent log container error: {whole_error}")
+                raise AssertionError(f"Agent log error: {whole_error}")
 
 
 def check_requests_stats_in_agent_log(content: str) -> bool:

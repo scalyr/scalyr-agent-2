@@ -32,7 +32,7 @@ def image_builder_cls(image_builder_name) -> Type[ContainerImageBuilder]:
 @pytest.fixture(scope="session")
 def image_name(image_builder_cls, request):
     """
-    Registry URL from where to get image to test.
+    Get name of the ready image to test.
     """
 
     reg_container = None
@@ -40,7 +40,7 @@ def image_name(image_builder_cls, request):
     if request.config.option.images_registry:
         full_image_name = f"{request.config.option.images_registry}/{image_builder_cls.RESULT_IMAGE_NAME}"
 
-    # Registry is not specified, build the image and put it in the locally created registry.
+    # Registry is not specified, build the image.
     else:
         reg_container = LocalRegistryContainer(
             name="images_registry",
