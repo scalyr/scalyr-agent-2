@@ -107,19 +107,47 @@ jobs:
 #          path:  /tmp/output_registry
 #          retention-days: 1
 
+  prepare-k8s-test-matrix:
+    runs-on: ubuntu-22.04
+    outputs:
+      test-matrix-json: ${{ steps.get-test-matrix.outputs.test-matrix-json }}
 
-  test-images:
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Perform the deployment of the test environment
+        uses: ./.github/actions/perform-deployment
+        with:
+          deployment-name: "agent_build.__init__.BuildTestEnvironment"
+
+      - name: ""
+        id: get-test-matrix
+        run: |
+          echo "::set-output name=test-matrix-json::$(python3 -m  tests.end_to_end_tests.container_image_tests.k8s_test)"
+
+  test-k8s-images:
     needs:
       - build-images
-    runs-on: ubuntu-latest
+      - prepare-k8s-test-matrix
+    runs-on: ubuntu-22.04
 
     strategy:
       fail-fast: false
       matrix:
-        #image-type: [ "docker-json", "docker-syslog", "docker-api", "k8s", "k8s-restart-agent-on-monitor-death"]
-        image-type: [ "k8s", "k8s-restart-agent-on-monitor-death"]
-        image-distro: [ "debian" ]
-        python-version: [ "3.8.13" ]
+        os: [ubuntu-22.04]
+        pytest_params : ${{ fromJSON(needs.prepare-k8s-test-matrix.outputs.test-matrix-json) }}
+#        image-type: [ "docker-json", "docker-syslog", "docker-api", "k8s", "k8s-restart-agent-on-monitor-death"]
+#        image-type: [ "k8s", "k8s-restart-agent-on-monitor-death"]
+#        image-distro: [ "debian" ]
+#        python-version: [ "3.8.13" ]
+#        k8s_version:
+#          - { "version": "v1.17.17", "driver": "docker", "runtime": "docker" }
 
     env:
       DOCKER_BUILDKIT: 1

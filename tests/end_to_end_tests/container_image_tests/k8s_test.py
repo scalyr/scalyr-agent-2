@@ -31,22 +31,126 @@ from agent_build.tools.common import check_output_with_log, check_call_with_log
 from agent_build.tools.constants import SOURCE_ROOT
 from tests.end_to_end_tests.verify import verify_logs, ScalyrQueryRequest
 
-from agent_build.package_builders import DOCKER_IMAGE_BUILDERS
+from agent_build.package_builders import DOCKER_IMAGE_BUILDERS, ContainerImageBaseDistro
 
 
 log = logging.getLogger(__name__)
 
 
 # parametrize test cases for each kubernetes builder.
-pytestmark = [
-    pytest.mark.parametrize(
-        ["image_builder_name"],
-        [
-            [builder_name] for builder_name in DOCKER_IMAGE_BUILDERS.keys() if "k8s" in builder_name
-        ],
+# pytestmark = [
+#     pytest.mark.parametrize(
+#         ["image_builder_name"],
+#         [
+#             [builder_name] for builder_name in DOCKER_IMAGE_BUILDERS.keys() if "k8s" in builder_name
+#         ],
+#         indirect=True
+#     ),
+#     pytest.mark.parametrize(
+#         ["kubernetes_version", "minikube_driver"],
+#         [["v1.17.17", "docker"]],
+#         #[[{"version": "v1.17.17", "driver": "docker", "runtime": "docker"}]],
+#         indirect=True
+#     )
+# ]
+
+# DEFAULT_KUBERNETES_VERSION = {
+#         "kubernetes_version": "v1.17.17",
+#         "minikube_driver": "",
+#         "container_runtime": "docker"
+# }
+
+DEFAULT_KUBERNETES_VERSION = {
+        "kubernetes_version": "v1.22.7",
+        "minikube_driver": "",
+        "container_runtime": "docker"
+}
+
+KUBERNETES_VERSIONS_TO_TEST = [
+    DEFAULT_KUBERNETES_VERSION,
+    # {
+    #     "kubernetes_version": "v1.20.15",
+    #     "minikube_driver": "",
+    #     "container_runtime": "docker"
+    # },
+    # {
+    #     "kubernetes_version": "v1.21.10",
+    #     "minikube_driver": "",
+    #     "container_runtime": "docker"
+    # },
+    # {
+    #     "kubernetes_version": "v1.22.7",
+    #     "minikube_driver": "",
+    #     "container_runtime": "docker"
+    # },
+    # {
+    #     "kubernetes_version": "v1.23.4",
+    #     "minikube_driver": "docker",
+    #     "container_runtime": "containerd"
+    # },
+    # {
+    #     "kubernetes_version": "v1.24.0",
+    #     "minikube_driver": "docker",
+    #     "container_runtime": "containerd"
+    # }
+]
+
+PARAMS = []
+
+# Use debian based image as default image for extended tests.
+DEFAULT_IMAGE_BUILDER = f"k8s-{ContainerImageBaseDistro.DEBIAN.value}"
+
+BUILDERS_TO_TEST = [builder_name for builder_name in DOCKER_IMAGE_BUILDERS.keys() if "k8s" in builder_name]
+
+for k_v in KUBERNETES_VERSIONS_TO_TEST:
+    PARAMS.append({
+        "image_builder_name": DEFAULT_IMAGE_BUILDER,
+        **k_v
+    })
+
+BUILDERS_TO_TEST.remove(DEFAULT_IMAGE_BUILDER)
+
+for builder_name in BUILDERS_TO_TEST:
+    m = re.match(r"^k8s(?P<modification>-*.*)-(?P<distro>[^-]+)$", builder_name)
+    modification = m.group("modification")
+    distro = m.group("distro")
+
+    if modification:
+        continue
+
+    # Image modifications such as 'k8s-with-openmetrics' are only tested for a "default" distribution "debian"
+    # images based on another distributions (such alpine) are tested only with their general image (e.g. k8s-alpine)
+    if modification and distro != ContainerImageBaseDistro.DEBIAN.value:
+        continue
+
+    PARAMS.append({
+        "image_builder_name": builder_name,
+        **DEFAULT_KUBERNETES_VERSION
+    })
+
+
+# for builder_name in DOCKER_IMAGE_BUILDERS.keys():
+#     if "k8s" not in builder_name:
+#         continue
+#     if builder_name == "k8s-debian":
+#         kubernetes_versions = KUBERNETES_VERSIONS[:]
+#     else:
+#         kubernetes_versions = [DEFAULT_KUBERNETES_VERSION]
+#
+#     for k_v in kubernetes_versions:
+#         MATRIX.append({
+#             "image_builder_name": builder_name,
+#             "kubernetes_version": k_v,
+#         })
+
+
+def pytest_generate_tests(metafunc):
+    metafunc.parametrize(
+        ["image_builder_name", "kubernetes_version", "minikube_driver", "container_runtime"],
+        [list(r.values()) for r in PARAMS],
         indirect=True
     )
-]
+
 
 
 def _run_kubectl(cmd_args: List[str]):
@@ -55,22 +159,43 @@ def _run_kubectl(cmd_args: List[str]):
     ])
 
 
+# @pytest.fixture(scope="session")
+# def kubernetes_info(request):
+#     return request.param.copy()
+
 @pytest.fixture(scope="session")
-def minikube_test_profile_name():
-    return "agent-end-to-end-test"
+def kubernetes_version(request):
+    return request.param
 
 
 @pytest.fixture(scope="session")
-def minikube_test_cluster(image_name, minikube_test_profile_name):
+def minikube_driver(request):
+    return request.param
+
+@pytest.fixture(scope="session")
+def container_runtime(request):
+    return request.param
+
+
+@pytest.fixture(scope="session")
+def minikube_test_profile_name(kubernetes_version, minikube_driver, container_runtime):
+    return f"agent-end-to-end-test-{kubernetes_version}-{minikube_driver}-{container_runtime}"
+
+
+@pytest.fixture(scope="session")
+def minikube_test_profile(minikube_test_profile_name, kubernetes_version, minikube_driver, container_runtime):
     check_call_with_log([
         "minikube", "delete", "-p", minikube_test_profile_name
     ])
     check_call_with_log([
-        "minikube", "start", "-p", minikube_test_profile_name, "--driver=docker"
+        "minikube",
+        "start",
+        "-p", minikube_test_profile_name,
+        f"--driver={minikube_driver}",
+        f"--kubernetes-version={kubernetes_version}",
+        f"--container-runtime={container_runtime}"
     ])
 
-    # Upload agent's image to minikube cluster.
-    check_call_with_log(["minikube", "-p", minikube_test_profile_name, "image", "load", "--overwrite=true", image_name])
     yield
 
     check_call_with_log([
@@ -78,7 +203,17 @@ def minikube_test_cluster(image_name, minikube_test_profile_name):
     ])
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
+def minikube_test_cluster(minikube_test_profile):
+    check_call_with_log([
+        "minikube",
+        "start",
+        "-p", minikube_test_profile_name,
+    ])
+    return
+
+
+@pytest.fixture(scope="module")
 def scalyr_namespace(minikube_test_cluster):
     try:
         check_output_with_log(
@@ -186,7 +321,9 @@ def prepare_scalyr_api_key_secret(scalyr_api_key, scalyr_namespace):
 
 
 @pytest.fixture
-def cluster_name(image_builder_name, test_session_suffix, request):
+def cluster_name(image_builder_name, image_name, test_session_suffix, request):
+    # Upload agent's image to minikube cluster.
+    check_call_with_log(["minikube", "-p", minikube_test_profile_name, "image", "load", "--overwrite=true", image_name])
     return f"agent-image-test-{image_builder_name}-{request.node.nodeid}-{test_session_suffix}"
 
 
@@ -347,8 +484,15 @@ def _get_agent_log_content(pod_name: str):
         "/var/log/scalyr-agent-2/agent.log"
     ]).decode()
 
+@pytest.mark.timeout(20000)
+def test_basiceeeee(
+    scalyr_namespace,
+    cluster_name
 
-@pytest.mark.timeout(200)
+):
+    a=10
+
+@pytest.mark.timeout(20000)
 def test_basic(
     scalyr_api_read_key,
     scalyr_server,
@@ -404,10 +548,14 @@ def _get_pod_status_container_statuses(pod_name: str):
     status = _get_pod_status(pod_name=pod_name)
     return{s["name"]: s for s in status["containerStatuses"]}
 
+@pytest.fixture(scope="session")
+def ff():
+    return "1"
 
-@pytest.mark.timeout(200)
+@pytest.mark.timeout(20000)
+@pytest.mark.skipif(ff == "1", reason="ggg")
 def test_agent_pod_fails_on_k8s_monitor_fail(
-    image_builder_name,
+    #image_builder_name,
     scalyr_api_read_key,
     scalyr_server,
     cluster_name,
@@ -421,8 +569,8 @@ def test_agent_pod_fails_on_k8s_monitor_fail(
     Tests that agent exits on Kubernetes monitor's failure.
     We emulate failure of the kubernetes monitor by revoking permissions from the agent's service account.
     """
-    if not image_builder_name.startswith("k8s-restart-agent-on-monitor-death"):
-        pytest.skip(f"This test now only for a special preview build '{image_builder_name}'")
+    # if not image_builder_name.startswith("k8s-restart-agent-on-monitor-death"):
+    #     pytest.skip(f"This test now only for a special preview build '{image_builder_name}'")
 
     cluster_role = default_cluster_role.copy()
 
@@ -478,3 +626,18 @@ def test_agent_pod_fails_on_k8s_monitor_fail(
     assert "Cluster name detected, enabling k8s metric reporting and controller information" in agent_log
 
     log.info("Test passed!")
+
+
+if __name__ == '__main__':
+    params = []
+    for p in PARAMS:
+        image_builder_name = p["image_builder_name"]
+        kubernetes_version = p["kubernetes_version"]
+        minikube_driver = p["minikube_driver"]
+        container_runtime = p["container_runtime"]
+
+        params.append(
+            f"{image_builder_name}-{kubernetes_version}-{minikube_driver}-{container_runtime}"
+        )
+
+    print(json.dumps(params))

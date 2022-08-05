@@ -501,7 +501,7 @@ for distro in ContainerImageBaseDistro:
 _DISTRO_BUILDERS = collections.defaultdict(list)
 
 
-def create_dictro_specific_image_builders(builder_cls: Type[ContainerImageBuilder]):
+def create_distro_specific_image_builders(builder_cls: Type[ContainerImageBuilder]):
     """
     Helper function which creates distro-specific image builder classes from the base agent image builder class.
     For example if builder is for docker-json image then it will produce builder for docker-json-debian,
@@ -538,12 +538,12 @@ def create_dictro_specific_image_builders(builder_cls: Type[ContainerImageBuilde
         _DISTRO_BUILDERS[distro.value].append(_BuilderClass)
 
 
-create_dictro_specific_image_builders(DockerJsonContainerBuilder)
-create_dictro_specific_image_builders(DockerSyslogContainerBuilder)
-create_dictro_specific_image_builders(DockerApiContainerBuilder)
-create_dictro_specific_image_builders(K8sContainerBuilder)
-create_dictro_specific_image_builders(K8sWithOpenmetricsContainerBuilder)
-create_dictro_specific_image_builders(K8sRestartAgentOnMonitorsDeathBuilder)
+create_distro_specific_image_builders(DockerJsonContainerBuilder)
+create_distro_specific_image_builders(DockerSyslogContainerBuilder)
+create_distro_specific_image_builders(DockerApiContainerBuilder)
+create_distro_specific_image_builders(K8sContainerBuilder)
+create_distro_specific_image_builders(K8sWithOpenmetricsContainerBuilder)
+create_distro_specific_image_builders(K8sRestartAgentOnMonitorsDeathBuilder)
 
 
 class ImageBulkBuilder(CacheableBuilder):
