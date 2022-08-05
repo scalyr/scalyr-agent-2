@@ -86,18 +86,10 @@ jobs:
       # at least on non-master branches
       - name: 'Upload docker registry with result image to cache.'
         uses: actions/cache@v3
-        id: restore-registry
         with:
           path: /tmp/output_registry
           # use all available workflow identifiers to provide unique cache key.
           key: ${{ matrix.image-distro }}-images-result-registry-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}
-
-      - name: Check availability of the images.
-        if: steps.cache.restore-registry.cache-hit != 'true'
-        uses: actions/github-script@v3
-        with:
-          script: |
-            core.setFailed('Result image registry is not found in cache.')
 
       # We build all images with tha same base image all at once and store all result images in a single
       # registry.
@@ -195,9 +187,17 @@ jobs:
 
       - name: 'Restore target images from cache.'
         uses: actions/cache@v3
+        id: restore-registry
         with:
           path: /tmp/output_registry
           key: ${{ matrix.image-distro }}-images-result-registry-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}
+
+      - name: Check availability of the images.
+        if: steps.cache.restore-registry.cache-hit != 'true'
+        uses: actions/github-script@v3
+        with:
+          script: |
+            core.setFailed('Result image registry is not found in cache.')
 
       - name: "Start local registry with result images from artifacts."
         run: |
