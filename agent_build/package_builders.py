@@ -609,12 +609,11 @@ DOCKER_IMAGE_BULK_BUILDERS = {
 
 
 if __name__ == '__main__':
-    matrix = [
-
-
-    ]
+    matrix = {
+        "include": []
+    }
     for distro in _DISTRO_BUILDERS.keys():
-        matrix.append({
+        matrix["include"].append({
             "os": "ubuntu-22.04",
             "python-version": "3.8.13",
             "image-distro": distro.value
