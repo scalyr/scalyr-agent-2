@@ -229,7 +229,11 @@ def verify_logs(
             "Server certificate validation has been disabled" not in agent_log_content
         )
 
-    check_agent_log_for_errors(content=agent_log_content)
+    first_check_agent_log_content = agent_log_content
+    if not first_check_agent_log_content.endswith("\n"):
+        # Get only complete lines.
+        first_check_agent_log_content = first_check_agent_log_content.rsplit(os.linesep, 1)[0]
+    check_agent_log_for_errors(content=first_check_agent_log_content)
 
     log.info("Wait for agent log requests stats.")
     while not check_requests_stats_in_agent_log(content=get_agent_log_content()):
@@ -287,7 +291,9 @@ def verify_logs(
         break
 
     # Do a final error check for agent log.
-    check_agent_log_for_errors(content=get_agent_log_content())
+    # We also replace agent log part from the first check, so it will check only new lines.
+    second_check_agent_log_content = get_agent_log_content().replace(first_check_agent_log_content, "")
+    check_agent_log_for_errors(content=second_check_agent_log_content)
 
 
 def verify_agent_status(agent_version: str, agent_commander: AgentCommander):
