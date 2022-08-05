@@ -983,7 +983,7 @@ class CacheableBuilder:
                 additional_args["action"] = "store_true"
 
             if "action" not in additional_args:
-                if param.annotation in [List, list]:
+                if param.annotation in [List, list] or str(param.annotation).startswith("typing.List"):
                     arg_type = str
                 else:
                     arg_type = param.annotation
@@ -1026,7 +1026,7 @@ class CacheableBuilder:
                 value = getattr(args, name, None)
 
                 if value:
-                    if param.annotation in [List, list]:
+                    if param.annotation in [List, list] or str(param.annotation).startswith("typing.List"):
                         # this is comma separated string
                         value = value.split(",")
 
