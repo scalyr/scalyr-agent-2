@@ -179,7 +179,7 @@ def container_runtime(request):
 
 @pytest.fixture(scope="session")
 def minikube_test_profile_name(kubernetes_version, minikube_driver, container_runtime):
-    return f"agent-end-to-end-test-{kubernetes_version}-{minikube_driver}-{container_runtime}"
+    return f"agent-end-to-end-test-{kubernetes_version}-{minikube_driver}-{container_runtime}".replace(".", "_")
 
 
 @pytest.fixture(scope="session")

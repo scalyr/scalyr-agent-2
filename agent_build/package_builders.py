@@ -59,6 +59,7 @@ _DEPLOYMENT_BUILD_BASE_IMAGE_STEP = (
 )
 _AGENT_REQUIREMENT_FILES_PATH = _AGENT_BUILD_PATH / "requirement-files"
 
+
 class BuildDockerBaseImageStep(ShellScriptDeploymentStep):
     """
     This deployment step is responsible for the building of the base image of the agent docker images.
