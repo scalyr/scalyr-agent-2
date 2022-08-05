@@ -46,19 +46,20 @@ def image_registry(request):
             registry_port=5050
         )
         reg_container.start()
+
+        builder = image_builder_cls(
+            registry=image_registry,
+            push=True,
+        )
+
+        builder.build()
+
         yield "localhost:5050"
         reg_container.kill()
 
 
 @pytest.fixture(scope="session")
 def image_name(image_builder_cls, image_registry):
-
-    builder = image_builder_cls(
-        registry=image_registry,
-        push=True,
-    )
-
-    builder.build()
 
     full_image_registry_name = f"{image_registry}/{image_builder_cls.RESULT_IMAGE_NAME}"
 
