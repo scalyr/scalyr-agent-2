@@ -2,7 +2,7 @@
 # NOTE: multi-stage builds require Docker 17.05 or greater
 
 # Type of the image build, e.g: docker-json, docker-syslog, k8s
-ARG BUILD_TYPE
+ARG IMAGE_TYPE_STAGE_NAME
 
 # Name of the base image to use.
 ARG BASE_IMAGE
@@ -25,7 +25,7 @@ ENV AGENT_BUILD_DEBUG=$AGENT_BUILD_DEBUG
 # Special env. variable that will enable addional logging info about that command runs in docker.
 ENV AGENT_BUILD_IN_DOCKER=1
 # e.g. k8s, docker-json
-ARG BUILD_TYPE
+ARG IMAGE_TYPE_STAGE_NAME
 # fully qualified name of the builder class which has to build image's filesystem.
 ARG BUILDER_FQDN
 ADD . /scalyr-agent-2
@@ -50,12 +50,7 @@ COPY --from=scalyr-build /tmp/container-fs /
 
 
 # Optional stage for docker-json.
-FROM scalyr-base as build-docker-json
-MAINTAINER Scalyr Inc <support@scalyr.com>
-# Nothing to add
-
-# Optional stage for docker-api.
-FROM scalyr-base as build-docker-api
+FROM scalyr-base as build-common
 MAINTAINER Scalyr Inc <support@scalyr.com>
 # Nothing to add
 
@@ -74,21 +69,16 @@ FROM scalyr-base as build-k8s
 MAINTAINER Scalyr Inc <support@scalyr.com>
 ENV SCALYR_STDOUT_SEVERITY ERROR
 
-# Optional stage for k8s-with-openmetrics.
-FROM scalyr-base as build-k8s-with-openmetrics
-MAINTAINER Scalyr Inc <support@scalyr.com>
-ENV SCALYR_STDOUT_SEVERITY ERROR
-
 
 # Noraml result image.
-FROM build-$BUILD_TYPE as scalyr-normal
+FROM build-$IMAGE_TYPE_STAGE_NAME as scalyr-normal
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
 CMD ["/usr/sbin/scalyr-agent-2", "--no-fork", "--no-change-user", "start"]
 
 
 # Result image stage for testing.
-FROM build-$BUILD_TYPE as scalyr-testing
+FROM build-$IMAGE_TYPE_STAGE_NAME as scalyr-testing
 MAINTAINER Scalyr Inc <support@scalyr.com>
 # Since test version of the image uses coverage, add command that runs the Agent with enabled coverage.
 CMD ["coverage", "run", "--branch", "/usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py", "--no-fork", "--no-change-user", "start"]

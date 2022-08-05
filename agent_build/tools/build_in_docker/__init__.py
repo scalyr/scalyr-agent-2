@@ -176,13 +176,15 @@ class DockerContainer:
         image_name: str,
         ports: List[str] = None,
         mounts: List[str] = None,
-        command: List[str] = None
+        command: List[str] = None,
+        detached: bool = True
     ):
         self.name = name
         self.image_name = image_name
         self.mounts = mounts or []
         self.ports = ports or []
         self.command = command or []
+        self.detached = detached
 
     def start(self):
 
@@ -192,7 +194,7 @@ class DockerContainer:
         command_args = [
             "docker",
             "run",
-            "-d",
+            "-d" if self.detached else "-i",
             "--name",
             self.name,
         ]

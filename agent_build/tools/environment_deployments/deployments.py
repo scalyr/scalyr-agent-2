@@ -80,7 +80,8 @@ def remove_directory_in_docker(path: pl.Path):
         ],
         command=[
             "rm", "-r", f"/parent/{path.name}"
-        ]
+        ],
+        detached=False
     ):
         pass
 
@@ -776,6 +777,9 @@ class CacheableBuilder:
     REQUIRED_BUILDER_CLASSES: List[Type['CacheableBuilder']] = []
     DEPLOYMENT_STEP: DeploymentStep = None
 
+    # This class attribute can be used to set FQDN to classes which are created dynamically.
+    _FULLY_QUALIFIED_NAME = None
+
     def __new__(cls, *args, **kwargs):
         obj = super(CacheableBuilder, cls).__new__(cls)
 
@@ -801,7 +805,7 @@ class CacheableBuilder:
             deployment_step: DeploymentStep = None
     ):
 
-        self.output_path = AGENT_BUILD_OUTPUT / "builder_outputs" / type(self).get_fully_qualified_name()
+        self.output_path = AGENT_BUILD_OUTPUT / "builder_outputs" / type(self).get_fully_qualified_name().replace(".", "_")
         self.deployment_step = deployment_step or type(self).DEPLOYMENT_STEP
         self.required_builders = required_builders
 
@@ -818,18 +822,23 @@ class CacheableBuilder:
         return result
 
     @classmethod
-    def get_fully_qualified_name(cls):
+    def get_fully_qualified_name(cls) -> str:
         """
-        Return fully qualified name of the class.
-        :return:
+        Return fully qualified name of the class. This is needed for the builder to be able to run itself from
+        once more, for example from docker. We have a special script 'agent_build/scripts/builder_helper.py' which
+        can run builder through finding them by their FDQN.
         """
+        if cls._FULLY_QUALIFIED_NAME:
+            return cls._FULLY_QUALIFIED_NAME
 
+        # FDQN is not specified, generate it from the module and class name.
+        # NOTE: that's won't work with dynamically created classes. For such classes,
+        # specify the '_FULLY_QUALIFIED_NAME' manually.
         cls_module = sys.modules[cls.__module__]
         module_path = pl.Path(cls_module.__file__)
         module_parent_rel_dir = module_path.parent.relative_to(SOURCE_ROOT)
         module_full_name = ".".join(str(module_parent_rel_dir).split(os.sep)) + "." + module_path.stem
         return f"{module_full_name}.{cls.__qualname__}"
-
 
     def build(self, locally: bool = False):
         """
@@ -863,12 +872,11 @@ class CacheableBuilder:
             self._build()
             return
 
-        build_package_script_path = pl.Path("/scalyr-agent-2/agent_build/scripts/builder_helper.py")
-
-
+        # This builder runs in docker. Make docker container run special script which has to run
+        # the same builder. The builder has to be found to its FDQN.
         command_args = [
             "python3",
-            str(build_package_script_path),
+            "/scalyr-agent-2/agent_build/scripts/builder_helper.py",
             self.get_fully_qualified_name(),
         ]
 
@@ -923,8 +931,6 @@ class CacheableBuilder:
             base_image_name,
             *command_args
         ])
-
-        a=10
 
     def _build(self):
         pass

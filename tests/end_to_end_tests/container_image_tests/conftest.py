@@ -4,71 +4,71 @@ from typing import Type
 import pytest
 
 from agent_build.tools.common import check_call_with_log
-from agent_build.package_builders import ContainerImageBuilder, DOCKER_IMAGE_PACKAGE_BUILDERS
+from agent_build.package_builders import ContainerImageBuilder, DOCKER_IMAGE_BUILDERS
 from agent_build.tools.build_in_docker import LocalRegistryContainer
 
 
-
-@pytest.fixture(scope="session")
-def image_builder_cls(request) -> Type[ContainerImageBuilder]:
-    image_builder_name = request.param
-    return DOCKER_IMAGE_PACKAGE_BUILDERS[image_builder_name]
-
-
-@pytest.fixture(scope="session")
-def agent_image_registry_port():
-    return 5050
-
-
-@pytest.fixture(scope="session")
-def image_name(image_builder_cls):
-    return image_builder_cls.RESULT_IMAGE_NAMES[0]
-
-@pytest.fixture(scope="session")
-def image_user():
-    return "test_user"
-
-@pytest.fixture(scope="session")
-def image_tag():
-    return "latest"
-
-
-@pytest.fixture(scope="session")
-def full_image_name(image_name, image_user, image_tag):
-    return f"{image_user}/{image_name}:{image_tag}"
-
-
-@pytest.fixture(scope="session")
-def agent_image(image_builder_cls, agent_image_registry_port, image_name, image_user, image_tag, full_image_name):
-    # Run container with docker registry.
-    logging.info("Run new local docker registry in container.")
-
-    registry_host = f"localhost:{agent_image_registry_port}"
-
-    registry_container = LocalRegistryContainer(
-        name="agent_images_registry", registry_port=agent_image_registry_port
+def pytest_addoption(parser):
+    parser.addoption(
+        "--images-registry",
+        dest="images_registry",
+        required=False,
+        help="Docker images registry URL where image to test is stored."
+             "It mainly should be specified on CI/CD tests to get image from existing image registry. "
+             'During local testing, this option can be omitted and image and registry will be created "on fly"'
     )
 
+
+@pytest.fixture(scope="session")
+def image_builder_name(request):
+    return request.param
+
+
+@pytest.fixture(scope="session")
+def image_builder_cls(image_builder_name) -> Type[ContainerImageBuilder]:
+    return DOCKER_IMAGE_BUILDERS[image_builder_name]
+
+
+@pytest.fixture(scope="session")
+def image_registry(request):
+    """
+    Registry URL from where to get image to test.
+    """
+
+    # If registry is specified externally, then reuse it.
+    if request.config.option.images_registry:
+        yield request.config.option.images_registry
+
+    # Registry is not specified, build the image and put it in the locally created registry.
+    else:
+        reg_container = LocalRegistryContainer(
+            name="images_registry",
+            registry_port=5050
+        )
+        reg_container.start()
+        yield "localhost:5050"
+        reg_container.kill()
+
+
+@pytest.fixture(scope="session")
+def image_name(image_builder_cls, image_registry):
+
     builder = image_builder_cls(
-        registry=registry_host,
-        tags=[image_tag],
-        user=image_user,
+        registry=image_registry,
         push=True,
     )
 
-    full_image_name_with_registry = f"{registry_host}/{full_image_name}"
+    builder.build()
 
-    with registry_container:
-        builder.build()
+    full_image_registry_name = f"{image_registry}/{image_builder_cls.RESULT_IMAGE_NAME}"
 
-        # Pull result image from registry and make image visible for the munikube cluster.
-        check_call_with_log(["docker", "pull", full_image_name_with_registry])
-        check_call_with_log(["docker", "tag", full_image_name_with_registry, full_image_name])
+    # Pull result image from registry.
+    check_call_with_log(["docker", "pull", full_image_registry_name])
+    check_call_with_log(["docker", "tag", full_image_registry_name, image_builder_cls.RESULT_IMAGE_NAME])
 
-    yield
+    yield image_builder_cls.RESULT_IMAGE_NAME
 
-    # cleanup
-    check_call_with_log(["docker", "image", "rm", full_image_name])
+    check_call_with_log(["docker", "image", "rm", image_builder_cls.RESULT_IMAGE_NAME])
 
 
 

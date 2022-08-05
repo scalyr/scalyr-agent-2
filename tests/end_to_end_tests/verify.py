@@ -70,7 +70,7 @@ def check_agent_log_for_errors(content: str):
 
             to_fail = True
 
-            # There is an issue with dns resolution on GitHub actions side, so we skip some of the error messages.
+            # There is an issue with dns resolution on GitHub actions side, so we skip some error messages.
             connection_error_mgs = '[error="client/connectionFailed"] Failed to connect to "https://agent.scalyr.com" due to errno=-3.'
 
             if connection_error_mgs in messages:

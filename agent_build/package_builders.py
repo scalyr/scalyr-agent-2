@@ -16,10 +16,12 @@
 This module defines all possible packages of the Scalyr Agent and how they can be built.
 """
 import argparse
+import collections
 import dataclasses
 import enum
 import json
 import pathlib as pl
+import pydoc
 import tarfile
 import abc
 import shutil
@@ -28,7 +30,7 @@ import sys
 import stat
 import os
 import logging
-from typing import List, Type
+from typing import List, Type, Tuple
 
 from agent_build.tools import constants
 from agent_build.tools.environment_deployments import deployments
@@ -36,7 +38,7 @@ from agent_build.tools import build_in_docker
 from agent_build.tools import common
 from agent_build.tools.constants import Architecture, PackageType
 from agent_build.tools.environment_deployments.deployments import ShellScriptDeploymentStep, DeploymentStep, CacheableBuilder
-from agent_build.prepare_agent_filesystem import build_linux_lfs_agent_files, get_install_info, create_change_logs
+from agent_build.prepare_agent_filesystem import build_linux_lfs_agent_files, get_install_info, add_config
 from agent_build.tools.constants import SOURCE_ROOT
 from agent_build.tools.common import check_output_with_log
 from agent_build.tools.common import shlex_join
@@ -56,7 +58,6 @@ _DEPLOYMENT_BUILD_BASE_IMAGE_STEP = (
     _AGENT_BUILD_PATH / "tools/environment_deployments/steps/build_base_docker_image"
 )
 _AGENT_REQUIREMENT_FILES_PATH = _AGENT_BUILD_PATH / "requirement-files"
-
 
 class BuildDockerBaseImageStep(ShellScriptDeploymentStep):
     """
@@ -85,7 +86,7 @@ class BuildDockerBaseImageStep(ShellScriptDeploymentStep):
                  _AGENT_BUILD_PATH / "docker/Dockerfile.base",
                 # and helper lib for base image builder.
                 _DEPLOYMENT_BUILD_BASE_IMAGE_STEP / "build_base_images_common_lib.sh",
-                # .. and requirement files...
+                # .. and requirement files.
                 _AGENT_REQUIREMENT_FILES_PATH / "docker-image-requirements.txt",
                 _AGENT_REQUIREMENT_FILES_PATH / "compression-requirements.txt",
                 _AGENT_REQUIREMENT_FILES_PATH / "main-requirements.txt",
@@ -105,10 +106,14 @@ class ContainerImageBuilder(CacheableBuilder):
      `docker/scripts/container_builder_base.sh`. See that script for information on it can be used."
     """
     # Path to the configuration which should be used in this build.
-    CONFIG_PATH = None
+    CONFIG_PATH: pl.Path = None
+    ADDITIONAL_CONFIG_PATHS: List[pl.Path] = None
 
-    # Names of the result image that goes to dockerhub.
-    RESULT_IMAGE_NAMES: List[str]
+    BUILDER_NAME: str
+    IMAGE_TYPE_STAGE_NAME: str = "common"
+
+    # Name of the result image that goes to dockerhub.
+    RESULT_IMAGE_NAME: str
 
     BASE_IMAGE_BUILDER_STEP: BuildDockerBaseImageStep
 
@@ -135,6 +140,7 @@ class ContainerImageBuilder(CacheableBuilder):
             Used only for testing."
         """
         self.config_path = type(self).CONFIG_PATH
+        self.additional_config_paths = type(self).ADDITIONAL_CONFIG_PATHS or []
 
         self.dockerfile_path = SOURCE_ROOT / "agent_build/docker/Dockerfile"
 
@@ -179,7 +185,12 @@ class ContainerImageBuilder(CacheableBuilder):
         build_linux_lfs_agent_files(
             copy_agent_source=True,
             output_path=self._package_root_path,
-            config_path=type(self).CONFIG_PATH,
+        )
+
+        add_config(
+            base_config_source_path=type(self).CONFIG_PATH,
+            output_path=self._package_root_path / "etc/scalyr-agent-2",
+            additional_config_paths=type(self).ADDITIONAL_CONFIG_PATHS
         )
 
         # Need to create some docker specific directories.
@@ -310,23 +321,20 @@ class ContainerImageBuilder(CacheableBuilder):
 
         tag_options = []
 
-        image_names = type(self).RESULT_IMAGE_NAMES[:]
-        for image_name in image_names:
+        full_name = type(self).RESULT_IMAGE_NAME
 
-            full_name = image_name
+        if self.user:
+            full_name = f"{self.user}/{full_name}"
 
-            if self.user:
-                full_name = f"{self.user}/{full_name}"
+        if registry:
+            full_name = f"{registry}/{full_name}"
 
-            if registry:
-                full_name = f"{registry}/{full_name}"
+        for tag in tags:
+            tag_options.append("-t")
 
-            for tag in tags:
-                tag_options.append("-t")
+            full_name_with_tag = f"{full_name}:{tag}"
 
-                full_name_with_tag = f"{full_name}:{tag}"
-
-                tag_options.append(full_name_with_tag)
+            tag_options.append(full_name_with_tag)
 
         command_options = [
             "docker",
@@ -336,7 +344,7 @@ class ContainerImageBuilder(CacheableBuilder):
             "-f",
             str(self.dockerfile_path),
             "--build-arg",
-            f"BUILD_TYPE={type(self).PACKAGE_TYPE.value}",
+            f"IMAGE_TYPE_STAGE_NAME={type(self).IMAGE_TYPE_STAGE_NAME}",
             "--build-arg",
             f"BUILDER_FQDN={type(self).get_fully_qualified_name()}",
             "--build-arg",
@@ -372,7 +380,7 @@ class ContainerImageBuilder(CacheableBuilder):
 
         command_options.append(str(SOURCE_ROOT))
 
-        build_log_message = f"Build images:  {image_names}"
+        build_log_message = f"Build image:  {full_name}"
         if self.push:
             build_log_message = f"{build_log_message} and push."
         else:
@@ -403,31 +411,6 @@ _AGENT_BUILD_DEPLOYMENT_STEPS_PATH = _AGENT_BUILD_PATH / "tools/environment_depl
 _AGENT_BUILD_REQUIREMENTS_FILES_PATH = _AGENT_BUILD_PATH / "requirement-files"
 
 
-class ContainerPackageDistro(enum.Enum):
-    DEBIAN = "debian"
-    ALPINE = "alpine"
-
-    @property
-    def image_suffix(self):
-        suffixes = {
-            ContainerPackageDistro.DEBIAN: "slim",
-            ContainerPackageDistro.ALPINE: "alpine"
-        }
-        return suffixes[self]
-
-
-@dataclasses.dataclass
-class ContainerPackageTypeInfo:
-    package_type: PackageType
-    result_image_names: List[str]
-    distros: List[ContainerPackageDistro]
-
-
-_DEFAULT_CONTAINER_PACKAGE_POSSIBLE_DISTROS = [
-    ContainerPackageDistro.DEBIAN,
-    ContainerPackageDistro.ALPINE
-]
-
 # CPU architectures or platforms that has to be supported by the Agent docker images,
 _AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS = [
     Architecture.X86_64.as_docker_platform.value,
@@ -436,192 +419,131 @@ _AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS = [
 ]
 
 
-# Here listed all possible types of the containerised agent builds.
-_CONTAINER_PACKAGE_INFOS = [
-    # An image for running on Docker configured to fetch logs via the file system (the container log
-    # directory is mounted to the agent container.)  This is the preferred way of running on Docker.
-    # This image is published to scalyr/scalyr-agent-docker-json.
-    ContainerPackageTypeInfo(
-        package_type=PackageType.DOCKER_JSON,
-        result_image_names=["scalyr-agent-docker-json"],
-        distros=_DEFAULT_CONTAINER_PACKAGE_POSSIBLE_DISTROS
-    ),
-    # An image for running on Docker configured to receive logs from other containers via syslog.
-    # This is the deprecated approach (but is still published under scalyr/scalyr-docker-agent for
-    # backward compatibility.)  We also publish this under scalyr/scalyr-docker-agent-syslog to help
-    # with the eventual migration.
-    ContainerPackageTypeInfo(
-        package_type=PackageType.DOCKER_SYSLOG,
-        result_image_names=[
-            "scalyr-agent-docker-syslog",
-            "scalyr-agent-docker",
-        ],
-        distros=_DEFAULT_CONTAINER_PACKAGE_POSSIBLE_DISTROS
-    ),
-    # An image for running on Docker configured to fetch logs via the Docker API using docker_raw_logs: false
-    # configuration option.
-    ContainerPackageTypeInfo(
-        package_type=PackageType.DOCKER_API,
-        result_image_names=["scalyr-agent-docker-api"],
-        distros=_DEFAULT_CONTAINER_PACKAGE_POSSIBLE_DISTROS
-    ),
-    # An image for running the agent on Kubernetes.
-    ContainerPackageTypeInfo(
-        package_type=PackageType.K8S,
-        result_image_names=["scalyr-k8s-agent"],
-        distros=_DEFAULT_CONTAINER_PACKAGE_POSSIBLE_DISTROS
-    ),
-    # An image for running the agent on Kubernetes with Kubernetes Open Metrics monitor enabled.
-    ContainerPackageTypeInfo(
-        package_type=PackageType.K8S_WITH_OPENMETRICS,
-        result_image_names=["scalyr-k8s-agent-with-openmetrics-monitor"],
-        distros=_DEFAULT_CONTAINER_PACKAGE_POSSIBLE_DISTROS
-    )
-]
-
-# DOCKER_IMAGE_PACKAGE_BUILDERS = {}
-#
-# for package_info in _CONTAINER_PACKAGE_INFOS:
-#     for distro in package_info.distros:
-#         base_docker_image_step = BuildDockerBaseImageStep(
-#             name=f"agent-docker-base-image-{distro.value}",
-#             python_image_suffix=distro.image_suffix,
-#             platforms=_AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS,
-#         )
-#
-#         builder_name = f"{package_info.package_type.value}-{distro.value}"
-#
-#         class _ImageBuilder(ContainerImageBuilder):
-#             NAME = builder_name
-#             PACKAGE_TYPE = package_info.package_type
-#             CONFIG_PATH = SOURCE_ROOT / "docker" / f"{package_info.package_type.value}-config"
-#             RESULT_IMAGE_NAMES = package_info.result_image_names[:]
-#             BASE_IMAGE_BUILDER_STEP = DEPLOYMENT_STEP = base_docker_image_step
-#             FQDN = f"{__name__}.{builder_name}"
-#
-#         setattr(sys.modules[__name__], builder_name, _ImageBuilder)
-#
-#         # DOCKER_IMAGE_PACKAGE_BUILDERS[builder_name] = _ImageBuilder
-
-
 class DockerJsonContainerBuilder(ContainerImageBuilder):
-    PACKAGE_TYPE = PackageType.DOCKER_JSON
+    BUILDER_NAME = "docker-json"
     CONFIG_PATH = SOURCE_ROOT / "docker" / "docker-json-config"
-    RESULT_IMAGE_NAMES = ["scalyr-agent-docker-json"]
+    RESULT_IMAGE_NAME = "scalyr-agent-docker-json"
 
 
 class DockerSyslogContainerBuilder(ContainerImageBuilder):
-    PACKAGE_TYPE = PackageType.DOCKER_SYSLOG
+    BUILDER_NAME = PACKAGE_TYPE = "docker-syslog"
     CONFIG_PATH = SOURCE_ROOT / "docker" / "docker-syslog-config"
-    RESULT_IMAGE_NAMES = [
-            "scalyr-agent-docker-syslog",
-            "scalyr-agent-docker",
-        ]
+    # "scalyr-agent-docker",
+    RESULT_IMAGE_NAME = "scalyr-agent-docker-syslog"
+
+
 
 class DockerApiContainerBuilder(ContainerImageBuilder):
-    PACKAGE_TYPE = PackageType.DOCKER_API
+    BUILDER_NAME = "docker-api"
     CONFIG_PATH = SOURCE_ROOT / "docker" / "docker-api-config"
-    RESULT_IMAGE_NAMES =["scalyr-agent-docker-api"]
+    RESULT_IMAGE_NAME = "scalyr-agent-docker-api"
 
 
 class K8sContainerBuilder(ContainerImageBuilder):
-    PACKAGE_TYPE =PackageType.K8S
+    BUILDER_NAME = IMAGE_TYPE_STAGE_NAME = "k8s"
     CONFIG_PATH = SOURCE_ROOT / "docker" / "k8s-config"
-    RESULT_IMAGE_NAMES = ["scalyr-k8s-agent"]
+    RESULT_IMAGE_NAME = "scalyr-k8s-agent"
 
 
 class K8sWithOpenmetricsContainerBuilder(ContainerImageBuilder):
-    PACKAGE_TYPE = PackageType.K8S_WITH_OPENMETRICS
+    BUILDER_NAME = "k8s-with-openmetrics"
+    IMAGE_TYPE_STAGE_NAME = "k8s"
     CONFIG_PATH = SOURCE_ROOT / "docker" / "k8s-config-with-openmetrics-monitor"
-    RESULT_IMAGE_NAMES = ["scalyr-k8s-agent-with-openmetrics-monitor"]
+    RESULT_IMAGE_NAME = "scalyr-k8s-agent-with-openmetrics-monitor"
 
 
-# Instantiate builder steps for base images.
-BASE_DOCKER_IMAGE_BUILD_STEP_DEBIAN = BuildDockerBaseImageStep(
-    name=f"agent-docker-base-image-debian",
-    python_image_suffix="slim",
-    platforms=_AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS,
-)
-BASE_DOCKER_IMAGE_BUILD_STEP_ALPINE = BuildDockerBaseImageStep(
-    name=f"agent-docker-base-image-alpine",
-    python_image_suffix="alpine",
-    platforms=_AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS,
-)
-
-
-# Debian based images.
-class DockerJsonContainerBuilderDebian(DockerJsonContainerBuilder):
-    BASE_IMAGE_BUILDER_STEP = DEPLOYMENT_STEP = BASE_DOCKER_IMAGE_BUILD_STEP_DEBIAN
-
-class DockerSyslogContainerBuilderDebian(DockerSyslogContainerBuilder):
-    BASE_IMAGE_BUILDER_STEP = DEPLOYMENT_STEP = BASE_DOCKER_IMAGE_BUILD_STEP_DEBIAN
-
-class DockerApiContainerBuilderDebian(DockerApiContainerBuilder):
-    BASE_IMAGE_BUILDER_STEP = DEPLOYMENT_STEP = BASE_DOCKER_IMAGE_BUILD_STEP_DEBIAN
-
-class K8sContainerBuilderDebian(K8sContainerBuilder):
-    BASE_IMAGE_BUILDER_STEP = DEPLOYMENT_STEP = BASE_DOCKER_IMAGE_BUILD_STEP_DEBIAN
-
-class K8sWithOpenmetricsContainerBuilderDebian(K8sWithOpenmetricsContainerBuilder):
-    BASE_IMAGE_BUILDER_STEP = DEPLOYMENT_STEP = BASE_DOCKER_IMAGE_BUILD_STEP_DEBIAN
-
-# Alpine base images
-class DockerJsonContainerBuilderAlpine(DockerJsonContainerBuilder):
-    BASE_IMAGE_BUILDER_STEP = DEPLOYMENT_STEP = BASE_DOCKER_IMAGE_BUILD_STEP_ALPINE
-
-
-class DockerSyslogContainerBuilderAlpine(DockerSyslogContainerBuilder):
-    BASE_IMAGE_BUILDER_STEP = DEPLOYMENT_STEP = BASE_DOCKER_IMAGE_BUILD_STEP_ALPINE
-
-
-class DockerApiContainerBuilderAlpine(DockerApiContainerBuilder):
-    BASE_IMAGE_BUILDER_STEP = DEPLOYMENT_STEP = BASE_DOCKER_IMAGE_BUILD_STEP_ALPINE
-
-
-class K8sContainerBuilderAlpine(K8sContainerBuilder):
-    BASE_IMAGE_BUILDER_STEP = DEPLOYMENT_STEP = BASE_DOCKER_IMAGE_BUILD_STEP_ALPINE
-
-
-class K8sWithOpenmetricsContainerBuilderAlpine(K8sWithOpenmetricsContainerBuilder):
-    BASE_IMAGE_BUILDER_STEP = DEPLOYMENT_STEP = BASE_DOCKER_IMAGE_BUILD_STEP_ALPINE
-
-
-# Mapping of available docker image type (aka docker-json, docker-syslog) to a
-# particular image distro type (debian, alpine)
-
-_DISTRO_TO_BUILDERS = {
-    "debian":  [
-        DockerJsonContainerBuilderDebian,
-        DockerSyslogContainerBuilderDebian,
-        DockerApiContainerBuilderDebian,
-        K8sContainerBuilderDebian,
-        K8sWithOpenmetricsContainerBuilderDebian
-    ],
-    "alpine":  [
-        DockerJsonContainerBuilderAlpine,
-        DockerSyslogContainerBuilderAlpine,
-        DockerApiContainerBuilderAlpine,
-        K8sContainerBuilderAlpine,
-        K8sWithOpenmetricsContainerBuilderAlpine
+class K8sRestartAgentOnMonitorsDeathBuilder(ContainerImageBuilder):
+    BUILDER_NAME = "k8s-restart-agent-on-monitor-death"
+    IMAGE_TYPE_STAGE_NAME = "k8s"
+    CONFIG_PATH = SOURCE_ROOT / "docker" / "k8s-config"
+    ADDITIONAL_CONFIG_PATHS = [
+        SOURCE_ROOT / "docker" / "k8s-config-restart-agent-on-monitor-death"
     ]
-}
+    RESULT_IMAGE_NAME = "scalyr-k8s-restart-agent-on-monitor-death"
 
-# _DISTRO_TO_BUILDERS = {
-#     "debian":  {
-#         PackageType.DOCKER_JSON: DockerJsonContainerBuilderDebian,
-#         PackageType.DOCKER_SYSLOG: DockerSyslogContainerBuilderDebian,
-#         PackageType.DOCKER_API: DockerApiContainerBuilderDebian,
-#         PackageType.K8S: K8sContainerBuilderDebian,
-#         PackageType.K8S_WITH_OPENMETRICS: K8sWithOpenmetricsContainerBuilderDebian
-#     },
-#     "alpine":  {
-#         PackageType.DOCKER_JSON: DockerJsonContainerBuilderAlpine,
-#         PackageType.DOCKER_SYSLOG: DockerSyslogContainerBuilderAlpine,
-#         PackageType.DOCKER_API: DockerApiContainerBuilderAlpine,
-#         PackageType.K8S: K8sContainerBuilderAlpine,
-#         PackageType.K8S_WITH_OPENMETRICS: K8sWithOpenmetricsContainerBuilderAlpine
-#     }
-# }
+
+class ContainerImageBaseDistro(enum.Enum):
+    DEBIAN = "debian"
+    ALPINE = "alpine"
+
+    @property
+    def image_suffix(self):
+        suffixes = {
+            ContainerImageBaseDistro.DEBIAN: "slim",
+            ContainerImageBaseDistro.ALPINE: "alpine"
+        }
+        return suffixes[self]
+
+
+# Collection of the agent image base image builder stapes.
+_BASE_IMAGES_BUILDER_STEPS = {}
+
+for distro in ContainerImageBaseDistro:
+    _BASE_IMAGES_BUILDER_STEPS[distro] = BuildDockerBaseImageStep(
+        name=f"agent-docker-base-image-{distro.value}",
+        python_image_suffix=distro.image_suffix,
+        platforms=_AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS,
+)
+
+# # Instantiate builder steps for base images.
+# BASE_DOCKER_IMAGE_BUILD_STEP_DEBIAN = BuildDockerBaseImageStep(
+#     name=f"agent-docker-base-image-debian",
+#     python_image_suffix="slim",
+#     platforms=_AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS,
+# )
+# BASE_DOCKER_IMAGE_BUILD_STEP_ALPINE = BuildDockerBaseImageStep(
+#     name=f"agent-docker-base-image-alpine",
+#     python_image_suffix="alpine",
+#     platforms=_AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS,
+# )
+
+# Collection of all agent image builders grouped by base distro (debian, alpine).
+_DISTRO_BUILDERS = collections.defaultdict(list)
+
+
+def create_dictro_specific_image_builders(builder_cls: Type[ContainerImageBuilder]):
+    """
+    Helper function which creates distro-specific image builder classes from the base agent image builder class.
+    For example if builder is for docker-json image then it will produce builder for docker-json-debian,
+        docker-json-alpine, etc.
+    :param builder_cls: Base image builder class.
+    """
+
+    global _DISTRO_BUILDERS
+
+    module = sys.modules[__name__]
+
+    for distro in ContainerImageBaseDistro:
+
+        # Create CamelCase distro name suffix for builder class name.
+        distro_name_chars = list(distro.value)
+        distro_name_chars[0] = distro_name_chars[0].upper()
+        distro_camel_case_name = "".join(distro_name_chars)
+
+        builder_class_name = f"{builder_cls.__name__}{distro_camel_case_name}"
+
+        # Since we create those builders dynamically, they won't be able to find their FDQN properly,
+        # That's why we cheat a little with specifying FDQN manually.
+        # We'll create attribute in this module which will point to this particular builder class,
+        # and FQND has to be exactly this new attribute.
+        builder_fqnd = f"{module.__name__}.{builder_class_name}"
+
+        class _BuilderClass(builder_cls):
+            BASE_IMAGE_BUILDER_STEP = DEPLOYMENT_STEP = _BASE_IMAGES_BUILDER_STEPS[distro]
+            _FULLY_QUALIFIED_NAME = builder_fqnd
+
+        # Add result builder as current module's attribute because that's where the above FDQN has to point.
+        setattr(module, builder_class_name, _BuilderClass)
+
+        _DISTRO_BUILDERS[distro.value].append(_BuilderClass)
+
+
+create_dictro_specific_image_builders(DockerJsonContainerBuilder)
+create_dictro_specific_image_builders(DockerSyslogContainerBuilder)
+create_dictro_specific_image_builders(DockerApiContainerBuilder)
+create_dictro_specific_image_builders(K8sContainerBuilder)
+create_dictro_specific_image_builders(K8sWithOpenmetricsContainerBuilder)
+create_dictro_specific_image_builders(K8sRestartAgentOnMonitorsDeathBuilder)
 
 
 class ImageBulkBuilder(CacheableBuilder):
@@ -660,18 +582,26 @@ class ImageBulkBuilder(CacheableBuilder):
             image_builder.build(locally=locally)
 
 
+# Bulk builder for debian based images.
 class ImagesBulkBuilderDebian(ImageBulkBuilder):
-    REQUIRED_BUILDER_CLASSES = IMAGE_BUILDERS = _DISTRO_TO_BUILDERS["debian"][:]
+    REQUIRED_BUILDER_CLASSES = IMAGE_BUILDERS = _DISTRO_BUILDERS["debian"][:]
 
 
+# Bulk builder for alpine based images.
 class ImagesBulkBuilderAlpine(ImageBulkBuilder):
-    REQUIRED_BUILDER_CLASSES = IMAGE_BUILDERS = _DISTRO_TO_BUILDERS["alpine"][:]
+    REQUIRED_BUILDER_CLASSES = IMAGE_BUILDERS = _DISTRO_BUILDERS["alpine"][:]
 
 
-DOCKER_IMAGE_PACKAGE_BUILDERS = {}
-for distro_name, builders in _DISTRO_TO_BUILDERS.items():
+# Final collection with all agent image builder classes.
+DOCKER_IMAGE_BUILDERS = {}
+for distro_name, builders in _DISTRO_BUILDERS.items():
     for builder in builders:
-        DOCKER_IMAGE_PACKAGE_BUILDERS[f"{builder.PACKAGE_TYPE.value}-{distro_name}"] = builder
+        if builder.BUILDER_NAME in DOCKER_IMAGE_BUILDERS:
+            raise ValueError(f"Image builder name {builder.BUILDER_NAME} already exists, please rename is.")
+        DOCKER_IMAGE_BUILDERS[f"{builder.BUILDER_NAME}-{distro_name}"] = builder
 
-DOCKER_IMAGE_PACKAGE_BUILDERS["bulk-images-debian"] = ImagesBulkBuilderDebian
-DOCKER_IMAGE_PACKAGE_BUILDERS["bulk-images-alpine"] = ImagesBulkBuilderAlpine
+
+DOCKER_IMAGE_BULK_BUILDERS = {
+    "bulk-images-debian": ImagesBulkBuilderDebian,
+    "bulk-images-alpine": ImagesBulkBuilderAlpine
+}

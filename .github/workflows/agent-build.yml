@@ -30,11 +30,9 @@ jobs:
         images-distro: [ "debian" ]
         python-version: [ "3.8.13" ]
 
-
+    # Create local docker registry container where result images has to be pushed.
     services:
-      # Label used to access the service container
       registry:
-        # Docker Hub image
         image: registry:2
         ports:
           - 5000:5000
@@ -97,7 +95,7 @@ jobs:
         with:
           name: ${{ matrix.images-distro }}-images-result-registry
           path:  /tmp/output_registry
-          retention-days: 5
+          retention-days: 1
 
   test-images:
     runs-on: ubuntu-latest
@@ -105,9 +103,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image-type: [ "docker-json", "docker-syslog", "docker-api", "k8s", "k8s-restart-agent-on-monitor-death"]
-        image-distro-name: [ "debian" ]
+        #image-type: [ "docker-json", "docker-syslog", "docker-api", "k8s", "k8s-restart-agent-on-monitor-death"]
+        image-type: [ "k8s", "k8s-restart-agent-on-monitor-death"]
+        image-distro: [ "debian" ]
         python-version: [ "3.8.13" ]
+
+    # Create local docker registry container where we put previously built images.
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
+        volumes:
+          - /tmp/output_registry:/var/lib/registry
 
     env:
       DOCKER_BUILDKIT: 1
@@ -128,48 +136,59 @@ jobs:
         with:
           deployment-name: "agent_build.__init__.BuildTestEnvironment"
 
-      - name: Sanity check deployments logic by running internal tests
-        run: |
-          python3 -m pytest agent_build/tools/tests
+#      - name: Set up QEMU
+#        id: qemu
+#        uses: docker/setup-qemu-action@8b122486cedac8393e77aa9734c3528886e4a1a8 # v2
+#        with:
+#          image: tonistiigi/binfmt:qemu-v6.2.0
+#          platforms: all
 
-      - name: Set up QEMU
-        id: qemu
-        uses: docker/setup-qemu-action@8b122486cedac8393e77aa9734c3528886e4a1a8 # v2
+#      - name: Perform the build of the base docker image in the deployment.
+#        uses: ./.github/actions/perform-deployment
+#        with:
+#          deployment-name: ${{ matrix.image-type }}-${{ matrix.image-distro-name }}
+
+#      - name: Set up Docker Buildx
+#        uses: docker/setup-buildx-action@dc7b9719a96d48369863986a06765841d7ea23f6 # v2.0.0
+#        with:
+#          driver-opts: network=host
+
+#      - name: Start minikube for the test of the kubernetes build
+#        if: contains(matrix.image-type, 'k8s')
+#        shell: bash
+#        run: |
+#          minikube start
+#
+#          echo ""
+#          echo "kubectl version"
+#          kubectl version
+#          echo ""
+#          echo "kubectl cluster-info"
+#          echo ""
+#          kubectl cluster-info
+
+#      - name: Run image test
+#        env:
+#          SCALYR_API_KEY: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
+#        run: |
+#          python3 tests/package_tests/run_package_test.py package-test \
+#           "${{ matrix.image-type }}-${{ matrix.image-distro-name }}_test" \
+#            --name-suffix "_${{ github.run_number }}${{ github.run_attempt }}" \
+
+      - name: "Download result image in form of registry and put it in local registry's data root."
+      - uses: actions/download-artifact@v3
         with:
-          image: tonistiigi/binfmt:qemu-v6.2.0
-          platforms: all
+          name:  ${{ matrix.images-distro }}-images-result-registry
+          path: /tmp/output_registry
 
-      - name: Perform the build of the base docker image in the deployment.
-        uses: ./.github/actions/perform-deployment
-        with:
-          deployment-name: ${{ matrix.image-type }}-${{ matrix.image-distro-name }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@dc7b9719a96d48369863986a06765841d7ea23f6 # v2.0.0
-        with:
-          driver-opts: network=host
-
-      - name: Start minikube for the test of the kubernetes build
-        if: contains(matrix.image-type, 'k8s')
+      - name: Run tests
         shell: bash
         run: |
-          minikube start
-
-          echo ""
-          echo "kubectl version"
-          kubectl version
-          echo ""
-          echo "kubectl cluster-info"
-          echo ""
-          kubectl cluster-info
-
-      - name: Run image test
-        env:
-          SCALYR_API_KEY: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
-        run: |
-          python3 tests/package_tests/run_package_test.py package-test \
-           "${{ matrix.image-type }}-${{ matrix.image-distro-name }}_test" \
-            --name-suffix "_${{ github.run_number }}${{ github.run_attempt }}" \
+          python3 -m pytest  tests/end_to_end_tests/container_image_tests/k8s_test.py \
+              -k ${{ matrix.image-type }}-${{ matrix.image-distro }} \
+            --scalyr-api-key ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }} \
+            --scalyr-api-read-key ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }} \
+            --test-session-suffix ${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Notify Slack on Failure
         # NOTE: github.ref is set to pr ref (and not branch name, e.g. refs/pull/28/merge) for pull
