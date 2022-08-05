@@ -193,7 +193,7 @@ jobs:
           key: ${{ matrix.image-distro }}-images-result-registry-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}
 
       - name: Check availability of the images.
-        if: steps.cache.restore-registry.cache-hit != 'true'
+        if: steps.restore-registry.outputs.cache-hit != 'true'
         uses: actions/github-script@v3
         with:
           script: |
