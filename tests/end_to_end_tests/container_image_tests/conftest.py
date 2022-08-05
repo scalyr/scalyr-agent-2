@@ -30,14 +30,15 @@ def image_builder_cls(image_builder_name) -> Type[ContainerImageBuilder]:
 
 
 @pytest.fixture(scope="session")
-def image_registry(request):
+def image_name(image_builder_cls, request):
     """
     Registry URL from where to get image to test.
     """
 
+    reg_container = None
     # If registry is specified externally, then reuse it.
     if request.config.option.images_registry:
-        yield request.config.option.images_registry
+        full_image_name = f"{request.config.option.images_registry}/{image_builder_cls.RESULT_IMAGE_NAME}"
 
     # Registry is not specified, build the image and put it in the locally created registry.
     else:
@@ -48,29 +49,39 @@ def image_registry(request):
         reg_container.start()
 
         builder = image_builder_cls(
-            registry=image_registry,
+            registry=f"localhost:5050",
             push=True,
         )
-
         builder.build()
 
-        yield "localhost:5050"
-        reg_container.kill()
-
-
-@pytest.fixture(scope="session")
-def image_name(image_builder_cls, image_registry):
-
-    full_image_registry_name = f"{image_registry}/{image_builder_cls.RESULT_IMAGE_NAME}"
+        full_image_name = f"localhost:5050/{image_builder_cls.RESULT_IMAGE_NAME}"
 
     # Pull result image from registry.
-    check_call_with_log(["docker", "pull", full_image_registry_name])
-    check_call_with_log(["docker", "tag", full_image_registry_name, image_builder_cls.RESULT_IMAGE_NAME])
+    check_call_with_log(["docker", "pull", full_image_name])
 
-    yield image_builder_cls.RESULT_IMAGE_NAME
+    if reg_container:
+        reg_container.kill()
+
+    check_call_with_log(["docker", "tag", full_image_name, image_builder_cls.RESULT_IMAGE_NAME])
+
+    yield full_image_name
 
     check_call_with_log(["docker", "image", "rm", image_builder_cls.RESULT_IMAGE_NAME])
 
+
+# @pytest.fixture(scope="session")
+# def image_name(image_builder_cls, image_registry):
+#
+#     full_image_registry_name = f"{image_registry}/{image_builder_cls.RESULT_IMAGE_NAME}"
+#
+#     # Pull result image from registry.
+#     check_call_with_log(["docker", "pull", full_image_registry_name])
+#     check_call_with_log(["docker", "tag", full_image_registry_name, image_builder_cls.RESULT_IMAGE_NAME])
+#
+#     yield image_builder_cls.RESULT_IMAGE_NAME
+#
+#     check_call_with_log(["docker", "image", "rm", image_builder_cls.RESULT_IMAGE_NAME])
+#
 
 
 
