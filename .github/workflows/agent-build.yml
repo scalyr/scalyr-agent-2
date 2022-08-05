@@ -176,7 +176,7 @@ jobs:
 #            --name-suffix "_${{ github.run_number }}${{ github.run_attempt }}" \
 
       - name: "Download result image in form of registry and put it in local registry's data root."
-      - uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v3
         with:
           name:  ${{ matrix.images-distro }}-images-result-registry
           path: /tmp/output_registry
