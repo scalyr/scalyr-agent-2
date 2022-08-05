@@ -64,6 +64,9 @@ jobs:
         # but for now it will live here.
         env:
           PYTHONPATH: .
+          SCALYR_TOKEN_PROD_US: ${{ secrets.SCALYR_TOKEN_PROD_US }}
+          SCALYR_TOKEN_PROD_EU: ${{ secrets.SCALYR_TOKEN_PROD_EU }}
+          SCALYR_TOKEN_STAGING_EU: ${{ secrets.SCALYR_TOKEN_STAGING_EU }}
         run: ./scripts/verify-add-events-api-response-headers.py
 
       - name: Run Shell Scripts Lint Checks
