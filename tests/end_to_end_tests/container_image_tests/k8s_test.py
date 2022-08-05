@@ -629,15 +629,20 @@ def test_agent_pod_fails_on_k8s_monitor_fail(
 
 
 if __name__ == '__main__':
-    params = []
+    matrix = []
     for p in PARAMS:
         image_builder_name = p["image_builder_name"]
+        image_builder_cls = DOCKER_IMAGE_BUILDERS[image_builder_name]
+        image_distro = image_builder_cls.DISTRO
         kubernetes_version = p["kubernetes_version"]
         minikube_driver = p["minikube_driver"]
         container_runtime = p["container_runtime"]
 
-        params.append(
-            f"{image_builder_name}-{kubernetes_version}-{minikube_driver}-{container_runtime}"
-        )
+        matrix.append({
+            "os": "ubuntu-22.04",
+            "python-version": "3.8.13",
+            "pytest-params": f"{image_builder_name}-{kubernetes_version}-{minikube_driver}-{container_runtime}",
+            "image-distro": image_distro.value
+        })
 
-    print(json.dumps(params))
+    print(json.dumps(matrix))

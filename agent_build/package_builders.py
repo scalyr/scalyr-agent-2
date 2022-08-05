@@ -529,13 +529,14 @@ def create_distro_specific_image_builders(builder_cls: Type[ContainerImageBuilde
         builder_fqnd = f"{module.__name__}.{builder_class_name}"
 
         class _BuilderClass(builder_cls):
+            DISTRO = distro
             BASE_IMAGE_BUILDER_STEP = DEPLOYMENT_STEP = _BASE_IMAGES_BUILDER_STEPS[distro]
             _FULLY_QUALIFIED_NAME = builder_fqnd
 
         # Add result builder as current module's attribute because that's where the above FDQN has to point.
         setattr(module, builder_class_name, _BuilderClass)
 
-        _DISTRO_BUILDERS[distro.value].append(_BuilderClass)
+        _DISTRO_BUILDERS[distro].append(_BuilderClass)
 
 
 create_distro_specific_image_builders(DockerJsonContainerBuilder)
@@ -584,24 +585,36 @@ class ImageBulkBuilder(CacheableBuilder):
 
 # Bulk builder for debian based images.
 class ImagesBulkBuilderDebian(ImageBulkBuilder):
-    REQUIRED_BUILDER_CLASSES = IMAGE_BUILDERS = _DISTRO_BUILDERS["debian"][:]
+    REQUIRED_BUILDER_CLASSES = IMAGE_BUILDERS = _DISTRO_BUILDERS[ContainerImageBaseDistro.DEBIAN][:]
 
 
 # Bulk builder for alpine based images.
 class ImagesBulkBuilderAlpine(ImageBulkBuilder):
-    REQUIRED_BUILDER_CLASSES = IMAGE_BUILDERS = _DISTRO_BUILDERS["alpine"][:]
+    REQUIRED_BUILDER_CLASSES = IMAGE_BUILDERS = _DISTRO_BUILDERS[ContainerImageBaseDistro.ALPINE][:]
 
 
 # Final collection with all agent image builder classes.
 DOCKER_IMAGE_BUILDERS = {}
-for distro_name, builders in _DISTRO_BUILDERS.items():
+for distro, builders in _DISTRO_BUILDERS.items():
     for builder in builders:
         if builder.BUILDER_NAME in DOCKER_IMAGE_BUILDERS:
             raise ValueError(f"Image builder name {builder.BUILDER_NAME} already exists, please rename is.")
-        DOCKER_IMAGE_BUILDERS[f"{builder.BUILDER_NAME}-{distro_name}"] = builder
+        DOCKER_IMAGE_BUILDERS[f"{builder.BUILDER_NAME}-{distro.value}"] = builder
 
 
 DOCKER_IMAGE_BULK_BUILDERS = {
     "bulk-images-debian": ImagesBulkBuilderDebian,
     "bulk-images-alpine": ImagesBulkBuilderAlpine
 }
+
+
+if __name__ == '__main__':
+    matrix = {
+        "os": ["ubuntu-22.04"],
+        "python-version": ["3.8.13"],
+        "image-distro": []
+    }
+    for distro in _DISTRO_BUILDERS.keys():
+        matrix["image-distro"].append(distro.value)
+
+    print(json.dumps(matrix))
