@@ -98,6 +98,8 @@ jobs:
           retention-days: 1
 
   test-images:
+    needs:
+      - build-images
     runs-on: ubuntu-latest
 
     strategy:
