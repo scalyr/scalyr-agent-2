@@ -51,16 +51,18 @@ jobs:
           echo "::set-output name=build-matrix-json::$(python3 -m agent_build.package_builders)"
           echo "::set-output name=test-matrix-json::$(python3 -m tests.end_to_end_tests.container_image_tests.k8s_test)"
         
-        
 
   build-images:
     needs:
       - pre-job
     runs-on: ${{ matrix.os }}
-    outputs:
-      saved-registry: ${{ steps.upload-registry.saved_name }}
 
     strategy:
+      # This job receives its matrix from the previous step. The matrix itself is created by the agent_build/package_builder.py module.
+      # The matrix, for now, consists only from the 'include' part with following fields:
+      #   "image-distro": name of the base distro for image (e.g. debian, alpine)
+      #   "python-version": Version of python to setup on this runner. (NOTE: version of python used in images may differ, and it specified in the source code.)
+      #   "os": Runner OS.
       matrix: ${{ fromJSON(needs.pre-job.outputs.build-matrix-json) }}
 
     # Create local docker registry container where result images has to be pushed.
@@ -114,22 +116,6 @@ jobs:
         with:
           deployment-name: ${{ steps.get-builder-fqdn.outputs.fqdn }}
 
-      # Use GitHub's cache to share registry with next jobs.
-      # Since the result registry is not so small, it may be better to avoid using artifacts,
-      # at least on non-master branches
-      - name: Perform the deployment of the test environment
-        uses: ./.github/actions/share-in-cache
-        id: upload-registry
-        with:
-          path: /tmp/output_registry
-          name: ${{ matrix.image-distro }}-images-result-registry
-
-#      - name: 'Upload docker registry with result image to cache.'
-#        uses: actions/cache@v3
-#        with:
-#          path: /tmp/output_registry
-#          # use all available workflow identifiers to provide unique cache key.
-#          key: ${{ matrix.image-distro }}-images-result-registry-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}
 
       # We build all images with tha same base image all at once and store all result images in a single
       # registry.
@@ -138,6 +124,13 @@ jobs:
           python3 build_package_new.py bulk-images-${{ matrix.image-distro }} \
             --registry localhost:5000 \
             --push
+
+      - name: Save result registry data root with all result images.
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.image-distro }}-image-registry
+          path: /tmp/output_registry
+
 
   test-k8s-images:
     needs:
@@ -168,19 +161,11 @@ jobs:
         with:
           deployment-name: "agent_build.__init__.BuildTestEnvironment"
 
-      - name: 'Restore target images from cache.'
-        uses: actions/cache@v3
-        id: restore-registry
+      - name: Download registry with previously built images.
+        uses: actions/download-artifact@v3
         with:
+          name: ${{ matrix.image-distro }}-image-registry
           path: /tmp/output_registry
-          key: ${{ needs.build-images.outputs.saved-registry }}
-
-      - name: Check availability of the images.
-        if: steps.restore-registry.outputs.cache-hit != 'true'
-        uses: actions/github-script@v3
-        with:
-          script: |
-            core.setFailed('Result image registry is not found in cache.')
 
       - name: "Start local registry with result images from artifacts."
         run: |
@@ -189,7 +174,6 @@ jobs:
             -p 5000:5000 \
             -v /tmp/output_registry:/var/lib/registry \
             registry:2 
-
 
       - name: Run tests
         shell: bash
