@@ -34,7 +34,7 @@ jobs:
       - name: Install python
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.8.13"
 
       - name: Perform the deployment of the test environment
         uses: ./.github/actions/perform-deployment
@@ -44,7 +44,9 @@ jobs:
       - name: "Get build and test job matrices."
         id: get-job-matrices
         run: |
+          echo "Build job matrix:"
           echo "$(python3 -m agent_build.package_builders)"
+          echo "Test job matrix: "
           echo "$(python3 -m tests.end_to_end_tests.container_image_tests.k8s_test)"
           echo "::set-output name=build-matrix-json::$(python3 -m agent_build.package_builders)"
           echo "::set-output name=test-matrix-json::$(python3 -m tests.end_to_end_tests.container_image_tests.k8s_test)"
@@ -55,9 +57,10 @@ jobs:
     needs:
       - pre-job
     runs-on: ${{ matrix.os }}
+    outputs:
+      saved-registry: ${{ steps.upload-registry.saved_name }}
 
     strategy:
-      fail-fast: false
       matrix: ${{ fromJSON(needs.pre-job.outputs.build-matrix-json) }}
 
     # Create local docker registry container where result images has to be pushed.
@@ -114,12 +117,19 @@ jobs:
       # Use GitHub's cache to share registry with next jobs.
       # Since the result registry is not so small, it may be better to avoid using artifacts,
       # at least on non-master branches
-      - name: 'Upload docker registry with result image to cache.'
-        uses: actions/cache@v3
+      - name: Perform the deployment of the test environment
+        uses: ./.github/actions/share-in-cache
+        id: upload-registry
         with:
           path: /tmp/output_registry
-          # use all available workflow identifiers to provide unique cache key.
-          key: ${{ matrix.image-distro }}-images-result-registry-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}
+          name: ${{ matrix.image-distro }}-images-result-registry
+
+#      - name: 'Upload docker registry with result image to cache.'
+#        uses: actions/cache@v3
+#        with:
+#          path: /tmp/output_registry
+#          # use all available workflow identifiers to provide unique cache key.
+#          key: ${{ matrix.image-distro }}-images-result-registry-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}
 
       # We build all images with tha same base image all at once and store all result images in a single
       # registry.
@@ -128,14 +138,6 @@ jobs:
           python3 build_package_new.py bulk-images-${{ matrix.image-distro }} \
             --registry localhost:5000 \
             --push
-          
-
-#      - name: 'Upload docker registry with result image as artifact.'
-#        uses: actions/upload-artifact@v3
-#        with:
-#          name: ${{ matrix.image-distro }}-images-result-registry
-#          path:  /tmp/output_registry
-#          retention-days: 1
 
   test-k8s-images:
     needs:
@@ -166,57 +168,12 @@ jobs:
         with:
           deployment-name: "agent_build.__init__.BuildTestEnvironment"
 
-#      - name: Set up QEMU
-#        id: qemu
-#        uses: docker/setup-qemu-action@8b122486cedac8393e77aa9734c3528886e4a1a8 # v2
-#        with:
-#          image: tonistiigi/binfmt:qemu-v6.2.0
-#          platforms: all
-
-#      - name: Perform the build of the base docker image in the deployment.
-#        uses: ./.github/actions/perform-deployment
-#        with:
-#          deployment-name: ${{ matrix.image-type }}-${{ matrix.image-distro-name }}
-
-#      - name: Set up Docker Buildx
-#        uses: docker/setup-buildx-action@dc7b9719a96d48369863986a06765841d7ea23f6 # v2.0.0
-#        with:
-#          driver-opts: network=host
-
-#      - name: Start minikube for the test of the kubernetes build
-#        if: contains(matrix.image-type, 'k8s')
-#        shell: bash
-#        run: |
-#          minikube start
-#
-#          echo ""
-#          echo "kubectl version"
-#          kubectl version
-#          echo ""
-#          echo "kubectl cluster-info"
-#          echo ""
-#          kubectl cluster-info
-
-#      - name: Run image test
-#        env:
-#          SCALYR_API_KEY: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
-#        run: |
-#          python3 tests/package_tests/run_package_test.py package-test \
-#           "${{ matrix.image-type }}-${{ matrix.image-distro-name }}_test" \
-#            --name-suffix "_${{ github.run_number }}${{ github.run_attempt }}" \
-
-#      - name: "Download result image in form of registry and put it in local registry's data root."
-#        uses: actions/download-artifact@v3
-#        with:
-#          name:  ${{ matrix.image-distro }}-images-result-registry
-#          path: /tmp/output_registry
-
       - name: 'Restore target images from cache.'
         uses: actions/cache@v3
         id: restore-registry
         with:
           path: /tmp/output_registry
-          key: ${{ matrix.image-distro }}-images-result-registry-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}
+          key: ${{ needs.build-images.outputs.saved-registry }}
 
       - name: Check availability of the images.
         if: steps.restore-registry.outputs.cache-hit != 'true'

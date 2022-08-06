@@ -1,0 +1,36 @@
+name: "Share in cache"
+description: "Upload something to cache to be able to reuse it next jobs."
+
+inputs:
+  path:
+    description: "Path to upload to cache"
+    required: true
+
+  name:
+    description: "Name of the upload."
+    required: true
+
+outputs:
+  saved_name:
+    description: "Full name of the uploaded path."
+    value: ${{ steps.create-full-path.outputs.full-path }}
+
+
+
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Create unique full path"
+      id: create-full-path
+      shell: bash
+      run: |
+        echo "::set-output name=full-path::${{ input.name }}-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}"
+
+    - name: 'Upload to cache.'
+      id: upload
+      uses: actions/cache@v3
+      with:
+        path: ${{ inputs.path }}
+        # use all available workflow identifiers to provide unique cache key.
+        key: ${{ steps.create-full-path.outputs.full-path }}
