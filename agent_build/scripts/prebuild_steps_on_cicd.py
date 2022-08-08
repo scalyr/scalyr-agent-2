@@ -15,7 +15,7 @@ for builder in DOCKER_IMAGE_BUILDERS.values():
 ALL_STEP_BUILDERS = []
 for step_id, step in ALL_STEPS_TO_PREBUILD.items():
     class StepWrapperBuilder(CacheableBuilder):
-        REQUIRED_STEPS = [cacheable_step]
+        REQUIRED_STEPS = [step]
 
 
     StepWrapperBuilder.assign_fully_qualified_name(
