@@ -27,7 +27,7 @@ async function checkAndGetCache(
     finalCacheSuffix
 ) {
     //
-    // Check if there is an existing cache for the given deployment step name.
+    // Check if there is an existing cache for the given step name.
     //
     const cachePath = path.join(cacheDir, name)
     const key = `${name}-${finalCacheSuffix}`
@@ -36,9 +36,9 @@ async function checkAndGetCache(
     const result = await cache.restoreCache([cachePath], key)
 
     if (typeof result !== "undefined") {
-        console.log(`Cache for the deployment step with key ${key} is found.`)
+        console.log(`Cache for the step with key ${key} is found.`)
     } else {
-        console.log(`Cache for the deployment step with key ${key} is not found.`)
+        console.log(`Cache for the step with key ${key} is not found.`)
     }
 
     // Return whether it is a hit or not.
@@ -52,35 +52,35 @@ async function checkAndSaveCache(
     finalCacheSuffix
 ) {
     //
-    // Save the cache directory for a particular deployment step if it hasn't been saved yet.
+    // Save the cache directory for a particular step if it hasn't been saved yet.
     //
 
     const fullPath = path.join(cacheDir, name)
     const cacheKey = `${name}-${finalCacheSuffix}`
 
-    // Skip files. Deployment cache can be only the directory.
+    // Skip files. Cache can be only the directory.
     if (!fs.lstatSync(fullPath).isDirectory()) {
         return
     }
 
     // If there's no cache hit, then save directory to the cache now.
     if (isHit) {
-        console.log(`Cache for the deployment step with key ${cacheKey} has been hit. Skip saving.`)
+        console.log(`Cache for the step with key ${cacheKey} has been hit. Skip saving.`)
     }
     else {
-        console.log(`Save cache for the deployment step with key ${cacheKey}.`)
+        console.log(`Save cache for the step with key ${cacheKey}.`)
 
         try {
             await cache.saveCache([fullPath], cacheKey)
         } catch (error) {
             console.warn(
-                `Can not save deployment cache by key ${cacheKey}. 
+                `Can not save cache by key ${cacheKey}.
                 It seems that seems that it has been saved somewhere else.\nOriginal message: ${error}`
             )
         }
     }
 
-    // After the deployment, the deployment can leave a special file 'paths.txt'.
+    // The step can leave a special file 'paths.txt'.
     // This file contains paths of the tools that are needed to be added to the system's PATH.
     const pathsFilePath = path.join(fullPath, "paths.txt")
     if (fs.existsSync(pathsFilePath)) {
@@ -96,40 +96,40 @@ async function checkAndSaveCache(
     }
 }
 
-async function performDeployment() {
+async function executeRunner() {
     // The main action function. It does the following:
-    // 1. Get all cache names of the steps of the given deployment and then try to load those caches by using that names.
-    // 2. Run the deployment. If there are cache hits that have been done previously, then the deployment will reuse them.
-    // 3. If there are deployment steps, which results haven't been found during the step 1, then the results of those
+    // 1. Get all cache names of the steps of the given runner and then try to load those caches by using that names.
+    // 2. Execute the runner. If there are cache hits that have been done previously, then the runner will reuse them.
+    // 3. If there are steps, which results haven't been found during the step 1, then the results of those
     //    steps will be cached using their cache names.
 
-    const deploymentName = core.getInput("deployment-name");
+    const runnerFQDN = core.getInput("runner-fqdn");
     const cacheVersionSuffix = core.getInput("cache-version-suffix");
-    const cacheDir = path.resolve(path.join("agent_build_output", "deployment_cache"));
+    const cacheDir = path.resolve(path.join("agent_build_output", "step_cache"));
     const cacheKeyRunnerPart = core.getInput("cache-key-runner-part")
     if (!fs.existsSync(cacheDir)) {
         fs.mkdirSync(cacheDir,{recursive: true})
     }
 
-    // Get json list with names of all deployments which are needed for this deployment.
-    const deployment_helper_script_path = path.join("agent_build", "scripts", "builder_helper.py")
-    // Run special github-related helper command which returns names for all deployments, which are used in the current
-    // deployment.
+    // Get json list with names of all steps which are needed for this runner.
+    const runner_helper_script_path = path.join("agent_build", "scripts", "runner_helper.py")
+    // Run special github-related helper command which returns names for all steps, which are used in the current
+    // runner.
     const code = child_process.execFileSync(
         "python3",
-        [deployment_helper_script_path, deploymentName, "--get-all-cacheable-steps"]
+        [runner_helper_script_path, runnerFQDN, "--get-all-cacheable-steps"]
     );
 
     // Read and decode names from json.
-    const json_encoded_deployment_names = buffer.Buffer.from(code, 'utf8').toString()
-    const deployment_cache_names = JSON.parse(json_encoded_deployment_names)
+    const json_encoded_step_names = buffer.Buffer.from(code, 'utf8').toString()
+    const step_cache_names = JSON.parse(json_encoded_step_names)
 
     const cacheHits = {}
 
     const finalCacheSuffix = `${cacheKeyRunnerPart}-${cacheVersionSuffix}`
 
-    // Run through deployment names and look if the is any existing cache for them.
-    for (let name of deployment_cache_names) {
+    // Run through step names and look if the is any existing cache for them.
+    for (let name of step_cache_names) {
         console.log(name);
         cacheHits[name] = await checkAndGetCache(
             name,
@@ -138,11 +138,11 @@ async function performDeployment() {
         )
     }
 
-    // Run the deployment. Also provide cache directory, if there are some found caches, then the deployment
+    // Execute runner's steps. Also provide cache directory, if there are some found caches, then the step
     // has to reuse them.
     child_process.execFileSync(
         "python3",
-        [deployment_helper_script_path, deploymentName, "--run-all-cacheable-steps"],
+        [runner_helper_script_path, runnerFQDN, "--run-all-cacheable-steps"],
         {stdio: 'inherit'}
     );
 
@@ -163,7 +163,7 @@ async function performDeployment() {
 async function run() {
     // Entry function. Just catch any error and pass it to GH Actions.
   try {
-      await performDeployment()
+      await executeRunner()
   } catch (error) {
     core.setFailed(error.message);
   }
