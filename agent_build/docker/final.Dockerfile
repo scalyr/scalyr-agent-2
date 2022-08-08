@@ -1,6 +1,7 @@
 ARG BASE_IMAGE_NAME
 ARG TARGETPLATFORM
 ARG IMAGE_TYPE_STAGE_NAME
+ARG PYTHON_BASE_IMAGE
 
 
 FROM ${BASE_IMAGE_NAME}:${TARGETOS}-${TARGETARCH}-${TARGETVARIANT} as scalyr-build
@@ -20,7 +21,7 @@ RUN tar -xf /tmp/build/scalyr-agent.tar.gz
 WORKDIR /
 
 # Copy result files to a new base stage.
-FROM ${BASE_IMAGE_NAME} as scalyr-base
+FROM ${PYTHON_BASE_IMAGE} as scalyr-base
 MAINTAINER Scalyr Inc <support@scalyr.com>
 # Copy Agent's Python dependencies. Those dependencies were built in the base image,
 # which is given by 'BASE_IMAGE' arg.

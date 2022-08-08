@@ -37,10 +37,10 @@ jobs:
         with:
           python-version: "3.8.13"
 
-      - name: Perform the deployment of the test environment
-        uses: ./.github/actions/perform-deployment
-        with:
-          deployment-name: "agent_build.__init__.BuildTestEnvironment"
+#      - name: Perform the deployment of the test environment
+#        uses: ./.github/actions/perform-deployment
+#        with:
+#          deployment-name: "agent_build.__init__.BuildTestEnvironment"
 
       - name: "Get build and test job matrices."
         id: get-job-matrices
@@ -153,7 +153,7 @@ jobs:
 
       # We build all images with tha same base image all at once and store all result images in a single
       # registry.
-      - name: Build All Images For The ${{ matrix.builder-name }}
+      - name: Build images with builder '${{ matrix.builder-name }}'
         run: |
           python3 build_package_new.py ${{ matrix.builder-name }} \
             --registry localhost:5000 \
