@@ -8,11 +8,6 @@ on:
     branches:
       - master
 
-permissions:
-  actions: write  # Needed for skip-duplicate-jobs job
-  contents: read
-  checks: write   # Needed for publish test results job
-  pull-requests: write   # Needed for publish test results job
 
 jobs:
   # Special job which automatically cancels old runs for the same branch, prevents runs for the
@@ -20,6 +15,9 @@ jobs:
   pre_job:
     name: Skip Duplicate Jobs Pre Job
     runs-on: ubuntu-latest
+    permissions:
+      actions: write  # Needed for skip-duplicate-jobs job
+      contents: read
     outputs:
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
     steps:
@@ -115,17 +113,21 @@ jobs:
             .coverage
         if: ${{ success() || failure() }}
 
-      - name: Publish Test Results (for linux)
+  publish-test-results:
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write   # Needed for publish test results job
+      pull-requests: write   # Needed for publish test results job
+    if: success() || failure()
+    needs:
+      - pre_job
+      - unittests
+    steps:
+      - name: Download test results
+        uses: actions/download-artifact@v3
+        with:
+          path: reports
+      - name: Publish Test Results
         uses: EnricoMi/publish-unit-test-result-action@v2
-        if: ${{ matrix.platform == 'ubuntu' && ( success() || failure() ) }}
         with:
-          junit_files: "test-results/junit*.xml"
-          comment_title: Test Results - Python ${{ matrix.python-version }} - ${{ matrix.platform }}
-
-      - name: Publish Test Results (for not linux)
-        # the regular version of this action runs in a docker container.
-        uses: EnricoMi/publish-unit-test-result-action/composite@v2
-        if: ${{ matrix.platform != 'ubuntu' && ( success() || failure() ) }}
-        with:
-          junit_files: "test-results/junit*.xml"
-          comment_title: Test Results - Python ${{ matrix.python-version }} - ${{ matrix.platform }}
+          junit_files: "reports/**/junit*.xml"
