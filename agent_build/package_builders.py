@@ -798,24 +798,23 @@ for base_distro, builders in _DISTRO_BUILDERS.items():
             raise ValueError(f"Image builder name {builder.BUILDER_NAME} already exists, please rename is.")
         DOCKER_IMAGE_BUILDERS[builder.BUILDER_NAME] = builder
 
-
-DOCKER_IMAGE_BULK_BUILDERS = {
-    "bulk-images-debian": ImagesBulkBuilderDebian,
-    "bulk-images-alpine": ImagesBulkBuilderAlpine
-}
+#
+# DOCKER_IMAGE_BULK_BUILDERS = {
+#     "bulk-images-debian": ImagesBulkBuilderDebian,
+#     "bulk-images-alpine": ImagesBulkBuilderAlpine
+# }
 
 
 if __name__ == '__main__':
     matrix = {
         "include": []
     }
-    for base_distro in _DISTRO_BUILDERS.keys():
+
+    for builder_name, builder in DOCKER_IMAGE_BUILDERS.items():
         matrix["include"].append({
-            "image-distro": base_distro.value,
+            "builder-name": builder_name,
             "python-version": "3.8.13",
             "os": "ubuntu-20.04",
-
-
         })
 
     print(json.dumps(matrix))

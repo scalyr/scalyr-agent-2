@@ -103,7 +103,7 @@ jobs:
     strategy:
       # This job receives its matrix from the previous job. The matrix itself is created by the agent_build/package_builder.py module.
       # The matrix, for now, consists only from the 'include' part with following fields:
-      #   "image-distro": name of the base distro for image (e.g. debian, alpine)
+      #   "builder-name": name of the base distro for image (e.g. debian, alpine)
       #   "python-version": Version of python to setup on this runner. (NOTE: version of python used in images may differ, and it specified in the source code.)
       #   "os": Runner OS.
       matrix: ${{ fromJSON(needs.pre-job.outputs.build-matrix-json) }}
@@ -143,7 +143,7 @@ jobs:
         id: get-builder-fqdn
         run: |
           set -e
-          echo "::set-output name=fqdn::$(python3 build_package_new.py bulk-images-${{ matrix.image-distro }} --fqdn)"
+          echo "::set-output name=fqdn::$(python3 build_package_new.py bulk-images-${{ matrix.builder-name }} --fqdn)"
 
       - name: Perform the build of the base docker image in the deployment.
         uses: ./.github/actions/perform-deployment
