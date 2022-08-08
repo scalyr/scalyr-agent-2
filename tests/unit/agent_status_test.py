@@ -346,6 +346,14 @@ class TestReportStatus(ScalyrTestCase):
         monitor_status.reported_lines = 20
         monitor_status.errors = 40
 
+        monitor_status = MonitorStatus()
+        monitor_manager.monitors_status.append(monitor_status)
+        monitor_status.stop_agent_on_failure = True
+        monitor_status.is_alive = True
+        monitor_status.monitor_name = "essential_monitor()"
+        monitor_status.reported_lines = 20
+        monitor_status.errors = 40
+
     def make_default(self):
         """
         Keep only one worker and one session to reproduce the default config case.
@@ -449,6 +457,7 @@ Monitors:
 Running monitors:
   linux_process_metrics(agent): 50 lines emitted, 2 errors
   linux_system_metrics(): 20 lines emitted, 0 errors
+  essential_monitor(): 20 lines emitted, 40 errors, stop_agent_on_failure=true
 
 Failed monitors:
   bad_monitor() 20 lines emitted, 40 errors
@@ -535,6 +544,7 @@ Monitors:
 Running monitors:
   linux_process_metrics(agent): 50 lines emitted, 2 errors
   linux_system_metrics(): 20 lines emitted, 0 errors
+  essential_monitor(): 20 lines emitted, 40 errors, stop_agent_on_failure=true
 
 Failed monitors:
   bad_monitor() 20 lines emitted, 40 errors
@@ -625,6 +635,7 @@ Monitors:
 Running monitors:
   linux_process_metrics(agent): 50 lines emitted, 2 errors
   linux_system_metrics(): 20 lines emitted, 0 errors
+  essential_monitor(): 20 lines emitted, 40 errors, stop_agent_on_failure=true
 
 Failed monitors:
   bad_monitor() 20 lines emitted, 40 errors
@@ -728,6 +739,7 @@ Monitors:
 Running monitors:
   linux_process_metrics(agent): 50 lines emitted, 2 errors
   linux_system_metrics(): 20 lines emitted, 0 errors
+  essential_monitor(): 20 lines emitted, 40 errors, stop_agent_on_failure=true
 
 Failed monitors:
   bad_monitor() 20 lines emitted, 40 errors
@@ -816,6 +828,7 @@ Monitors:
 Running monitors:
   linux_process_metrics(agent): 50 lines emitted, 2 errors
   linux_system_metrics(): 20 lines emitted, 0 errors
+  essential_monitor(): 20 lines emitted, 40 errors, stop_agent_on_failure=true
 
 Failed monitors:
   bad_monitor() 20 lines emitted, 40 errors
@@ -1015,6 +1028,7 @@ Monitors:
 Running monitors:
   linux_process_metrics(agent): 50 lines emitted, 2 errors
   linux_system_metrics(): 20 lines emitted, 0 errors
+  essential_monitor(): 20 lines emitted, 40 errors, stop_agent_on_failure=true
 
 Failed monitors:
   bad_monitor() 20 lines emitted, 40 errors
@@ -1125,6 +1139,7 @@ Monitors:
 Running monitors:
   linux_process_metrics(agent): 50 lines emitted, 2 errors
   linux_system_metrics(): 20 lines emitted, 0 errors
+  essential_monitor(): 20 lines emitted, 40 errors, stop_agent_on_failure=true
 
 Failed monitors:
   bad_monitor() 20 lines emitted, 40 errors
@@ -1247,6 +1262,7 @@ Monitors:
 Running monitors:
   linux_process_metrics(agent): 50 lines emitted, 2 errors
   linux_system_metrics(): 20 lines emitted, 0 errors
+  essential_monitor(): 20 lines emitted, 40 errors, stop_agent_on_failure=true
 
 Failed monitors:
   bad_monitor() 20 lines emitted, 40 errors
@@ -1382,6 +1398,7 @@ Monitors:
 Running monitors:
   linux_process_metrics(agent): 50 lines emitted, 2 errors
   linux_system_metrics(): 20 lines emitted, 0 errors
+  essential_monitor(): 20 lines emitted, 40 errors, stop_agent_on_failure=true
 
 Failed monitors:
   bad_monitor() 20 lines emitted, 40 errors
