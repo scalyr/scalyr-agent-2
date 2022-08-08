@@ -34,14 +34,13 @@ sys.path.append(str(__SOURCE_ROOT__))
 
 from agent_build.tools import common
 from agent_build.tools.environment_deployments.deployments import CacheableBuilder
-from agent_build.package_builders import DOCKER_IMAGE_BUILDERS, DOCKER_IMAGE_BULK_BUILDERS
+from agent_build.package_builders import DOCKER_IMAGE_BUILDERS
 
 _AGENT_BUILD_PATH = __SOURCE_ROOT__ / "agent_build"
 
 
 BUILDERS: Dict[str, CacheableBuilder]  = {
     **DOCKER_IMAGE_BUILDERS,
-    **DOCKER_IMAGE_BULK_BUILDERS
 }
 
 if __name__ == "__main__":
