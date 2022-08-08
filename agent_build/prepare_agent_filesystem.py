@@ -231,7 +231,6 @@ def build_agent_base_files(
         output_path: pl.Path,
         install_type: str,
         version: str = None,
-        #config_path: pl.Path = None,
         frozen_binary_path: pl.Path = None,
         copy_agent_source: bool = False
 ):
@@ -243,7 +242,6 @@ def build_agent_base_files(
     :param version: Version string to assign to the future package, uses version from the VERSION file if None.
     :param frozen_binary_path: Path to frozen binaries, if specified, then those binaries will be used in the
         'bin' folder. Excludes 'copy_agent_source'.
-    # :param config_path: Path to a particular config directory that will be copied to agent files.
     :param copy_agent_source: If True, then agent's source code is also copied into the '<output_path>/py' directory.
         In opposite, it is expected that a frozen binaries will be placed instead of source code later.
     """
@@ -267,12 +265,6 @@ def build_agent_base_files(
         shutil.copy2(
             SOURCE_ROOT / "VERSION", output_path / "VERSION"
         )
-
-    # if config_path:
-    #     add_config(
-    #         config_source_path=config_path,
-    #         output_path=output_path / "config"
-    #     )
 
     # Create bin directory with executables.
     bin_path = output_path / "bin"
@@ -328,7 +320,6 @@ def build_linux_agent_files(
         output_path: pl.Path,
         install_type: str,
         version: str = None,
-        #config_path: pl.Path = None,
         frozen_binary_path: pl.Path = None,
         copy_agent_source: bool = False
 ):
@@ -338,7 +329,6 @@ def build_linux_agent_files(
     :param install_type: String with install type of the future package.
         See 'install_info' in scalyr_agent/__scalyr__.py module.
     :param version: Version string to assign to the future package, uses version from the VERSION file if None.
-    #:param config_path: Path to a particular config directory that will be copied to agent files.
     :param frozen_binary_path: Path to frozen binaries, if specified, then those binaries will be used in the
         'bin' folder. Excludes 'copy_agent_source'.
     :param copy_agent_source: If True, then agent's source code is also copied into the '<output_path>/py' directory.
@@ -349,7 +339,6 @@ def build_linux_agent_files(
         output_path=output_path,
         install_type=install_type,
         version=version,
-        #config_path=config_path,
         frozen_binary_path=frozen_binary_path,
         copy_agent_source=copy_agent_source
     )
@@ -371,7 +360,6 @@ def build_linux_agent_files(
 def build_linux_lfs_agent_files(
         output_path: pl.Path,
         version: str = None,
-        #config_path: pl.Path = None,
         frozen_binary_path: pl.Path = None,
         copy_agent_source: bool = False,
 ):
@@ -380,7 +368,6 @@ def build_linux_lfs_agent_files(
         In opposite, it is expected that a frozen binaries will be placed instead of source code later.
     :param output_path: Output path for the root of the agent's base files.
     :param version: Version string to assign to the future package, uses version from the VERSION file if None.
-    #:param config_path: Path to a particular config directory that will be copied to agent files.
     :param frozen_binary_path: Path to frozen binaries, if specified, then those binaries will be used in the
         'bin' folder. Excludes 'copy_agent_source'.
     :param copy_agent_source: If True, then agent's source code is also copied into the '<output_path>/py' directory.
@@ -396,20 +383,6 @@ def build_linux_lfs_agent_files(
 
     pl.Path(output_path, "var/log/scalyr-agent-2").mkdir(parents=True)
     pl.Path(output_path, "var/lib/scalyr-agent-2").mkdir(parents=True)
-
-    # if config_path:
-    #     add_config(
-    #         config_source_path=config_path,
-    #         output_path=output_path / "etc/scalyr-agent-2"
-    #     )
-
-    bin_path = agent_install_root / "bin"
-
-    # copy scalyr-agent-2-config wrapper script.
-    shutil.copy(
-        SOURCE_ROOT / "agent_build/linux/scalyr-agent-2-config",
-        bin_path
-    )
 
     usr_sbin_path = output_path / "usr/sbin"
     usr_sbin_path.mkdir(parents=True)

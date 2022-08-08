@@ -31,7 +31,7 @@ from agent_build.tools.common import check_output_with_log, check_call_with_log
 from agent_build.tools.constants import SOURCE_ROOT
 from tests.end_to_end_tests.verify import verify_logs, ScalyrQueryRequest
 
-from agent_build.package_builders import DOCKER_IMAGE_BUILDERS, ContainerImageBaseDistro
+from agent_build.docker_image_builders import DOCKER_IMAGE_BUILDERS, ContainerImageBaseDistro
 
 
 log = logging.getLogger(__name__)

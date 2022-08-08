@@ -15,7 +15,6 @@
 # This is a new package build script which uses new package  build logic.
 # usage:
 #       build_package_new.py <name of the package> --output-dir <output directory>
-import logging
 import pathlib as pl
 import argparse
 import sys
@@ -33,13 +32,13 @@ __SOURCE_ROOT__ = __PARENT_DIR__
 sys.path.append(str(__SOURCE_ROOT__))
 
 from agent_build.tools import common
-from agent_build.tools.environment_deployments.deployments import CacheableBuilder
-from agent_build.package_builders import DOCKER_IMAGE_BUILDERS
+from agent_build.tools.runner import Runner
+from agent_build.docker_image_builders import DOCKER_IMAGE_BUILDERS
 
 _AGENT_BUILD_PATH = __SOURCE_ROOT__ / "agent_build"
 
 
-BUILDERS: Dict[str, CacheableBuilder]  = {
+BUILDERS: Dict[str, Runner]  = {
     **DOCKER_IMAGE_BUILDERS,
 }
 

@@ -1,17 +1,14 @@
 # Base image that creates all necessary dependencies for the scalyr-agent docker image.
 # NOTE: multi-stage builds require Docker 17.05 or greater
 
-## Suffix for the python dockerhub image. For now can be:
-##   - 'slim' for debian based image
-##   - 'alpine' for alpine based image.
-#ARG BASE_IMAGE_SUFFIX
-
+# Name of base python image, e.g. python:slim, python:alpine
 ARG PYTHON_BASE_IMAGE
 
-# Install dependency packages for debian.
+# Install dependency packages.
 FROM ${PYTHON_BASE_IMAGE} as scalyr-base-dependencies
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
+# Short name of the base distribution type, e.g. debian, alpine.
 ARG DISTRO_NAME
 
 ## Workaround for weird build failure on Circle CI, see

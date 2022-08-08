@@ -15,7 +15,7 @@
 
 # NOTE: This script is a part of the explanatory example of how Deployments work and it is not used in the real code.
 # This script is used by "ShellScriptDeploymentStep"
-# (See more in class "ShellScriptDeploymentStep" in the "agent_build/tools/environment_deployments/deployments.py"
+# (See more in class "ShellScriptDeploymentStep" in the "agent_build/tools/environment_deployments/runner.py"
 
 
 pip_cache_dir="$(python3 -m pip cache dir)"

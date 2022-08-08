@@ -13,14 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script expects the next environment variables:
-#   DISRO_NAME: Short name of the base distribution for the result image (debian, alpine)
-# Also can except builtin argument from the docker buildx such as:
-#   TARGETVARIANT
-
 set -e
 
-# Install build dependencies according to a current ditribution type.
+# Install build dependencies according to a current distribution type.
 if [ "$DISTRO_NAME" = "debian" ]; then
 #  # Workaround for weird build failure on Circle CI, see
 #  # https://github.com/docker/buildx/issues/495#issuecomment-995503425 for details

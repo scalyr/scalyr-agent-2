@@ -1,4 +1,4 @@
-# Copyright 2014-2021 Scalyr Inc.
+# Copyright 2014-2022 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 
 """
 This helper script act as an entry point for builders inside docker.
-Script caller specifies FDQN of the builder class, and script imports it and executes.
+Script caller specifies FQDN of the builder class, and script imports it and executes.
 """
 
 import argparse
@@ -29,7 +29,7 @@ SOURCE_ROOT = pl.Path(__file__).parent.parent.parent
 # local packages. All such imports also have to be done after that.
 sys.path.append(str(SOURCE_ROOT))
 
-from agent_build.tools.environment_deployments.deployments import CacheableBuilder
+from agent_build.tools.runner import Runner
 
 
 if __name__ == '__main__':
@@ -40,7 +40,7 @@ if __name__ == '__main__':
     base_parser.add_argument("builder_class_fqdn")
     base_args, other_args = base_parser.parse_known_args()
 
-    builder_cls: Type[CacheableBuilder] = pydoc.locate(base_args.builder_class_fqdn) # NOQA
+    builder_cls: Type[Runner] = pydoc.locate(base_args.builder_class_fqdn) # NOQA
 
     parser = argparse.ArgumentParser()
 

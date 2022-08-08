@@ -32,7 +32,7 @@ _SOURCE_ROOT = pl.Path(__file__).parent.parent.parent.absolute()
 # local packages. All such imports also have to be done after that.
 sys.path.append(str(_SOURCE_ROOT))
 
-from agent_build import package_builders
+from agent_build import docker_image_builders
 
 BUILDERS_TO_USE = [
     package_builders.DOCKER_JSON_CONTAINER_BUILDER_DEBIAN,

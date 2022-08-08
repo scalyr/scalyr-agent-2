@@ -1,29 +1,43 @@
+# Copyright 2014-2022 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import json
 
-from agent_build.tools.environment_deployments.deployments import CacheableBuilder
-from agent_build.package_builders import DOCKER_IMAGE_BUILDERS
+from agent_build.tools.runner import Runner
+from agent_build.docker_image_builders import DOCKER_IMAGE_BUILDERS
 
 
 ALL_STEPS_TO_PREBUILD = {}
 
 for builder in DOCKER_IMAGE_BUILDERS.values():
-    for cacheable_step in builder.get_all_cacheable_deployment_steps():
+    for cacheable_step in builder.get_all_cacheable_steps():
         if not cacheable_step.pre_build_in_cdcd:
             continue
         ALL_STEPS_TO_PREBUILD[cacheable_step.id] = cacheable_step
 
 ALL_STEP_BUILDERS = []
 for step_id, step in ALL_STEPS_TO_PREBUILD.items():
-    class StepWrapperBuilder(CacheableBuilder):
+    class StepWrapperRunner(Runner):
         REQUIRED_STEPS = [step]
 
 
-    StepWrapperBuilder.assign_fully_qualified_name(
-        class_name=StepWrapperBuilder.__name__,
+    StepWrapperRunner.assign_fully_qualified_name(
+        class_name=StepWrapperRunner.__name__,
+        module_name=__name__,
         class_name_suffix=step.id,
-        module_name=__name__
     )
-    ALL_STEP_BUILDERS.append(StepWrapperBuilder)
+    ALL_STEP_BUILDERS.append(StepWrapperRunner)
 
 if __name__ == '__main__':
     matrix = {

@@ -70,7 +70,6 @@ class Architecture(enum.Enum):
         return f"linux-{self.as_docker_platform}"
 
 
-
 _ARCHITECTURE_TO_DOCKER_PLATFORM = {
     Architecture.X86_64: DockerPlatform.AMD64,
     Architecture.ARM64: DockerPlatform.ARM64,
@@ -93,11 +92,3 @@ class PackageType(enum.Enum):
     K8S_WITH_OPENMETRICS = "k8s-with-openmetrics"
     K8S_RESTART_AGENT_ON_MONITOR_DEATH = "k8s-restart-agent-on-monitor-death"
     MSI = "msi"
-
-
-
-
-# AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS_STRING = []
-#
-# for plat in AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS:
-#     AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS_STRING.append(plat.value)

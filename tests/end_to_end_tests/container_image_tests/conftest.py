@@ -5,7 +5,7 @@ from typing import Type
 import pytest
 
 from agent_build.tools.common import check_call_with_log, check_output_with_log
-from agent_build.package_builders import ContainerImageBuilder, DOCKER_IMAGE_BUILDERS
+from agent_build.docker_image_builders import ContainerImageRunner, DOCKER_IMAGE_BUILDERS
 
 
 def pytest_addoption(parser):
@@ -23,7 +23,7 @@ def image_builder_name(request):
 
 
 @pytest.fixture(scope="session")
-def image_builder_cls(image_builder_name) -> Type[ContainerImageBuilder]:
+def image_builder_cls(image_builder_name) -> Type[ContainerImageRunner]:
     return DOCKER_IMAGE_BUILDERS[image_builder_name]
 
 

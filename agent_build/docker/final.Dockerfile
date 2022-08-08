@@ -12,7 +12,7 @@ ADD . /scalyr-agent-2
 ARG BUILDER_FQDN
 
 # Build the tarball with Agent's files.
-RUN AGENT_BUILD_IN_DOCKER=1 python3 /scalyr-agent-2/agent_build/scripts/builder_helper.py ${BUILDER_FQDN} --only-filesystem-tarball /tmp/build/scalyr-agent.tar.gz
+RUN AGENT_BUILD_IN_DOCKER=1 python3 /scalyr-agent-2/agent_build/scripts/runner_helper.py ${BUILDER_FQDN} --only-filesystem-tarball /tmp/build/scalyr-agent.tar.gz
 
 # Extract tarball to the special place that can be reused by next stages.
 WORKDIR /tmp/container-fs

@@ -7,28 +7,28 @@ import subprocess
 import shutil
 import stat
 
-from agent_build.tools.environment_deployments.deployments import ShellScriptDeploymentStep, CacheableBuilder
+from agent_build.tools.runner import ShellScriptRunnerStep, Runner
 from agent_build.tools.constants import Architecture, PackageType,SOURCE_ROOT
 from agent_build.prepare_agent_filesystem import get_install_info
 
-PYTHON_BASE = ShellScriptDeploymentStep(
+PYTHON_BASE = ShellScriptRunnerStep(
     name="python_glibc_2_12_base",
     script_path=pl.Path("agent_build/tools/environment_deployments/steps/frozen_binaries_prepare_base.sh"),
     architecture=Architecture.X86_64,
-    previous_step="centos:6",
+    base_step="centos:6",
     cacheable=True,
     cache_as_image=True
 )
 
-BUILD_PYTHON_GLIBC = ShellScriptDeploymentStep(
+BUILD_PYTHON_GLIBC = ShellScriptRunnerStep(
     name="python_glibc_2_12_build_python",
     architecture=Architecture.X86_64,
     script_path=pl.Path("agent_build/tools/environment_deployments/steps/frozen_binaries_build_python.sh"),
-    previous_step=PYTHON_BASE,
+    base_step=PYTHON_BASE,
     cacheable=True
 )
 
-INSTALL_AGENT_REQUIREMENTS = ShellScriptDeploymentStep(
+INSTALL_AGENT_REQUIREMENTS = ShellScriptRunnerStep(
     name="python_glibc_2_12_build_agent_deps",
     architecture=Architecture.X86_64,
     script_path=pl.Path("agent_build/tools/environment_deployments/steps/frozen_binaries_build_python_dependencies.sh"),
@@ -43,10 +43,10 @@ INSTALL_AGENT_REQUIREMENTS = ShellScriptDeploymentStep(
     required_steps={
         "PYTHON_BUILD": BUILD_PYTHON_GLIBC,
     },
-    previous_step=PYTHON_BASE
+    base_step=PYTHON_BASE
 )
 
-PYTHON_GLIBC_WITH_AGENT_DEPS = ShellScriptDeploymentStep(
+PYTHON_GLIBC_WITH_AGENT_DEPS = ShellScriptRunnerStep(
     name="python_glibc_2_12_with_deps",
     architecture=Architecture.X86_64,
     script_path=pl.Path("agent_build/tools/environment_deployments/steps/frozen_binaries_python_with_agent_deps.sh"),
@@ -54,13 +54,13 @@ PYTHON_GLIBC_WITH_AGENT_DEPS = ShellScriptDeploymentStep(
         "PYTHON_BUILD": BUILD_PYTHON_GLIBC,
         "AGENT_DEPS": INSTALL_AGENT_REQUIREMENTS,
     },
-    previous_step=PYTHON_BASE,
+    base_step=PYTHON_BASE,
     cacheable=True,
     cache_as_image=True
 )
 # ======
 
-class FrozenBinaryAgentBuilder(CacheableBuilder):
+class FrozenBinaryAgentBuilder(Runner):
     NAME = "frozen_binary_agent_builder"
     BASE_ENVIRONMENT = PYTHON_GLIBC_WITH_AGENT_DEPS
     FROZEN_BINARY_FILENAME = "scalyr-agent-2"
@@ -228,7 +228,7 @@ class FrozenBinaryAgentBuilder(CacheableBuilder):
         )
 
 
-PREPARE_FPM_BUILDER = ShellScriptDeploymentStep(
+PREPARE_FPM_BUILDER = ShellScriptRunnerStep(
     name="fpm_builder",
     architecture=Architecture.X86_64,
     script_path=pl.Path("agent_build/tools/environment_deployments/steps/prepare_fpm_builder.sh"),
@@ -239,16 +239,16 @@ PREPARE_FPM_BUILDER = ShellScriptDeploymentStep(
         "PYTHON_BUILD": BUILD_PYTHON_GLIBC,
         "AGENT_DEPS": INSTALL_AGENT_REQUIREMENTS,
     },
-    previous_step="ubuntu:20.04",
+    base_step="ubuntu:20.04",
     cacheable=True,
     cache_as_image=True
 )
 
 
-class FpmBasedPackageBuilder(CacheableBuilder):
+class FpmBasedPackageBuilder(Runner):
     ARCHITECTURE: Architecture
     PACKAGE_TYPE: PackageType
-    REQUIRED_BUILDER_CLASSES = [FrozenBinaryAgentBuilder]
+    REQUIRED_RUNNERS_CLASSES = [FrozenBinaryAgentBuilder]
     BASE_ENVIRONMENT = PREPARE_FPM_BUILDER
     RESULT_FILENAME_GLOB_FORMAT: str
 
@@ -284,7 +284,7 @@ class FpmBasedPackageBuilder(CacheableBuilder):
         )
 
         super(FpmBasedPackageBuilder, self).__init__(
-            required_builders=[self.build_frozen_binary]
+            required_runners=[self.build_frozen_binary]
         )
 
     @property

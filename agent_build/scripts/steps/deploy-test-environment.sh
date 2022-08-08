@@ -13,15 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script is used by "ShellScriptDeploymentStep"
-# (See more in class "ShellScriptDeploymentStep" in the "agent_build/tools/environment_deployments/deployments.py"
+# This script is used by Runner - agent_build/__init__.py.BuildTestEnvironment to install testing requirements.
 
-# This script is used in the deployment step that build base image for the bullseye(debian) based agent docker images.
-# This file is sourced by one of the actual shell scripts that has to build the base image.
 
-set -e
+pip_cache_dir="$(python3 -m pip cache dir)"
 
-# source main library, all needed functions are in there.
-. "$SOURCE_ROOT/agent_build/tools/environment_deployments/steps/build_base_docker_image/build_base_images_common_lib.sh"
+# Reuse cached pip cache if exists.
+restore_from_cache pip "$pip_cache_dir"
 
-build_all_base_images slim
+REQUIREMENTS_PATH="$SOURCE_ROOT/agent_build/requirement-files"
+
+sh_cs python3 -m pip install -v -r "${REQUIREMENTS_PATH}/testing-requirements.txt"
+
+# Save pip cache to reuse it in future.
+save_to_cache pip "$pip_cache_dir"
+
+
+
+
