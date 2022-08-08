@@ -38,7 +38,7 @@ elif [ "$DISTRO_NAME" = "alpine" ]; then
     g++ \
     make \
     python3-dev \
-    patchelf \
+    patchelf
 else
   2>&1 echo "Unknown DISTRO_NAME=${DISRO_NAME}"
   exit 1
