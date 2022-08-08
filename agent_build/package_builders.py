@@ -733,7 +733,7 @@ def create_distro_specific_image_builders(builder_cls: Type[ContainerImageBuilde
             class_name_suffix=base_distro.value,
             module_name=__name__
         )
-        _DISTRO_BUILDERS[base_distro.value].append(_BaseImageBuilder)
+        _DISTRO_BUILDERS[base_distro].append(_BaseImageBuilder)
 
 
 create_distro_specific_image_builders(DockerJsonContainerBuilder)

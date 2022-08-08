@@ -33,9 +33,9 @@ if __name__ == '__main__':
     for builder in ALL_STEP_BUILDERS:
         matrix["include"].append(
             {
+                "step-builder-fqdn": builder.get_fully_qualified_name(),
                 "os": "ubuntu-20.04",
                 "python-version": "3.8.13",
-                "step-builder-fqdn": builder.get_fully_qualified_name()
             }
         )
 
