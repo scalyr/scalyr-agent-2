@@ -251,11 +251,17 @@ class DeploymentStep(files_checksum_tracker.FilesChecksumTracker):
     #     return self.initial_docker_image is not None
 
     @property
-    def result_image_name(self) -> str:
+    def result_image_name(self) -> Optional[DockerImageSpec]:
         """
         The name of the result docker image, just the same as cache key.
         """
-        return self.id
+        if not self.runs_in_docker:
+            return None
+
+        return DockerImageSpec(
+            name=self.id,
+            platform=self.base_docker_image.platform
+        )
 
     def _get_required_steps_output_directories(self) -> Dict[str, pl.Path]:
         result = {}
@@ -610,9 +616,11 @@ class ShellScriptDeploymentStep(DeploymentStep):
 
         # Run step directly on the current system
         if not self.runs_in_docker:
+            env = os.environ.copy()
+            env.update(self._get_all_environment_variables())
             common.check_call_with_log(
                 command_args,
-                env=self._get_all_environment_variables(),
+                env=env,
             )
             return
 
@@ -945,13 +953,13 @@ class CacheableBuilder:
 
         self.output_path.mkdir(parents=True)
 
+        docker_image = None
         if self.base_environment:
             if isinstance(self.base_environment, DeploymentStep):
-                docker_image = self.base_environment.result_image_name
+                if self.base_environment.runs_in_docker:
+                    docker_image = self.base_environment.result_image_name
             else:
                 docker_image = self.base_environment
-        else:
-            docker_image = None
 
         if not common.IN_DOCKER:
             if self.base_environment:
