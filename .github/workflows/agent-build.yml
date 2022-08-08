@@ -163,7 +163,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.builder-name }}
-          path: /tmp/build-output/${{ matrix.result-tarball-name }}
+          path: /tmp/build-output
           retention-days: 1
 
 
@@ -208,7 +208,7 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: ${{ matrix.builder-name }}
-          path: /tmp/build-output/${{ matrix.result-tarball-name }}
+          path: /tmp/build-output
 
       - name: Run tests
         shell: bash
