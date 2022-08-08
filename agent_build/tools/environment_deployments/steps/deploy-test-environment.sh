@@ -24,8 +24,7 @@ restore_from_cache pip "$pip_cache_dir"
 
 REQUIREMENTS_PATH="$SOURCE_ROOT/agent_build/requirement-files"
 
-sh_cs python3 -m pip install -r "${REQUIREMENTS_PATH}/testing-requirements.txt"
-sh_cs python3 -m pip install -r "${REQUIREMENTS_PATH}/compression-requirements.txt"
+sh_cs python3 -m pip install -v -r "${REQUIREMENTS_PATH}/testing-requirements.txt"
 
 # Save pip cache to reuse it in future.
 save_to_cache pip "$pip_cache_dir"
