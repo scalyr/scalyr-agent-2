@@ -372,10 +372,11 @@ class MonitorsManager(StoppableThread):
             monitor.config_from_monitors(self)
             starting_minitor_message = "Starting monitor %s." % monitor.monitor_name
             if monitor.get_stop_agent_on_failure():
-                starting_minitor_message += " Config option 'stop_agent_on_failure' is enabled."
+                starting_minitor_message += (
+                    " Config option 'stop_agent_on_failure' is enabled."
+                )
 
             log.info(starting_minitor_message)
-
 
             # NOTE: Workaround for a not so great behavior with out code where we create
             # thread instances before forking. This causes issues because "_is_stopped"

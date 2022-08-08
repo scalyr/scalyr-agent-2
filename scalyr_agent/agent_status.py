@@ -1088,7 +1088,9 @@ def __report_monitor_manager(output, manager_status, read_time):
                 entry.errors,
             )
             if entry.stop_agent_on_failure:
-                running_monitors_message = "{}, stop_agent_on_failure=true".format(running_monitors_message)
+                running_monitors_message = "{}, stop_agent_on_failure=true".format(
+                    running_monitors_message
+                )
             print(running_monitors_message, file=output)
 
     dead_monitors = (
