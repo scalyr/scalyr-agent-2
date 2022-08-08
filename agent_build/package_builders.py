@@ -307,10 +307,14 @@ class ContainerImageBuilder(CacheableBuilder):
             result.append(f"{name}:{cls.RESULT_IMAGE_TAG}")
         return result
 
+    @classmethod
+    def get_result_image_tarball_name(cls):
+        file_name = cls.get_final_result_image_name().replace(":", "-")
+        return f"{file_name}.tar"
+
     @property
     def result_image_tarball_path(self) -> pl.Path:
-        file_name = type(self).get_final_result_image_name().replace(":", "-")
-        return self.output_path / f"{file_name}.tar"
+        return self.output_path / f"{type(self).get_result_image_tarball_name()}.tar"
 
     def _build(self, locally: bool = False):
         """
@@ -636,6 +640,7 @@ if __name__ == '__main__':
     for builder_name, builder in DOCKER_IMAGE_BUILDERS.items():
         matrix["include"].append({
             "builder-name": builder_name,
+            "result-tarball-name": builder.get_result_image_tarball_name(),
             "python-version": "3.8.13",
             "os": "ubuntu-20.04",
         })

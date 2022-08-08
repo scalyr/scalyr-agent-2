@@ -724,14 +724,14 @@ if __name__ == '__main__':
     for p in PARAMS:
         image_builder_name = p["image_builder_name"]
         image_builder_cls = DOCKER_IMAGE_BUILDERS[image_builder_name]
-        image_distro = image_builder_cls.DISTRO
         kubernetes_version = p["kubernetes_version"]
         minikube_driver = p["minikube_driver"]
         container_runtime = p["container_runtime"]
 
         matrix["include"].append({
             "pytest-params": f"{image_builder_name}-{kubernetes_version}-{minikube_driver}-{container_runtime}",
-            "image-distro": image_distro.value,
+            "builder-name": image_builder_name,
+            "image-tarball-name": image_builder_cls.get_result_image_tarball_name(),
             "os": "ubuntu-20.04",
             "python-version": "3.8.13",
         })

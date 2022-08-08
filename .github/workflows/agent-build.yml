@@ -103,7 +103,8 @@ jobs:
     strategy:
       # This job receives its matrix from the previous job. The matrix itself is created by the agent_build/package_builder.py module.
       # The matrix, for now, consists only from the 'include' part with following fields:
-      #   "builder-name": name of the base distro for image (e.g. debian, alpine)
+      #   "builder-name": name of the builder that builds the target image.
+      #   "result-tarball-name": filename of the result image tarball.
       #   "python-version": Version of python to setup on this runner. (NOTE: version of python used in images may differ, and it specified in the source code.)
       #   "os": Runner OS.
       matrix: ${{ fromJSON(needs.pre-job.outputs.build-matrix-json) }}
@@ -156,14 +157,13 @@ jobs:
       - name: Build images with builder '${{ matrix.builder-name }}'
         run: |
           python3 build_package_new.py ${{ matrix.builder-name }} \
-            --registry localhost:5000 \
-            --push
+            --image-output-path /tmp/build-output
 
-      - name: Save result registry data root with all result images.
+      - name: Save result image tarball.
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.image-distro }}-image-registry
-          path: /tmp/output_registry
+          name: ${{ matrix.builder-name }}-result-image
+          path: /tmp/build-output/${{ matrix.result-tarball-name }}
 
 
   test-k8s-images:
@@ -178,7 +178,8 @@ jobs:
       # This job receives its matrix from the preparation job. The matrix itself is created by the tests/end_to_end_tests/container_image_tests/k8s_test.py module.
       # The matrix, for now, consists only from the 'include' part with following fields:
       #   "pytest-params": String with all parameters for a particular test variant which then goes to "parametrize" test cases which has to be run there.
-      #   "image-distro": name of the base distro for image (e.g. debian, alpine)
+      #   "builder-name": name of the builder that builds the target image.
+      #   "result-tarball-name": filename of the result image tarball.
       #   "os": Runner's OS
       #   "python-version": Version of the python installed on runner.
       matrix: ${{ fromJSON(needs.pre-job.outputs.test-matrix-json) }}
@@ -205,16 +206,8 @@ jobs:
       - name: Download registry with previously built images.
         uses: actions/download-artifact@v3
         with:
-          name: ${{ matrix.image-distro }}-image-registry
-          path: /tmp/output_registry
-
-      - name: "Start local registry with result images from artifacts."
-        run: |
-          docker run \
-            -d --rm --name registry \
-            -p 5000:5000 \
-            -v /tmp/output_registry:/var/lib/registry \
-            registry:2 
+          name: ${{ matrix.builder-name }}-result-image
+          path: /tmp/build-output/${{ matrix.result-tarball-name }}
 
       - name: Run tests
         shell: bash
