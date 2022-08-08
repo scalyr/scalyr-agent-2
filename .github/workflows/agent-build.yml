@@ -37,10 +37,10 @@ jobs:
         with:
           python-version: "3.8.13"
 
-#      - name: Perform the deployment of the test environment
-#        uses: ./.github/actions/perform-deployment
-#        with:
-#          deployment-name: "agent_build.__init__.BuildTestEnvironment"
+      - name: Perform the deployment of the test environment
+        uses: ./.github/actions/perform-deployment
+        with:
+          deployment-name: "agent_build.__init__.BuildTestEnvironment"
 
       - name: "Get build and test job matrices."
         id: get-job-matrices
@@ -162,7 +162,7 @@ jobs:
       - name: Save result image tarball.
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.builder-name }}-result-image
+          name: ${{ matrix.builder-name }}
           path: /tmp/build-output/${{ matrix.result-tarball-name }}
 
 
@@ -206,7 +206,7 @@ jobs:
       - name: Download registry with previously built images.
         uses: actions/download-artifact@v3
         with:
-          name: ${{ matrix.builder-name }}-result-image
+          name: ${{ matrix.builder-name }}
           path: /tmp/build-output/${{ matrix.result-tarball-name }}
 
       - name: Run tests
