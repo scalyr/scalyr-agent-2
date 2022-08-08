@@ -22,7 +22,7 @@ permissions:
 # For example: https://github.com/scalyr/scalyr-agent-2/pull/804/commits/0eccf278623552b51d9289d75a47794e88f02862
 jobs:
   pre-job:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-20.04
     outputs:
       pre-built-cached-steps-matrix: ${{ steps.get-job-matrices.outputs.pre-built-cached-steps-matrix }}
       build-matrix-json: ${{ steps.get-job-matrices.outputs.build-matrix-json }}
@@ -45,6 +45,7 @@ jobs:
       - name: "Get build and test job matrices."
         id: get-job-matrices
         run: |
+          set -e 
           echo "Build job matrix:"
           echo "$(python3 -m agent_build.package_builders)"
           echo "Test job matrix: "

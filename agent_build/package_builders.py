@@ -813,7 +813,7 @@ if __name__ == '__main__':
         matrix["include"].append({
             "image-distro": base_distro.value,
             "python-version": "3.8.13",
-            "os": "ubuntu-22.04",
+            "os": "ubuntu-20.04",
 
 
         })
