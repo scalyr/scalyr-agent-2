@@ -314,7 +314,7 @@ class ContainerImageBuilder(CacheableBuilder):
 
     @property
     def result_image_tarball_path(self) -> pl.Path:
-        return self.output_path / f"{type(self).get_result_image_tarball_name()}.tar"
+        return self.output_path / type(self).get_result_image_tarball_name()
 
     def _build(self, locally: bool = False):
         """
@@ -380,6 +380,8 @@ class ContainerImageBuilder(CacheableBuilder):
             ])
 
         if self.image_output_path:
+            target_path = self.image_output_path / self.result_image_tarball_path.name
+            log.info(f"Saving result image tarball to '{target_path}'")
             shutil.copy(
                 self.result_image_tarball_path,
                 self.image_output_path
@@ -396,76 +398,6 @@ _AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS = [
     DockerPlatform.AMD64.value
     # Architecture.ARMV7.as_docker_platform.value,
 ]
-
-#
-# for distro in ContainerImageBaseDistro:
-#     for plat in _AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS:
-
-
-# class BaseImageBuilder(CacheableBuilder):
-#     #BASE_IMAGE_NAME: str
-#     RESULT_IMAGE_NAME: str
-#     BASE_ARCH_BUILDER_STEPS: List[BaseImageBuilderStep]
-#
-#     def _build(self, locally: bool = False):
-#         """
-#         Combine all platform specific base images into one final multi-arch image.
-#         """
-#
-#         platforms_options = []
-#
-#         # Since docker buildx builder can not use local docker images as base images,
-#         # we push them and then pull from the local registry.
-#         with LocalRegistryContainer(
-#                 name=f"base-images-registry-debian",
-#                 registry_port=5050
-#         ):
-#
-#             for base_arch_step in type(self).BASE_ARCH_BUILDER_STEPS:
-#
-#                 # Load image from a particular platform from the tarball
-#                 image_path = base_arch_step.output_directory / base_arch_step.result_image_tarball_name
-#                 load_output = check_output_with_log([
-#                     "docker", "load", "-i", str(image_path)
-#                 ]).decode().strip()
-#
-#                 image_id = load_output.split(":")[-1]
-#
-#                 # Tar loaded image with normal name.
-#                 registry_image_name = f"localhost:5050/{base_arch_step.base_image_result_image_name_with_tag}"
-#                 check_call_with_log([
-#                     "docker", "tag", image_id, registry_image_name
-#                 ])
-#
-#                 # Push it to local registry.
-#                 check_call_with_log([
-#                     "docker", "push", registry_image_name
-#                 ])
-#
-#                 platforms_options.extend([
-#                     "--platform",
-#                     str(base_arch_step.image_platform)
-#                 ])
-#
-#             result_image_path = self.output_path / f"{type(self).RESULT_IMAGE_NAME}.tar"
-#
-#             # Build OCI tarball with agent's final image.
-#             check_call_with_log([
-#                 "docker",
-#                 "buildx",
-#                 "build",
-#                 *platforms_options,
-#                 "--build-arg",
-#                 f"BASE_IMAGE_NAME=localhost:5050/{base_arch_step.base_image_result_name}",
-#                 "-f",
-#                 str(SOURCE_ROOT / "agent_build/docker/final.Dockerfile"),
-#                 "--output",
-#                 f"type=oci,dest={result_image_path}",
-#                 str(SOURCE_ROOT)
-#             ])
-
-
-#BASE_IMAGE_BUILDER_STEPS: Dict[ContainerImageBaseDistro, List[BaseImageBuilderStep]] = collections.defaultdict(list)
 
 
 class DockerJsonContainerBuilder(ContainerImageBuilder):
