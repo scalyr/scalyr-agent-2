@@ -838,7 +838,7 @@ class EnvironmentShellScriptStep(ShellScriptDeploymentStep):
 
 class CacheableBuilder:
     REQUIRED_BUILDER_CLASSES: List[Type['CacheableBuilder']] = []
-    REQUIRED_STEPS: List[DeploymentStep] = None
+    REQUIRED_STEPS: List[DeploymentStep] = []
     BASE_ENVIRONMENT: Union[DeploymentStep, str] = None
 
     # This class attribute can be used to set FQDN to classes which are created dynamically.
