@@ -148,10 +148,6 @@ class ScalyrMonitor(StoppableThread):
 
         # The MonitorConfig object created from the config for this monitor instance.
         self._config = MonitorConfig(monitor_config, monitor_module=self.monitor_name)
-
-        # Flag that indicates that agent can not keep working if that monitor fails.
-        self._stop_agent_on_failure = monitor_config.get("stop_agent_on_failure", False)
-
         log_path = self.monitor_name.split(".")[-1] + ".log"
         self.disabled = False
         # TODO: For now, just leverage the logic in the loggers for naming this monitor.  However,
@@ -222,7 +218,7 @@ class ScalyrMonitor(StoppableThread):
         Returns boolean value which indicates that the agent can not run without this monitor and
         has to fail if monitor fails.
         """
-        return self._stop_agent_on_failure
+        return self._config.get("stop_agent_on_failure", False)
 
     @property
     def uid(self):
