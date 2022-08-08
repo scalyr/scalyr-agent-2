@@ -89,7 +89,7 @@ jobs:
           image: tonistiigi/binfmt:qemu-v6.2.0
           platforms: all
 
-      - name: Perform the deployment of the test environment
+      - name: Run cached step.
         uses: ./.github/actions/perform-deployment
         with:
           deployment-name: ${{ matrix.step-builder-fqdn }}
@@ -143,7 +143,7 @@ jobs:
         id: get-builder-fqdn
         run: |
           set -e
-          echo "::set-output name=fqdn::$(python3 build_package_new.py bulk-images-${{ matrix.builder-name }} --fqdn)"
+          echo "::set-output name=fqdn::$(python3 build_package_new.py ${{ matrix.builder-name }} --fqdn)"
 
       - name: Perform the build of the base docker image in the deployment.
         uses: ./.github/actions/perform-deployment
