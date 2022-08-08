@@ -188,6 +188,7 @@ class ContainerImageBuilder(CacheableBuilder):
             push: bool = False,
             platforms: List = None,
             only_filesystem_tarball: str = None,
+            image_output_path: str = None,
             use_test_version: bool = False,
     ):
         """
@@ -212,6 +213,8 @@ class ContainerImageBuilder(CacheableBuilder):
         self.tags = tags or []
         self.user = user
         self.push = push
+
+        self.image_output_path = image_output_path and pl.Path(image_output_path)
 
         self.only_filesystem_tarball = only_filesystem_tarball and pl.Path(only_filesystem_tarball)
         if self.only_filesystem_tarball:
@@ -372,191 +375,11 @@ class ContainerImageBuilder(CacheableBuilder):
                 str(SOURCE_ROOT)
             ])
 
-    # def load_image_from_tarball(self):
-    #     load_output = check_output_with_log([
-    #         "docker", "load", "-i", str(self.result_image_tarball_path)
-    #     ]).decode().strip()
-    #
-    #     image_id = load_output.split(":")[-1]
-    #
-    #     check_call_with_log([
-    #         "docker", "tag", image_id, type(self).get_final_result_image_name()
-    #     ])
-
-    # def _build(self, locally: bool = False):
-    #     """
-    #     This function builds Agent docker image by using the specified dockerfile (defaults to "Dockerfile").
-    #     It passes to dockerfile its own package type through docker build arguments, so the same package builder
-    #     will be executed inside the docker build to prepare inner container filesystem.
-    #
-    #     The result image is built upon the base image that has to be built by the deployment of this builder.
-    #         Since it's not a trivial task to "transfer" a multi-platform image from one place to another, the image is
-    #         pushed to a local registry in the container, and the root of that registry is transferred instead.
-    #
-    #     Registry's root in /var/lib/registry is exposed to the host by using docker's mount feature and saved in the
-    #         deployment's output directory. This builder then spins up another local registry container and mounts root
-    #         of the saved registry. Now builder can refer to this local registry in order to get the base image.
-    #
-    #     """
-    #
-    #     if self.only_filesystem_tarball:
-    #         self.build_filesystem_tarball()
-    #         return
-    #
-    #     registry_data_path = self.base_image_deployment_step.output_directory / "output_registry"
-    #
-    #     # Create docker buildx builder instance. # Without it the result image won't be pushed correctly
-    #     # to the local registry.
-    #     buildx_builder_name = "agent_image_buildx_builder"
-    #
-    #     # print docker and buildx version
-    #     docker_version_output = (
-    #         common.check_output_with_log(["docker", "version"]).decode().strip()
-    #     )
-    #     log.info(f"Using docker version:\n{docker_version_output}\n")
-    #
-    #     buildx_version_output = (
-    #         common.check_output_with_log(["docker", "buildx", "version"])
-    #         .decode()
-    #         .strip()
-    #     )
-    #     log.info(f"Using buildx version {buildx_version_output}")
-    #
-    #     # check if builder already exists.
-    #     ls_output = (
-    #         common.check_output_with_log(["docker", "buildx", "ls"]).decode().strip()
-    #     )
-    #
-    #     if buildx_builder_name not in ls_output:
-    #         # Build new buildx builder
-    #         log.info(f"Create new buildx builder instance '{buildx_builder_name}'.")
-    #         common.run_command(
-    #             [
-    #                 "docker",
-    #                 "buildx",
-    #                 "create",
-    #                 # This option is important, without it the image won't be pushed to the local registry.
-    #                 "--driver-opt=network=host",
-    #                 "--name",
-    #                 buildx_builder_name,
-    #             ]
-    #         )
-    #
-    #     # Use builder.
-    #     log.info(f"Use buildx builder instance '{buildx_builder_name}'.")
-    #     common.run_command(
-    #         [
-    #             "docker",
-    #             "buildx",
-    #             "use",
-    #             buildx_builder_name,
-    #         ]
-    #     )
-    #
-    #     log.info("Build base image.")
-    #
-    #     base_image_tag_suffix = (
-    #         self.base_image_deployment_step.python_image_suffix
-    #     )
-    #
-    #     base_image_name = f"agent_base_image:{base_image_tag_suffix}"
-    #
-    #     if self.use_test_version:
-    #         log.info("Build testing image version.")
-    #         base_image_name = f"{base_image_name}-testing"
-    #
-    #     registry = self.registry or ""
-    #     tags = self.tags or ["latest"]
-    #
-    #     if not os.path.isfile(self.dockerfile_path):
-    #         raise ValueError(f"File path {self.dockerfile_path} doesn't exist")
-    #
-    #     tag_options = []
-    #
-    #     full_name = type(self).RESULT_IMAGE_NAME
-    #
-    #     if self.user:
-    #         full_name = f"{self.user}/{full_name}"
-    #
-    #     if registry:
-    #         full_name = f"{registry}/{full_name}"
-    #
-    #     for tag in tags:
-    #         tag_options.append("-t")
-    #
-    #         full_name_with_tag = f"{full_name}:{tag}"
-    #
-    #         tag_options.append(full_name_with_tag)
-    #
-    #     command_options = [
-    #         "docker",
-    #         "buildx",
-    #         "build",
-    #         *tag_options,
-    #         "-f",
-    #         str(self.dockerfile_path),
-    #         "--build-arg",
-    #         f"IMAGE_TYPE_STAGE_NAME={type(self).IMAGE_TYPE_STAGE_NAME}",
-    #         "--build-arg",
-    #         f"BUILDER_FQDN={type(self).get_fully_qualified_name()}",
-    #         "--build-arg",
-    #         f"BASE_IMAGE=localhost:5005/{base_image_name}",
-    #         "--build-arg",
-    #         f"BASE_IMAGE_SUFFIX={base_image_tag_suffix}",
-    #     ]
-    #
-    #     if common.DEBUG:
-    #         # If debug, then also specify the debug mode inside the docker build.
-    #         command_options.extend(
-    #             [
-    #                 "--build-arg",
-    #                 "AGENT_BUILD_DEBUG=1",
-    #             ]
-    #         )
-    #
-    #     # If we need to push, then specify all platforms.
-    #     if self.push:
-    #         for plat in self.platforms:
-    #             command_options.append("--platform")
-    #             command_options.append(plat)
-    #
-    #     if self.use_test_version:
-    #         # Pass special build argument to produce testing image.
-    #         command_options.append("--build-arg")
-    #         command_options.append("MODE=testing")
-    #
-    #     if self.push:
-    #         command_options.append("--push")
-    #     else:
-    #         command_options.append("--load")
-    #
-    #     command_options.append(str(SOURCE_ROOT))
-    #
-    #     build_log_message = f"Build image:  {full_name}"
-    #     if self.push:
-    #         build_log_message = f"{build_log_message} and push."
-    #     else:
-    #         build_log_message = (
-    #             f"{build_log_message} and load result image to local docker."
-    #         )
-    #
-    #     log.info(build_log_message)
-    #
-    #     # Create container with local image registry. And mount existing registry root with base images.
-    #     registry_container = build_in_docker.LocalRegistryContainer(
-    #         name="agent_image_output_registry",
-    #         registry_port=5005,
-    #         registry_data_path=registry_data_path,
-    #     )
-    #
-    #     # Start registry and run build of the final docker image. Build process will refer the the
-    #     # base image in the local registry.
-    #     with registry_container:
-    #         common.run_command(
-    #             command_options,
-    #             # This command runs partially runs the same code, so it would be nice to see the output.
-    #             debug=True,
-    #         )
+        if self.image_output_path:
+            shutil.copy(
+                self.result_image_tarball_path,
+                self.image_output_path
+            ),
 
 
 _AGENT_BUILD_DOCKER_PATH = _AGENT_BUILD_PATH / "docker"

@@ -26,6 +26,7 @@ RUN DISTRO_NAME=${DISTRO_NAME} agent_build/docker/install-base-dependencies.sh
 
 FROM scalyr-base-dependencies as scalyr-python-libs-build-dependencies
 
+# Install packages that are required to build agent python dependency libs.
 ADD agent_build/docker/install-python-libs-build-dependencies.sh agent_build/docker/install-python-libs-build-dependencies.sh
 RUN DISTRO_NAME=${DISTRO_NAME} agent_build/docker/install-python-libs-build-dependencies.sh
 
@@ -36,88 +37,13 @@ ADD agent_build/requirement-files/compression-requirements.txt agent_build/requi
 ADD agent_build/requirement-files/main-requirements.txt agent_build/requirement-files/main-requirements.txt
 ARG TARGETVARIANT
 ARG COVERAGE_VERSION
+# Install agent python denendency libs.
 RUN DISTRO_NAME=${DISTRO_NAME} TARGETVARIANT=${TARGETVARIANT} COVERAGE_VERSION=${COVERAGE_VERSION} agent_build/docker/install-python-libs.sh
 
+# Create a final image with only dependnencies that will be required by final image.
+FROM scalyr-base-dependencies
 
-
-#RUN apt-get update && apt-get install -y build-essential git tar curl
-
-#        # Install dependency packages for alpine.
-#        FROM python:3.8.13-alpine as scalyr-dependencies-alpine
-#        MAINTAINER Scalyr Inc <support@scalyr.com>
-#
-#        RUN apk update && apk add --virtual build-dependencies \
-#            binutils \
-#            build-base \
-#            gcc \
-#            g++ \
-#            make \
-#            curl \
-#            python3-dev \
-#            patchelf \
-#            git
-#
-#        FROM scalyr-dependencies-$BASE_IMAGE_SUFFIX as scalyr-dependencies
-#
-#        ARG TARGETVARIANT
-#        ARG TARGETARCH
-#        ARG COVERAGE_VERSION
-#        ARG BASE_IMAGE_SUFFIX
-#
-#        ADD agent_build/requirement-files/docker-image-requirements.txt agent_build/requirement-files/docker-image-requirements.txt
-#        ADD agent_build/requirement-files/compression-requirements.txt agent_build/requirement-files/compression-requirements.txt
-#        ADD agent_build/requirement-files/main-requirements.txt agent_build/requirement-files/main-requirements.txt
-#
-#        # orjson is wheel is not available for armv7 + musl yet so we exclude it here. We can't exclude it
-#        # with pip environment markers since they are not specific enough.
-#        RUN if [ "$TARGETVARIANT" = "v7" ] && [ "$BASE_IMAGE_SUFFIX" = "alpine" ]; then sed -i '/^orjson/d' agent_build/requirement-files/main-requirements.txt; fi
-#
-#        # Right now we don't support lz4 on server side yet so we don't include this dependency since it doesn't offer pre built
-#        # wheel and it substantially slows down base image build
-#        RUN sed -i '/^lz4/d' agent_build/requirement-files/compression-requirements.txt
-#
-#        # Workaround so we can use pre-built orjson wheel for musl. We need to pin pip to older version for
-#        # manylinux2014 wheel format to work.
-#        # See https://github.com/ijl/orjson/issues/8 for details.
-#        # If we don't that and we include orjson and zstandard, we need rust chain and building the image
-#        # will be very slow due to cross compilation in emulated environment (QEMU)
-#        # TODO: Remove once orjson and zstandard musl wheel is available - https://github.com/pypa/auditwheel/issues/305#issuecomment-922251777
-#        RUN echo 'manylinux2014_compatible = True' > /usr/local/lib/python3.8/_manylinux.py
-#
-#        # Install agent dependencies.
-#        RUN pip3 install --upgrade pip
-#        RUN pip3 --no-cache-dir install --root /tmp/dependencies -r agent_build/requirement-files/docker-image-requirements.txt
-#
-#        # Install coverage if its version if specified. Only used in testing.
-#        RUN if [ -n "${COVERAGE_VERSION}" ]; then pip3 install --root /tmp/dependencies coverage=="${COVERAGE_VERSION}"; fi
-#
-#        # Clean up files which were installed to use manylinux2014 workaround
-#        RUN rm /usr/local/lib/python3.8/_manylinux.py
-#
-#        # Install packages and tools that will be required during the final image build.
-#
-#        # Install tools for alpine
-#        FROM python:3.8.13-alpine as ready-base-alpine
-#        MAINTAINER Scalyr Inc <support@scalyr.com>
-#
-#        RUN apk update && apk add --virtual curl git
-#
-#        # Install tools for debian.
-#        FROM python:3.8.13-slim as ready-base-slim
-#        MAINTAINER Scalyr Inc <support@scalyr.com>
-#
-#        # Workaround for weird build failure on Circle CI, see
-#        # https://github.com/docker/buildx/issues/495#issuecomment-995503425 for details
-#        RUN ln -s /usr/bin/dpkg-split /usr/sbin/dpkg-split
-#        RUN ln -s /usr/bin/dpkg-deb /usr/sbin/dpkg-deb
-#        RUN ln -s /bin/rm /usr/sbin/rm
-#        RUN ln -s /bin/tar /usr/sbin/tar
-#
-#        RUN apt-get update && apt-get install -y git tar curl
-#
-#        # Create a final base stage from one of the prefious OS-specific stages.
-#        FROM ready-base-$BASE_IMAGE_SUFFIX
-#
-#        # Copy Agent's Python dependencies, so they also can be used in the final image build.
-#        COPY --from=scalyr-dependencies  /tmp/dependencies/ /tmp/dependencies/
-#        WORKDIR /
+# Copy Agent's Python dependencies, so they also can be used in the final image build.
+COPY --from=scalyr-python-libs-build-dependencies  /tmp/dependencies/ /tmp/dependencies/
+COPY --from=scalyr-python-libs-build-dependencies  /tmp/test-image-dependencies /tmp/test-image-dependencies
+WORKDIR /
