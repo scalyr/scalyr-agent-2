@@ -370,13 +370,13 @@ class MonitorsManager(StoppableThread):
         # Check to see if we can open the metric log.  Maybe we should not silently fail here but instead fail.
         if monitor.open_metric_log():
             monitor.config_from_monitors(self)
-            starting_minitor_message = "Starting monitor %s." % monitor.monitor_name
+            starting_monitor_message = "Starting monitor %s." % monitor.monitor_name
             if monitor.get_stop_agent_on_failure():
-                starting_minitor_message += (
+                starting_monitor_message += (
                     " Config option 'stop_agent_on_failure' is enabled."
                 )
 
-            log.info(starting_minitor_message)
+            log.info(starting_monitor_message)
 
             # NOTE: Workaround for a not so great behavior with out code where we create
             # thread instances before forking. This causes issues because "_is_stopped"
