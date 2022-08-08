@@ -1,21 +1,19 @@
-import logging
+import pathlib as pl
+import shutil
 from typing import Type
 
 import pytest
 
-from agent_build.tools.common import check_call_with_log
+from agent_build.tools.common import check_call_with_log, check_output_with_log
 from agent_build.package_builders import ContainerImageBuilder, DOCKER_IMAGE_BUILDERS
-from agent_build.tools.build_in_docker import LocalRegistryContainer
 
 
 def pytest_addoption(parser):
     parser.addoption(
-        "--images-registry",
-        dest="images_registry",
+        "--image-tarball-path",
+        dest="image_tarball_path",
         required=False,
-        help="Docker images registry URL where image to test is stored."
-             "It mainly should be specified on CI/CD tests to get image from existing image registry. "
-             'During local testing, this option can be omitted and image and registry will be created "on fly"'
+        help="Path to a tarball with the image to test. If not specified, then this tarball wil be built."
     )
 
 
@@ -30,43 +28,83 @@ def image_builder_cls(image_builder_name) -> Type[ContainerImageBuilder]:
 
 
 @pytest.fixture(scope="session")
-def image_name(image_builder_cls, request):
+def image_name(image_builder_cls, request, tmp_path_factory):
     """
-    Get name of the ready image to test.
+    Name of the image to tests.
     """
 
-    reg_container = None
-    # If registry is specified externally, then reuse it.
-    if request.config.option.images_registry:
-        full_image_name = f"{request.config.option.images_registry}/{image_builder_cls.RESULT_IMAGE_NAME}"
-
-    # Registry is not specified, build the image.
+    if request.config.option.image_tarball_path:
+        source_image_tarball_path = pl.Path(request.config.option.image_tarball_path)
     else:
-        reg_container = LocalRegistryContainer(
-            name="images_registry",
-            registry_port=5050
-        )
-        reg_container.start()
-
-        builder = image_builder_cls(
-            registry=f"localhost:5050",
-            push=True,
-        )
+        builder = image_builder_cls()
         builder.build()
+        source_image_tarball_path = builder.result_image_tarball_path
 
-        full_image_name = f"localhost:5050/{image_builder_cls.RESULT_IMAGE_NAME}"
+    tmp_dir = tmp_path_factory.mktemp("image_tarball")
 
-    # Pull result image from registry.
-    check_call_with_log(["docker", "pull", full_image_name])
+    tarball_path = tmp_dir / source_image_tarball_path.name
 
-    if reg_container:
-        reg_container.kill()
+    shutil.copy(
+        source_image_tarball_path,
+        tarball_path
+    )
 
-    check_call_with_log(["docker", "tag", full_image_name, image_builder_cls.RESULT_IMAGE_NAME])
+    load_output = check_output_with_log([
+        "docker", "load", "-i", str(tarball_path)
+    ]).decode().strip()
 
-    yield full_image_name
+    image_id = load_output.split(":")[-1]
 
-    check_call_with_log(["docker", "image", "rm", image_builder_cls.RESULT_IMAGE_NAME])
+    image_name = image_builder_cls.get_final_result_image_name()
+
+    check_call_with_log([
+        "docker", "tag", image_id, image_name
+    ])
+
+    yield image_name
+
+    check_call_with_log([
+        "docker", "image", "rm", "-f", image_id, image_name
+    ])
+
+# @pytest.fixture(scope="session")
+# def image_name22(image_builder_cls, request):
+#     """
+#     Get name of the ready image to test.
+#     """
+#
+#     reg_container = None
+#     # If registry is specified externally, then reuse it.
+#     if request.config.option.images_registry:
+#         full_image_name = f"{request.config.option.images_registry}/{image_builder_cls.RESULT_IMAGE_NAME}"
+#
+#     # Registry is not specified, build the image.
+#     else:
+#         reg_container = LocalRegistryContainer(
+#             name="images_registry",
+#             registry_port=5050
+#         )
+#         reg_container.start()
+#
+#         builder = image_builder_cls(
+#             registry=f"localhost:5050",
+#             push=True,
+#         )
+#         builder.build()
+#
+#         full_image_name = f"localhost:5050/{image_builder_cls.RESULT_IMAGE_NAME}"
+#
+#     # Pull result image from registry.
+#     check_call_with_log(["docker", "pull", full_image_name])
+#
+#     if reg_container:
+#         reg_container.kill()
+#
+#     check_call_with_log(["docker", "tag", full_image_name, image_builder_cls.RESULT_IMAGE_NAME])
+#
+#     yield full_image_name
+#
+#     check_call_with_log(["docker", "image", "rm", image_builder_cls.RESULT_IMAGE_NAME])
 
 
 # @pytest.fixture(scope="session")

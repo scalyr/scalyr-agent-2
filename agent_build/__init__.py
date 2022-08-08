@@ -5,7 +5,6 @@ from agent_build.tools.constants import Architecture, SOURCE_ROOT
 # Step that runs small script which installs requirements for the test/dev environment.
 INSTALL_TEST_REQUIREMENT_STEP = ShellScriptDeploymentStep(
     name="install_test_requirements",
-    architecture=Architecture.UNKNOWN,
     script_path= SOURCE_ROOT / "agent_build/tools/environment_deployments/steps/deploy-test-environment.sh",
     tracked_file_globs=[SOURCE_ROOT / "agent_build/requirement-files/*.txt"],
     cacheable=True
@@ -13,4 +12,4 @@ INSTALL_TEST_REQUIREMENT_STEP = ShellScriptDeploymentStep(
 
 
 class BuildTestEnvironment(CacheableBuilder):
-    DEPLOYMENT_STEP = INSTALL_TEST_REQUIREMENT_STEP
+    BASE_ENVIRONMENT = INSTALL_TEST_REQUIREMENT_STEP

@@ -38,8 +38,6 @@ from agent_build.package_builders import DOCKER_IMAGE_BUILDERS, DOCKER_IMAGE_BUL
 
 _AGENT_BUILD_PATH = __SOURCE_ROOT__ / "agent_build"
 
-common.init_logging()
-
 
 BUILDERS: Dict[str, CacheableBuilder]  = {
     **DOCKER_IMAGE_BUILDERS,
@@ -47,6 +45,9 @@ BUILDERS: Dict[str, CacheableBuilder]  = {
 }
 
 if __name__ == "__main__":
+
+    common.init_logging()
+
     base_parser = argparse.ArgumentParser(add_help=False)
     base_parser.add_argument("builder_name", choices=BUILDERS.keys())
 

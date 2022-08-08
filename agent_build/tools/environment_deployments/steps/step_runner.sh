@@ -64,6 +64,8 @@ sh_cs() {
 log "=========== Run Deployment Step Script'$(basename "$STEP_SCRIPT_PATH")' ==========="
 
 log "SOURCE_ROOT: ${SOURCE_ROOT}"
+log "STEP_OUTPUT_PATH: ${STEP_OUTPUT_PATH}"
+log "STEP_CACHE_DIR: ${CACHE_DIR}"
 
 
 # Function that restores data from cache if exists.

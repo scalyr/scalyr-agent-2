@@ -62,7 +62,7 @@ PYTHON_GLIBC_WITH_AGENT_DEPS = ShellScriptDeploymentStep(
 
 class FrozenBinaryAgentBuilder(CacheableBuilder):
     NAME = "frozen_binary_agent_builder"
-    DEPLOYMENT_STEP = PYTHON_GLIBC_WITH_AGENT_DEPS
+    BASE_ENVIRONMENT = PYTHON_GLIBC_WITH_AGENT_DEPS
     FROZEN_BINARY_FILENAME = "scalyr-agent-2"
 
     def __init__(
@@ -249,7 +249,7 @@ class FpmBasedPackageBuilder(CacheableBuilder):
     ARCHITECTURE: Architecture
     PACKAGE_TYPE: PackageType
     REQUIRED_BUILDER_CLASSES = [FrozenBinaryAgentBuilder]
-    DEPLOYMENT_STEP = PREPARE_FPM_BUILDER
+    BASE_ENVIRONMENT = PREPARE_FPM_BUILDER
     RESULT_FILENAME_GLOB_FORMAT: str
 
     _FPM_PACKAGE_TYPES = {

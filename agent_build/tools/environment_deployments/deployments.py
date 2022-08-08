@@ -27,7 +27,7 @@ import logging
 import inspect
 import sys
 from functools import wraps
-from typing import Union, Optional, List, Dict, Type, Any
+from typing import Union, Optional, List, Dict, Type, Any, Mapping
 
 from agent_build.tools import common
 from agent_build.tools import constants
@@ -36,9 +36,10 @@ from agent_build.tools import build_in_docker
 from agent_build.tools.common import shlex_join
 from agent_build.tools.build_in_docker import DockerContainer
 from agent_build.tools.constants import Architecture
-from agent_build.tools.constants import AGENT_BUILD_OUTPUT, SOURCE_ROOT
+from agent_build.tools.constants import AGENT_BUILD_OUTPUT, SOURCE_ROOT, DockerPlatform
 from agent_build.tools.common import check_call_with_log
 
+log = logging.getLogger(__name__)
 
 _PARENT_DIR = pl.Path(__file__).parent.parent.absolute()
 _AGENT_BUILD_PATH = constants.SOURCE_ROOT / "agent_build"
@@ -112,6 +113,34 @@ class DeploymentStepError(Exception):
         super(DeploymentStepError, self).__init__(message)
 
 
+class UniqueDict(dict):
+    def __setitem__(self, key, value):
+        if key in self:
+            raise ValueError(f"Key '{key}' already exists.")
+
+        super(UniqueDict, self).__setitem__(key, value)
+
+    def update(self, m: Mapping, **kwargs) -> None:
+        if isinstance(m, dict):
+            m = m.items()
+        for k, v in m:
+            self[k] = v
+
+
+# d = UniqueDict()
+#
+# d["1"] = 1
+#
+# d.update({"1": 2})
+# a=1
+
+
+@dataclasses.dataclass
+class DockerImageSpec:
+    name: str
+    platform: DockerPlatform
+
+
 class DeploymentStep(files_checksum_tracker.FilesChecksumTracker):
     """
     Base abstraction that represents set of action that has to be performed in order to prepare some environment,
@@ -123,13 +152,14 @@ class DeploymentStep(files_checksum_tracker.FilesChecksumTracker):
     def __init__(
         self,
         name: str,
-        architecture: constants.Architecture,
+        #architecture: constants.Architecture,
         tracked_file_globs: List[Union[str,pl.Path]] = None,
-        previous_step: Union[str, "DeploymentStep"] = None,
+        previous_step: Union["DeploymentStep", DockerImageSpec] = None,
         required_steps: Dict[str, 'DeploymentStep'] = None,
         environment_variables: Dict[str, str] = None,
         cacheable: bool = False,
-        cache_as_image: bool = False
+        cache_as_image: bool = False,
+        pre_build_in_cicd: bool = False
     ):
         """
         :param architecture: Architecture of the machine where step has to be performed.
@@ -144,21 +174,27 @@ class DeploymentStep(files_checksum_tracker.FilesChecksumTracker):
         )
 
         self.name = name
-        self.architecture = architecture
+        self.pre_build_in_cdcd = pre_build_in_cicd
+        #self.architecture = architecture
 
         if isinstance(previous_step, DeploymentStep):
             # The previous step is specified.
             # The base docker image is a result image of the previous step.
             self.base_docker_image = previous_step.result_image_name
+            self.initial_docker_image = previous_step.initial_docker_image
             self.previous_step = previous_step
-        elif isinstance(previous_step, str):
-            # The previous step isn't specified, but it is just a base docker image.
+        elif isinstance(previous_step, DockerImageSpec):
+            # The previous step isn't specified, but it is just a docker image.
             self.base_docker_image = previous_step
+            self.initial_docker_image = previous_step
             self.previous_step = None
         else:
             # the previous step is not specified.
             self.base_docker_image = None
+            self.initial_docker_image = None
             self.previous_step = None
+
+        self.runs_in_docker = bool(self.initial_docker_image)
 
         self.environment_variables = environment_variables or {}
 
@@ -185,21 +221,34 @@ class DeploymentStep(files_checksum_tracker.FilesChecksumTracker):
         return result
 
     @property
-    def initial_docker_image(self) -> str:
-        """
-        Name of the docker image of the most parent step. If step is not performed in the docker, returns None,
-            otherwise it has to be the name of some public image.
-        This is needed for the step's unique name to be distinguishable from other instances of the same step but with
-            different base images, for example centos:6 and centos:7
-        """
-        if not self.previous_step:
-            return self.base_docker_image
-
-        return self.previous_step.initial_docker_image
-
-    @property
     def id(self):
-        return f"{self.name}_{self.checksum}"
+        result = f"{self.name}"
+        if self.runs_in_docker:
+            image_name = self.initial_docker_image.name.replace(":", "-")
+            image_platform = self.initial_docker_image.platform.replace("/", "-")
+            result = f"{result}-{image_name}-{image_platform}"
+        result = f"{result}-{self.checksum}"
+        return result
+
+    # @property
+    # def initial_docker_image(self) -> str:
+    #     """
+    #     Name of the docker image of the most parent step. If step is not performed in the docker, returns None,
+    #         otherwise it has to be the name of some public image.
+    #     This is needed for the step's unique name to be distinguishable from other instances of the same step but with
+    #         different base images, for example centos:6 and centos:7
+    #     """
+    #     if not self.previous_step:
+    #         return self.base_docker_image
+    #
+    #     return self.previous_step.initial_docker_image
+
+    # @property
+    # def runs_in_docker(self) -> bool:
+    #     """
+    #     Whether this step has to be performed in docker or not.
+    #     """
+    #     return self.initial_docker_image is not None
 
     @property
     def result_image_name(self) -> str:
@@ -208,12 +257,33 @@ class DeploymentStep(files_checksum_tracker.FilesChecksumTracker):
         """
         return self.id
 
-    @property
-    def runs_in_docker(self) -> bool:
-        """
-        Whether this step has to be performed in docker or not.
-        """
-        return self.initial_docker_image is not None
+    def _get_required_steps_output_directories(self) -> Dict[str, pl.Path]:
+        result = {}
+
+        for step_env_var_name, step in self.required_steps.items():
+            if self.runs_in_docker:
+                step_dir = pl.Path("/tmp/required_steps") / step.output_directory.name
+            else:
+                step_dir = step.output_directory
+
+            result[step_env_var_name] = step_dir
+
+        return result
+
+    def _get_all_environment_variables(self):
+        result_env_variables = UniqueDict()
+
+        # Set path of the required steps as env. variables.
+        for step_env_var_name, step_output_path in self._get_required_steps_output_directories().items():
+            result_env_variables[step_env_var_name] = str(step_output_path)
+
+        result_env_variables.update(self.environment_variables)
+
+        if common.IN_CICD:
+            result_env_variables["IN_CICD"] = "1"
+
+        return result_env_variables
+
 
     @property
     def checksum(self) -> str:
@@ -229,12 +299,7 @@ class DeploymentStep(files_checksum_tracker.FilesChecksumTracker):
         if self.previous_step:
             sha256.update(self.previous_step.checksum.encode())
 
-        sorted_env_variables = {
-            name: self.environment_variables[name]
-            for name in sorted(self.environment_variables.keys())
-        }
-
-        for name, value in sorted_env_variables.items():
+        for name, value in self._get_all_environment_variables().items():
             sha256.update(name.encode())
             sha256.update(value.encode())
 
@@ -245,183 +310,177 @@ class DeploymentStep(files_checksum_tracker.FilesChecksumTracker):
 
         return sha256.hexdigest()
 
+    def _pre_run(self) -> bool:
+        """
+        Function that runs before steps main run method.
+        :return True if the main step run has to be skipped.
+        """
+        if self.output_directory.exists():
+            shutil.rmtree(self.output_directory)
+
+        # First check for cached results.
+        if self.cache_directory.exists():
+            shutil.copytree(
+                self.cache_directory,
+                self.output_directory
+            )
+            return True
+
+        return False
+
+    def _post_run(self, is_skipped: bool):
+        """
+        Function that runs after the steps main run function.
+        :param is_skipped: Boolean flag that indicates that the main run method has been skipped.
+        """
+        pass
+
+
     def run(self):
         """
         Run the step. Based on its initial data, it will be performed in docker or locally, on the current system.
         """
 
-        save_to_cache = False
+        self.output_directory.parent.mkdir(parents=True, exist_ok=True)
+        skipped = self._pre_run()
+        if not skipped:
+            logging.info(f"Run step {self.name}.")
+            for step in self.required_steps.values():
+                step.run()
 
-        if self.runs_in_docker and self.cache_as_image:
-            # Before the build, check if there is already an image with the same name. The name contains the checksum
-            # of all files which are used in it, so the name identity also guarantees the content identity.
-            output = (
-                common.check_output_with_log(
-                    ["docker", "images", "-q", self.result_image_name]
+            if self.previous_step:
+                self.previous_step.run()
+
+            if self.output_directory.exists():
+                remove_directory_in_docker(self.output_directory)
+            self.output_directory.mkdir(parents=True, exist_ok=True)
+
+            try:
+                logging.info(f"Start step: {self.id}")
+                self._run_function_in_isolated_source_directory(function=self._run)
+            except Exception:
+                globs = [str(g) for g in self.tracked_file_globs]
+                logging.exception(
+                    f"'{type(self).__name__}' has failed. "
+                    "HINT: Make sure that you have specified all files. "
+                    f"For now, tracked files are: {globs}."
                 )
-                    .decode()
-                    .strip()
-            )
-
-            if output:
-                # The image already exists, skip the build.
-                logging.info(
-                    f"Image '{self.result_image_name}' already exists, skip the build and reuse it."
-                )
-                return
-
-            # If code runs in CI/CD, then check if the image file is already in cache and we can reuse it.
-            if common.IN_CICD:
-                cached_image_path = self.cache_directory / self.result_image_name
-                if cached_image_path.is_file():
-                    logging.info(
-                        f"Cached image {self.result_image_name} file for the deployment step '{self.name}' has been found, "
-                        f"loading and reusing it instead of building."
-                    )
-                    check_call_with_log(["docker", "load", "-i", str(cached_image_path)])
-                    return
-                else:
-                    # Cache is used but there is no suitable image file. Set the flag to signal that the built
-                    # image has to be saved to the cache.
-                    save_to_cache = True
-
-        logging.info(f"Run step {self.name}.")
-        for step in self.required_steps.values():
-            step.run()
-
-        if self.previous_step:
-            self.previous_step.run()
-
-        if self.runs_in_docker:
-            logging.info(
-                f"Build image '{self.result_image_name}' from base image '{self.base_docker_image}' "
-                f"for the deployment step '{self.name}'."
-            )
-            run_func = self._run_in_docker
+                raise
         else:
-            run_func = self._run_locally
+            log.info(f"Result if the step '{self.id}' is found in cache, skip.")
 
-        if self.output_directory.exists():
-            remove_directory_in_docker(self.output_directory)
-        self.output_directory.mkdir(parents=True, exist_ok=True)
-
-        try:
-            logging.info(f"Start step: {self.id}")
-            self._run_function_in_isolated_source_directory(function=run_func)
-        except Exception:
-            globs = [str(g) for g in self.tracked_file_globs]
-            logging.exception(
-                f"'{type(self).__name__}' has failed. "
-                "HINT: Make sure that you have specified all files. "
-                f"For now, tracked files are: {globs}."
-            )
-            raise
-
-        if self.runs_in_docker and self.cache_as_image and common.IN_CICD:
-            self.cache_directory.mkdir(parents=True, exist_ok=True)
-            cached_image_path = self.cache_directory / self.result_image_name
-            logging.info(
-                f"Saving image '{self.result_image_name}' file for the deployment step {self.name} into cache."
-            )
-            save_docker_image(
-                image_name=self.result_image_name, output_path=cached_image_path
-            )
+        self._post_run(is_skipped=skipped)
 
 
 
-    def _run_in_docker(self):
-        """
-        This function does the same deployment but inside the docker.
-        """
-        pass
+        # if self.runs_in_docker:
+        #     logging.info(
+        #         f"Build image '{self.result_image_name}' from base image '{self.base_docker_image}' "
+        #         f"for the deployment step '{self.name}'."
+        #     )
+        #     run_func = self._run_in_docker
+        # else:
+        #     run_func = self._run_locally
 
     @abc.abstractmethod
-    def _run_locally(self):
-        """
-        Run step locally. This has to be implemented in children classes.
-        """
+    def _run(self):
         pass
 
-    @abc.abstractmethod
-    def _run_in_docker_impl(self, locally: bool = False):
-        """
-        Run step in docker. This has to be implemented in children classes.
-        :param locally: If we are already in docker, this has to be set as True, to avoid loop.
-        """
+    def cleanup(self):
         pass
 
-    def _restore_from_cache(self, key: str, path: pl.Path) -> bool:
-        """
-        Restore file or directory by given key from the step's cache.
-        :param key: Name of the file or directory to search in cache.
-        :param path: Path where to copy the cached object if it's found.
-        :return: True if cached object is found.
-        """
-        full_path = self.cache_directory / key
-        if full_path.exists():
-            if full_path.is_dir():
-                shutil.copytree(full_path, path)
-            else:
-                shutil.copy2(full_path, path)
-            return True
 
-        return False
+    # def _run_in_docker(self):
+    #     """
+    #     This function does the same deployment but inside the docker.
+    #     """
+    #     pass
+    #
+    # @abc.abstractmethod
+    # def _run_locally(self):
+    #     """
+    #     Run step locally. This has to be implemented in children classes.
+    #     """
+    #     pass
 
-    def _save_to_cache(self, key: str, path: pl.Path):
-        """
+    # @abc.abstractmethod
+    # def _run_in_docker_impl(self, locally: bool = False):
+    #     """
+    #     Run step in docker. This has to be implemented in children classes.
+    #     :param locally: If we are already in docker, this has to be set as True, to avoid loop.
+    #     """
+    #     pass
 
-        :param key: Name of the file or directory in cache.
-        :param path: Path from where to copy the object to the cache.
-        """
-        full_path = self.cache_directory / key
-        if path.is_dir():
-            shutil.copytree(path, full_path)
-        else:
-            shutil.copy2(path, key)
-
-
-class DockerFileDeploymentStep(DeploymentStep):
-    """
-    The deployment step which actions are defined in the Dockerfile. As implies, can be performed only in docker.
-    """
-
-    # Path the dockerfile.
-    DOCKERFILE_PATH: pl.Path
-
-    def __init__(
-        self,
-        architecture: constants.Architecture,
-        previous_step: Union[str, "DeploymentStep"] = None,
-    ):
-        super(DockerFileDeploymentStep, self).__init__(
-            architecture=architecture, previous_step=previous_step
-        )
-
-        # Also add dockerfile to the used file collection, so it is included to the checksum calculation.
-        self.used_files = self._init_used_files(
-            self.used_files + [type(self).DOCKERFILE_PATH]
-        )
-
-    @property
-    def runs_in_docker(self) -> bool:
-        # This step is in docker by definition.
-        return True
-
-    def _run_locally(self):
-        # This step is in docker by definition.
-        raise RuntimeError("The docker based step can not be performed locally.")
-
-    def _run_in_docker_impl(self, locally: bool = False):
-        """
-        Perform the actual build by calling docker build with specified dockerfile and other options.
-        :param locally: This is ignored, the dockerfile based step can not be performed locally.
-        """
-        build_in_docker.run_docker_build(
-            architecture=self.architecture,
-            image_name=self.result_image_name,
-            dockerfile_path=type(self).DOCKERFILE_PATH,
-            build_context_path=type(self).DOCKERFILE_PATH.parent,
-        )
+    # def _restore_from_cache(self, key: str, path: pl.Path) -> bool:
+    #     """
+    #     Restore file or directory by given key from the step's cache.
+    #     :param key: Name of the file or directory to search in cache.
+    #     :param path: Path where to copy the cached object if it's found.
+    #     :return: True if cached object is found.
+    #     """
+    #     full_path = self.cache_directory / key
+    #     if full_path.exists():
+    #         if full_path.is_dir():
+    #             shutil.copytree(full_path, path)
+    #         else:
+    #             shutil.copy2(full_path, path)
+    #         return True
+    #
+    #     return False
+    #
+    # def _save_to_cache(self, key: str, path: pl.Path):
+    #     """
+    #
+    #     :param key: Name of the file or directory in cache.
+    #     :param path: Path from where to copy the object to the cache.
+    #     """
+    #     full_path = self.cache_directory / key
+    #     if path.is_dir():
+    #         shutil.copytree(path, full_path)
+    #     else:
+    #         shutil.copy2(path, key)
+# class DockerFileDeploymentStep(DeploymentStep):
+#     """
+#     The deployment step which actions are defined in the Dockerfile. As implies, can be performed only in docker.
+#     """
+#
+#     # Path the dockerfile.
+#     DOCKERFILE_PATH: pl.Path
+#
+#     def __init__(
+#         self,
+#         architecture: constants.Architecture,
+#         previous_step: Union[str, "DeploymentStep"] = None,
+#     ):
+#         super(DockerFileDeploymentStep, self).__init__(
+#             architecture=architecture, previous_step=previous_step
+#         )
+#
+#         # Also add dockerfile to the used file collection, so it is included to the checksum calculation.
+#         self.used_files = self._init_used_files(
+#             self.used_files + [type(self).DOCKERFILE_PATH]
+#         )
+#
+#     @property
+#     def runs_in_docker(self) -> bool:
+#         # This step is in docker by definition.
+#         return True
+#
+#     def _run_locally(self):
+#         # This step is in docker by definition.
+#         raise RuntimeError("The docker based step can not be performed locally.")
+#
+#     def _run_in_docker_impl(self, locally: bool = False):
+#         """
+#         Perform the actual build by calling docker build with specified dockerfile and other options.
+#         :param locally: This is ignored, the dockerfile based step can not be performed locally.
+#         """
+#         build_in_docker.run_docker_build(
+#             architecture=self.architecture,
+#             image_name=self.result_image_name,
+#             dockerfile_path=type(self).DOCKERFILE_PATH,
+#             build_context_path=type(self).DOCKERFILE_PATH.parent,
+#         )
 
 
 class ShellScriptDeploymentStep(DeploymentStep):
@@ -432,14 +491,13 @@ class ShellScriptDeploymentStep(DeploymentStep):
     def __init__(
         self,
         name: str,
-        architecture: constants.Architecture,
         script_path: Union[str, pl.Path],
         tracked_file_globs: List[Union[str, pl.Path]] = None,
         previous_step: Union[str, "DeploymentStep"] = None,
         required_steps: Dict[str, 'DeploymentStep'] = None,
         environment_variables: Dict[str, str] = None,
         cacheable: bool = False,
-        cache_as_image: bool = False
+        pre_build_in_cicd: bool = False
     ):
 
         self.script_path = pl.Path(script_path)
@@ -453,14 +511,16 @@ class ShellScriptDeploymentStep(DeploymentStep):
 
         super(ShellScriptDeploymentStep, self).__init__(
             name=name,
-            architecture=architecture,
+            #architecture=architecture,
             tracked_file_globs=tracked_file_globs,
             previous_step=previous_step,
             required_steps=required_steps,
             environment_variables=environment_variables,
             cacheable=cacheable,
-            cache_as_image=cache_as_image
+            pre_build_in_cicd=pre_build_in_cicd,
         )
+
+        self._step_container_name = f"{self.result_image_name}-container".replace(":", "-")
 
     def _get_command_line_args(self) -> List[str]:
         """
@@ -506,21 +566,21 @@ class ShellScriptDeploymentStep(DeploymentStep):
         """
         command_args = self._get_command_line_args()
 
-        # Copy current environment.
-        env = os.environ.copy()
-
-        if common.IN_CICD:
-            env["IN_CICD"] = "1"
-
-        for step_env_var_name, step in self.required_steps.items():
-            env[step_env_var_name] = str(self.output_directory)
-
-        for name, value in self.environment_variables.items():
-            env[name] = value
+        # # Copy current environment.
+        # env = os.environ.copy()
+        #
+        # if common.IN_CICD:
+        #     env["IN_CICD"] = "1"
+        #
+        # for step_env_var_name, step in self.required_steps.items():
+        #     env[step_env_var_name] = str(self.output_directory)
+        #
+        # for name, value in self.environment_variables.items():
+        #     env[name] = value
 
         output = common.run_command(
             command_args,
-            env=env,
+            env=self._get_all_environment_variables(),
             debug=True,
         ).decode()
 
@@ -538,7 +598,7 @@ class ShellScriptDeploymentStep(DeploymentStep):
     def docker_cache_directory(self):
         return self.docker_container_source_root / f"/tmp/{self.id}_cache"
 
-    def _run_in_docker(self):
+    def _run(self):
         """
         Run step in docker. It uses a special logic, which is implemented in 'agent_build/tools/tools.build_in_docker'
         module,that allows to execute custom command inside docker by using 'docker build' command. It differs from
@@ -546,236 +606,240 @@ class ShellScriptDeploymentStep(DeploymentStep):
         :param locally: If we are already in docker, this has to be set as True, to avoid loop.
         """
 
-        # Since we used 'docker build' instead of 'docker run', we can not just mount files, that are used in this step.
-        # Instead of that, we'll create intermediate image with all files and use it as base image.
+        command_args = self._get_command_line_args()
 
-        # To create an intermediate image, first we create container, put all needed files and commit it.
-        intermediate_image_name = "agent-build-deployment-step-intermediate"
-
-        # Remove if such intermediate container exists.
-        common.check_call_with_log(["docker", "rm", "-f", intermediate_image_name])
-
-        container_name = f"{self.result_image_name}-container".replace(":", "-")
-
-        common.check_call_with_log(["docker", "rm", "-f", container_name])
-
-        try:
-
-            # Get command that has to run shell script.
-            command_args = self._get_command_line_args()
-
-            env_options = []
-            mount_options = []
-
-            for step_env_var_name, step in self.required_steps.items():
-                docker_step_dir = pl.Path("/tmp/required_steps") / step.output_directory.name
-                mount_options.extend([
-                    "-v",
-                    f"{step.output_directory}:{docker_step_dir}"
-                ])
-                env_options.extend([
-                    "-e",
-                    f"{step_env_var_name}={docker_step_dir}"
-                ])
-
-            for name, value in self.environment_variables.items():
-                env_options.extend([
-                    "-e",
-                    f"{name}={value}"
-                ])
-
-            if common.IN_CICD:
-                env_options.extend([
-                    "-e",
-                    "IN_CICD=1"
-                ])
-
-            common.check_call_with_log([
-                    "docker",
-                    "create",
-                    "-t",
-                    "--name",
-                    container_name,
-                    "--workdir",
-                    str(self.docker_container_source_root),
-                    # "-v",
-                    # f"{self._isolated_source_root_path}:{self.docker_container_source_root}",
-                    # "-v",
-                    # f"{self.cache_directory}:{self.docker_cache_directory}",
-                    *mount_options,
-                    *env_options,
-                    self.base_docker_image,
-                    *command_args
-            ])
-
-            common.run_command([
-                "docker",
-                "cp",
-                "-a",
-                f"{self._isolated_source_root_path}/.",
-                f"{container_name}:{self.docker_container_source_root}",
-            ])
-
-            self.cache_directory.mkdir(parents=True, exist_ok=True)
-            common.run_command([
-                "docker",
-                "cp",
-                "-a",
-                f"{self.cache_directory}",
-                f"{container_name}:{self.docker_cache_directory}",
-            ])
-
-            common.run_command([
-                "docker",
-                "cp",
-                "-a",
-                f"{self.output_directory}",
-                f"{container_name}:{self.docker_output_directory}",
-            ])
-
-            common.check_call_with_log([
-                "docker",
-                "start",
-                "--attach",
-                container_name
-            ])
-
-            if self.cache_as_image:
-                check_call_with_log([
-                    "docker", "commit", container_name, self.result_image_name
-                ])
-                return
-
-            common.run_command(
-                [
-                    "docker",
-                    "cp",
-                    "-a",
-                    f"{container_name}:{self.docker_output_directory}/.",
-                    str(self.output_directory)
-                ]
+        # Run step directly on the current system
+        if not self.runs_in_docker:
+            common.check_call_with_log(
+                command_args,
+                env=self._get_all_environment_variables(),
             )
-            old_cache_directory = self.cache_directory.parent / f"~{self.cache_directory.name}"
-            if old_cache_directory.exists():
-                self.remove_directory_in_docker(old_cache_directory)
-            self.cache_directory.rename(old_cache_directory)
-            try:
-                common.run_command(
-                    [
-                        "docker",
-                        "cp",
-                        "-a",
-                        f"{container_name}:{self.docker_cache_directory}/.",
-                        str(self.cache_directory)
-                    ]
-                )
-            except Exception:
-                old_cache_directory.rename(self.cache_directory)
-                raise
+            return
+
+        # Run step in docker.
+        common.check_call_with_log(["docker", "rm", "-f", self._step_container_name])
+
+        mount_options = []
+        for step_env_var_name, step_output_path in self._get_required_steps_output_directories().items():
+            step = self.required_steps[step_env_var_name]
+            mount_options.extend([
+                "-v",
+                f"{step.output_directory}:{step_output_path}"
+            ])
+
+        # Mount isolated source root.
+        mount_options.extend([
+            "-v",
+            f"{self._isolated_source_root_path}:{self.docker_container_source_root}",
+            "-v",
+            f"{self.cache_directory}:{self.docker_cache_directory}",
+            "-v",
+            f"{self.output_directory}:{self.docker_output_directory}"
+
+        ])
+
+        env_options = []
+        for env_var_name, env_var_val in self._get_all_environment_variables().items():
+            env_options.extend([
+                "-e",
+                f"{env_var_name}={env_var_val}"
+            ])
+
+        common.check_call_with_log([
+                "docker",
+                "run",
+                "-i",
+                "--name",
+                self._step_container_name,
+                "--workdir",
+                str(self.docker_container_source_root),
+                *mount_options,
+                *env_options,
+                self.base_docker_image,
+                *command_args
+        ])
+
+
+
+            # common.check_call_with_log([
+            #         "docker",
+            #         "create",
+            #         "-t",
+            #         "--name",
+            #         container_name,
+            #         "--workdir",
+            #         str(self.docker_container_source_root),
+            #         # "-v",
+            #         # f"{self._isolated_source_root_path}:{self.docker_container_source_root}",
+            #         # "-v",
+            #         # f"{self.cache_directory}:{self.docker_cache_directory}",
+            #         *mount_options,
+            #         *env_options,
+            #         self.base_docker_image,
+            #         *command_args
+            # ])
+
+            # common.run_command([
+            #     "docker",
+            #     "cp",
+            #     "-a",
+            #     f"{self._isolated_source_root_path}/.",
+            #     f"{container_name}:{self.docker_container_source_root}",
+            # ])
+
+            # self.cache_directory.mkdir(parents=True, exist_ok=True)
+            # common.run_command([
+            #     "docker",
+            #     "cp",
+            #     "-a",
+            #     f"{self.cache_directory}",
+            #     f"{container_name}:{self.docker_cache_directory}",
+            # ])
+            #
+            # common.run_command([
+            #     "docker",
+            #     "cp",
+            #     "-a",
+            #     f"{self.output_directory}",
+            #     f"{container_name}:{self.docker_output_directory}",
+            # ])
+
+            # common.check_call_with_log([
+            #     "docker",
+            #     "start",
+            #     "--attach",
+            #     container_name
+            # ])
+
+            # check_call_with_log([
+            #     "docker", "commit", container_name, self.result_image_name
+            # ])
+
+            # common.run_command(
+            #     [
+            #         "docker",
+            #         "cp",
+            #         "-a",
+            #         f"{container_name}:{self.docker_output_directory}/.",
+            #         str(self.output_directory)
+            #     ]
+            # )
+            # old_cache_directory = self.cache_directory.parent / f"~{self.cache_directory.name}"
+            # if old_cache_directory.exists():
+            #     remove_directory_in_docker(old_cache_directory)
+            # self.cache_directory.rename(old_cache_directory)
+            # try:
+            #     common.run_command(
+            #         [
+            #             "docker",
+            #             "cp",
+            #             "-a",
+            #             f"{container_name}:{self.docker_cache_directory}/.",
+            #             str(self.cache_directory)
+            #         ]
+            #     )
+            # except Exception:
+            #     old_cache_directory.rename(self.cache_directory)
+            #     raise
+            # else:
+            #     remove_directory_in_docker(old_cache_directory)
+
+        # finally:
+        #     # Remove intermediate container and image.
+        #     common.run_command(["docker", "rm", "-f", intermediate_image_name])
+        #     common.run_command(["docker", "image", "rm", "-f", intermediate_image_name])
+
+    # def _run(self):
+    #     if self.runs_in_docker:
+    #         self._run_in_docker()
+    #     else:
+    #         self._run_locally()
+
+    def cleanup(self):
+        check_call_with_log([
+            "docker", "rm", "-f", self._step_container_name
+        ])
+
+
+class ArtifactShellScriptStep(ShellScriptDeploymentStep):
+    def _pre_run(self) -> bool:
+        if self.output_directory.exists():
+            if self.output_directory.is_symlink():
+                self.output_directory.unlink()
             else:
-                self.remove_directory_in_docker(old_cache_directory)
+                remove_directory_in_docker(self.output_directory)
 
-        finally:
-            # Remove intermediate container and image.
-            common.run_command(["docker", "rm", "-f", intermediate_image_name])
-            common.run_command(["docker", "image", "rm", "-f", intermediate_image_name])
+        if self.cache_directory.exists():
 
+            self.output_directory.symlink_to(self.cache_directory)
+            return True
 
-class Deployment:
-    """
-    Abstraction which represents some final desired state of the environment which is defined by set of steps, which are
-    instances of the :py:class:`DeploymentStep`
-    """
+        return False
 
-    def __init__(
-        self,
-        name: str,
-        step_classes: List[Type[DeploymentStep]],
-        architecture: constants.Architecture = constants.Architecture.UNKNOWN,
-        base_docker_image: str = None,
-    ):
-        """
-        :param name: Name of the deployment. Must be unique for the whole project.
-        :param step_classes: List of step classes. All those steps classes will be instantiated
-            by using current specifics.
-        :param architecture: Architecture of the machine where deployment and its steps has to be performed.
-        :param base_docker_image: Name of the docker image, if the deployment and all its steps has to be performed
-            inside that docker image.
-        """
-        self.name = name
-        self.architecture = architecture
-        self.base_docker_image = base_docker_image
-        self.cache_directory = constants.DEPLOYMENT_CACHE_DIR / self.name
-        self.output_directory = constants.DEPLOYMENT_OUTPUT / self.name
-
-        # List with instantiated steps.
-        self.steps = []
-
-        # If docker image is used that is has to be passed as previous step for the first step.
-        previous_step = base_docker_image
-
-        for step_cls in step_classes:
-            step = step_cls(
-                architecture=architecture,
-                # specify previous step for the current step.
-                previous_step=previous_step,
+    def _post_run(self, is_skipped: bool):
+        if not is_skipped:
+            shutil.copytree(
+                self.output_directory,
+                self.cache_directory
             )
-            previous_step = step
-            self.steps.append(step)
-
-        # Add this instance to the global collection of all deployments.
-        if self.name in ALL_DEPLOYMENTS:
-            raise ValueError(f"The deployment with name: {self.name} already exists.")
-
-        ALL_DEPLOYMENTS[self.name] = self
-
-    @property
-    def output_path(self) -> pl.Path:
-        """
-        Path to the directory where the deployment's steps can put their results.
-        """
-        return constants.DEPLOYMENT_OUTPUT / self.name
-
-    @property
-    def in_docker(self) -> bool:
-        """
-        Flag that shows whether this deployment has to be performed in docker or not.
-        """
-        # If the base image is defined, then this deployment is meant to be
-        # performed in docker.
-
-        return self.base_docker_image is not None
-
-    @property
-    def result_image_name(self) -> Optional[str]:
-        """
-        The name of the result image of the whole deployment if it has to be performed in docker. It's, logically,
-        just a result image name of the last step.
-        """
-        return self.steps[-1].result_image_name.lower()
-
-    def deploy(self):
-        """
-        Perform the deployment by running all deployment steps.
-        """
-
-        for step in self.steps:
-            step.run()
+            a=10
 
 
-# Special collection where all created deployments are stored. All of the  deployments are saved with unique name as
-# key, so it is possible to find any deployment by its name. The ability to find needed deployment step by its name is
-# crucial if we want to run it on the CI/CD.
-ALL_DEPLOYMENTS: Dict[str, "Deployment"] = {}
+class EnvironmentShellScriptStep(ShellScriptDeploymentStep):
+    def _pre_run(self) -> bool:
+        if self.runs_in_docker:
+            # Before the build, check if there is already an image with the same name. The name contains the checksum
+            # of all files which are used in it, so the name identity also guarantees the content identity.
+            output = (
+                common.check_output_with_log(
+                    ["docker", "images", "-q", self.result_image_name]
+                )
+                    .decode()
+                    .strip()
+            )
 
+            if output:
+                # The image already exists, skip the build.
+                logging.info(
+                    f"Image '{self.result_image_name}' already exists, skip the build and reuse it."
+                )
+                return True
 
-def get_deployment_by_name(name: str) -> Deployment:
-    return ALL_DEPLOYMENTS[name]
+            # # If code runs in CI/CD, then check if the image file is already in cache, and we can reuse it.
+            # if common.IN_CICD:
+
+            # Check in step's cache for the image tarball.
+            cached_image_path = self.cache_directory / self.result_image_name
+            if cached_image_path.is_file():
+                logging.info(
+                    f"Cached image {self.result_image_name} file for the deployment step '{self.name}' has been found, "
+                    f"loading and reusing it instead of building."
+                )
+                check_call_with_log(["docker", "load", "-i", str(cached_image_path)])
+                return True
+
+        return False
+
+    def _post_run(self, is_skipped: bool):
+        # Save results in cache.
+        if self.runs_in_docker and not is_skipped:
+            check_call_with_log([
+                "docker", "commit", self._step_container_name, self.result_image_name
+            ])
+            self.cache_directory.mkdir(parents=True, exist_ok=True)
+            cached_image_path = self.cache_directory / self.result_image_name
+            logging.info(
+                f"Saving image '{self.result_image_name}' file for the deployment step {self.name} into cache."
+            )
+            save_docker_image(
+                image_name=self.result_image_name, output_path=cached_image_path
+            )
 
 
 class CacheableBuilder:
     REQUIRED_BUILDER_CLASSES: List[Type['CacheableBuilder']] = []
-    DEPLOYMENT_STEP: DeploymentStep = None
+    REQUIRED_STEPS: List[DeploymentStep] = None
+    BASE_ENVIRONMENT: Union[DeploymentStep, str] = None
 
     # This class attribute can be used to set FQDN to classes which are created dynamically.
     _FULLY_QUALIFIED_NAME = None
@@ -802,19 +866,24 @@ class CacheableBuilder:
     def __init__(
             self,
             required_builders: List['CacheableBuilder'] = None,
-            deployment_step: DeploymentStep = None
+            required_steps: List[DeploymentStep] = None,
+            base_environment: Union[DeploymentStep, str] = None
     ):
 
         self.output_path = AGENT_BUILD_OUTPUT / "builder_outputs" / type(self).get_fully_qualified_name().replace(".", "_")
-        self.deployment_step = deployment_step or type(self).DEPLOYMENT_STEP
+        self.base_environment = base_environment or type(self).BASE_ENVIRONMENT
+        self.required_steps = required_steps or type(self).REQUIRED_STEPS or []
         self.required_builders = required_builders
 
     @classmethod
     def get_all_cacheable_deployment_steps(cls) -> List[DeploymentStep]:
         result = []
 
-        if cls.DEPLOYMENT_STEP:
-            result.extend(cls.DEPLOYMENT_STEP.get_all_cacheable_steps())
+        if cls.BASE_ENVIRONMENT:
+            result.extend(cls.BASE_ENVIRONMENT.get_all_cacheable_steps())
+
+        for req_step in cls.REQUIRED_STEPS:
+            result.extend(req_step.get_all_cacheable_steps())
 
         for builder_cls in cls.REQUIRED_BUILDER_CLASSES:
             result.extend(builder_cls.get_all_cacheable_deployment_steps())
@@ -840,6 +909,30 @@ class CacheableBuilder:
         module_full_name = ".".join(str(module_parent_rel_dir).split(os.sep)) + "." + module_path.stem
         return f"{module_full_name}.{cls.__qualname__}"
 
+    @classmethod
+    def assign_fully_qualified_name(
+            cls,
+            class_name: str,
+            class_name_suffix: str,
+            module_name: str):
+
+        class_name_suffix_chars = list(class_name_suffix)
+        class_name_suffix_chars[0] = class_name_suffix_chars[0].upper()
+        class_name_suffix = "".join(class_name_suffix_chars)
+        final_class_name = f"{class_name}{class_name_suffix}"
+
+        module = sys.modules[module_name]
+        if module_name == "__main__":
+            # if the module is main we still hae to get its full name
+            module_name_parts = str(pl.Path(module.__file__).relative_to(SOURCE_ROOT)).strip(".py").split(os.sep)
+            module_name = ".".join(module_name_parts)
+        cls._FULLY_QUALIFIED_NAME = f"{module_name}.{final_class_name}"
+        cls.__name__ = final_class_name
+        if hasattr(module, final_class_name):
+            raise ValueError(f"Attribute '{final_class_name}' of the module {module_name} is already set.")
+
+        setattr(module, final_class_name, cls)
+
     def build(self, locally: bool = False):
         """
         The function where the actual build of the package happens.
@@ -852,20 +945,26 @@ class CacheableBuilder:
 
         self.output_path.mkdir(parents=True)
 
-        if self.deployment_step:
-            runs_in_docker = self.deployment_step.runs_in_docker
+        if self.base_environment:
+            if isinstance(self.base_environment, DeploymentStep):
+                docker_image = self.base_environment.result_image_name
+            else:
+                docker_image = self.base_environment
         else:
-            runs_in_docker = False
+            docker_image = None
 
         if not common.IN_DOCKER:
-            if self.deployment_step:
-                self.deployment_step.run()
+            if self.base_environment:
+                self.base_environment.run()
+
+            for required_step in self.required_steps:
+                required_step.run()
 
             if self.required_builders:
                 for builder in self.required_builders:
                     builder.build()
 
-            if not runs_in_docker:
+            if not docker_image:
                 self._build()
                 return
         else:
@@ -906,8 +1005,6 @@ class CacheableBuilder:
                 str(value)
             ])
 
-        base_image_name = self.deployment_step.result_image_name.lower()
-
         env_options = [
             "-e",
             "AGENT_BUILD_IN_DOCKER=1",
@@ -928,7 +1025,7 @@ class CacheableBuilder:
             f"{constants.SOURCE_ROOT}:/scalyr-agent-2",
             *additional_mounts,
             *env_options,
-            base_image_name,
+            docker_image,
             *command_args
         ])
 

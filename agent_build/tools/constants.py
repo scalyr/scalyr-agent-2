@@ -11,8 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
+import dataclasses
 import enum
 import pathlib as pl
 
@@ -23,13 +22,30 @@ DEPLOYMENT_OUTPUT = AGENT_BUILD_OUTPUT / "deployment"
 DEPLOYMENT_CACHE_DIR = AGENT_BUILD_OUTPUT / "deployment_cache"
 
 
+@dataclasses.dataclass(frozen=True)
+class DockerPlatformInfo:
+    os: str
+    architecture: str
+    variant: str = None
+
+    def __str__(self):
+        result = f"{self.os}/{self.architecture}"
+        if self.variant:
+            result = f"{result}/{self.variant}"
+        return result
+
+    @property
+    def to_dashed_str(self):
+        return f"{self.os}-{self.architecture}-{self.variant or ''}"
+
+
 class DockerPlatform(enum.Enum):
-    AMD64 = "linux/amd64"
-    ARM64 = "linux/arm64"
-    # For Raspberry Pi and other lower powered armv7 based ARM platforms
-    ARM = "linux/arm"
-    ARMV7 = "linux/arm/v7"
-    ARMV8 = "linux/arm/v8"
+    AMD64 = DockerPlatformInfo("linux", "amd64")
+    ARM64 = DockerPlatformInfo("linux", "arm64")
+    # # For Raspberry Pi and other lower powered armv7 based ARM platforms
+    ARM = DockerPlatformInfo("linux", "arm")
+    ARMV7 = DockerPlatformInfo("linux", "arm", "v7")
+    ARMV8 = DockerPlatformInfo("linux", "arm", "v8")
 
 
 class Architecture(enum.Enum):
@@ -45,9 +61,14 @@ class Architecture(enum.Enum):
     UNKNOWN = "unknown"
 
     @property
-    def as_docker_platform(self) -> DockerPlatform:
+    def as_docker_platform(self) -> str:
         global _ARCHITECTURE_TO_DOCKER_PLATFORM
-        return _ARCHITECTURE_TO_DOCKER_PLATFORM[self]
+        return _ARCHITECTURE_TO_DOCKER_PLATFORM[self].value
+
+    @property
+    def to_docker_build_triplet(self):
+        return f"linux-{self.as_docker_platform}"
+
 
 
 _ARCHITECTURE_TO_DOCKER_PLATFORM = {
