@@ -164,6 +164,7 @@ jobs:
         with:
           name: ${{ matrix.builder-name }}
           path: /tmp/build-output/${{ matrix.result-tarball-name }}
+          retention-days: 1
 
 
   test-k8s-images:

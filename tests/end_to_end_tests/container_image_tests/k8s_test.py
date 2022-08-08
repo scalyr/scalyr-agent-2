@@ -731,7 +731,7 @@ if __name__ == '__main__':
         matrix["include"].append({
             "pytest-params": f"{image_builder_name}-{kubernetes_version}-{minikube_driver}-{container_runtime}",
             "builder-name": image_builder_name,
-            "image-tarball-name": image_builder_cls.get_result_image_tarball_name(),
+            "result-tarball-name": image_builder_cls.get_result_image_tarball_name(),
             "os": "ubuntu-20.04",
             "python-version": "3.8.13",
         })
