@@ -382,7 +382,8 @@ class ContainerImageBuilder(CacheableBuilder):
         if self.image_output_path:
             target_path = self.image_output_path / self.result_image_tarball_path.name
             log.info(f"Saving result image tarball to '{target_path}'")
-            shutil.copy(
+            self.image_output_path.mkdir(exist_ok=True, parents=True)
+            shutil.copy2(
                 self.result_image_tarball_path,
                 self.image_output_path
             ),
