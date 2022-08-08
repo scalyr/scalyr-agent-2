@@ -153,9 +153,9 @@ jobs:
 
       # We build all images with tha same base image all at once and store all result images in a single
       # registry.
-      - name: Build All Images For The ${{ matrix.image-distro }}
+      - name: Build All Images For The ${{ matrix.builder-name }}
         run: |
-          python3 build_package_new.py bulk-images-${{ matrix.image-distro }} \
+          python3 build_package_new.py ${{ matrix.builder-name }} \
             --registry localhost:5000 \
             --push
 
