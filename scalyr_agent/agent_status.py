@@ -590,6 +590,8 @@ class MonitorStatus(BaseAgentStatus):
         self.monitor_id = None
         # monitors unique short_hash
         self.monitor_short_hash = None
+        # bool flag that indicates that the 'stop_agent_on_failure' config option is enabled.
+        self.stop_agent_on_failure = None
         # The total number of metric lines reported by the monitor.
         self.reported_lines = 0
         # The total number of errors produced by the monitor.
@@ -1079,16 +1081,17 @@ def __report_monitor_manager(output, manager_status, read_time):
 
     for entry in manager_status.monitors_status:
         if entry.is_alive:
-            print(
-                "%s%s: %d lines emitted, %d errors"
-                % (
-                    padding,
-                    entry.monitor_name,
-                    entry.reported_lines,
-                    entry.errors,
-                ),
-                file=output,
+            running_monitors_message = "%s%s: %d lines emitted, %d errors" % (
+                padding,
+                entry.monitor_name,
+                entry.reported_lines,
+                entry.errors,
             )
+            if entry.stop_agent_on_failure:
+                running_monitors_message = "{}, stop_agent_on_failure=true".format(
+                    running_monitors_message
+                )
+            print(running_monitors_message, file=output)
 
     dead_monitors = (
         len(manager_status.monitors_status) - manager_status.total_alive_monitors
