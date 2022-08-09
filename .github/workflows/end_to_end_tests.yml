@@ -350,6 +350,8 @@ jobs:
           echo "Kubernetes API cAdvisor metrics monitor checks"
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'-kubernetes-api-cadvisor-metrics" "machine_cpu_cores 2"'
           MINIMUM_RESULTS=2 ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'-kubernetes-api-cadvisor-metrics" "container_cpu_load_average_10s "'
+          # Verify locally calculated rate metrics
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'-kubernetes-api-cadvisor-metrics" "container_cpu_usage_seconds_total_rate "'
 
           # 2. Verify node exporter metrics
           echo "Node exporter metrics monitor checks"
@@ -357,6 +359,8 @@ jobs:
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'-node-exporter-" "process_open_fds "'
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'-node-exporter-" "node_vmstat_pswpin "'
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'-node-exporter-" "node_vmstat_pswpout "'
+          # Verify locally calculated rate metrics
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'-node-exporter-" "node_cpu_seconds_total_rate "'
 
           # 3. Verify kube state event metrics
           echo "Kube state events metrics monitor checks"
