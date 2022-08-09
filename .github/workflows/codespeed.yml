@@ -33,8 +33,8 @@ jobs:
       fail-fast: false
       matrix:
         python-version:
-          - "2.7"
-          - "3.5"
+          - "2.7.17"
+          - "3.5.9"
 
     steps:
       - name: Checkout Repository
@@ -67,11 +67,9 @@ jobs:
         env:
           PYTHONPATH: .
           CODESPEED_URL: "https://scalyr-agent-codespeed.herokuapp.com/"
-          CODESPEED_PROJECT: "scalyr-agent-2-microbenchmarks--uploadertest"
+          CODESPEED_PROJECT: "scalyr-agent-2-microbenchmarks"
           CODESPEED_EXECUTABLE: ${{ steps.setup-python.outputs.python-version }}
-          # don't know what this next var should be yet
-          # CODESPEED_ENVIRONMENT: Circle CI Docker Executor Medium Size
-          CODESPEED_ENVIRONMENT: gha uploader test
+          CODESPEED_ENVIRONMENT: GitHub Hosted Action Runner
           CODESPEED_AUTH: ${{ secrets.CODESPEED_AUTH }}
         run: python benchmarks/scripts/send_microbenchmarks_data_to_codespeed.py --data-path="benchmark_results/*.json" --debug
 
