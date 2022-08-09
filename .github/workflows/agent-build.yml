@@ -40,7 +40,7 @@ jobs:
       - name: Perform the deployment of the test environment
         uses: ./.github/actions/perform-deployment
         with:
-          deployment-name: "agent_build.__init__.BuildTestEnvironment"
+          runner-fqdn: "agent_build.__init__.BuildTestEnvironment"
 
       - name: "Get build and test job matrices."
         id: get-job-matrices
@@ -92,7 +92,7 @@ jobs:
       - name: Run cached step.
         uses: ./.github/actions/perform-deployment
         with:
-          deployment-name: ${{ matrix.step-builder-fqdn }}
+          runner-fqdn: ${{ matrix.step-builder-fqdn }}
 
   build-images:
     needs:
@@ -144,7 +144,7 @@ jobs:
       - name: Perform the build of the base docker image in the deployment.
         uses: ./.github/actions/perform-deployment
         with:
-          deployment-name: ${{ steps.get-builder-fqdn.outputs.fqdn }}
+          runner-fqdn: ${{ steps.get-builder-fqdn.outputs.fqdn }}
 
 
       # We build all images with tha same base image all at once and store all result images in a single
@@ -197,7 +197,7 @@ jobs:
       - name: Perform the deployment of the test environment
         uses: ./.github/actions/perform-deployment
         with:
-          deployment-name: "agent_build.__init__.BuildTestEnvironment"
+          runner-fqdn: "agent_build.__init__.BuildTestEnvironment"
 
       - name: Download registry with previously built images.
         uses: actions/download-artifact@v3

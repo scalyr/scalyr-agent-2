@@ -567,7 +567,7 @@ jobs:
       - name: Perform the deployment of the test environment
         uses: ./.github/actions/perform-deployment
         with:
-          deployment-name: "agent_build.__init__.BuildTestEnvironment"
+          runner-fqdn: "agent_build.__init__.BuildTestEnvironment"
 
       - name: Run tests
         shell: bash
