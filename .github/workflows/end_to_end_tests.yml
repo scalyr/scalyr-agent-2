@@ -361,6 +361,10 @@ jobs:
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'-node-exporter-" "node_vmstat_pswpout "'
           # Verify locally calculated rate metrics
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'-node-exporter-" "node_cpu_seconds_total_rate "'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'-node-exporter-" "node_network_transmit_bytes_total_rate "'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'-node-exporter-" "node_network_receive_bytes_total_rate "'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'-node-exporter-" "node_disk_read_bytes_total_rate "'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'-node-exporter-" "node_disk_written_bytes_total_rate "'
 
           # 3. Verify kube state event metrics
           echo "Kube state events metrics monitor checks"
