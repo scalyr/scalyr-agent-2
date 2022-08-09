@@ -56,6 +56,7 @@ jobs:
           echo "::set-output name=pre-built-cached-steps-matrix::$(python3 -m agent_build.scripts.prebuild_steps_on_cicd)"
 
   pre-build-cached-step:
+    name: ${{ matrix.name }}
     needs:
       - pre-job
 
@@ -63,6 +64,7 @@ jobs:
     strategy:
       # This job receives its matrix from the previous job. The matrix itself is created by the agent_build/scripts/prebuild_steps_on_cicd.py  module.
       # The matrix, for now, consists only from the 'include' part with following fields:
+      #   "name": Name of the build job. (Not used in actiual build process, but just gives meaningful name to the job).
       #   "step-builder-fqdn": Fully qualified name of the builder class that has to run the cached step.
       #   "python-version": Version of python to setup on this runner. (NOTE: version of python used in images may differ, and it specified in the source code.)
       #   "os": Runner OS.

@@ -47,6 +47,7 @@ if __name__ == '__main__':
     for builder in ALL_STEP_BUILDERS:
         matrix["include"].append(
             {
+                "name": f"Pre-build: {builder.REQUIRED_STEPS[0].name}",
                 "step-builder-fqdn": builder.get_fully_qualified_name(),
                 "os": "ubuntu-20.04",
                 "python-version": "3.8.13",
