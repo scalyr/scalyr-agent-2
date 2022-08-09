@@ -11,13 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 import sys
 import subprocess
 import shlex
 import logging
 import os
 import pathlib as pl
-from typing import List
+from typing import List, Mapping, Dict
 
 # If this environment variable is set, then commands output is not suppressed.
 DEBUG = bool(os.environ.get("AGENT_BUILD_DEBUG"))
@@ -88,7 +89,7 @@ def subprocess_command_run_with_log(func):
             logging.info(f" ### COMMAND #{number} FAILED. ###\n")
             raise e from None
         else:
-            logging.info(f" ### COMMAND #{number} ENDED. ###\n")
+            logging.info("\n")
             return result
 
     return wrapper
@@ -111,7 +112,7 @@ class DockerContainer:
         self,
         name: str,
         image_name: str,
-        ports: List[str] = None,
+        ports: Dict[str, str] = None,
         mounts: List[str] = None,
         command: List[str] = None,
         detached: bool = True
@@ -119,9 +120,21 @@ class DockerContainer:
         self.name = name
         self.image_name = image_name
         self.mounts = mounts or []
-        self.ports = ports or []
+
+        self.ports = {}
+        ports = ports or {}
+        for name, p in ports.items():
+            host, guest = p.split(":")
+            if "/" in guest:
+                guest_port, proto = guest.split("/")
+            else:
+                guest_port = guest
+                proto = "tcp"
+            self.ports[name] = f"{host}:{guest_port}/{proto}"
         self.command = command or []
         self.detached = detached
+
+        self.real_ports = {}
 
     def start(self):
 
@@ -136,9 +149,9 @@ class DockerContainer:
             self.name,
         ]
 
-        for port in self.ports:
+        for ports in self.ports.values():
             command_args.append("-p")
-            command_args.append(port)
+            command_args.append(ports)
 
         for mount in self.mounts:
             command_args.append("-v")
@@ -150,14 +163,32 @@ class DockerContainer:
 
         check_call_with_log(command_args)
 
+        self.real_ports = self._get_real_ports()
+
     def kill(self):
         check_call_with_log(["docker", "rm", "-f", self.name])
 
     def __enter__(self):
-        return self.start()
+        self.start()
+        return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.kill()
+
+    def _get_real_ports(self):
+        output = subprocess.check_output([
+            "docker", "container", "inspect", self.name
+        ]).decode().strip()
+        container_info = json.loads(output)[0]
+        ports_info = container_info["NetworkSettings"]["Ports"]
+
+        result = {}
+        for name, ports in self.ports.items():
+            host, guest = ports.split(":")
+            host_info = ports_info[guest][0]
+            result[name] = int(host_info["HostPort"])
+
+        return result
 
 
 class LocalRegistryContainer(DockerContainer):
@@ -176,6 +207,30 @@ class LocalRegistryContainer(DockerContainer):
         super(LocalRegistryContainer, self).__init__(
             name=name,
             image_name="registry:2",
-            ports=[f"{registry_port}:5000"],
+            ports={
+                "registry_port": f"{registry_port}:{5000}"
+            },
             mounts=[f"{registry_data_path}:/var/lib/registry"],
         )
+
+    @property
+    def real_registry_port(self):
+        return self.real_ports["registry_port"]
+
+
+class UniqueDict(dict):
+    """
+    Simple dict subclass which raises error on attempt of adding existing key.
+    Needed to keep tracking that
+    """
+    def __setitem__(self, key, value):
+        if key in self:
+            raise ValueError(f"Key '{key}' already exists.")
+
+        super(UniqueDict, self).__setitem__(key, value)
+
+    def update(self, m: Mapping, **kwargs) -> None:
+        if isinstance(m, dict):
+            m = m.items()
+        for k, v in m:
+            self[k] = v

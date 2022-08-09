@@ -399,7 +399,7 @@ def prepare_scalyr_api_key_secret(scalyr_api_key, scalyr_namespace, run_kubectl)
 
 
 @pytest.fixture
-def cluster_name(minikube_test_profile,image_builder_name, image_name, test_session_suffix, request):
+def cluster_name(image_name, minikube_test_profile,image_builder_name, test_session_suffix, request):
     # Upload agent's image to minikube cluster.
     check_call_with_log(["minikube", "-p", minikube_test_profile, "image", "load", "--overwrite=true", image_name])
     return f"agent-image-test-{image_builder_name}-{request.node.nodeid}-{test_session_suffix}"

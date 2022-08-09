@@ -16,6 +16,7 @@
 This module defines all possible packages of the Scalyr Agent and how they can be built.
 """
 import collections
+import concurrent.futures
 import enum
 import json
 import logging
@@ -24,14 +25,13 @@ import re
 import tarfile
 import shutil
 import os
+import time
 from typing import List, Type, Dict
 
-from agent_build.tools.common import LocalRegistryContainer
-from agent_build.tools.common import check_call_with_log
 from agent_build.tools.runner import Runner, ArtifactRunnerStep
 from agent_build.prepare_agent_filesystem import build_linux_lfs_agent_files, add_config
 from agent_build.tools.constants import SOURCE_ROOT, DockerPlatform, DockerPlatformInfo
-from agent_build.tools.common import check_output_with_log
+from agent_build.tools.common import check_output_with_log, UniqueDict, LocalRegistryContainer, check_call_with_log
 
 log = logging.getLogger(__name__)
 
@@ -67,6 +67,13 @@ class ContainerImageBaseDistro(enum.Enum):
         }
         return suffixes[self]
 
+    @property
+    def camel_case(self):
+        chars = list(str(self.value))
+        chars[0] = chars[0].upper()
+        return "".join(chars)
+
+
 
 class BaseImagePlatformBuilderStep(ArtifactRunnerStep):
     """
@@ -78,7 +85,8 @@ class BaseImagePlatformBuilderStep(ArtifactRunnerStep):
             self,
             python_base_image: str,
             base_distro: ContainerImageBaseDistro,
-            image_platform: DockerPlatformInfo
+            image_platform: DockerPlatformInfo,
+            general_base_image_name: str
     ):
         """
         :param python_base_image: Name of the base docker image with python.
@@ -92,13 +100,12 @@ class BaseImagePlatformBuilderStep(ArtifactRunnerStep):
 
         platform_dashed_str = image_platform.to_dashed_str
 
-        self.base_result_image_name = f"agent-base-image-{base_distro.value}"
-        self.base_result_image_name_with_tag = f"{self.base_result_image_name }:{platform_dashed_str}"
-        self.result_image_tarball_name = f"{self.base_result_image_name }-{platform_dashed_str}.tar"
+        self.base_result_image_name_with_tag = f"{general_base_image_name}:{platform_dashed_str}"
+        self.result_image_tarball_name = f"{general_base_image_name }-{platform_dashed_str}.tar"
 
         super(BaseImagePlatformBuilderStep, self).__init__(
-            name=f"{self.base_result_image_name}-{platform_dashed_str}",
-            script_path="agent_build/docker/build_base_image.sh",
+            name=f"{general_base_image_name}-{platform_dashed_str}",
+            script_path="agent_build/docker/build_base_platform_image.sh",
             tracked_files_globs=[
                 _AGENT_BUILD_PATH / "docker/base.Dockerfile",
                 _AGENT_BUILD_PATH / "docker/install-base-dependencies.sh",
@@ -120,7 +127,7 @@ class BaseImagePlatformBuilderStep(ArtifactRunnerStep):
         )
 
 
-class ContainerImageRunner(Runner):
+class ContainerImageBuilder(Runner):
     """
     The base builder for all docker and kubernetes based images. It builds base images for each particular
         platform/architecture and then use them to build a final multi-arch image.
@@ -151,6 +158,11 @@ class ContainerImageRunner(Runner):
 
     # List of runner steps where each of them is responsible for one particular platform/architecture.
     BASE_PLATFORM_BUILDER_STEPS: List[BaseImagePlatformBuilderStep]
+
+    # General name of the base images that have to be used by this final image.
+    # Each particular base image is also contains platform/architecture related suffix combined with that general name.
+    GENERAL_BASE_IMAGE_NAME: str
+
 
     def __init__(
             self,
@@ -203,7 +215,7 @@ class ContainerImageRunner(Runner):
                         self.base_platform_builder_steps.append(step)
                         break
 
-        super(ContainerImageRunner, self).__init__(
+        super(ContainerImageBuilder, self).__init__(
             required_steps=self.base_platform_builder_steps
         )
 
@@ -265,6 +277,15 @@ class ContainerImageRunner(Runner):
         return f"{cls.RESULT_IMAGE_NAME}:{cls.RESULT_IMAGE_TAG}"
 
     @classmethod
+    def get_all_result_image_names(cls) -> List[str]:
+        names = []
+        for name in [cls.RESULT_IMAGE_NAME, *cls.ALTERNATIVE_IMAGE_NAMES]:
+            for tag in [cls.RESULT_IMAGE_TAG]:
+                names.append(f"{name}:{tag}")
+
+        return names
+
+    @classmethod
     def get_final_alternative_names(cls) -> List[str]:
         result = []
         for name in cls.ALTERNATIVE_IMAGE_NAMES:
@@ -280,6 +301,76 @@ class ContainerImageRunner(Runner):
     def result_image_tarball_path(self) -> pl.Path:
         return self.output_path / type(self).get_result_image_tarball_name()
 
+    def _build_image(
+            self,
+            base_image_registry_host: str,
+            platforms_options: List[str],
+            image_type_stage_name: str,
+            builder_fqdn: str,
+            result_image_names: List[str]
+    ):
+        """
+        Build final image.
+        :param base_image_registry_host: Registry where all base platform-specific images are stored.
+        :param platforms_options: List of docker build command line '--platform' options to specify target image
+            platforms to be built.
+        :param image_type_stage_name: Image type stage name, see the 'IMAGE_TYPE_STAGE_NAME' class attribute.
+        :param builder_fqdn: FQDN of the image builder that has to build filesystem for the dfinl docker image.
+        :param result_image_names: List of names of the result images that has to be published to the Dockerhub.
+        """
+        image_names_options = []
+        for name in result_image_names:
+            final_name = name
+            if self.registry:
+                final_name = f"{self.registry}/{final_name}"
+            image_names_options.extend([
+                "-t",
+                final_name
+            ])
+
+        additional_options = [
+            "--push" if self.push else "--load"
+        ]
+
+        check_call_with_log([
+            "docker",
+            "buildx",
+            "build",
+            *image_names_options,
+            *platforms_options,
+            "--build-arg",
+            f"PYTHON_BASE_IMAGE={type(self).PYTHON_BASE_IMAGE}",
+            "--build-arg",
+            f"BASE_IMAGE_NAME={base_image_registry_host}/{type(self).GENERAL_BASE_IMAGE_NAME}",
+            "--build-arg",
+            f"BUILDER_FQDN={builder_fqdn}",
+            "--build-arg",
+            f"IMAGE_TYPE_STAGE_NAME={image_type_stage_name}",
+            *additional_options,
+            "-f",
+            str(SOURCE_ROOT / "agent_build/docker/final.Dockerfile"),
+            str(SOURCE_ROOT)
+        ])
+
+    def _perform_build(
+            self,
+            base_images_registry_host: str,
+            platforms_options: List[str]
+    ):
+        """
+        Function which builds a final image. Can be overridden for a customised result, for example
+            to do a bulk build as we do lower.
+        :param base_images_registry_host: Registry where all base platform-specific images are stored.
+        :param platforms_options: List of docker build command line '--platform' options to specify target image
+        """
+        self._build_image(
+            base_image_registry_host=base_images_registry_host,
+            platforms_options=platforms_options,
+            image_type_stage_name=type(self).IMAGE_TYPE_STAGE_NAME,
+            builder_fqdn=type(self).get_fully_qualified_name(),
+            result_image_names=self.get_all_result_image_names()
+        )
+
     def _run(self):
         """
         Combine all platform specific base images into one final multi-arch image.
@@ -294,9 +385,10 @@ class ContainerImageRunner(Runner):
         # Since docker buildx builder can not use local docker images as base images,
         # we push them and then pull from the local registry.
         with LocalRegistryContainer(
-                name=f"base-images-registry-debian",
-                registry_port=5050
-        ):
+                name=f"base-images-registry",
+                registry_port=0
+        ) as container:
+
             for base_arch_step in type(self).BASE_PLATFORM_BUILDER_STEPS:
                 # Load image for a particular platform from the tarball
                 image_path = base_arch_step.output_directory / base_arch_step.result_image_tarball_name
@@ -307,7 +399,7 @@ class ContainerImageRunner(Runner):
                 image_id = load_output.split(":")[-1]
 
                 # Tag loaded image with normal name.
-                registry_image_name = f"localhost:5050/{base_arch_step.base_result_image_name_with_tag}"
+                registry_image_name = f"localhost:{container.real_registry_port}/{base_arch_step.base_result_image_name_with_tag}"
                 check_call_with_log([
                     "docker", "tag", image_id, registry_image_name
                 ])
@@ -322,79 +414,53 @@ class ContainerImageRunner(Runner):
                     str(base_arch_step.image_platform)
                 ])
 
-            # Build OCI tarball with agent's final image.
-            check_call_with_log([
-                "docker",
-                "buildx",
-                "build",
-                *platforms_options,
-                "--build-arg",
-                f"PYTHON_BASE_IMAGE={type(self).PYTHON_BASE_IMAGE}",
-                "--build-arg",
-                f"BASE_IMAGE_NAME=localhost:5050/{base_arch_step.base_result_image_name}",
-                "--build-arg",
-                f"BUILDER_FQDN={type(self).get_fully_qualified_name()}",
-                "--build-arg",
-                f"IMAGE_TYPE_STAGE_NAME={type(self).IMAGE_TYPE_STAGE_NAME}",
-                "-f",
-                str(SOURCE_ROOT / "agent_build/docker/final.Dockerfile"),
-                "--output",
-                f"type=oci,dest={self.result_image_tarball_path}",
-                str(SOURCE_ROOT)
-            ])
-
-        if self.image_output_path:
-            target_path = self.image_output_path / self.result_image_tarball_path.name
-            log.info(f"Saving result image tarball to '{target_path}'")
-            self.image_output_path.mkdir(exist_ok=True, parents=True)
-            shutil.copy2(
-                self.result_image_tarball_path,
-                self.image_output_path
-            ),
+            self._perform_build(
+                base_images_registry_host=f"localhost:{container.real_registry_port}",
+                platforms_options=platforms_options
+            )
 
 
 # CPU architectures or platforms that has to be supported by the Agent docker images,
 _AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS = [
     DockerPlatform.AMD64.value,
     DockerPlatform.ARM64.value,
-    DockerPlatform.ARMV7.value,
+    #DockerPlatform.ARMV7.value,
 ]
 
 
-class DockerJsonContainerBuilder(ContainerImageRunner):
+class DockerJsonContainerBuilder(ContainerImageBuilder):
     BUILDER_NAME = "docker-json"
     CONFIG_PATH = SOURCE_ROOT / "docker" / "docker-json-config"
     RESULT_IMAGE_NAME = "scalyr-agent-docker-json"
 
 
-class DockerSyslogContainerBuilder(ContainerImageRunner):
+class DockerSyslogContainerBuilder(ContainerImageBuilder):
     BUILDER_NAME = PACKAGE_TYPE = "docker-syslog"
     CONFIG_PATH = SOURCE_ROOT / "docker" / "docker-syslog-config"
-    # "scalyr-agent-docker",
     RESULT_IMAGE_NAME = "scalyr-agent-docker-syslog"
     ALTERNATIVE_IMAGE_NAMES = ["scalyr-agent-docker"]
 
 
-class DockerApiContainerBuilder(ContainerImageRunner):
+class DockerApiContainerBuilder(ContainerImageBuilder):
     BUILDER_NAME = "docker-api"
     CONFIG_PATH = SOURCE_ROOT / "docker" / "docker-api-config"
     RESULT_IMAGE_NAME = "scalyr-agent-docker-api"
 
 
-class K8sContainerBuilder(ContainerImageRunner):
+class K8sContainerBuilder(ContainerImageBuilder):
     BUILDER_NAME = IMAGE_TYPE_STAGE_NAME = "k8s"
     CONFIG_PATH = SOURCE_ROOT / "docker" / "k8s-config"
     RESULT_IMAGE_NAME = "scalyr-k8s-agent"
 
 
-class K8sWithOpenmetricsContainerBuilder(ContainerImageRunner):
+class K8sWithOpenmetricsContainerBuilder(ContainerImageBuilder):
     BUILDER_NAME = "k8s-with-openmetrics"
     IMAGE_TYPE_STAGE_NAME = "k8s"
     CONFIG_PATH = SOURCE_ROOT / "docker" / "k8s-config-with-openmetrics-monitor"
     RESULT_IMAGE_NAME = "scalyr-k8s-agent-with-openmetrics-monitor"
 
 
-class K8sRestartAgentOnMonitorsDeathBuilder(ContainerImageRunner):
+class K8sRestartAgentOnMonitorsDeathBuilder(ContainerImageBuilder):
     BUILDER_NAME = "k8s-restart-agent-on-monitor-death"
     IMAGE_TYPE_STAGE_NAME = "k8s"
     CONFIG_PATH = SOURCE_ROOT / "docker" / "k8s-config"
@@ -404,25 +470,57 @@ class K8sRestartAgentOnMonitorsDeathBuilder(ContainerImageRunner):
     RESULT_IMAGE_NAME = "scalyr-k8s-restart-agent-on-monitor-death"
 
 
+class BulkImageBuilder(ContainerImageBuilder):
+    """
+    A helper builder class which builds all image builder with  the same base distro.
+        It is mainly needed in GitHubAction CI/CD to build all images of the same base distro in one registry.
+    """
+    IMAGE_BUILDERS: List[Type[ContainerImageBuilder]]
+
+    def _perform_build(
+            self,
+            base_images_registry_host: str,
+            platforms_options: List[str]
+    ):
+        """
+        Override this function to build all images with the same base distro at once.
+        :param base_images_registry_host: Registry where all base platform-specific images are stored.
+        :param platforms_options: List of docker build command line '--platform' options to specify target image
+            platforms to be built.
+        """
+        for builder_cls in type(self).IMAGE_BUILDERS:
+            super(BulkImageBuilder, self)._build_image(
+                base_image_registry_host=base_images_registry_host,
+                platforms_options=platforms_options,
+                image_type_stage_name=builder_cls.IMAGE_TYPE_STAGE_NAME,
+                builder_fqdn=builder_cls.get_fully_qualified_name(),
+                result_image_names=builder_cls.get_all_result_image_names()
+            )
+
+
 _BASE_IMAGE_PLATFORM_BUILDER_STEPS = collections.defaultdict(dict)
 
-# Final collection of all docker image builder.
-DOCKER_IMAGE_BUILDERS: Dict[str, Type[ContainerImageRunner]] = {}
+# Final collection of all docker image builders.
+DOCKER_IMAGE_BUILDERS: Dict[str, Type[ContainerImageBuilder]] = UniqueDict()
 
 
-def create_distro_specific_image_builders(builder_cls: Type[ContainerImageRunner]):
+_BULK_IMAGE_BUILDERS_TO_DISTROS: Dict[ContainerImageBaseDistro, Type[BulkImageBuilder]] = UniqueDict()
+
+
+def create_distro_specific_image_builders(base_builders_classes: List[Type[ContainerImageBuilder]]):
     """
     Helper function which creates distro-specific image builder classes from the base agent image builder class.
     For example if builder is for 'docker-json' image then it will produce builder for docker-json-debian,
         docker-json-alpine, etc.
-    :param builder_cls: Base image builder class.
+    :param base_builders_classes: Base builder classes.
     """
 
-    global _BASE_IMAGE_PLATFORM_BUILDER_STEPS, DOCKER_IMAGE_BUILDERS
+    global _BASE_IMAGE_PLATFORM_BUILDER_STEPS, DOCKER_IMAGE_BUILDERS, BULK_DOCKER_IMAGE_BUILDERS
 
     for base_distro in ContainerImageBaseDistro:
         base_image_builder_steps = []
         python_base_image = f"python:{IMAGES_PYTHON_VERSION}-{base_distro.as_python_image_suffix}"
+        general_base_image_name = f"agent-base-image-{base_distro.value}"
 
         # Create or reuse base platform/architecture image builder steps.
         for plat in _AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS:
@@ -432,7 +530,8 @@ def create_distro_specific_image_builders(builder_cls: Type[ContainerImageRunner
                 base_platform_step = BaseImagePlatformBuilderStep(
                     python_base_image=python_base_image,
                     base_distro=base_distro,
-                    image_platform=plat
+                    image_platform=plat,
+                    general_base_image_name=general_base_image_name
                 )
                 _BASE_IMAGE_PLATFORM_BUILDER_STEPS[base_distro][plat] = base_platform_step
 
@@ -444,33 +543,57 @@ def create_distro_specific_image_builders(builder_cls: Type[ContainerImageRunner
         else:
             result_image_tag = base_distro.value
 
-        # Create builder class for a specialised image.
-        class _BaseImageBuilder(builder_cls):
-            # Add distro suffix  to a general image builder name.
-            BUILDER_NAME = f"{builder_cls.BUILDER_NAME}-{base_distro.value}"
-            PYTHON_BASE_IMAGE = python_base_image
-            RESULT_IMAGE_TAG = result_image_tag
-            REQUIRED_STEPS = BASE_PLATFORM_BUILDER_STEPS = base_image_builder_steps[:]
+        distro_builders = []
+        for builder_cls in base_builders_classes:
+            # Create builder class for a specialised image.
+            class DistroImageBuilder(builder_cls):
+                # Add distro suffix  to a general image builder name.
+                BUILDER_NAME = f"{builder_cls.BUILDER_NAME}-{base_distro.value}"
+                PYTHON_BASE_IMAGE = python_base_image
+                RESULT_IMAGE_TAG = result_image_tag
+                GENERAL_BASE_IMAGE_NAME = general_base_image_name
+                REQUIRED_STEPS = BASE_PLATFORM_BUILDER_STEPS = base_image_builder_steps[:]
 
-        # Assign fully qualified name to the result class, so it can be found outside this temporary scope.
-        _BaseImageBuilder.assign_fully_qualified_name(
-            class_name=builder_cls.__name__,
+            # Assign fully qualified name to the result class, so it can be found outside this temporary scope.
+            DistroImageBuilder.assign_fully_qualified_name(
+                class_name=builder_cls.__name__,
+                module_name=__name__,
+                class_name_suffix=base_distro.camel_case,
+            )
+            distro_builders.append(DistroImageBuilder)
+            DOCKER_IMAGE_BUILDERS[DistroImageBuilder.BUILDER_NAME] = DistroImageBuilder
+
+        class DistroBulkImageBuilder(BulkImageBuilder):
+            BUILDER_NAME = f"build-bulk-images-{base_distro.value}"
+            PYTHON_BASE_IMAGE = python_base_image
+            IMAGE_BUILDERS = distro_builders[:]
+            REQUIRED_STEPS = BASE_PLATFORM_BUILDER_STEPS = base_image_builder_steps[:]
+            GENERAL_BASE_IMAGE_NAME = general_base_image_name
+
+        DistroBulkImageBuilder.assign_fully_qualified_name(
+            class_name=DistroBulkImageBuilder.__name__,
             module_name=__name__,
-            class_name_suffix=base_distro.value,
+            class_name_suffix=base_distro.camel_case
         )
-        if _BaseImageBuilder.BUILDER_NAME in DOCKER_IMAGE_BUILDERS:
-            raise ValueError(f"Image builder name {builder.BUILDER_NAME} already exists, please rename is.")
-        DOCKER_IMAGE_BUILDERS[_BaseImageBuilder.BUILDER_NAME] = _BaseImageBuilder
+        _BULK_IMAGE_BUILDERS_TO_DISTROS[base_distro] = DistroBulkImageBuilder
 
 
 # Create distro specific image builders from general builder classes.
-create_distro_specific_image_builders(DockerJsonContainerBuilder)
-create_distro_specific_image_builders(DockerSyslogContainerBuilder)
-create_distro_specific_image_builders(DockerApiContainerBuilder)
-create_distro_specific_image_builders(K8sContainerBuilder)
-create_distro_specific_image_builders(K8sWithOpenmetricsContainerBuilder)
-create_distro_specific_image_builders(K8sRestartAgentOnMonitorsDeathBuilder)
+create_distro_specific_image_builders([
+    DockerJsonContainerBuilder,
+    DockerSyslogContainerBuilder,
+    K8sContainerBuilder,
+    K8sWithOpenmetricsContainerBuilder,
+    K8sRestartAgentOnMonitorsDeathBuilder
+])
 
+# Final collection of build image builders.
+BULK_DOCKER_IMAGE_BUILDERS = UniqueDict({
+    bulk_builder.BUILDER_NAME: bulk_builder
+    for base_distro, bulk_builder in _BULK_IMAGE_BUILDERS_TO_DISTROS.items()
+})
+
+a=10
 
 if __name__ == '__main__':
     # We use this module as script in order to generate build job matrix for GitHub Actions.
@@ -478,10 +601,10 @@ if __name__ == '__main__':
         "include": []
     }
 
-    for builder_name, builder in DOCKER_IMAGE_BUILDERS.items():
+    for bulk_builder_distro, bulk_builder in _BULK_IMAGE_BUILDERS_TO_DISTROS.items():
         matrix["include"].append({
-            "builder-name": builder_name,
-            "result-tarball-name": builder.get_result_image_tarball_name(),
+            "builder-name": bulk_builder.BUILDER_NAME,
+            "distro-name": bulk_builder_distro.value,
             "python-version": f"{IMAGES_PYTHON_VERSION}",
             "os": "ubuntu-20.04",
         })

@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import abc
 import argparse
 import dataclasses
 import hashlib
@@ -23,12 +22,13 @@ import shutil
 import logging
 import inspect
 import sys
-from typing import Union, Optional, List, Dict, Type, Mapping
+import time
+from typing import Union, Optional, List, Dict, Type
 
 from agent_build.tools import common
 from agent_build.tools import constants
 from agent_build.tools.constants import AGENT_BUILD_OUTPUT, SOURCE_ROOT, DockerPlatform
-from agent_build.tools.common import check_call_with_log, DockerContainer
+from agent_build.tools.common import check_call_with_log, DockerContainer, UniqueDict
 
 log = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ def remove_directory_in_docker(path: pl.Path):
 
     # In order to be able to remove the whole directory, we mount parent directory.
     with DockerContainer(
-        name="agent_build_step_trash_remover",
+        name=f"agent_build_step_trash_remover",
         image_name="ubuntu:22.04",
         mounts=[
             f"{path.parent}:/parent"
@@ -53,24 +53,6 @@ def remove_directory_in_docker(path: pl.Path):
         detached=False
     ):
         pass
-
-
-class UniqueDict(dict):
-    """
-    Simple dict subclass which raises error on attempt of adding existing key.
-    Needed to keep tracking that
-    """
-    def __setitem__(self, key, value):
-        if key in self:
-            raise ValueError(f"Key '{key}' already exists.")
-
-        super(UniqueDict, self).__setitem__(key, value)
-
-    def update(self, m: Mapping, **kwargs) -> None:
-        if isinstance(m, dict):
-            m = m.items()
-        for k, v in m:
-            self[k] = v
 
 
 @dataclasses.dataclass
@@ -175,8 +157,8 @@ class RunnerStep:
         self.required_steps = required_steps or {}
 
         # personal cache directory of the step.
-        self.cache_directory = constants.DEPLOYMENT_CACHE_DIR / self.id
-        self.output_directory = constants.DEPLOYMENT_OUTPUT / self.id
+        self.cache_directory = constants.STEP_CACHE_DIR / self.id
+        self.output_directory = constants.STEP_OUTPUT / self.id
         self._isolated_source_root = AGENT_BUILD_OUTPUT / "runner_steps_isolated_roots" / self.id
 
         self.cacheable = cacheable
@@ -671,13 +653,6 @@ class Runner:
         :param class_name_suffix: Additional suffix to class name. if needed.
         :param module_name: Name of the module where to add an attribute with this class.
         """
-
-        # if specified, add suffix. and just make it CamelCase
-        if class_name_suffix:
-            class_name_suffix_chars = list(class_name_suffix)
-            class_name_suffix_chars[0] = class_name_suffix_chars[0].upper()
-            class_name_suffix = "".join(class_name_suffix_chars)
-
         final_class_name = f"{class_name}{class_name_suffix}"
 
         module = sys.modules[module_name]

@@ -58,7 +58,7 @@ sh_cs() {
   sh -c "${*}"
 }
 
-log "=========== Run Deployment Step Script'$(basename "$STEP_SCRIPT_PATH")' ==========="
+log "=========== Execute Runner Step Script'$(basename "$STEP_SCRIPT_PATH")' ==========="
 
 log "SOURCE_ROOT: ${SOURCE_ROOT}"
 log "STEP_OUTPUT_PATH: ${STEP_OUTPUT_PATH}"
@@ -130,4 +130,4 @@ export STEP_OUTPUT_PATH
 # Run the script.
 . "${STEP_SCRIPT_PATH}"
 
-log "=========== The Deployment Step Script '$(basename "$STEP_SCRIPT_PATH")' is successfully ended ==========="
+log "=========== The Runner Step Script '$(basename "$STEP_SCRIPT_PATH")' is successfully ended ==========="

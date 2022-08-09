@@ -37,7 +37,7 @@ jobs:
         with:
           python-version: "3.8.13"
 
-      - name: Perform the deployment of the test environment
+      - name: Execute the test environment deploy runner.
         uses: ./.github/actions/execute-runner
         with:
           runner-fqdn: "agent_build.__init__.BuildTestEnvironment"
@@ -97,6 +97,7 @@ jobs:
           runner-fqdn: ${{ matrix.step-builder-fqdn }}
 
   build-images:
+    name: Build all images based on ${{ matrix.distro-name }} distribution.
     needs:
       - pre-job
       - pre-build-cached-step
@@ -105,8 +106,8 @@ jobs:
     strategy:
       # This job receives its matrix from the previous job. The matrix itself is created by the agent_build/package_builder.py module.
       # The matrix, for now, consists only from the 'include' part with following fields:
-      #   "builder-name": name of the builder that builds the target image.
-      #   "result-tarball-name": filename of the result image tarball.
+      #   "builder-name": name of the builder that builds the target images.
+      #   "distro-name": Name of the base distribution, e.g. debian, alpine on which base the resul images are built.
       #   "python-version": Version of python to setup on this runner. (NOTE: version of python used in images may differ, and it specified in the source code.)
       #   "os": Runner OS.
       matrix: ${{ fromJSON(needs.pre-job.outputs.build-matrix-json) }}
@@ -137,16 +138,20 @@ jobs:
         with:
           driver-opts: network=host
 
-      - name: Get builder fqdn
-        id: get-builder-fqdn
+      - name: Spin up local registry to store result images.
         run: |
-          set -e
-          echo "::set-output name=fqdn::$(python3 build_package_new.py ${{ matrix.builder-name }} --fqdn)"
+          docker run -d --rm --name registry -p 5000:5000 -v /tmp/result_registry:/var/lib/registry registry:2
 
-      - name: Perform the build of the base docker image in the deployment.
+#      - name: Get fqdn of the builder '${{ matrix.builder-name }}'
+#        id: get-builder-fqdn
+#        run: |
+#          set -e
+#          echo "::set-output name=fqdn::$(python3 build_package_new.py ${{ matrix.builder-name }} --fqdn)"
+
+      - name: Perform the build of the base docker images.
         uses: ./.github/actions/execute-runner
         with:
-          runner-fqdn: ${{ steps.get-builder-fqdn.outputs.fqdn }}
+          runner-fqdn: "agent_build.docker_image_builders.DistroBulkImageBuilder${{ distro-name }}"
 
 
       # We build all images with tha same base image all at once and store all result images in a single
@@ -154,13 +159,13 @@ jobs:
       - name: Build images with builder '${{ matrix.builder-name }}'
         run: |
           python3 build_package_new.py ${{ matrix.builder-name }} \
-            --image-output-path /tmp/build-output
+            --images-registry /tmp/result_registry
 
-      - name: Save result image tarball.
+      - name: Save registry data root with result images as artifact.
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.builder-name }}
-          path: /tmp/build-output
+          name: ${{ matrix.distro-name }}
+          path: /tmp/result_registry
           retention-days: 1
 
 
@@ -196,7 +201,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Perform the deployment of the test environment
+      - name: Execute the test environment deploy runner.
         uses: ./.github/actions/execute-runner
         with:
           runner-fqdn: "agent_build.__init__.BuildTestEnvironment"
