@@ -48,13 +48,16 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install tox
+      - name: Install Deps
         env:
           TOX_VERSION: 3.20.1
           TOX_GH_ACTIONS_VERSION: 2.9.1
         run: |
           python -m pip install --upgrade pip
-          pip install "tox==$TOX_VERSION" "tox-gh-actions==$TOX_GH_ACTIONS_VERSION"
+          pip install "tox==$TOX_VERSION" "tox-gh-actions==$TOX_GH_ACTIONS_VERSION" "cffi==1.12.3" "udatetime==0.0.16" "requests"
+          # Needed for snappy library
+          sudo apt-get update
+          sudo apt-get install -y libsnappy-dev
 
       - name: Run Benchmarks
         run: tox -e micro-benchmarks
