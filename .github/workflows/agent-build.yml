@@ -151,7 +151,7 @@ jobs:
       - name: Perform the build of the base docker images.
         uses: ./.github/actions/execute-runner
         with:
-          runner-fqdn: "agent_build.docker_image_builders.DistroBulkImageBuilder${{ matrix.distro-name }}"
+          runner-fqdn: "agent_build.docker_image_builders.DistroBulkImageBuilder-${{ matrix.distro-name }}"
 
 
       # We build all images with tha same base image all at once and store all result images in a single

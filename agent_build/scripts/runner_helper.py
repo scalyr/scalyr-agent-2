@@ -20,8 +20,7 @@ Script caller specifies FQDN of the builder class, and script imports it and exe
 import argparse
 import sys
 import pathlib as pl
-import pydoc
-from typing import Type
+import importlib
 
 
 SOURCE_ROOT = pl.Path(__file__).parent.parent.parent
@@ -40,7 +39,10 @@ if __name__ == '__main__':
     base_parser.add_argument("builder_class_fqdn")
     base_args, other_args = base_parser.parse_known_args()
 
-    builder_cls: Type[Runner] = pydoc.locate(base_args.builder_class_fqdn) # NOQA
+    module_name, class_name = base_args.builder_class_fqdn.rsplit(".", 1)
+
+    module = importlib.import_module(module_name)
+    builder_cls: Runner = getattr(module, class_name)
 
     parser = argparse.ArgumentParser()
 

@@ -558,7 +558,7 @@ def create_distro_specific_image_builders(base_builders_classes: List[Type[Conta
             DistroImageBuilder.assign_fully_qualified_name(
                 class_name=builder_cls.__name__,
                 module_name=__name__,
-                class_name_suffix=base_distro.camel_case,
+                class_name_suffix=f"-{base_distro.value}",
             )
             distro_builders.append(DistroImageBuilder)
             DOCKER_IMAGE_BUILDERS[DistroImageBuilder.BUILDER_NAME] = DistroImageBuilder
@@ -573,7 +573,7 @@ def create_distro_specific_image_builders(base_builders_classes: List[Type[Conta
         DistroBulkImageBuilder.assign_fully_qualified_name(
             class_name=DistroBulkImageBuilder.__name__,
             module_name=__name__,
-            class_name_suffix=base_distro.camel_case
+            class_name_suffix=f"-{base_distro.value}"
         )
         _BULK_IMAGE_BUILDERS_TO_DISTROS[base_distro] = DistroBulkImageBuilder
 
