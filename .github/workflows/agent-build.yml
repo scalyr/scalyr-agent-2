@@ -212,14 +212,18 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: ${{ matrix.distro-name }}
-          path: /tmp/build-output
+          path: /tmp/result_registry
+
+      - name: Spin up local registry to store result images.
+        run: |
+          docker run -d --rm --name registry -p 5000:5000 -v /tmp/result_registry:/var/lib/registry registry:2
 
       - name: Run tests
         shell: bash
         run: |
           python3 -m pytest  tests/end_to_end_tests/container_image_tests/k8s_test.py \
               -k ${{ matrix.pytest-params }} \
-            --image-tarball-path /tmp/build-output/${{ matrix.result-tarball-name }} \
+            --images-registry localhost:5000 \
             --scalyr-api-key ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }} \
             --scalyr-api-read-key ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }} \
             --test-session-suffix ${{ github.run_id }}-${{ github.run_attempt }}
