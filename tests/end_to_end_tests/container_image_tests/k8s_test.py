@@ -553,6 +553,12 @@ def create_agent_daemonset(
     def create():
         run_kubectl(["apply", "-f", str(agent_manifest_path)])
 
+        while True:
+            run_kubectl([
+                "get", "pods"
+            ])
+            time.sleep(1)
+
         # Get name of the created pod.
         pod_name = (
             run_kubectl_output([

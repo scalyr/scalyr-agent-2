@@ -226,7 +226,8 @@ jobs:
             --images-registry localhost:5000 \
             --scalyr-api-key ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }} \
             --scalyr-api-read-key ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }} \
-            --test-session-suffix ${{ github.run_id }}-${{ github.run_attempt }}
+            --test-session-suffix ${{ github.run_id }}-${{ github.run_attempt }} \
+            -s
 
       - name: Notify Slack on Failure
         # NOTE: github.ref is set to pr ref (and not branch name, e.g. refs/pull/28/merge) for pull
