@@ -186,7 +186,7 @@ def pytest_generate_tests(metafunc):
     param_names =  ["image_builder_name", "kubernetes_version", "minikube_driver", "container_runtime"]
 
     final_params = []
-    for p in PARAMS:
+    for p in EXTENDED_PARAMS:
         final_params.append(
             [p[name] for name in param_names]
         )
