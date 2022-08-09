@@ -555,7 +555,7 @@ def create_agent_daemonset(
 
         while True:
             run_kubectl([
-                "get", "pods"
+                "-n", "scalyr", "get", "pods"
             ])
             time.sleep(1)
 
