@@ -72,10 +72,19 @@ def check_agent_log_for_errors(content: str):
 
             # There is an issue with dns resolution on GitHub actions side, so we skip some error messages.
             connection_error_mgs = '[error="client/connectionFailed"] Failed to connect to "https://agent.scalyr.com" due to errno=-3.'
-
             if connection_error_mgs in message:
                 # If the traceback that follows after error message contains particular error message,
                 # then we are ok with that.
+                errors_to_ignore = [
+                    "socket.gaierror: [Errno -3] Try again",
+                    "socket.gaierror: [Errno -3] Temporary failure in name resolution",
+                ]
+                for error_to_ignore in errors_to_ignore:
+                    if error_to_ignore in additional_lines:
+                        to_fail = False
+                        log.info(f"Ignored error: {whole_error}")
+                        break
+            elif "get current leader: Temporary error seen while accessing api:" in message:
                 errors_to_ignore = [
                     "socket.gaierror: [Errno -3] Try again",
                     "socket.gaierror: [Errno -3] Temporary failure in name resolution",
