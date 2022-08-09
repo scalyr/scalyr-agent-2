@@ -861,9 +861,12 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
 
         # 1. Kubernetes API metrics monitor
         if self.__scrape_kubernetes_api_metrics:
+            monitor_id = f"{node_name}_kubernetes-api-metrics"
+            scrape_url = kubernetes_api_metrics_scrape_url
+
             monitor_config, log_config = self.__get_monitor_config_and_log_config(
-                monitor_id=f"{node_name}_kubernetes-api-metrics",
-                url=kubernetes_api_metrics_scrape_url,
+                monitor_id=monitor_id,
+                url=scrape_url,
                 verify_https=verify_https,
                 ca_file=ca_file,
                 headers=headers,
@@ -880,6 +883,13 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
                 ),
                 include_node_name=self.__include_node_name,
                 include_cluster_name=self.__include_cluster_name,
+            )
+
+            self._logger.debug(
+                f'Using monitor config options for scrape url "{scrape_url}" and monitor id "{monitor_id}": {monitor_config}'
+            )
+            self._logger.debug(
+                f'Using log config options for scrape url "{scrape_url}" and monitor id "{monitor_id}": {log_config}'
             )
 
             monitor = monitors_manager.add_monitor(
@@ -904,9 +914,12 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
 
         # 2. Kubernetes API cAdvisor metrics monitor
         if self.__scrape_kubernetes_api_cadvisor_metrics:
+            monitor_id = f"{node_name}_kubernetes-api-cadvisor-metrics"
+            scrape_url = kubernetes_api_cadvisor_metrics_scrape_url
+
             monitor_config, log_config = self.__get_monitor_config_and_log_config(
-                monitor_id=f"{node_name}_kubernetes-api-cadvisor-metrics",
-                url=kubernetes_api_cadvisor_metrics_scrape_url,
+                monitor_id=monitor_id,
+                url=scrape_url,
                 verify_https=verify_https,
                 ca_file=ca_file,
                 headers=headers,
@@ -923,6 +936,13 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
                 ),
                 include_node_name=self.__include_node_name,
                 include_cluster_name=self.__include_cluster_name,
+            )
+
+            self._logger.debug(
+                f'Using monitor config options for scrape url "{scrape_url}" and monitor id "{monitor_id}": {monitor_config}'
+            )
+            self._logger.debug(
+                f'Using log config options for scrape url "{scrape_url}" and monitor id "{monitor_id}": {log_config}'
             )
 
             monitor = monitors_manager.add_monitor(
@@ -1032,8 +1052,9 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             return
 
         node_name = self.__get_node_name()
+        monitor_id = f"{node_name}_{pod.name}"
         monitor_config, log_config = self.__get_monitor_config_and_log_config(
-            monitor_id=f"{node_name}_{pod.name}",
+            monitor_id=monitor_id,
             url=scrape_url,
             sample_interval=scrape_config.scrape_interval or self.__scrape_interval,
             scrape_timeout=scrape_config.scrape_timeout,
@@ -1060,10 +1081,10 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             f'Started scrapping url "{scrape_url}" for pod {pod.namespace}/{pod.name} ({pod.uid})'
         )
         self._logger.debug(
-            f'Using monitor config options for scrape url "{scrape_url}": {monitor_config}'
+            f'Using monitor config options for scrape url "{scrape_url}" and monitor id "{monitor_id}": {monitor_config}'
         )
         self._logger.debug(
-            f'Using log config options for scrape url "{scrape_url}": {log_config}'
+            f'Using log config options for scrape url "{scrape_url}" and monitor id "{monitor_id}": {log_config}'
         )
 
         self.__add_watcher_log_config(
