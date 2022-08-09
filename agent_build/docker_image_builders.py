@@ -163,6 +163,9 @@ class ContainerImageBuilder(Runner):
     # Each particular base image is also contains platform/architecture related suffix combined with that general name.
     GENERAL_BASE_IMAGE_NAME: str
 
+    # Type of the distribution on which the current image based.
+    DISTRO_TYPE: ContainerImageBaseDistro
+
 
     def __init__(
             self,
@@ -503,8 +506,8 @@ _BASE_IMAGE_PLATFORM_BUILDER_STEPS = collections.defaultdict(dict)
 # Final collection of all docker image builders.
 DOCKER_IMAGE_BUILDERS: Dict[str, Type[ContainerImageBuilder]] = UniqueDict()
 
-
-_BULK_IMAGE_BUILDERS_TO_DISTROS: Dict[ContainerImageBaseDistro, Type[BulkImageBuilder]] = UniqueDict()
+# # Final collection of build image builders.
+BULK_DOCKER_IMAGE_BUILDERS: Dict[str, Type[BulkImageBuilder]] = UniqueDict()
 
 
 def create_distro_specific_image_builders(base_builders_classes: List[Type[ContainerImageBuilder]]):
@@ -549,6 +552,7 @@ def create_distro_specific_image_builders(base_builders_classes: List[Type[Conta
             class DistroImageBuilder(builder_cls):
                 # Add distro suffix  to a general image builder name.
                 BUILDER_NAME = f"{builder_cls.BUILDER_NAME}-{base_distro.value}"
+                DISTRO_TYPE = base_distro
                 PYTHON_BASE_IMAGE = python_base_image
                 RESULT_IMAGE_TAG = result_image_tag
                 GENERAL_BASE_IMAGE_NAME = general_base_image_name
@@ -565,6 +569,7 @@ def create_distro_specific_image_builders(base_builders_classes: List[Type[Conta
 
         class DistroBulkImageBuilder(BulkImageBuilder):
             BUILDER_NAME = f"build-bulk-images-{base_distro.value}"
+            DISTRO_TYPE = base_distro
             PYTHON_BASE_IMAGE = python_base_image
             IMAGE_BUILDERS = distro_builders[:]
             REQUIRED_STEPS = BASE_PLATFORM_BUILDER_STEPS = base_image_builder_steps[:]
@@ -575,7 +580,8 @@ def create_distro_specific_image_builders(base_builders_classes: List[Type[Conta
             module_name=__name__,
             class_name_suffix=f"-{base_distro.value}"
         )
-        _BULK_IMAGE_BUILDERS_TO_DISTROS[base_distro] = DistroBulkImageBuilder
+        BULK_DOCKER_IMAGE_BUILDERS[DistroBulkImageBuilder.BUILDER_NAME] = DistroBulkImageBuilder
+        #_BULK_IMAGE_BUILDERS_TO_DISTROS[base_distro] = DistroBulkImageBuilder
 
 
 # Create distro specific image builders from general builder classes.
@@ -587,12 +593,6 @@ create_distro_specific_image_builders([
     K8sRestartAgentOnMonitorsDeathBuilder
 ])
 
-# Final collection of build image builders.
-BULK_DOCKER_IMAGE_BUILDERS = UniqueDict({
-    bulk_builder.BUILDER_NAME: bulk_builder
-    for base_distro, bulk_builder in _BULK_IMAGE_BUILDERS_TO_DISTROS.items()
-})
-
 a=10
 
 if __name__ == '__main__':
@@ -601,10 +601,10 @@ if __name__ == '__main__':
         "include": []
     }
 
-    for bulk_builder_distro, bulk_builder in _BULK_IMAGE_BUILDERS_TO_DISTROS.items():
+    for bulk_builder_name, bulk_builder in BULK_DOCKER_IMAGE_BUILDERS.items():
         matrix["include"].append({
-            "builder-name": bulk_builder.BUILDER_NAME,
-            "distro-name": bulk_builder_distro.value,
+            "builder-name": bulk_builder_name,
+            "distro-name": bulk_builder.DISTRO_TYPE.value,
             "python-version": f"{IMAGES_PYTHON_VERSION}",
             "os": "ubuntu-20.04",
         })

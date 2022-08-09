@@ -12,8 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
+import argparse
 import functools
 import json
 import pprint
@@ -28,10 +27,10 @@ import pytest
 import yaml
 
 from agent_build.tools.common import check_output_with_log, check_call_with_log
-from agent_build.tools.constants import SOURCE_ROOT
+from agent_build.tools.constants import SOURCE_ROOT, DockerPlatform
 from tests.end_to_end_tests.verify import verify_logs, ScalyrQueryRequest
 
-from agent_build.docker_image_builders import DOCKER_IMAGE_BUILDERS, ContainerImageBaseDistro
+from agent_build.docker_image_builders import DOCKER_IMAGE_BUILDERS, ContainerImageBaseDistro, BULK_DOCKER_IMAGE_BUILDERS
 
 
 log = logging.getLogger(__name__)
@@ -58,11 +57,6 @@ pytestmark = [
     pytest.mark.usefixtures("dump_info")
 ]
 
-DEFAULT_KUBERNETES_VERSION = {
-        "kubernetes_version": "v1.17.17",
-        "minikube_driver": "",
-        "container_runtime": "docker"
-}
 
 DEFAULT_KUBERNETES_VERSION = {
         "kubernetes_version": "v1.22.7",
@@ -70,8 +64,12 @@ DEFAULT_KUBERNETES_VERSION = {
         "container_runtime": "docker"
 }
 
-KUBERNETES_VERSIONS_TO_TEST = [
-    DEFAULT_KUBERNETES_VERSION,
+KUBERNETES_VERSIONS = [
+    {
+        "kubernetes_version": "v1.17.17",
+        "minikube_driver": "",
+        "container_runtime": "docker"
+    },
     {
         "kubernetes_version": "v1.20.15",
         "minikube_driver": "",
@@ -82,11 +80,7 @@ KUBERNETES_VERSIONS_TO_TEST = [
         "minikube_driver": "",
         "container_runtime": "docker"
     },
-    {
-        "kubernetes_version": "v1.22.7",
-        "minikube_driver": "",
-        "container_runtime": "docker"
-    },
+    DEFAULT_KUBERNETES_VERSION,
     {
         "kubernetes_version": "v1.23.4",
         "minikube_driver": "docker",
@@ -100,37 +94,76 @@ KUBERNETES_VERSIONS_TO_TEST = [
 ]
 
 PARAMS = []
+EXTENDED_PARAMS = []
+
+for bulk_builder_name, bulk_builder in BULK_DOCKER_IMAGE_BUILDERS.items():
+    if bulk_builder.DISTRO_TYPE == ContainerImageBaseDistro.DEBIAN:
+        kubernetes_versions_to_test = KUBERNETES_VERSIONS[:]
+    else:
+        kubernetes_versions_to_test = [DEFAULT_KUBERNETES_VERSION]
+
+    base_distro = bulk_builder.DISTRO_TYPE
+
+    for image_builder in bulk_builder.IMAGE_BUILDERS:
+        builder_name = image_builder.BUILDER_NAME
+        if "k8s" not in builder_name:
+            continue
+
+        builder_params = {
+                "image_builder_name": builder_name,
+                **DEFAULT_KUBERNETES_VERSION
+            }
+
+        if builder_name == f"k8s-{base_distro.value}" and base_distro == ContainerImageBaseDistro.DEBIAN:
+            # If this is a "main build", aka 'k8s-debian' then also apply different platform testing
+            # in extended test mode.
+            for k_v in KUBERNETES_VERSIONS:
+                EXTENDED_PARAMS.append({
+                    "image_builder_name": builder_name,
+                    **k_v
+                })
+            PARAMS.append(builder_params)
+        else:
+            EXTENDED_PARAMS.append(builder_params)
+            PARAMS.append(builder_params)
+
+
+
+
+
+
+
 
 # Use debian based image as default image for extended tests.
-DEFAULT_IMAGE_BUILDER = f"k8s-{ContainerImageBaseDistro.DEBIAN.value}"
-
-BUILDERS_TO_TEST = [builder_name for builder_name in DOCKER_IMAGE_BUILDERS.keys() if "k8s" in builder_name]
-
-for k_v in KUBERNETES_VERSIONS_TO_TEST:
-    PARAMS.append({
-        "image_builder_name": DEFAULT_IMAGE_BUILDER,
-        **k_v
-    })
-
-BUILDERS_TO_TEST.remove(DEFAULT_IMAGE_BUILDER)
-
-for builder_name in BUILDERS_TO_TEST:
-    m = re.match(r"^k8s(?P<modification>-*.*)-(?P<distro>[^-]+)$", builder_name)
-    modification = m.group("modification")
-    distro = m.group("distro")
-
-    if modification:
-        continue
-
-    # Image modifications such as 'k8s-with-openmetrics' are only tested for a "default" distribution "debian"
-    # images based on another distributions (such alpine) are tested only with their general image (e.g. k8s-alpine)
-    if modification and distro != ContainerImageBaseDistro.DEBIAN.value:
-        continue
-
-    PARAMS.append({
-        "image_builder_name": builder_name,
-        **DEFAULT_KUBERNETES_VERSION
-    })
+# DEFAULT_IMAGE_BUILDER = f"k8s-{ContainerImageBaseDistro.DEBIAN.value}"
+#
+# BUILDERS_TO_TEST = [builder_name for builder_name in DOCKER_IMAGE_BUILDERS.keys() if "k8s" in builder_name]
+#
+# for k_v in KUBERNETES_VERSIONS:
+#     PARAMS.append({
+#         "image_builder_name": DEFAULT_IMAGE_BUILDER,
+#         **k_v
+#     })
+#
+# BUILDERS_TO_TEST.remove(DEFAULT_IMAGE_BUILDER)
+#
+# for builder_name in BUILDERS_TO_TEST:
+#     m = re.match(r"^k8s(?P<modification>-*.*)-(?P<distro>[^-]+)$", builder_name)
+#     modification = m.group("modification")
+#     distro = m.group("distro")
+#
+#     if modification:
+#         continue
+#
+#     # Image modifications such as 'k8s-with-openmetrics' are only tested for a "default" distribution "debian"
+#     # images based on another distributions (such alpine) are tested only with their general image (e.g. k8s-alpine)
+#     if modification and distro != ContainerImageBaseDistro.DEBIAN.value:
+#         continue
+#
+#     PARAMS.append({
+#         "image_builder_name": builder_name,
+#         **DEFAULT_KUBERNETES_VERSION
+#     })
 
 
 # for builder_name in DOCKER_IMAGE_BUILDERS.keys():
@@ -717,13 +750,30 @@ def test_agent_pod_fails_on_k8s_monitor_fail(
     log.info("Test passed!")
 
 
-if __name__ == '__main__':
+def main():
+    """
+    This function generates GitHub Actions tests job matrix.
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--extended",
+        action="store_true",
+        help="Return extended test job matrix"
+    )
+
+    args = parser.parse_args()
+
+    if args.extended:
+        params = EXTENDED_PARAMS[:]
+    else:
+        params = PARAMS[:]
+
     matrix = {
         "include": []
     }
-    for p in PARAMS:
+
+    for p in params:
         image_builder_name = p["image_builder_name"]
-        image_builder_cls = DOCKER_IMAGE_BUILDERS[image_builder_name]
         kubernetes_version = p["kubernetes_version"]
         minikube_driver = p["minikube_driver"]
         container_runtime = p["container_runtime"]
@@ -731,9 +781,12 @@ if __name__ == '__main__':
         matrix["include"].append({
             "pytest-params": f"{image_builder_name}-{kubernetes_version}-{minikube_driver}-{container_runtime}",
             "builder-name": image_builder_name,
-            "result-tarball-name": image_builder_cls.get_result_image_tarball_name(),
             "os": "ubuntu-20.04",
             "python-version": "3.8.13",
         })
 
     print(json.dumps(matrix))
+
+
+if __name__ == '__main__':
+    main()
