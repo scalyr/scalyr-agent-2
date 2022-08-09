@@ -28,41 +28,46 @@ def image_builder_cls(image_builder_name) -> Type[ContainerImageBuilder]:
 
 
 @pytest.fixture(scope="session")
-def image_registry(request):
+def image_name(image_builder_cls, request):
     """
     Registry that contains target image. It may be an externally specified one, or if omitted,
         new local registry with image is created.
     """
+    image_main_name = image_builder_cls.get_all_result_image_names()[0]
     # If registry is specified externally, then reuse it.
     if request.config.option.images_registry:
-        yield request.config.option.images_registry
+        yield f"{request.config.option.images_registry}/{image_main_name}"
 
     # Registry is not specified, build the image.
     else:
+
         with LocalRegistryContainer(
             name="images_registry",
             registry_port=0
         ) as reg_container:
 
-            yield f"localhost:{reg_container.real_registry_port}"
+            registry_host = f"localhost:{reg_container.real_registry_port}"
+
+            builder = image_builder_cls(
+                registry=registry_host,
+                push=True,
+            )
+            builder.run()
+
+            yield f"{registry_host}/{image_main_name}"
 
 
-@pytest.fixture(scope="session")
-def image_name(image_builder_cls, image_registry):
-    """
-    Get name of the ready image to test.
-    """
-
-    image_main_name = image_builder_cls.get_all_result_image_names()[0]
-    full_image_name = f"{image_registry}/{image_main_name}"
-
-    builder = image_builder_cls(
-        registry=image_registry,
-        push=True,
-    )
-    builder.run()
-
-    return full_image_name
+# @pytest.fixture(scope="session")
+# def image_name(image_builder_cls, image_registry):
+#     """
+#     Get name of the ready image to test.
+#     """
+#
+#
+#
+#
+#
+#     return full_image_name
 
 
 
