@@ -110,7 +110,7 @@ for bulk_builder_name, bulk_builder in BULK_DOCKER_IMAGE_BUILDERS.items():
             continue
 
         builder_params = {
-                "image_builder_cls": image_builder,
+                "image_builder_name": builder_name,
                 **DEFAULT_KUBERNETES_VERSION
             }
 
@@ -119,7 +119,7 @@ for bulk_builder_name, bulk_builder in BULK_DOCKER_IMAGE_BUILDERS.items():
             # in extended test mode.
             for k_v in KUBERNETES_VERSIONS:
                 EXTENDED_PARAMS.append({
-                    "image_builder_cls": image_builder,
+                    "image_builder_name": builder_name,
                     **k_v
                 })
             PARAMS.append(builder_params)
@@ -773,15 +773,15 @@ def main():
     }
 
     for p in params:
-        image_builder_cls = p["image_builder_cls"]
-        image_builder_name = image_builder_cls.BUILDER_NAME
+        image_builder_name = p["image_builder_name"]
+        image_builder_cls = DOCKER_IMAGE_BUILDERS[image_builder_name]
         kubernetes_version = p["kubernetes_version"]
         minikube_driver = p["minikube_driver"]
         container_runtime = p["container_runtime"]
 
         matrix["include"].append({
             "pytest-params": f"{image_builder_name}-{kubernetes_version}-{minikube_driver}-{container_runtime}",
-            "distro-name": image_builder_cls.DISTRO_TYPE.value,
+            "distro-name": image_builder_cls,
             "os": "ubuntu-20.04",
             "python-version": "3.8.13",
         })
