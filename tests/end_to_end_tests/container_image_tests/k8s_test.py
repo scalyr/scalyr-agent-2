@@ -620,7 +620,7 @@ def test_basic(
 
     agent_pod_name = create_agent_daemonset()
     # Wait a little.
-    time.sleep(5)
+    time.sleep(10)
 
     test_writer_pod_name = start_test_log_writer_pod()
 
