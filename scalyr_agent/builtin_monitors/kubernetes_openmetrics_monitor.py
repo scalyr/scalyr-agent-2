@@ -437,15 +437,15 @@ SCALYR_AGENT_ANNOTATION_CALCULATE_RATE_METRIC_NAMES = (
 CALCULATE_RATE_METRIC_NAMES = {
     "node-exporter": [
         # node-exporter metrics
-        "node_cpu_seconds_total",
-        "node_network_transmit_bytes_total",
-        "node_network_receive_bytes_total",
-        "node_disk_read_bytes_total",
-        "node_disk_written_bytes_total",
+        "openmetrics_monitor:node_cpu_seconds_total",
+        "openmetrics_monitor:node_network_transmit_bytes_total",
+        "openmetrics_monitor:node_network_receive_bytes_total",
+        "openmetrics_monitor:node_disk_read_bytes_total",
+        "openmetrics_monitor:node_disk_written_bytes_total",
     ],
     "kubernetes-api-cadvisor": [
         # Kubernetes API cAdvisor metrics
-        "container_cpu_usage_seconds_total",
+        "openmetrics_monitor:container_cpu_usage_seconds_total",
     ],
 }
 
