@@ -432,6 +432,23 @@ SCALYR_AGENT_ANNOTATION_CALCULATE_RATE_METRIC_NAMES = (
     "k8s.monitor.config.scalyr.com/calculate_rate_metric_names"
 )
 
+# A list of metric names for metrics used by Kubernetes Explorer functionality for which per second
+# rates should be calculated by the agent.
+CALCULATE_RATE_METRIC_NAMES = {
+    "node-exporter": [
+        # node-exporter metrics
+        "node_cpu_seconds_total",
+        "node_network_transmit_bytes_total",
+        "node_network_receive_bytes_total",
+        "node_disk_read_bytes_total",
+        "node_disk_written_bytes_total",
+    ],
+    "kubernetes-api-cadvisor": [
+        # Kubernetes API cAdvisor metrics
+        "container_cpu_usage_seconds_total",
+    ],
+}
+
 
 # A regex to determine whether a string contains template directives
 TEMPLATE_RE = re.compile(r"\${[^}]+}")
@@ -752,6 +769,22 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
 
         if calculate_rate_metric_names is None:
             calculate_rate_metric_names = []
+
+        # Apply defaults from this file for mandatory metrics
+        # In case any custom values are specified as part of pod annotations, those are merged with
+        # the default values to avoid user from potentially breaking Kubernetes Explorer
+        # functionality by overriding required metrics
+        # NOTE: monitor_id contains pod name so we just check the id
+        if "node-exporter" in monitor_id:
+            calculate_rate_metric_names.extend(
+                CALCULATE_RATE_METRIC_NAMES["node-exporter"]
+            )
+        elif "kubernetes-api-cadvisor" in monitor_id:
+            calculate_rate_metric_names.extend(
+                CALCULATE_RATE_METRIC_NAMES["kubernetes-api-cadvisor"]
+            )
+
+        calculate_rate_metric_names = sorted(set(calculate_rate_metric_names))
 
         monitor_config = {
             "module": OPEN_METRICS_MONITOR_MODULE,
