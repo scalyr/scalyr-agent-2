@@ -51,7 +51,7 @@ jobs:
           echo "Test job matrix: "
           echo "$(python3 -m tests.end_to_end_tests.container_image_tests.k8s_test)"
           echo "::set-output name=build-matrix-json::$(python3 -m agent_build.docker_image_builders)"
-          echo "::set-output name=test-matrix-json::$(python3 -m tests.end_to_end_tests.container_image_tests.k8s_test)"
+          echo "::set-output name=test-matrix-json::$(python3 -m tests.end_to_end_tests.container_image_tests.k8s_test --extended)"
           
           echo "::set-output name=pre-built-cached-steps-matrix::$(python3 -m agent_build.scripts.prebuild_steps_on_cicd)"
 
@@ -182,7 +182,8 @@ jobs:
       # This job receives its matrix from the preparation job. The matrix itself is created by the tests/end_to_end_tests/container_image_tests/k8s_test.py module.
       # The matrix, for now, consists only from the 'include' part with following fields:
       #   "pytest-params": String with all parameters for a particular test variant which then goes to "parametrize" test cases which has to be run there.
-      #   "builder-name": name of the builder that builds the target image.
+      ##   "builder-name": name of the builder that builds the target image.
+      #   "distro-name": Name of the base distribution, e.g. debian, alpine on which base the resul images are built.
       #   "result-tarball-name": filename of the result image tarball.
       #   "os": Runner's OS
       #   "python-version": Version of the python installed on runner.
@@ -210,7 +211,7 @@ jobs:
       - name: Download registry with previously built images.
         uses: actions/download-artifact@v3
         with:
-          name: ${{ matrix.builder-name }}
+          name: ${{ matrix.distro-name }}
           path: /tmp/build-output
 
       - name: Run tests
