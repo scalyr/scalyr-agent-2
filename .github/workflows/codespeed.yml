@@ -63,12 +63,12 @@ jobs:
         run: tox -e micro-benchmarks
 
       - name: Process and submit results to CodeSpeed
-        # if: (github.ref == 'refs/heads/master' || github.head_ref == 'master')
+        if: (github.ref == 'refs/heads/master' || github.head_ref == 'master')
         env:
           PYTHONPATH: .
           CODESPEED_URL: "https://scalyr-agent-codespeed.herokuapp.com/"
           CODESPEED_PROJECT: "scalyr-agent-2-microbenchmarks"
-          CODESPEED_EXECUTABLE: ${{ steps.setup-python.outputs.python-version }}
+          CODESPEED_EXECUTABLE: Python ${{ steps.setup-python.outputs.python-version }}
           CODESPEED_ENVIRONMENT: GitHub Hosted Action Runner
           CODESPEED_AUTH: ${{ secrets.CODESPEED_AUTH }}
         run: python benchmarks/scripts/send_microbenchmarks_data_to_codespeed.py --data-path="benchmark_results/*.json" --debug
