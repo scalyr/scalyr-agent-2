@@ -1,4 +1,4 @@
-This action uses python module `agent_build/tools/environment_deployments.py`
+This action uses python module `agent_build/scripts/runner_helper.py`
 to perform some deployment which is defined in it. The main purpose of the action is to
 cache results of this deployment to the GitHub Actions cache. Since the deployments consist of 
 steps, and different deployments can use the same step, then it's more reasonable to cache each step

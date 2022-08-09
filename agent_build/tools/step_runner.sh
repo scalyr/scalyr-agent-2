@@ -13,9 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This is a " runner" script that serves as an entry point for the scripts that are specified in the Deployment Steps
-# with shell scripts.
-# See more in class "ShellScriptDeploymentStep" in the "agent_build/tools/environment_deployments/runner.py"
 #
 # The runner script accepts the path to the script to run as a first argument. The target script is called by using
 # 'source' command.

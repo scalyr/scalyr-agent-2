@@ -38,7 +38,7 @@ jobs:
           python-version: "3.8.13"
 
       - name: Perform the deployment of the test environment
-        uses: ./.github/actions/perform-deployment
+        uses: ./.github/actions/execute-runner
         with:
           runner-fqdn: "agent_build.__init__.BuildTestEnvironment"
 
@@ -90,7 +90,7 @@ jobs:
           platforms: all
 
       - name: Run cached step.
-        uses: ./.github/actions/perform-deployment
+        uses: ./.github/actions/execute-runner
         with:
           runner-fqdn: ${{ matrix.step-builder-fqdn }}
 
@@ -142,7 +142,7 @@ jobs:
           echo "::set-output name=fqdn::$(python3 build_package_new.py ${{ matrix.builder-name }} --fqdn)"
 
       - name: Perform the build of the base docker image in the deployment.
-        uses: ./.github/actions/perform-deployment
+        uses: ./.github/actions/execute-runner
         with:
           runner-fqdn: ${{ steps.get-builder-fqdn.outputs.fqdn }}
 
@@ -195,7 +195,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Perform the deployment of the test environment
-        uses: ./.github/actions/perform-deployment
+        uses: ./.github/actions/execute-runner
         with:
           runner-fqdn: "agent_build.__init__.BuildTestEnvironment"
 
