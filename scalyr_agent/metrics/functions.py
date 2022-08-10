@@ -133,7 +133,8 @@ class RateMetricFunction(MetricFunction):
 
     # If we track rate for more than this many metrics, a warning will be emitted.
     # With average metric name and value (timestamp, value) taking around 240 bytes, that means
-    # around 5 MB of memory usage (240 bytes * 20_000 entries = 4800000 bytes)
+    # around 5 MB of memory usage (240 bytes * 20_000 entries = 4800000 bytes). With instrumentation
+    # in production we see around 4 MB for 20k values.
     MAX_RATE_METRICS_COUNT_WARN = 20000
 
     # Hard limit on how many values will be stored in RATE_CALCULATION_METRIC_VALUES
