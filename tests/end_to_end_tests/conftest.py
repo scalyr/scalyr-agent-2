@@ -39,12 +39,12 @@ def pytest_runtest_protocol(item, nextitem):
     makes logs of each test case collapsable on GitHub Actions.
     """
     if IN_CICD:
-        logging.info(f"::group::{item.nodeid}")
+        print(f"::group::{item.nodeid}")
 
     orig_pytest_runtest_protocol(item, nextitem)
 
     if IN_CICD:
-        log.info("::endgroup::")
+        print("::endgroup::")
     return True
 
 

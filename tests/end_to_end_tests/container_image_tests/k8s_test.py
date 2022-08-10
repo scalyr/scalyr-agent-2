@@ -553,26 +553,28 @@ def create_agent_daemonset(
     def create():
         run_kubectl(["apply", "-f", str(agent_manifest_path)])
 
-        # while True:
-        #     run_kubectl([
-        #         "-n", "scalyr", "get", "pods"
-        #     ])
-        #     time.sleep(1)
-        time.sleep(10)
+        attempt = 0
+        while True:
+            try:
+                # Get name of the created pod.
+                return run_kubectl_output([
+                    "--namespace=scalyr",
+                    "get",
+                    "pods",
+                    "--selector=app=scalyr-agent-2",
+                    "--sort-by=.metadata.creationTimestamp",
+                    "-o",
+                    "jsonpath={.items[-1].metadata.name}",
+                ]).decode().strip()
+            except:
+                if attempt < 3:
+                    log.info("New pod is not found, retry")
+                    attempt += 1
+                    continue
+                else:
+                    log.error("Could not find new agent pod name.")
+                    raise
 
-        # Get name of the created pod.
-        pod_name = (
-            run_kubectl_output([
-                "--namespace=scalyr",
-                "get",
-                "pods",
-                "--selector=app=scalyr-agent-2",
-                "--sort-by=.metadata.creationTimestamp",
-                "-o",
-                "jsonpath={.items[-1].metadata.name}",
-            ]).decode().strip()
-        )
-        return pod_name
 
     yield create
 
@@ -602,6 +604,7 @@ def get_agent_log_content(run_kubectl_output):
 
     return get
 
+
 @pytest.mark.timeout(20000)
 def test_basiceeeee(
     scalyr_namespace,
@@ -627,7 +630,6 @@ def test_basic(
 
     agent_pod_name = create_agent_daemonset()
     # Wait a little.
-    time.sleep(10)
 
     test_writer_pod_name = start_test_log_writer_pod()
 
