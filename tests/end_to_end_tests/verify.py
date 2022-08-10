@@ -22,7 +22,7 @@ from typing import Callable, List, Any
 
 import requests
 
-from tests.end_to_end_tests.tools import AgentCommander
+from tests.end_to_end_tests.tools import AgentCommander, TimeTracker
 
 
 log = logging.getLogger(__name__)
@@ -116,7 +116,6 @@ def check_requests_stats_in_agent_log(content: str) -> bool:
         )
 
         if m:
-            log.info("Requests stats message has been found. Verify that stats...")
             # Also do a final check for a valid request stats.
             md = m.groupdict()
             requests_sent = int(md["requests_sent"])
@@ -209,6 +208,7 @@ def verify_logs(
     get_agent_log_content: Callable[[], str],
     counters_verification_query_filters: List[str],
     counter_getter: Callable[[Any], int],
+    time_tracker: TimeTracker,
     write_counter_messages: Callable[[], None] = None,
     verify_ssl: bool = True,
 ):
@@ -246,9 +246,12 @@ def verify_logs(
         first_check_agent_log_content = first_check_agent_log_content.rsplit(os.linesep, 1)[0]
     check_agent_log_for_errors(content=first_check_agent_log_content)
 
-    log.info("Wait for agent log requests stats.")
-    while not check_requests_stats_in_agent_log(content=get_agent_log_content()):
-        time.sleep(10)
+    log.info("Wait for agent log requests stats...")
+
+    with time_tracker(80, "Can not wait more for requests stats."):
+        while not check_requests_stats_in_agent_log(content=get_agent_log_content()):
+            log.info("   Request stats haven't been found yet, retry...")
+            time_tracker.sleep(10)
 
     log.info(
         "Verify that previously written test log file content has been uploaded to server."

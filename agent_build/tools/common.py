@@ -66,7 +66,7 @@ def subprocess_command_run_with_log(func):
     :param func: Function to wrap.
     """
 
-    def wrapper(*args, **kwargs):
+    def wrapper(*args, on_debug: bool = False, **kwargs):
 
         global _COMMAND_COUNTER
 
@@ -82,14 +82,20 @@ def subprocess_command_run_with_log(func):
 
         number = _COMMAND_COUNTER
         _COMMAND_COUNTER += 1
-        logging.info(f" ### RUN COMMAND #{number}: '{cmd_str}'. ###")
+
+        if on_debug:
+            level_log = logging.debug
+        else:
+            level_log = logging.info
+
+        level_log(f" ### RUN COMMAND #{number}: '{cmd_str}'. ###")
         try:
             result = func(*args, **kwargs)
         except subprocess.CalledProcessError as e:
-            logging.info(f" ### COMMAND #{number} FAILED. ###\n")
+            level_log(f" ### COMMAND #{number} FAILED. ###\n")
             raise e from None
         else:
-            logging.info("\n")
+            level_log("\n")
             return result
 
     return wrapper

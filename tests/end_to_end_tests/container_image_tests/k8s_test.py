@@ -21,7 +21,7 @@ import subprocess
 import pathlib as pl
 import time
 import logging
-from typing import List
+from typing import List, Optional
 
 import pytest
 import yaml
@@ -29,12 +29,12 @@ import yaml
 from agent_build.tools.common import check_output_with_log, check_call_with_log
 from agent_build.tools.constants import SOURCE_ROOT, DockerPlatform
 from tests.end_to_end_tests.verify import verify_logs, ScalyrQueryRequest
+from tests.end_to_end_tests.tools import TimeTracker
 
-from agent_build.docker_image_builders import DOCKER_IMAGE_BUILDERS, ContainerImageBaseDistro, BULK_DOCKER_IMAGE_BUILDERS
-
+from agent_build.docker_image_builders import DOCKER_IMAGE_BUILDERS, ContainerImageBaseDistro, \
+    BULK_DOCKER_IMAGE_BUILDERS
 
 log = logging.getLogger(__name__)
-
 
 # parametrize test cases for each kubernetes builder.
 # pytestmark = [
@@ -57,11 +57,10 @@ pytestmark = [
     pytest.mark.usefixtures("dump_info")
 ]
 
-
 DEFAULT_KUBERNETES_VERSION = {
-        "kubernetes_version": "v1.22.7",
-        "minikube_driver": "",
-        "container_runtime": "docker"
+    "kubernetes_version": "v1.22.7",
+    "minikube_driver": "",
+    "container_runtime": "docker"
 }
 
 KUBERNETES_VERSIONS = [
@@ -110,9 +109,9 @@ for bulk_builder_name, bulk_builder in BULK_DOCKER_IMAGE_BUILDERS.items():
             continue
 
         builder_params = {
-                "image_builder_name": builder_name,
-                **DEFAULT_KUBERNETES_VERSION
-            }
+            "image_builder_name": builder_name,
+            **DEFAULT_KUBERNETES_VERSION
+        }
 
         if builder_name == f"k8s-{base_distro.value}" and base_distro == ContainerImageBaseDistro.DEBIAN:
             # If this is a "main build", aka 'k8s-debian' then also apply different platform testing
@@ -126,12 +125,6 @@ for bulk_builder_name, bulk_builder in BULK_DOCKER_IMAGE_BUILDERS.items():
         else:
             EXTENDED_PARAMS.append(builder_params)
             PARAMS.append(builder_params)
-
-
-
-
-
-
 
 
 # Use debian based image as default image for extended tests.
@@ -182,16 +175,13 @@ for bulk_builder_name, bulk_builder in BULK_DOCKER_IMAGE_BUILDERS.items():
 
 
 def pytest_generate_tests(metafunc):
-
-    param_names =  ["image_builder_name", "kubernetes_version", "minikube_driver", "container_runtime"]
+    param_names = ["image_builder_name", "kubernetes_version", "minikube_driver", "container_runtime"]
 
     final_params = []
     for p in EXTENDED_PARAMS:
         final_params.append(
             [p[name] for name in param_names]
         )
-
-
 
     metafunc.parametrize(
         param_names,
@@ -236,6 +226,7 @@ def dump_info(run_kubectl_output, minikube_test_profile):
     :return: 
     """
 
+
 @pytest.fixture(scope="session")
 def kubernetes_version(request):
     return request.param
@@ -244,6 +235,7 @@ def kubernetes_version(request):
 @pytest.fixture(scope="session")
 def minikube_driver(request):
     return request.param
+
 
 @pytest.fixture(scope="session")
 def container_runtime(request):
@@ -286,47 +278,86 @@ def minikube_test_profile(kubernetes_version, minikube_driver, container_runtime
 #     ])
 #     return
 
+@pytest.fixture(scope="session")
+def minikube_kubectl_args(minikube_test_profile) -> List[str]:
+    """
+    Fixture which returns list with command line arguments that can run kubectl for a the current minikube
+        cluster progile.
+    """
+    return [
+        "minikube",
+        "-p",
+        minikube_test_profile,
+        "kubectl",
+        "--",
+    ]
+
 
 @pytest.fixture(scope="session")
 def run_kubectl(minikube_test_profile):
-    def run(cmd_args: List[str]):
-        check_call_with_log([
+    """
+        Fixture function which wraps 'subprocess.check_call' that runs kubectl command, to run
+        kubectl which is provided by minikube, so its fully compatible with the current minikube cluster profile.
+    """
+    def run(
+            cmd_args: List[str],
+            stderr=None,
+            output: bool = False,
+            on_debug: bool = False
+    ) -> Optional[str]:
+        final_cmd_args = [
             "minikube",
             "-p",
             minikube_test_profile,
             "kubectl",
             "--",
-            *cmd_args
-        ])
+            *cmd_args,
+        ]
+        if output:
+            func = check_output_with_log
+        else:
+            func = check_call_with_log
 
-    return run
-
-
-@pytest.fixture(scope="session")
-def run_kubectl_output(minikube_test_profile):
-    def run(
-            cmd_args: List[str],
-            stderr=None
-    ):
-        return check_output_with_log(
-            [
-                "minikube",
-                "-p",
-                minikube_test_profile,
-                "kubectl",
-                "--",
-                *cmd_args
-            ],
-            stderr=stderr
+        return func(
+            final_cmd_args,
+            stderr=stderr,
+            on_debug=True
         )
 
     return run
 
 
+# @pytest.fixture(scope="session")
+# def run_kubectl(minikube_test_profile):
+#     """
+#     Fixture function which wraps 'subprocess.check_output' that runs kubectl command, to run
+#         kubectl which is provided by minikube, so its fully compatible with the current minikube cluster profile.
+#     """
+#     def run(
+#             cmd_args: List[str],
+#             stderr=None,
+#             on_debug: bool = False,
+#     ):
+#         return check_output_with_log(
+#             [
+#                 "minikube",
+#                 "-p",
+#                 minikube_test_profile,
+#                 "kubectl",
+#                 "--",
+#                 *cmd_args
+#             ],
+#             stderr=stderr,
+#             on_debug=on_debug
+#         )
+#
+#     return run
+
+
 @pytest.fixture(scope="session")
-def scalyr_namespace(run_kubectl_output):
+def scalyr_namespace(run_kubectl):
     try:
-        run_kubectl_output(
+        run_kubectl(
             ["create", "namespace", "scalyr"],
             stderr=subprocess.PIPE
         )
@@ -373,7 +404,6 @@ def apply_agent_service_account(
         tmp_path_factory,
         run_kubectl
 ):
-
     def apply(
             service_account: dict = None,
             cluster_role: dict = None,
@@ -408,13 +438,8 @@ def apply_agent_service_account(
         ])
 
 
-
-
-
-
 @pytest.fixture(scope="session")
 def prepare_scalyr_api_key_secret(scalyr_api_key, scalyr_namespace, run_kubectl):
-
     run_kubectl(["--namespace=scalyr", "delete", "--ignore-not-found", "secret", "scalyr-api-key"])
     # Define API key
     run_kubectl(
@@ -432,14 +457,15 @@ def prepare_scalyr_api_key_secret(scalyr_api_key, scalyr_namespace, run_kubectl)
 
 
 @pytest.fixture
-def cluster_name(image_name, minikube_test_profile,image_builder_name, test_session_suffix, request):
+def cluster_name(image_name, minikube_test_profile, image_builder_name, test_session_suffix, request):
     # Upload agent's image to minikube cluster.
     check_call_with_log(["minikube", "-p", minikube_test_profile, "image", "load", "--overwrite=true", image_name])
     return f"agent-image-test-{image_builder_name}-{request.node.nodeid}-{test_session_suffix}"
 
 
 @pytest.fixture
-def prepare_agent_configmap(prepare_scalyr_api_key_secret, cluster_name: str, tmp_path: pl.Path, scalyr_namespace: str, run_kubectl):
+def prepare_agent_configmap(prepare_scalyr_api_key_secret, cluster_name: str, tmp_path: pl.Path, scalyr_namespace: str,
+                            run_kubectl):
     """
     Creates config map for the agent pod.
     """
@@ -512,23 +538,26 @@ def start_test_log_writer_pod(run_kubectl, run_kubectl_output):
         "delete", "--ignore-not-found", "deployment", "test-log-writer"
     ])
 
-    def start():
+    def start(time_tracker: TimeTracker):
         run_kubectl([
             "apply", "-f", str(manifest_path)
         ])
 
         # Get name of the created pod.
-        pod_name = (
-            run_kubectl_output([
-                "get",
-                "pods",
-                "--selector=app=test-log-writer",
-                "--sort-by=.metadata.creationTimestamp",
-                "-o",
-                "jsonpath={.items[-1].metadata.name}",
-            ]).decode().strip()
-        )
-        return pod_name
+        with time_tracker(1):
+            while True:
+                try:
+                    return run_kubectl_output([
+                        "get",
+                        "pods",
+                        "--selector=app=test-log-writer",
+                        "--sort-by=.metadata.creationTimestamp",
+                        "-o",
+                        "jsonpath={.items[-1].metadata.name}",
+                    ]).decode().strip()
+                except:
+                    time_tracker.sleep(0.3)
+                    continue
 
     yield start
     run_kubectl([
@@ -536,10 +565,10 @@ def start_test_log_writer_pod(run_kubectl, run_kubectl_output):
     ])
 
 
-
 @pytest.fixture
 def create_agent_daemonset(
-    agent_manifest_path, prepare_agent_configmap, prepare_scalyr_api_key_secret, cluster_name, scalyr_namespace, run_kubectl, run_kubectl_output
+        agent_manifest_path, prepare_agent_configmap, prepare_scalyr_api_key_secret, cluster_name, scalyr_namespace,
+        run_kubectl, run_kubectl_output
 ):
     """
     Return function which starts agent daemonset.
@@ -550,31 +579,27 @@ def create_agent_daemonset(
     ])
 
     # Create agent's daemonset.
-    def create():
+    def create(time_tracker: TimeTracker):
         run_kubectl(["apply", "-f", str(agent_manifest_path)])
 
-        attempt = 0
-        while True:
-            try:
-                # Get name of the created pod.
-                return run_kubectl_output([
-                    "--namespace=scalyr",
-                    "get",
-                    "pods",
-                    "--selector=app=scalyr-agent-2",
-                    "--sort-by=.metadata.creationTimestamp",
-                    "-o",
-                    "jsonpath={.items[-1].metadata.name}",
-                ]).decode().strip()
-            except:
-                if attempt < 3:
-                    log.info("New pod is not found, retry")
-                    attempt += 1
-                    continue
-                else:
-                    log.error("Could not find new agent pod name.")
-                    raise
-
+        with time_tracker(20):
+            while True:
+                try:
+                    # Get name of the created pod.
+                    return run_kubectl_output(
+                        [
+                            "--namespace=scalyr",
+                            "get",
+                            "pods",
+                            "--selector=app=scalyr-agent-2",
+                            "--sort-by=.metadata.creationTimestamp",
+                            "-o",
+                            "jsonpath={.items[-1].metadata.name}",
+                        ],
+                        on_debug=True
+                    ).decode().strip()
+                except:
+                    time_tracker.sleep(5, message="Can not get agent pod name in time.")
 
     yield create
 
@@ -585,55 +610,59 @@ def create_agent_daemonset(
 
 
 @pytest.fixture(scope="session")
-def get_agent_log_content(run_kubectl_output):
+def get_agent_log_content(run_kubectl):
     def get(pod_name: str):
         """
         Read content of the agent log file in the agent pod.
         """
-        return run_kubectl_output([
-            "--namespace=scalyr",
-            "exec",
-            "-i",
-            pod_name,
-            "--container",
-            "scalyr-agent",
-            "--",
-            "cat",
-            "/var/log/scalyr-agent-2/agent.log"
-        ]).decode()
+        return run_kubectl(
+            [
+                "--namespace=scalyr",
+                "exec",
+                "-i",
+                pod_name,
+                "--container",
+                "scalyr-agent",
+                "--",
+                "cat",
+                "/var/log/scalyr-agent-2/agent.log"
+            ],
+            output=True,
+            on_debug=True
+        ).decode()
 
     return get
 
 
 @pytest.mark.timeout(20000)
 def test_basiceeeee(
-    scalyr_namespace,
-    cluster_name
+        scalyr_namespace,
+        cluster_name
 
 ):
-    a=10
+    a = 10
+
 
 @pytest.mark.timeout(20000)
 def test_basic(
-    scalyr_api_read_key,
-    scalyr_server,
-    cluster_name,
-    create_agent_daemonset,
-    apply_agent_service_account,
-    start_test_log_writer_pod,
-    get_agent_log_content
+        scalyr_api_read_key,
+        scalyr_server,
+        cluster_name,
+        create_agent_daemonset,
+        apply_agent_service_account,
+        start_test_log_writer_pod,
+        get_agent_log_content,
 
 ):
+    timeout = TimeTracker(150)
 
     log.info(f"Starting test. Scalyr logs can be found by the cluster name: {cluster_name}")
     apply_agent_service_account()
 
-    agent_pod_name = create_agent_daemonset()
+    agent_pod_name = create_agent_daemonset(time_tracker=timeout)
     # Wait a little.
 
-    test_writer_pod_name = start_test_log_writer_pod()
-
-    time.sleep(5)
+    test_writer_pod_name = start_test_log_writer_pod(time_tracker=timeout)
 
     log.info("Verify pod logs.")
     verify_logs(
@@ -647,6 +676,7 @@ def test_basic(
             "$app=='test-log-writer'",
             f"$k8s-cluster=='{cluster_name}'",
         ],
+        time_tracker=timeout
     )
 
     logging.info("Test passed!")
@@ -656,7 +686,8 @@ def test_basic(
 def get_pod_metadata(run_kubectl_output):
     def get(pod_name: str):
         pod_metadata_output = run_kubectl_output([
-            "-n=scalyr", "get", "pods", "--selector=app=scalyr-agent-2", "--field-selector", f"metadata.name={pod_name}", "-o", "jsonpath={.items[-1]}"
+            "-n=scalyr", "get", "pods", "--selector=app=scalyr-agent-2", "--field-selector",
+            f"metadata.name={pod_name}", "-o", "jsonpath={.items[-1]}"
         ]).decode()
 
         return json.loads(pod_metadata_output)
@@ -677,25 +708,24 @@ def get_pod_status(get_pod_metadata):
 def get_pod_status_container_statuses(get_pod_status):
     def get(pod_name: str):
         status = get_pod_status(pod_name=pod_name)
-        return{s["name"]: s for s in status["containerStatuses"]}
+        return {s["name"]: s for s in status["containerStatuses"]}
 
     return get
 
 
 @pytest.mark.timeout(20000)
 def test_agent_pod_fails_on_k8s_monitor_fail(
-    image_builder_name,
-    scalyr_api_read_key,
-    scalyr_server,
-    cluster_name,
-    create_agent_daemonset,
-    apply_agent_service_account,
-    default_cluster_role,
-    get_pod_status_container_statuses,
-    get_agent_log_content
+        image_builder_name,
+        scalyr_api_read_key,
+        scalyr_server,
+        cluster_name,
+        create_agent_daemonset,
+        apply_agent_service_account,
+        default_cluster_role,
+        get_pod_status_container_statuses,
+        get_agent_log_content
 
 ):
-
     """
     Tests that agent exits on Kubernetes monitor's failure.
     We emulate failure of the kubernetes monitor by revoking permissions from the agent's service account.
