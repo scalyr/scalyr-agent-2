@@ -1,0 +1,136 @@
+name: Unittests
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  # Special job which automatically cancels old runs for the same branch, prevents runs for the
+  # same file set which has already passed, etc.
+  pre_job:
+    name: Skip Duplicate Jobs Pre Job
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write  # Needed for skip-duplicate-jobs job
+      contents: read
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@9d116fa7e55f295019cfab7e3ab72b478bcf7fdd # v4.0.0
+        with:
+          cancel_others: 'true'
+          github_token: ${{ github.token }}
+
+  coverage:
+    runs-on: ubuntu-latest
+    if: success() || failure()
+    needs:
+      - pre_job
+      - unittests
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        id: setup-python
+        with:
+          python-version: 3.8
+      - name: Install pycoverage
+        run: pip install coverage==4.5.4
+      - name: Download coverage reports
+        uses: actions/download-artifact@v3
+        with:
+          path: reports
+
+      - name: Prepare Coverage Data for codecov.io
+        run: |
+          coverage combine reports/**/.coverage
+          coverage xml -i -o coverage.xml
+
+      - name: Upload Coverage to Codecov.io
+        uses: codecov/codecov-action@81cd2dc8148241f03f5839d295e000b8f761e378 # pin@v3
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: true
+
+  unittests:
+    name: Unittests - Python ${{ matrix.python-version }} - ${{ matrix.platform }}
+    runs-on: ${{ matrix.platform }}-latest
+    defaults:
+      run:
+        shell: bash
+    needs: pre_job
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+          - "2.7"
+          - "3.6"
+          - "3.7"
+          - "3.8"
+          - "3.9"
+          - "3.10"
+        platform:
+          - ubuntu
+        include:
+          - platform: windows
+            python-version: "3.10"
+          - platform: macos
+            python-version: "3.10"
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        id: setup-python
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip' # caching pip dependencies
+          cache-dependency-path: |
+            dev-requirements.txt
+            windows-unit-tests-requirements.txt
+            benchmarks/micro/requirements-compression-algorithms.txt
+      - name: Install tox
+        env:
+          TOX_VERSION: 3.20.1
+          TOX_GH_ACTIONS_VERSION: 2.9.1
+        run: |
+          python -m pip install --upgrade pip
+          pip install "tox==$TOX_VERSION" "tox-gh-actions==$TOX_GH_ACTIONS_VERSION"
+
+      - name: Run Unit Tests
+        run: tox
+        env:
+          PLATFORM: ${{ matrix.platform }}
+
+      - name: Upload pytest test results
+        uses: actions/upload-artifact@v3
+        with:
+          name: pytest-results-${{ matrix.python-version }}-${{ matrix.platform }}
+          path: |
+            test-results/junit*.xml
+            .coverage
+        if: ${{ success() || failure() }}
+
+  publish-test-results:
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write   # Needed for publish test results job
+      pull-requests: write   # Needed for publish test results job
+    if: success() || failure()
+    needs:
+      - pre_job
+      - unittests
+    steps:
+      - name: Download test results
+        uses: actions/download-artifact@v3
+        with:
+          path: reports
+      - name: Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action@2a60c5d47eb29cd5cc922f51bbea18e148f56203 # pin@v2
+        with:
+          junit_files: "reports/**/junit*.xml"

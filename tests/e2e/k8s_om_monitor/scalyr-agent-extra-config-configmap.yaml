@@ -26,10 +26,10 @@ data:
               logger_include_node_name: false,
               verify_https: false,
               scrape_kubernetes_api_metrics: true,
-              kubernetes_api_metrics_scrape_interval: 20,
+              kubernetes_api_metrics_scrape_interval: 10,
               scrape_kubernetes_api_cadvisor_metrics: true,
-              kubernetes_api_cadvisor_metrics_scrape_interval: 20,
-              sample_interval: 20,
+              kubernetes_api_cadvisor_metrics_scrape_interval: 10,
+              sample_interval: 10,
               scrape_interval: 60
           }
         ]
