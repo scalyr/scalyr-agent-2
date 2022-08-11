@@ -227,6 +227,7 @@ class RateMetricFunctionTestCase(ScalyrTestCase):
 
         ts1 = 10
         ts2 = 70
+        ts3 = 130
 
         val1 = 20
 
@@ -377,6 +378,30 @@ class RateMetricFunctionTestCase(ScalyrTestCase):
         # - pod=pod1, node=node2, mode=user
         # - pod=pod2, node=node1, mode=user
         # - pod=pod2, node=node1, mode=kernel
+        self.assertEqual(len(func.RATE_CALCULATION_METRIC_VALUES), 5)
+
+        # Special case where extra_fields contains timestamp. Since timestamp value changes on each
+        # sample gather interval, we don't want this value to be used when calculating unique
+        # identifier / hash for the metric with all the possible label / tag values
+
+        metric_name = "docker.cpu_usage_seconds_total"
+        extra_fields = {
+            "pod": "pod2",
+            "node": "node1",
+            "mode": "kernel",
+            "timestamp": "123456789",
+        }
+
+        result = func.calculate(
+            monitor=monitor,
+            metric_name=metric_name,
+            extra_fields=extra_fields,
+            timestamp=ts3 * 1000,
+            metric_value=95,
+        )
+        self.assertEqual(result, [("docker.cpu_usage_seconds_total_rate", 0.05)])
+
+        # Should not result in new unique metric being stored
         self.assertEqual(len(func.RATE_CALCULATION_METRIC_VALUES), 5)
 
     def test_should_calculate_for_monitor_and_metric_function(self):

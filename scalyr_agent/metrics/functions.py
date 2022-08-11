@@ -204,6 +204,11 @@ could add overhead in terms of CPU and memory usage.
         # qualified monitor name.
         # Since same metric name can be used by values with different extra fields, we also include
         # extra fields as part of the dictionary key.
+        if "timestamp" in extra_fields:
+            del extra_fields["timestamp"]
+
+        # "timestamp" fiels is a bit special since it changes as part of every gather sample
+        # interval and we don't want to include
         extra_fields_hash = get_hash_for_flat_dictionary(extra_fields)
         dict_key = monitor.short_hash + "." + metric_name + "." + extra_fields_hash
 
