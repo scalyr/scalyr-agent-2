@@ -377,6 +377,7 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
             "metric_name_include_list": ["*"],
             "calculate_rate_metric_names": [
                 "openmetrics_monitor:container_cpu_usage_seconds_total",
+                "openmetrics_monitor:container_network_receive_bytes_total",
                 "openmetrics_monitor:container_network_transmit_bytes_total",
             ],
             "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
@@ -510,6 +511,7 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
                 "metric2",
                 "metric3:label=value",
                 "openmetrics_monitor:container_cpu_usage_seconds_total",
+                "openmetrics_monitor:container_network_receive_bytes_total",
                 "openmetrics_monitor:container_network_transmit_bytes_total",
             ],
             "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
