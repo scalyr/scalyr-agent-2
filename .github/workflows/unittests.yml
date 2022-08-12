@@ -44,7 +44,7 @@ jobs:
         with:
           python-version: 3.8
       - name: Install pycoverage
-        run: pip install coverage==4.5.4
+        run: pip install coverage==5.5
       - name: Download coverage reports
         uses: actions/download-artifact@v3
         with:
