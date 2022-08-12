@@ -1,6 +1,6 @@
 [paths]
 source =
-    scalyr_agent/
+    ./
     /home/circleci/scalyr-agent-2/
     /usr/share/scalyr-agent-2/py/
     /Users/runner/work/scalyr-agent-2/scalyr-agent-2/
