@@ -49,7 +49,16 @@ jobs:
           echo "Test job matrix: "
           echo "$(python3 -m tests.end_to_end_tests.container_image_tests.k8s_test.k8s_test)"
           echo "::set-output name=test-matrix-json::$(python3 -m tests.end_to_end_tests.container_image_tests.k8s_test.k8s_test --extended)"
-          echo "::set-output name=pre-built-cached-steps-matrix::$(python3 -m agent_build.scripts.prebuild_steps_on_cicd)"
+          python3 -m agent_build.scripts.prebuild_steps_on_cicd > pre_built_cached_steps_matrix.txt
+          echo "::set-output name=pre-built-cached-steps-matrix::$(cat pre_built_cached_steps_matrix.txt)"
+      
+      - name: Cache Primes
+        id: cache-primes
+        uses: actions/cache@v3
+        with:
+          path: prime-numbers
+          key: ${{ runner.os }}-primes
+      
 
   pre-build-cached-step:
     name: ${{ matrix.name }}
@@ -210,7 +219,7 @@ jobs:
       - name: Download registry with previously built image.
         uses: actions/download-artifact@v3
         with:
-          name: ${{ matrix.builder-name }}-${{ matrix.distro-name }}-registry
+          name: ${{ matrix.builder-name }}-registry
           path: /tmp/registry
 
 #      - name: Spin up local registry to store result images.
