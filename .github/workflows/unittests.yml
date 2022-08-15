@@ -34,6 +34,7 @@ jobs:
     needs:
       - pre_job
       - unittests
+      - monitor-smoketests
     steps:
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -205,6 +206,71 @@ jobs:
           steps: ${{ toJson(steps) }}
           channel: '#cloud-tech'
 
+  monitor-smoketests:
+    name: Monitor Smoketests - Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    needs: pre_job
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+          - "3.6"
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        id: setup-python
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip' # caching pip dependencies
+      - name: Install tox
+        env:
+          TOX_VERSION: 3.20.1
+          TOX_GH_ACTIONS_VERSION: 2.9.1
+        run: |
+          python -m pip install --upgrade pip
+          pip install "tox==$TOX_VERSION" "tox-gh-actions==$TOX_GH_ACTIONS_VERSION"
+
+      - name: Run Monitor Smoketests
+        run: |
+          rm -rf artifacts test-results .coverage
+          mkdir -p artifacts test-results
+          tox -e agent_monitors_ubuntu -- --artifacts-path artifacts -n 2 --junitxml=test-results/junit-1.xml
+        env:
+          SCALYR_API_KEY: ${{ secrets.SCALYR_API_KEY }}
+          READ_API_KEY: ${{ secrets.SCALYR_READ_API_KEY }}
+          SCALYR_SERVER: https://agent.scalyr.com
+          AGENT_HOST_NAME: monitors-test-${{ github.run_number }}
+
+      - name: Upload pytest test results
+        uses: actions/upload-artifact@v3
+        with:
+          name: pytest-results-${{ matrix.python-version }}-${{ matrix.variant }}
+          path: |
+            .coverage
+            test-results/junit*.xml
+            artifacts
+        if: ${{ success() || failure() }}
+
+      - name: Notify Slack on Failure
+        # NOTE: github.ref is set to pr ref (and not branch name, e.g. refs/pull/28/merge) for pull
+        # requests and that's why we need this special conditional and check for github.head_ref in
+        # case of PRs
+        if: ${{ failure() && (github.ref == 'refs/heads/master' || github.head_ref == 'master') }}
+        uses: act10ns/slack@87c73aef9f8838eb6feae81589a6b1487a4a9e08 # v1.6.0
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          status: ${{ job.status }}
+          steps: ${{ toJson(steps) }}
+          channel: '#cloud-tech'
+
   publish-test-results:
     runs-on: ubuntu-latest
     permissions:
@@ -215,6 +281,7 @@ jobs:
       - pre_job
       - unittests
       - standalone-smoketests
+      - monitor-smoketests
     steps:
       - name: Download test results
         uses: actions/download-artifact@v3
