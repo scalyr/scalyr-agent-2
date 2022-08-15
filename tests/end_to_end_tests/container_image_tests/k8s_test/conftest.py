@@ -439,7 +439,7 @@ def start_test_log_writer_pod(minikube_kubectl_args):
             while True:
                 try:
                     return get_pod_name()
-                except:
+                except subprocess.CalledProcessError:
                     time_tracker.sleep(5)
                     continue
 
@@ -509,7 +509,7 @@ def create_agent_daemonset(
                 try:
                     # Get name of the created pod.
                     return get_pod_name()
-                except:
+                except subprocess.CalledProcessError:
                     time_tracker.sleep(5, message="Can not get agent pod name in time.")
 
     yield create

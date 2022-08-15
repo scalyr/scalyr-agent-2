@@ -116,6 +116,15 @@ def pytest_generate_tests(metafunc):
     metafunc.parametrize(param_names, final_params, indirect=True)
 
 
+def test_nothing(
+    cluster_name
+):
+    """
+    Dummy test cases which does nothing but initialise all session fixtures in it, so the first
+        real test is not polluted by fixture outputs.
+    """
+
+
 def test_basic(
     scalyr_api_read_key,
     scalyr_server,
