@@ -3,10 +3,10 @@ name: Docker Images Build
 
 on:
   push:
-    branches:
-      - '*'
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+#    branches:
+#      - '*'
+#    tags:
+#      - 'v[0-9]+.[0-9]+.[0-9]+'
   pull_request:
     branches:
       - master
@@ -38,6 +38,8 @@ jobs:
       build-matrix-json: ${{ steps.get-info.outputs.build-matrix-json }}
       test-matrix-json: ${{ steps.get-info.outputs.test-matrix-json }}
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
+      is-extended: ${{ staps.extended-check.outputs.is-extended }}
+      is-production-tag: ${{ staps.check-tag.outputs.is-production-tag }}
 
     steps:
       - id: skip_check
@@ -49,23 +51,19 @@ jobs:
           github_token: ${{ github.token }}
 
       - name: Checkout repository
-        if: steps.skip_check.outputs.should_skip != 'true'
         uses: actions/checkout@v3
 
       - name: Install python
-        if: steps.skip_check.outputs.should_skip != 'true'
         uses: actions/setup-python@v4
         with:
           python-version: "3.8.13"
 
       - name: Execute the test environment deploy runner.
-        if: steps.skip_check.outputs.should_skip != 'true'
         uses: ./.github/actions/execute-runner
         with:
           runner-fqdn: "agent_build.__init__.BuildTestEnvironment"
 
       - name: "Get build and test job matrices."
-        if: steps.skip_check.outputs.should_skip != 'true'
         id: get-info
         run: |
           set -e 
@@ -81,10 +79,40 @@ jobs:
           echo "github.base_ref: ${{ github.base_ref }}"
           echo "github.head_ref: ${{ github.head_ref }}"
           echo "github.ref: ${{ github.ref }}"
+          echo "github.event_name: ${{ github.event_name }}"
+          echo "github.ref_type: ${{ github.ref_type }}"
+          echo "github.ref_name: ${{ github.ref_name }}"
 
-#      - name: Determine if extended testing is needed
-#        if: github.base_ref == 'master'
-          
+      - name: "Determine if extended testing is needed for the pull request"
+        id: check-pull-request
+        if: (github.event_name == 'pull_request' && github.base_ref == 'master') || (github.event_name == 'push' && github.ref_name == 'master') || (github.event_name == 'push' )
+        run: echo "::set-output name=is-extended::true"
+
+      - name: "Determine if extended testing is needed for the branch"
+        id: check-branch
+        if: github.event_name == 'push' && github.ref_type == 'branch' && github.ref_name == 'master'
+        run: echo "::set-output name=is-extended::true"
+
+      - name: "Get content of the VERSION file to match with current tag."
+        if: github.ref_type == 'tag'
+        id: version-file
+        run: |
+          echo "::set-output name=version::$(cat VERSION | tr -d '\n' | tr -d ' ')"
+
+      - name: "Determine if extended testing is needed for the tag"
+        id: check-tag
+        if: github.event_name == 'push' && github.ref_type == 'tag' && github.ref_name == 'v${{steps.version-file.outputs.version}}'
+        run: |
+          echo "::set-output name=is-extended::true"
+          echo "::set-output name=is-production-tag::true"
+
+      - name: "Determine if step build extended or not."
+        id: extended-check
+        if: steps.check-pull-request.outputs.is-extended == 'true' || steps.check-branch.outputs.is-extended == 'true' || steps.check-tag.outputs.is-extended == 'true'
+        run: |
+          echo "::set-output name=is-extended::true"
+        
+        
           
           
 
@@ -231,7 +259,7 @@ jobs:
       - pre-job
       - pre-build-cached-step
 
-    #if:  matrix.params.extended != 'true
+    if:  matrix.params.extended != 'true || needs.pre-job.outputs.is-extended == 'true'
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -345,11 +373,11 @@ jobs:
             --dest-registry-creds "${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}:${{ secrets.DOCKER_HUB_PASSWORD_TEST_ACCOUNT }}"
 
 
-      - name: Get content of the VERSION file to match with current tag.
-        if: github.ref_type == 'tag'
-        id: version-file
-        run: |
-          echo "::set-output name=version::$(cat VERSION | tr -d '\n' | tr -d ' ')"
+#      - name: Get content of the VERSION file to match with current tag.
+#        if: github.ref_type == 'tag'
+#        id: version-file
+#        run: |
+#          echo "::set-output name=version::$(cat VERSION | tr -d '\n' | tr -d ' ')"
 
       - name: Publish image of the builder '${{ matrix.builder-name }}-${{ matrix.distro-name }}' using production tag '${{ github.ref_name }}'.
         if: github.ref_type == 'tag' && github.ref_name == 'v${{steps.version-file.outputs.version}}'
