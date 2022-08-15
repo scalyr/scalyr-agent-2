@@ -118,10 +118,10 @@ jobs:
           python3 -m agent_build.scripts.prebuild_steps_on_cicd > pre_built_cached_steps_matrix.txt
           echo "::set-output name=pre-built-cached-steps-matrix::$(cat pre_built_cached_steps_matrix.txt)"
 
-      - name: "Get print job matrices."
+      - name: "Print job matrices."
         run: |
           echo "Image build job matrix: "
-          echo "${{ steps.get-info.outputs.build-matrix-json }} | jq --color-output)"
+          echo '${{ steps.get-info.outputs.build-matrix-json }}' | jq --color-output
           
 
         
