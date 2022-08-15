@@ -22,9 +22,7 @@ import json
 from agent_build.tools.runner import Runner
 from agent_build.docker_image_builders import DOCKER_IMAGE_BUILDERS
 
-ALL_RUNNERS = [
-    *list(DOCKER_IMAGE_BUILDERS.values())
-]
+ALL_RUNNERS = [*list(DOCKER_IMAGE_BUILDERS.values())]
 
 ALL_STEPS_TO_PREBUILD = {}
 # Search for all runer steps that has to be pre-built.
@@ -39,6 +37,7 @@ ALL_STEP_BUILDERS = []
 # Create "dummy" Runner for each runner step that has to be pre-built, this dummy runner will be executed
 # by its fqdn to run the step.
 for step_id, step in ALL_STEPS_TO_PREBUILD.items():
+
     class StepWrapperRunner(Runner):
         REQUIRED_STEPS = [step]
 
@@ -49,8 +48,6 @@ for step_id, step in ALL_STEPS_TO_PREBUILD.items():
         class_name_suffix=step.id,
     )
     ALL_STEP_BUILDERS.append(StepWrapperRunner)
-
-
 
 
 if __name__ == "__main__":

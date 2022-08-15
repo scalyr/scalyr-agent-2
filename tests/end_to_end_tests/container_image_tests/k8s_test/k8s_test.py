@@ -116,9 +116,7 @@ def pytest_generate_tests(metafunc):
     metafunc.parametrize(param_names, final_params, indirect=True)
 
 
-def test_nothing(
-    cluster_name
-):
+def test_nothing(cluster_name):
     """
     Dummy test cases which does nothing but initialise all session fixtures in it, so the first
         real test is not polluted by fixture outputs.

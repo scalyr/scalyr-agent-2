@@ -31,12 +31,11 @@ __SOURCE_ROOT__ = __PARENT_DIR__
 # local packages. All such imports also have to be done after that.
 sys.path.append(str(__SOURCE_ROOT__))
 
-from agent_build.tools import common
 from agent_build.tools.runner import Runner
 from agent_build.docker_image_builders import (
     DOCKER_IMAGE_BUILDERS,
 )
-from agent_build.tools.common import UniqueDict
+from agent_build.tools import UniqueDict, init_logging
 
 _AGENT_BUILD_PATH = __SOURCE_ROOT__ / "agent_build"
 
@@ -45,7 +44,7 @@ BUILDERS: Dict[str, Runner] = UniqueDict(**DOCKER_IMAGE_BUILDERS)
 
 if __name__ == "__main__":
 
-    common.init_logging()
+    init_logging()
 
     base_parser = argparse.ArgumentParser(add_help=False)
     base_parser.add_argument("builder_name", choices=BUILDERS.keys())

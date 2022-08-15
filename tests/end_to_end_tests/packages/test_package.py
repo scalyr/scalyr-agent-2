@@ -6,7 +6,10 @@ from typing import Union
 
 import pytest
 
-from agent_build.tools.environment_deployments.deployments import CacheableBuilder, ShellScriptDeploymentStep
+from agent_build.tools.environment_deployments.deployments import (
+    CacheableBuilder,
+    ShellScriptDeploymentStep,
+)
 from agent_build.tools.constants import SOURCE_ROOT, Architecture
 
 
@@ -17,7 +20,10 @@ class FrozenBinaryTestRunnerBuilder(CacheableBuilder):
         super(FrozenBinaryTestRunnerBuilder, self).__init__()
 
     def _build(self):
-        full_script_path = SOURCE_ROOT / "tests/end_to_end_tests/packages/_test_package_locally/frozen_pytest_runner.py"
+        full_script_path = (
+            SOURCE_ROOT
+            / "tests/end_to_end_tests/packages/_test_package_locally/frozen_pytest_runner.py"
+        )
 
         # Since we bundle pytest as frozen binary, it still has to be provided with source code of needed tests,
         # so we also bundle `tests` module to frozen binary.
@@ -28,13 +34,20 @@ class FrozenBinaryTestRunnerBuilder(CacheableBuilder):
                 "-m",
                 "PyInstaller",
                 "--onefile",
-                "--distpath", self.output_path / "dist",
-                "--workpath", self.output_path / "build",
-                "--hidden-import", "six",
-                "--hidden-import", "tests.end_to_end_tests",
-                "--hidden-import", "py",
-                "--hidden-import", "py._vendored_packages",
-                "--hidden-import", "py._vendored_packages.iniconfig",
+                "--distpath",
+                self.output_path / "dist",
+                "--workpath",
+                self.output_path / "build",
+                "--hidden-import",
+                "six",
+                "--hidden-import",
+                "tests.end_to_end_tests",
+                "--hidden-import",
+                "py",
+                "--hidden-import",
+                "py._vendored_packages",
+                "--hidden-import",
+                "py._vendored_packages.iniconfig",
                 "--add-data",
                 f"{SOURCE_ROOT / 'tests/end_to_end_tests'}{os.pathsep}./tests/end_to_end_tests",
                 # Add test configs
@@ -47,7 +60,7 @@ class FrozenBinaryTestRunnerBuilder(CacheableBuilder):
                 f"{SOURCE_ROOT / 'agent_build'}{os.pathsep}./agent_build",
                 full_script_path,
             ],
-            cwd=SOURCE_ROOT
+            cwd=SOURCE_ROOT,
         )
 
 
@@ -67,17 +80,15 @@ def previous_package_version():
 
 @pytest.fixture(scope="session")
 def prior_package(tmpdir_factory, previous_package_version):
-    return pl.Path("/Users/arthur/work/agents/scalyr-agent-2/scalyr-agent-2-2.0.1-1.x86_64.rpm")
-    builder = RpmPackageBuilder(
-        version="2.0.1"
+    return pl.Path(
+        "/Users/arthur/work/agents/scalyr-agent-2/scalyr-agent-2-2.0.1-1.x86_64.rpm"
     )
+    builder = RpmPackageBuilder(version="2.0.1")
     builder.build()
 
     tmp_dir = tmpdir_factory.mktemp("build_output-")
     result_path = pl.Path(tmp_dir) / builder.result_file_path.name
-    shutil.copy2(
-        builder.result_file_path, result_path
-    )
+    shutil.copy2(builder.result_file_path, result_path)
     return result_path
 
 
@@ -93,18 +104,12 @@ def package(tmpdir_factory):
 
     tmp_dir = tmpdir_factory.mktemp("build_output-")
     result_path = pl.Path(tmp_dir) / builder.result_file_path.name
-    shutil.copy2(
-        builder.result_file_path, result_path
-    )
+    shutil.copy2(builder.result_file_path, result_path)
     return result_path
 
 
 class RpmRepoBuilder(CacheableBuilder):
-
-    def __init__(
-            self,
-            packages_dir: Union[str, pl.Path]
-    ):
+    def __init__(self, packages_dir: Union[str, pl.Path]):
         self.packages_dir = pl.Path(packages_dir)
 
         super(RpmRepoBuilder, self).__init__()
@@ -119,29 +124,19 @@ class RpmRepoBuilder(CacheableBuilder):
         },
         previous_step="rockylinux:9",
         cacheable=True,
-        cache_as_image=True
+        cache_as_image=True,
     )
 
     def _build(self):
         repo_dir = self.output_path / "repo"
-        shutil.copytree(
-            self.packages_dir,
-            repo_dir,
-            dirs_exist_ok=True
-        )
+        shutil.copytree(self.packages_dir, repo_dir, dirs_exist_ok=True)
 
-        subprocess.check_call([
-            "createrepo", str(repo_dir)
-        ])
+        subprocess.check_call(["createrepo", str(repo_dir)])
 
         original_cwd = os.getcwd()
         os.chdir(self.output_path)
         try:
-            shutil.make_archive(
-                base_name="repo",
-                format="zip",
-                root_dir=repo_dir
-            )
+            shutil.make_archive(base_name="repo", format="zip", root_dir=repo_dir)
         finally:
             os.chdir(original_cwd)
 
@@ -152,34 +147,26 @@ class RpmRepoBuilder(CacheableBuilder):
 def rpm_repo_archive(package, prior_package, tmp_path_factory):
     packages_dir = tmp_path_factory.mktemp("rpm_packages_dir")
 
-    shutil.copy2(
-        package,
-        packages_dir
-    )
-    shutil.copy2(
-        prior_package,
-        packages_dir
-    )
+    shutil.copy2(package, packages_dir)
+    shutil.copy2(prior_package, packages_dir)
 
-    builder = RpmRepoBuilder(
-        packages_dir=packages_dir
-    )
+    builder = RpmRepoBuilder(packages_dir=packages_dir)
 
     builder.build()
 
     return builder.output_path / "repo.zip"
 
-def test_in_docker(
-        # package_testing_script_frozen_binary,
-        # rpm_package,
-        frozen_pytest_runner_path,
-        scalyr_api_key,
-        scalyr_api_read_key,
-        rpm_repo_archive,
-        test_session_name,
-        previous_package_version,
-        package_version
 
+def test_in_docker(
+    # package_testing_script_frozen_binary,
+    # rpm_package,
+    frozen_pytest_runner_path,
+    scalyr_api_key,
+    scalyr_api_read_key,
+    rpm_repo_archive,
+    test_session_name,
+    previous_package_version,
+    package_version,
 ):
     docker_repo_archive_path = pl.Path("/tmp") / rpm_repo_archive.name
     process = subprocess.Popen(
@@ -194,7 +181,7 @@ def test_in_docker(
             f"{rpm_repo_archive}:{docker_repo_archive_path}",
             # "-p",
             # "8080:80",
-            #"centos:7",
+            # "centos:7",
             "rl",
             "/test_runner",
             "tests/end_to_end_tests/packages/_test_package_locally/test_locally.py",
@@ -214,15 +201,17 @@ def test_in_docker(
             "--previous-package-version",
             previous_package_version,
             "--package-version",
-            package_version
+            package_version,
         ],
     )
 
     process.communicate()
     process.wait()
 
-    assert process.returncode == 0, "The test run inside the docker container has failed. " \
-                                    "Please see the output above to find real cause. " \
-                                    f"Exit code: {process.returncode}"
+    assert process.returncode == 0, (
+        "The test run inside the docker container has failed. "
+        "Please see the output above to find real cause. "
+        f"Exit code: {process.returncode}"
+    )
 
     a = 10

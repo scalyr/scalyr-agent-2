@@ -38,7 +38,7 @@ from agent_build.tools.runner import (
 )
 from agent_build.prepare_agent_filesystem import build_linux_lfs_agent_files, add_config
 from agent_build.tools.constants import SOURCE_ROOT, DockerPlatform, DockerPlatformInfo
-from agent_build.tools.common import (
+from agent_build.tools import (
     check_output_with_log,
     UniqueDict,
     LocalRegistryContainer,
@@ -486,10 +486,29 @@ class ContainerImageBuilder(Runner):
         # Need to create some docker specific directories.
         pl.Path(package_root_path / "var/log/scalyr-agent-2/containers").mkdir()
 
+    @classmethod
+    def get_all_result_image_names(cls, tags: List[str] = None):
+        result_names = collections.defaultdict(list)
+        all_image_names = [
+            cls.IMAGE_TYPE_SPEC.result_image_name,
+            *cls.IMAGE_TYPE_SPEC.additional_result_image_names,
+        ]
+
+        tags = tags or ["latest"]
+
+        for image_name in all_image_names:
+            for tag in tags:
+                final_tag = tag
+                if cls.TAG_SUFFIX:
+                    final_tag = f"{final_tag}-{cls.TAG_SUFFIX}"
+
+                result_names[image_name].append(final_tag)
+
+        return result_names
+
     def build(
         self,
         output_registry_dir: pl.Path,
-        platforms: List[str] = None,
     ):
         """
         Builds final image
@@ -506,18 +525,22 @@ class ContainerImageBuilder(Runner):
             Used only for testing."
         """
 
-        self.platforms = platforms
         self.run()
 
         output_registry_dir_path = output_registry_dir and pl.Path(output_registry_dir)
         result_registry_data_root = output_registry_dir_path / "registry"
+
+        # Cleanup, if needed.
         if result_registry_data_root.exists():
             shutil.rmtree(result_registry_data_root)
         result_registry_data_root.mkdir(parents=True)
 
-        base_image_registry_path = type(
-            self
-        ).BASE_IMAGE_BUILDER_STEP.get_output_directory(work_dir=self.work_dir)
+        base_image_builder_step = type(self).BASE_IMAGE_BUILDER_STEP
+        base_image_registry_path = base_image_builder_step.get_output_directory(
+            work_dir=self.work_dir
+        )
+
+        # Create registry container with base images and registry container for result images.
         with LocalRegistryContainer(
             name="base_image_registry",
             registry_port=0,
@@ -529,13 +552,16 @@ class ContainerImageBuilder(Runner):
         ) as result_registry:
 
             image_names_options = []
-            for name in type(self).get_all_result_image_names():
-                final_name = name
 
-                final_name = (
-                    f"localhost:{result_registry.real_registry_port}/{final_name}"
-                )
-                image_names_options.extend(["-t", final_name])
+            all_result_image_names = type(self).get_all_result_image_names()
+            for name, tags in all_result_image_names.items():
+                for tag in tags:
+                    final_name = f"{name}:{tag}"
+
+                    final_name = (
+                        f"localhost:{result_registry.real_registry_port}/{final_name}"
+                    )
+                    image_names_options.extend(["-t", final_name])
 
             additional_options = ["--push" if True else "--load"]
 
@@ -572,25 +598,13 @@ class ContainerImageBuilder(Runner):
                 ]
             )
 
-    @classmethod
-    def get_all_result_image_names(cls, tags: List[str] = None):
-        result_names = []
-        all_image_names = [
-            cls.IMAGE_TYPE_SPEC.result_image_name,
-            *cls.IMAGE_TYPE_SPEC.additional_result_image_names,
-        ]
-
-        tags = tags or ["latest"]
-
-        for image_name in all_image_names:
-            for tag in tags:
-                final_tag = tag
-                if cls.TAG_SUFFIX:
-                    final_tag = f"{final_tag}-{cls.TAG_SUFFIX}"
-
-                result_names.append(f"{image_name}:{final_tag}")
-
-        return result_names
+            # Also write a special JSON file near the registry folder where we list all created images and tags,
+            registry_images_info_file_path = (
+                output_registry_dir_path / "images-info.json"
+            )
+            registry_images_info_file_path.write_text(
+                json.dumps(all_result_image_names)
+            )
 
     def publish(
         self,
@@ -599,59 +613,62 @@ class ContainerImageBuilder(Runner):
         user: str,
         dest_registry_host: str = None,
         dest_registry_tls_skip_verify: bool = False,
-        dest_registry_creds: str = None
-
+        dest_registry_creds: str = None,
     ):
-        # Image names from the source registry do not have any additional tags
-        source_image_names = type(self).get_all_result_image_names()
-        dest_image_names = type(self).get_all_result_image_names(tags=tags)
 
         published_image_names = []
+
+        src_registry_images_info_file_path = src_registry_data_path / "images-info.json"
+        src_registry_images_info = json.loads(
+            src_registry_images_info_file_path.read_text()
+        )
 
         with LocalRegistryContainer(
             name=f"image-publish-src-registry",
             registry_port=0,
-            registry_data_path=src_registry_data_path,
+            registry_data_path=src_registry_data_path / "registry",
         ) as src_reg_container:
 
             src_registry_host = f"localhost:{src_reg_container.real_registry_port}"
-            for src_image_name, dest_image_name in zip(
-                source_image_names, dest_image_names
+            for image_name, dest_image_tags in (
+                type(self).get_all_result_image_names(tags=tags).items()
             ):
 
-                final_src_image_name = f"{src_registry_host}/{src_image_name}"
+                src_image_tag = src_registry_images_info[image_name][0]
 
-                final_dest_image_name = f"{user}/{dest_image_name}"
-                if dest_registry_host:
-                    final_dest_image_name = f"{dest_registry_host}/{final_dest_image_name}"
-
-                additional_options = []
-
-                if dest_registry_tls_skip_verify:
-                    additional_options.append(
-                        "--dest-tls-verify=false"
-                    )
-
-                if dest_registry_creds:
-                    additional_options.extend([
-                        "--dest-creds",
-                        dest_registry_creds
-                    ])
-
-                check_call_with_log(
-                    [
-                        "skopeo",
-                        "copy",
-                        "--all",
-                        "--src-tls-verify=false",
-                        *additional_options,
-                        f"docker://{final_src_image_name}",
-                        f"docker://{final_dest_image_name}",
-                    ],
-                    description=f"Copy image '{final_src_image_name}' to '{final_dest_image_name}'",
+                final_src_image_name = (
+                    f"{src_registry_host}/{image_name}:{src_image_tag}"
                 )
 
-                published_image_names.append(final_dest_image_name)
+                for dest_tag in dest_image_tags:
+                    final_dest_image_name = f"{user}/{image_name}:{dest_tag}"
+                    if dest_registry_host:
+                        final_dest_image_name = (
+                            f"{dest_registry_host}/{final_dest_image_name}"
+                        )
+
+                    additional_options = []
+
+                    if dest_registry_tls_skip_verify:
+                        additional_options.append("--dest-tls-verify=false")
+
+                    if dest_registry_creds:
+                        additional_options.extend(["--dest-creds", dest_registry_creds])
+
+                    check_call_with_log(
+                        [
+                            "skopeo",
+                            "copy",
+                            "--all",
+                            "--src-tls-verify=false",
+                            *additional_options,
+                            f"docker://{final_src_image_name}",
+                            f"docker://{final_dest_image_name}",
+                        ],
+                        description=f"Copy image '{final_src_image_name}' to '{final_dest_image_name}'",
+                    )
+
+                    published_image_names.append(final_dest_image_name)
 
         return published_image_names
 
@@ -684,21 +701,19 @@ class ContainerImageBuilder(Runner):
             required=True,
             help="Path to the directory where registry data root with result image is stored.",
         )
-        publish_parser = subparsers.add_parser(
-            "publish", help=""
-        )
+        publish_parser = subparsers.add_parser("publish", help="")
         publish_parser.add_argument(
             "--src-registry-data-dir",
             dest="src_registry_data_dir",
             required=True,
-            help="Path to the directory with registry data that contains images to publish."
+            help="Path to the directory with registry data that contains images to publish.",
         )
         publish_parser.add_argument(
             "--dest-registry-host",
             dest="dest_registry_host",
             required=False,
             default="docker.io",
-            help="URL to the target registry to save result images."
+            help="URL to the target registry to save result images.",
         )
         publish_parser.add_argument(
             "--dest-registry-tls-skip-verify",
@@ -706,24 +721,19 @@ class ContainerImageBuilder(Runner):
             required=False,
             action="store_true",
             help="If set, skopeo (tools that publishes images) won't check for secure connection. That's needed to"
-                 "push images to local registry."
+            "push images to local registry.",
         )
         publish_parser.add_argument(
             "--dest-registry-creds",
             dest="dest_registry_creds",
             required=False,
-            help="Colon-separated user name and password to target registry to publish."
+            help="Colon-separated user name and password to target registry to publish.",
         )
         publish_parser.add_argument(
-            "--tags",
-            dest="tags",
-            help="Comma-separated tags to publish."
+            "--tags", dest="tags", help="Comma-separated tags to publish."
         )
         publish_parser.add_argument(
-            "--user",
-            dest="user",
-            required=True,
-            help="Registry user."
+            "--user", dest="user", required=True, help="Registry user."
         )
 
     @classmethod
@@ -751,12 +761,12 @@ class ContainerImageBuilder(Runner):
             tags = args.tags and args.tags.split(",") or []
 
             builder.publish(
-                src_registry_data_path=args.src_registry_data_dir,
+                src_registry_data_path=pl.Path(args.src_registry_data_dir),
                 tags=tags,
                 user=args.user,
                 dest_registry_host=args.dest_registry_host,
                 dest_registry_tls_skip_verify=args.dest_registry_tls_skip_verify,
-                dest_registry_creds=args.dest_registry_creds
+                dest_registry_creds=args.dest_registry_creds,
             )
         else:
             if args.command is None:

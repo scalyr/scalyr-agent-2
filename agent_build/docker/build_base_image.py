@@ -20,6 +20,7 @@ import re
 import subprocess
 
 from agent_build.tools.steps_libs.container import LocalRegistryContainer
+#from agent_build.tools.steps_libs.subprocess_with_log import
 
 
 def main():
@@ -61,9 +62,6 @@ def main():
         image_name = f"{BASE_IMAGE_NAME_PREFIX}:{platform_suffix}"
         registry_image_name = f"localhost:{reg.real_registry_port}/{image_name}"
 
-        # subprocess.check_call(
-        #     ["docker", "import", str(tarball_path), registry_image_name]
-        # )
         load_output_bin = subprocess.check_output(
             ["docker", "load", "-i", str(tarball_path)]
         )
@@ -72,7 +70,7 @@ def main():
 
         subprocess.check_call(["docker", "tag", image_id, registry_image_name])
 
-        # # Push it to local registry.
+        # Push it to local registry.
         subprocess.check_call(["docker", "push", registry_image_name])
 
         docker_manifest_command_args.extend([registry_image_name])

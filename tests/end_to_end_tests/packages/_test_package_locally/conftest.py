@@ -25,7 +25,7 @@ def pytest_addoption(parser):
         dest="package_type",
         required=True,
         choices=["rpm"],
-        help="Type of the package to test."
+        help="Type of the package to test.",
     )
 
     parser.addoption(
@@ -33,22 +33,22 @@ def pytest_addoption(parser):
         dest="packages_archive_path",
         required=True,
         help="Path to the archive with packages to test. It also may contain package of the previous "
-             "version to test upgrade logics of the package. For the packages like deb or rpm, they are"
-             "packed into archive in form of the ready apt or yum repository. "
+        "version to test upgrade logics of the package. For the packages like deb or rpm, they are"
+        "packed into archive in form of the ready apt or yum repository. ",
     )
 
     parser.addoption(
         "--previous-package-version",
         dest="previous_package_version",
         required=True,
-        help="Version of the prior package to perform an upgrade test from this to a new version."
+        help="Version of the prior package to perform an upgrade test from this to a new version.",
     )
 
     parser.addoption(
         "--package-version",
         dest="package_version",
         required=True,
-        help="Version of the package to test."
+        help="Version of the package to test.",
     )
 
 
@@ -56,15 +56,16 @@ def pytest_addoption(parser):
 def package_type(request):
     return request.param
 
+
 @pytest.fixture(scope="session")
 def distro_name(request):
     return request.param
 
 
-
 @pytest.fixture(scope="session")
 def previous_package_version(request):
     return request.config.option.previous_package_version
+
 
 @pytest.fixture(scope="session")
 def package_version(request):
@@ -75,16 +76,17 @@ def package_version(request):
 def repo_host():
     return "127.0.0.1"
 
+
 @pytest.fixture(scope="session")
 def repo_port():
     return 80
+
 
 @pytest.fixture(scope="session")
 def packages_path(tmp_path_factory, request):
     path = tmp_path_factory.mktemp("packages")
     shutil.unpack_archive(
-        filename=request.config.option.packages_archive_path,
-        extract_dir=path
+        filename=request.config.option.packages_archive_path, extract_dir=path
     )
     return path
 
@@ -95,8 +97,7 @@ def rpm_repo(repo_host, repo_port, packages_path):
     fixtures_path = pl.Path(__file__).parent / "fixtures"
     yum_repo_config_path = fixtures_path / "scalyr_test_yum.repo"
     yum_repo_config = yum_repo_config_path.read_text().format(
-        repo_host=repo_host,
-        repo_port=repo_port
+        repo_host=repo_host, repo_port=repo_port
     )
 
     # Add local repo to yum.
@@ -104,8 +105,8 @@ def rpm_repo(repo_host, repo_port, packages_path):
     repo_config_path.write_text(yum_repo_config)
 
     with TCPServer(
-            ("", repo_port),
-            functools.partial(SimpleHTTPRequestHandler, directory=str(packages_path))
+        ("", repo_port),
+        functools.partial(SimpleHTTPRequestHandler, directory=str(packages_path)),
     ) as httpd:
         thread = threading.Thread(target=httpd.serve_forever)
         thread.start()
@@ -142,13 +143,12 @@ def package_path(package_type, package_version, packages_path) -> pl.Path:
 
     if package_type == "rpm":
         glob = f"scalyr-agent-2-{package_version}-1.*.rpm"
-        #raise RuntimeError(f"{list(packages_path.iterdir())}        {glob}")
+        # raise RuntimeError(f"{list(packages_path.iterdir())}        {glob}")
         return list(packages_path.glob(glob))[0]
 
 
 @pytest.fixture(scope="session")
 def install_rpm_package_function(rpm_repo):
-
     def install(version: str = None):
         package_name = "scalyr-agent-2"
         if version:
@@ -160,7 +160,6 @@ def install_rpm_package_function(rpm_repo):
 
 @pytest.fixture(scope="session")
 def downgrade_rpm_package_function(rpm_repo):
-
     def downgrade(version: str = None):
         package_name = "scalyr-agent-2"
         if version:
@@ -170,11 +169,8 @@ def downgrade_rpm_package_function(rpm_repo):
     return downgrade
 
 
-
-
 @pytest.fixture(scope="session")
 def uninstall_rpm_package_function(rpm_repo):
-
     def uninstall(version: str):
         package_name = "scalyr-agent-2"
         if version:
@@ -216,15 +212,16 @@ def agent_test_configs_path(tmp_path_factory):
     shutil.copytree(
         pl.Path(__file__).parent.parent.parent.parent / "ami/configs/.",
         path,
-        dirs_exist_ok=True
-
+        dirs_exist_ok=True,
     )
     return path
 
 
 @pytest.fixture(scope="session")
 def bad_cert_path(tmp_path_factory):
-    cert_source_path = pl.Path(__file__).parent.parent.parent.parent / "ami/files/ca_certs.crt"
+    cert_source_path = (
+        pl.Path(__file__).parent.parent.parent.parent / "ami/files/ca_certs.crt"
+    )
     dir_path = tmp_path_factory.mktemp("certs")
     cert_path = dir_path / cert_source_path.name
 
@@ -242,11 +239,10 @@ def agent_paths(package_type):
         return AgentPaths(
             configs_dir=pl.Path("/etc/scalyr-agent-2"),
             logs_dir=pl.Path("/var/log/scalyr-agent-2"),
-            install_root=pl.Path("/usr/share/scalyr-agent-2")
+            install_root=pl.Path("/usr/share/scalyr-agent-2"),
         )
 
     raise ValueError(f"Unknown package type {package_type}")
-
 
 
 # @pytest.fixture(scope="session")
@@ -259,6 +255,3 @@ def agent_paths(package_type):
 #             ])
 #
 #     return install
-
-
-

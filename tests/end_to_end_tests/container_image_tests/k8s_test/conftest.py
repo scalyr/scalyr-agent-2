@@ -9,7 +9,7 @@ import pytest
 import yaml
 
 from agent_build.tools.constants import SOURCE_ROOT
-from agent_build.tools.common import (
+from agent_build.tools import (
     check_call_with_log,
     check_output_with_log,
     check_output_with_log_debug,
@@ -489,7 +489,7 @@ def create_agent_daemonset(
     cluster_name,
     scalyr_namespace,
     minikube_kubectl_args,
-    get_agent_log_content
+    get_agent_log_content,
 ):
     """
     Return function which starts agent daemonset.
@@ -543,9 +543,12 @@ def create_agent_daemonset(
         with time_tracker(20):
             while True:
                 try:
-                    return get_agent_log_content(pod_name=pod_name)
+                    get_agent_log_content(pod_name=pod_name)
+                    return pod_name
                 except subprocess.CalledProcessError:
-                    time_tracker.sleep(5, message="Can not get agent's log file in time.")
+                    time_tracker.sleep(
+                        5, message="Can not get agent's log file in time."
+                    )
 
     yield create
 

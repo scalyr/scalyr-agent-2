@@ -32,9 +32,9 @@ from agent_build.tools.runner import Runner
 
 
 if __name__ == "__main__":
-    from agent_build.tools import common
+    from agent_build.tools import init_logging
 
-    common.init_logging()
+    init_logging()
 
     base_parser = argparse.ArgumentParser()
     base_parser.add_argument("builder_class_fqdn")

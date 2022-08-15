@@ -3,9 +3,7 @@ from typing import Type
 
 import pytest
 
-from agent_build.tools.common import (
-    LocalRegistryContainer,
-)
+from agent_build.tools import LocalRegistryContainer
 from agent_build.docker_image_builders import (
     ContainerImageBuilder,
     DOCKER_IMAGE_BUILDERS,
@@ -43,7 +41,7 @@ def source_registry_path(image_builder_cls, request, tmp_path_factory):
     builder = image_builder_cls(work_dir=work_dir)
     builder_output = tmp_path_factory.mktemp("builder-output")
     builder.build(output_registry_dir=builder_output)
-    return builder_output / "registry"
+    return builder_output
 
 
 @pytest.fixture(scope="session")
@@ -75,7 +73,7 @@ def all_published_image_names(
             tags=["test"],
             user="test_user",
             dest_registry_host=registry_host,
-            dest_registry_tls_skip_verify=True
+            dest_registry_tls_skip_verify=True,
         )
 
         yield all_published_image_names
