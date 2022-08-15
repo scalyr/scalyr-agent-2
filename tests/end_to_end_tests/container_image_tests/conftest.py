@@ -72,9 +72,10 @@ def all_published_image_names(
 
         all_published_image_names = builder.publish(
             src_registry_data_path=source_registry_path,
-            dest_registry_host=registry_host,
             tags=["test"],
             user="test_user",
+            dest_registry_host=registry_host,
+            dest_registry_tls_skip_verify=True
         )
 
         yield all_published_image_names
