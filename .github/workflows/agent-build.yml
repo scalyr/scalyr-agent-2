@@ -46,13 +46,9 @@ jobs:
         id: get-job-matrices
         run: |
           set -e 
-          echo "Build job matrix:"
-          echo "$(python3 -m agent_build.docker_image_builders)"
           echo "Test job matrix: "
-          echo "$(python3 -m tests.end_to_end_tests.container_image_tests.k8s_test)"
-          echo "::set-output name=build-matrix-json::$(python3 -m agent_build.docker_image_builders)"
-          echo "::set-output name=test-matrix-json::$(python3 -m tests.end_to_end_tests.container_image_tests.k8s_test --extended)"
-          
+          echo "$(python3 -m tests.end_to_end_tests.container_image_tests.k8s_test.k8s_test)"
+          echo "::set-output name=test-matrix-json::$(python3 -m tests.end_to_end_tests.container_image_tests.k8s_test.k8s_test --extended)"
           echo "::set-output name=pre-built-cached-steps-matrix::$(python3 -m agent_build.scripts.prebuild_steps_on_cicd)"
 
   pre-build-cached-step:
