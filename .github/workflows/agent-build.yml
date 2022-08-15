@@ -108,7 +108,7 @@ jobs:
         id: get-info
         run: |
           set -e
-          echo "::set-output name=build-matrix-json::$(python3 python3 agent_build/scripts/get_github_actions_matrices.py $${{ steps.extended-check.outputs.build-mode-option }})"
+          echo "::set-output name=build-matrix-json::$(python3 agent_build/scripts/get_github_actions_matrices.py $${{ steps.extended-check.outputs.build-mode-option }})"
           
           exit 0
           echo "Test job matrix: "
