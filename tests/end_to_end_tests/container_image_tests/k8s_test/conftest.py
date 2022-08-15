@@ -435,12 +435,12 @@ def start_test_log_writer_pod(minikube_kubectl_args):
             return output.decode().strip()
 
         # Get name of the created pod.
-        with time_tracker(1):
+        with time_tracker(20):
             while True:
                 try:
                     return get_pod_name()
                 except:
-                    time_tracker.sleep(0.3)
+                    time_tracker.sleep(5)
                     continue
 
     yield start
