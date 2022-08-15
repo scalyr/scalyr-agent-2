@@ -85,7 +85,7 @@ jobs:
 
       - name: "Determine if extended testing is needed for the pull request"
         id: check-pull-request
-        if: (github.event_name == 'pull_request' && github.base_ref == 'master') || (github.event_name == 'push' && github.ref_name == 'master') || (github.event_name == 'push' )
+        if: (github.event_name == 'pull_request' && github.base_ref == 'master')
         run: echo "::set-output name=is-extended::true"
 
       - name: "Determine if extended testing is needed for the branch"
