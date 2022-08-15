@@ -133,7 +133,8 @@ class RateMetricFunction(MetricFunction):
 
     # If we track rate for more than this many metrics, a warning will be emitted.
     # With average metric name and value (timestamp, value) taking around 240 bytes, that means
-    # around 5 MB of memory usage (240 bytes * 20_000 entries = 4800000 bytes)
+    # around 5 MB of memory usage (240 bytes * 20_000 entries = 4800000 bytes). With instrumentation
+    # in production we see around 4 MB for 20k values.
     MAX_RATE_METRICS_COUNT_WARN = 20000
 
     # Hard limit on how many values will be stored in RATE_CALCULATION_METRIC_VALUES
@@ -203,6 +204,13 @@ could add overhead in terms of CPU and memory usage.
         # qualified monitor name.
         # Since same metric name can be used by values with different extra fields, we also include
         # extra fields as part of the dictionary key.
+
+        # "timestamp" field is a bit special since it changes as part of every gather sample
+        # interval and we don't want to include it as part of the unique metric id which includes
+        # all the metric labels / extra_fields values
+        if "timestamp" in extra_fields:
+            del extra_fields["timestamp"]
+
         extra_fields_hash = get_hash_for_flat_dictionary(extra_fields)
         dict_key = monitor.short_hash + "." + metric_name + "." + extra_fields_hash
 

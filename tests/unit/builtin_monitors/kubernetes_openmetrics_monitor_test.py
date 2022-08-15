@@ -260,6 +260,271 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
         self.assertEqual(mock_logger.warn.call_count, 0)
         self.assertEqual(monitor_config.attributes, expected_attributes)
 
+    def test_get_monitor_and_log_config_default_calculate_rate_metric_names(self):
+        monitor_config = {
+            "module": "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor",
+        }
+        global_config = mock.Mock()
+        global_config.agent_log_path = MOCK_AGENT_LOG_PATH
+        mock_logger = mock.Mock()
+
+        monitor = KubernetesOpenMetricsMonitor(
+            monitor_config=monitor_config,
+            logger=mock_logger,
+            global_config=global_config,
+        )
+
+        # No custom calculate_rate_metric_names specified as part of pod annotations
+        kwargs = {
+            "monitor_id": "ip-111-11-11-11.eu-west-1.compute.internal_prometheus-node-exporter-nhm59",
+            "url": "https://192.168.100.0:8080/metrics",
+            "sample_interval": 10,
+            "log_filename": "foo.log",
+            "verify_https": False,
+            # NOTE: k8s-cluster and k8s-node are special attributes so user shouldn't be able to
+            # override those
+            "attributes": {
+                "app": "my-app",
+                "key-1": "value 1",
+                "k8s-node": "override",
+                "k8s-cluster": "override",
+            },
+            "ca_file": None,
+            "headers": None,
+            "include_node_name": True,
+            "include_cluster_name": True,
+        }
+        (
+            monitor_config,
+            log_config,
+        ) = monitor._KubernetesOpenMetricsMonitor__get_monitor_config_and_log_config(
+            **kwargs
+        )
+        expected_monitor_config = {
+            "ca_file": None,
+            "extra_fields": JsonObject(
+                {
+                    "k8s-node": "test-node-name",
+                    "k8s-cluster": "test-cluster-name",
+                    "app": "my-app",
+                    "key-1": "value 1",
+                }
+            ),
+            "headers": JsonObject({}),
+            "id": "ip-111-11-11-11.eu-west-1.compute.internal_prometheus-node-exporter-nhm59",
+            "log_path": "scalyr_agent.builtin_monitors.openmetrics_monitor.log",
+            "metric_component_value_include_list": JsonObject({}),
+            "metric_name_exclude_list": [],
+            "metric_name_include_list": ["*"],
+            "calculate_rate_metric_names": [
+                "openmetrics_monitor:node_cpu_seconds_total",
+                "openmetrics_monitor:node_disk_read_bytes_total",
+                "openmetrics_monitor:node_disk_written_bytes_total",
+                "openmetrics_monitor:node_network_receive_bytes_total",
+                "openmetrics_monitor:node_network_transmit_bytes_total",
+            ],
+            "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
+            "sample_interval": 10,
+            "timeout": 10,
+            "url": "https://192.168.100.0:8080/metrics",
+            "verify_https": False,
+        }
+        self.assertEqual(dict(monitor_config), dict(expected_monitor_config))
+        self.assertEqual(
+            log_config, {"path": os.path.join(MOCK_AGENT_LOG_PATH, "foo.log")}
+        )
+
+        kwargs = {
+            "monitor_id": "ip-111-11-11-11.eu-west-1.compute.internal_kubernetes-api-cadvisor-metrics",
+            "url": "https://192.168.100.0:8080/metrics",
+            "sample_interval": 10,
+            "log_filename": "foo.log",
+            "verify_https": False,
+            # NOTE: k8s-cluster and k8s-node are special attributes so user shouldn't be able to
+            # override those
+            "attributes": {
+                "app": "my-app",
+                "key-1": "value 1",
+                "k8s-node": "override",
+                "k8s-cluster": "override",
+            },
+            "ca_file": None,
+            "headers": None,
+            "include_node_name": True,
+            "include_cluster_name": True,
+        }
+        (
+            monitor_config,
+            log_config,
+        ) = monitor._KubernetesOpenMetricsMonitor__get_monitor_config_and_log_config(
+            **kwargs
+        )
+        expected_monitor_config = {
+            "ca_file": None,
+            "extra_fields": JsonObject(
+                {
+                    "k8s-node": "test-node-name",
+                    "k8s-cluster": "test-cluster-name",
+                    "app": "my-app",
+                    "key-1": "value 1",
+                }
+            ),
+            "headers": JsonObject({}),
+            "id": "ip-111-11-11-11.eu-west-1.compute.internal_kubernetes-api-cadvisor-metrics",
+            "log_path": "scalyr_agent.builtin_monitors.openmetrics_monitor.log",
+            "metric_component_value_include_list": JsonObject({}),
+            "metric_name_exclude_list": [],
+            "metric_name_include_list": ["*"],
+            "calculate_rate_metric_names": [
+                "openmetrics_monitor:container_cpu_usage_seconds_total",
+                "openmetrics_monitor:container_network_receive_bytes_total",
+                "openmetrics_monitor:container_network_transmit_bytes_total",
+            ],
+            "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
+            "sample_interval": 10,
+            "timeout": 10,
+            "url": "https://192.168.100.0:8080/metrics",
+            "verify_https": False,
+        }
+        self.assertEqual(dict(monitor_config), dict(expected_monitor_config))
+        self.assertEqual(
+            log_config, {"path": os.path.join(MOCK_AGENT_LOG_PATH, "foo.log")}
+        )
+
+        # User supplied additional calculate_rate_metric_names via pod annotations. Ensure those
+        # are merged together with the default values and don't override default values
+        kwargs = {
+            "monitor_id": "ip-111-11-11-11.eu-west-1.compute.internal_prometheus-node-exporter-nhm59",
+            "url": "https://192.168.100.0:8080/metrics",
+            "sample_interval": 10,
+            "log_filename": "foo.log",
+            "verify_https": False,
+            # NOTE: k8s-cluster and k8s-node are special attributes so user shouldn't be able to
+            # override those
+            "attributes": {
+                "app": "my-app",
+                "key-1": "value 1",
+                "k8s-node": "override",
+                "k8s-cluster": "override",
+            },
+            "ca_file": None,
+            "headers": None,
+            "include_node_name": True,
+            "include_cluster_name": True,
+            "calculate_rate_metric_names": [
+                "metric1",
+                "metric2",
+                "metric3:label=value",
+            ],
+        }
+        (
+            monitor_config,
+            log_config,
+        ) = monitor._KubernetesOpenMetricsMonitor__get_monitor_config_and_log_config(
+            **kwargs
+        )
+        expected_monitor_config = {
+            "ca_file": None,
+            "extra_fields": JsonObject(
+                {
+                    "k8s-node": "test-node-name",
+                    "k8s-cluster": "test-cluster-name",
+                    "app": "my-app",
+                    "key-1": "value 1",
+                }
+            ),
+            "headers": JsonObject({}),
+            "id": "ip-111-11-11-11.eu-west-1.compute.internal_prometheus-node-exporter-nhm59",
+            "log_path": "scalyr_agent.builtin_monitors.openmetrics_monitor.log",
+            "metric_component_value_include_list": JsonObject({}),
+            "metric_name_exclude_list": [],
+            "metric_name_include_list": ["*"],
+            "calculate_rate_metric_names": [
+                "metric1",
+                "metric2",
+                "metric3:label=value",
+                "openmetrics_monitor:node_cpu_seconds_total",
+                "openmetrics_monitor:node_disk_read_bytes_total",
+                "openmetrics_monitor:node_disk_written_bytes_total",
+                "openmetrics_monitor:node_network_receive_bytes_total",
+                "openmetrics_monitor:node_network_transmit_bytes_total",
+            ],
+            "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
+            "sample_interval": 10,
+            "timeout": 10,
+            "url": "https://192.168.100.0:8080/metrics",
+            "verify_https": False,
+        }
+        self.assertEqual(dict(monitor_config), dict(expected_monitor_config))
+        self.assertEqual(
+            log_config, {"path": os.path.join(MOCK_AGENT_LOG_PATH, "foo.log")}
+        )
+
+        kwargs = {
+            "monitor_id": "ip-111-11-11-11.eu-west-1.compute.internal_kubernetes-api-cadvisor-metrics",
+            "url": "https://192.168.100.0:8080/metrics",
+            "sample_interval": 10,
+            "log_filename": "foo.log",
+            "verify_https": False,
+            # NOTE: k8s-cluster and k8s-node are special attributes so user shouldn't be able to
+            # override those
+            "attributes": {
+                "app": "my-app",
+                "key-1": "value 1",
+                "k8s-node": "override",
+                "k8s-cluster": "override",
+            },
+            "ca_file": None,
+            "headers": None,
+            "include_node_name": True,
+            "include_cluster_name": True,
+            "calculate_rate_metric_names": [
+                "metric1",
+                "metric2",
+                "metric3:label=value",
+            ],
+        }
+        (
+            monitor_config,
+            log_config,
+        ) = monitor._KubernetesOpenMetricsMonitor__get_monitor_config_and_log_config(
+            **kwargs
+        )
+        expected_monitor_config = {
+            "ca_file": None,
+            "extra_fields": JsonObject(
+                {
+                    "k8s-node": "test-node-name",
+                    "k8s-cluster": "test-cluster-name",
+                    "app": "my-app",
+                    "key-1": "value 1",
+                }
+            ),
+            "headers": JsonObject({}),
+            "id": "ip-111-11-11-11.eu-west-1.compute.internal_kubernetes-api-cadvisor-metrics",
+            "log_path": "scalyr_agent.builtin_monitors.openmetrics_monitor.log",
+            "metric_component_value_include_list": JsonObject({}),
+            "metric_name_exclude_list": [],
+            "metric_name_include_list": ["*"],
+            "calculate_rate_metric_names": [
+                "metric1",
+                "metric2",
+                "metric3:label=value",
+                "openmetrics_monitor:container_cpu_usage_seconds_total",
+                "openmetrics_monitor:container_network_receive_bytes_total",
+                "openmetrics_monitor:container_network_transmit_bytes_total",
+            ],
+            "module": "scalyr_agent.builtin_monitors.openmetrics_monitor",
+            "sample_interval": 10,
+            "timeout": 10,
+            "url": "https://192.168.100.0:8080/metrics",
+            "verify_https": False,
+        }
+        self.assertEqual(dict(monitor_config), dict(expected_monitor_config))
+        self.assertEqual(
+            log_config, {"path": os.path.join(MOCK_AGENT_LOG_PATH, "foo.log")}
+        )
+
     def test_get_monitor_and_log_config(self):
         monitor_config = {
             "module": "scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor",

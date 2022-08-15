@@ -51,8 +51,10 @@ FUNCTIONS_REGISTRY = {
     "rate": RateMetricFunction(),
 }
 
-# Maximum cache size for MONITOR_METRIC_TO_FUNCTIONS_CACHE LRU cache
-MAX_CACHE_SIZE = 10000
+# Maximum cache size for MONITOR_METRIC_TO_FUNCTIONS_CACHE LRU cache. Instrumentation shows that
+# ~500 entries use around 0.1 MB of memory so 20.000 would mean about 4 MB of memory + overhead
+# (let's say 8 MB to be on the safe side)
+MAX_CACHE_SIZE = 20000
 
 # Stores cached list of MetricFunction class instances for the provided monitor and metric name.
 # This cache needs to be invalidated each time config is reloaded and config change is detected.
