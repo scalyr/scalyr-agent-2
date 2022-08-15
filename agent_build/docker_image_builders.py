@@ -634,7 +634,7 @@ class ContainerImageBuilder(Runner):
 
                 if dest_registry_creds:
                     additional_options.extend([
-                        "--dest-creds ",
+                        "--dest-creds",
                         dest_registry_creds
                     ])
 
