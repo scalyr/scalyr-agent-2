@@ -20,7 +20,7 @@ from tests.end_to_end_tests.tools import TimeTracker
 log = logging.getLogger(__name__)
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def dump_info(minikube_kubectl_args, minikube_test_profile):
     """Dump usefull environment information before/after the test case."""
     minikube_version_output = check_output_with_log_debug(["minikube", "version"])
@@ -61,7 +61,7 @@ def dump_info(minikube_kubectl_args, minikube_test_profile):
         f"kubectl  get pods -A: {kubernetes_get_pods_output.decode()}\n"
         f"kubectl describe node: {describe_node_output.decode()}\n"
     )
-    log.info(f"TEST INFO:\n{info}")
+    log.info(f"CLUSTER INFO:\n{info}")
 
 
 @pytest.fixture(scope="session")
