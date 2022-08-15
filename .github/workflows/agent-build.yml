@@ -163,8 +163,7 @@ jobs:
       - name: Build image with builder '${{ matrix.builder-name }}-${{ matrix.distro-name }}'
         run: |
           python3 build_package_new.py ${{ matrix.builder-name }}-${{ matrix.distro-name }} \
-            build \
-            --output-registry-dir /tmp/result
+            build --output-registry-dir /tmp/result
 
       - name: Save registry data root with result images as artifact.
         uses: actions/upload-artifact@v3
