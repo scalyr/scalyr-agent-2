@@ -598,12 +598,12 @@ class ContainerImageBuilder(Runner):
         tags: List[str],
         user: str,
         dest_registry_host: str = None,
+        dest_registry_tls_skip_verify: bool = False,
+
     ):
         # Image names from the source registry do not have any additional tags
         source_image_names = type(self).get_all_result_image_names()
         dest_image_names = type(self).get_all_result_image_names(tags=tags)
-
-        dest_registry_host = dest_registry_host or "docker.io"
 
         published_image_names = []
 
@@ -619,7 +619,17 @@ class ContainerImageBuilder(Runner):
             ):
 
                 final_src_image_name = f"{src_registry_host}/{src_image_name}"
-                final_dest_image_name = f"{dest_registry_host}/{user}/{dest_image_name}"
+
+                final_dest_image_name = f"{user}/{dest_image_name}"
+                if dest_registry_host:
+                    final_dest_image_name = f"{dest_registry_host}/{final_dest_image_name}"
+
+                additional_options = []
+
+                if dest_registry_tls_skip_verify:
+                    additional_options.append(
+                        "--dest-tls-verify=false"
+                    )
 
                 check_call_with_log(
                     [
@@ -627,8 +637,8 @@ class ContainerImageBuilder(Runner):
                         "copy",
                         "--all",
                         "--src-tls-verify=false",
+                        *additional_options,
                         f"docker://{final_src_image_name}",
-                        "--dest-tls-verify=false",
                         f"docker://{final_dest_image_name}",
                     ],
                     description=f"Copy image '{final_src_image_name}' to '{final_dest_image_name}'",
@@ -667,6 +677,41 @@ class ContainerImageBuilder(Runner):
             required=True,
             help="Path to the directory where registry data root with result image is stored.",
         )
+        publish_parser = subparsers.add_parser(
+            "publish", help=""
+        )
+        publish_parser.add_argument(
+            "--src-registry-data-dir",
+            dest="src_registry_data_dir",
+            required=True,
+            help="Path to the directory with registry data that contains images to publish."
+        )
+        publish_parser.add_argument(
+            "--dest-registry-host",
+            dest="dest_registry_host",
+            required=False,
+            default="docker.io",
+            help="URL to the target registry to save result images."
+        )
+        publish_parser.add_argument(
+            "--dest-registry-tls-skip-verify",
+            dest="dest_registry_tls_skip_verify",
+            required=False,
+            action="store_true",
+            help="If set, skopeo (tools that publishes images) won't check for secure connection. That's needed to"
+                 "push images to local registry."
+        )
+        publish_parser.add_argument(
+            "--tags",
+            dest="tags",
+            help="Comma-separated tags to publish."
+        )
+        publish_parser.add_argument(
+            "--user",
+            dest="user",
+            required=True,
+            help="Registry user."
+        )
 
     @classmethod
     def handle_command_line_arguments(
@@ -689,6 +734,16 @@ class ContainerImageBuilder(Runner):
             exit(0)
         elif args.command == "build-container-filesystem":
             builder.build_container_filesystem(output_path=pl.Path(args.output))
+        elif args.command == "publish":
+            tags = args.tags and args.tags.split(",") or []
+
+            builder.publish(
+                src_registry_data_path=args.src_registry_data_dir,
+                tags=tags,
+                user=args.user,
+                dest_registry_host=args.dest_registry_host,
+                dest_registry_tls_skip_verify=args.dest_registry_tls_skip_verify
+            )
         else:
             if args.command is None:
                 raise RuntimeError("Unspecified command.")
