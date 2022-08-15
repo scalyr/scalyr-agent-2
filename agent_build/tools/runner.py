@@ -1279,7 +1279,7 @@ class Runner:
 
     @classmethod
     def get_all_required_steps(cls) -> List[RunnerStep]:
-        pass
+        return cls.REQUIRED_STEPS[:]
 
     @classmethod
     def get_all_cacheable_steps(cls) -> List[RunnerStep]:

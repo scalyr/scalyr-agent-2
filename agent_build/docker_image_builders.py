@@ -401,7 +401,9 @@ class ContainerImageBuilder(Runner):
 
     @classmethod
     def get_all_required_steps(cls):
-        return [cls.BASE_IMAGE_BUILDER_STEP]
+        steps = super(ContainerImageBuilder, cls).get_all_required_steps()
+        steps.append(cls.BASE_IMAGE_BUILDER_STEP)
+        return steps
 
     # def build_filesystem_tarball(self, output_dir: str):
     #     """
