@@ -40,6 +40,7 @@ jobs:
         uses: fkirc/skip-duplicate-actions@9d116fa7e55f295019cfab7e3ab72b478bcf7fdd # v4.0.0
         with:
           cancel_others: 'true'
+          concurrent_skipping: 'same_content'
           do_not_skip: '["workflow_dispatch", "schedule", "pull_request"]'
           github_token: ${{ github.token }}
 
