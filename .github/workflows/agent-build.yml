@@ -58,10 +58,10 @@ jobs:
         with:
           python-version: "3.8.13"
 
-      - name: Execute the test environment deploy runner.
-        uses: ./.github/actions/execute-runner
-        with:
-          runner-fqdn: "agent_build.__init__.BuildTestEnvironment"
+#      - name: Execute the test environment deploy runner.
+#        uses: ./.github/actions/execute-runner
+#        with:
+#          runner-fqdn: "agent_build.__init__.BuildTestEnvironment"
 
       - name: Determine if extended testing is needed
         #if: steps.skip_check.outputs.should_skip != 'true' && ( github.base_ref == 'master' || github.ref == 'master')
@@ -121,7 +121,7 @@ jobs:
       - name: "Get print job matrices."
         run: |
           echo "Image build job matrix: "
-          echo "$${{ steps.get-info.outputs.build-matrix-json }} | jq --color-output)"
+          echo "${{ steps.get-info.outputs.build-matrix-json }} | jq --color-output)"
           
 
         
