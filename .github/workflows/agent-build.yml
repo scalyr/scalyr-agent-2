@@ -190,82 +190,141 @@ jobs:
           retention-days: 1
 
 
-  test-k8s-images:
+#  test-k8s-images:
+#    needs:
+#      - build-images
+#      - pre-job
+#      - pre-build-cached-step
+#    runs-on: ${{ matrix.os }}
+#
+#    strategy:
+#      fail-fast: false
+#      # This job receives its matrix from the preparation job. The matrix itself is created by the tests/end_to_end_tests/container_image_tests/k8s_test.py module.
+#      # The matrix, for now, consists only from the 'include' part with following fields:
+#      #   "pytest-params": String with all parameters for a particular test variant which then goes to "parametrize" test cases which has to be run there.
+#      #   "builder-name": name of the builder that builds the target image.
+#      #   "distro-name": Name of the base distribution, e.g. debian, alpine on which base the resul images are built.
+#      #   "result-tarball-name": filename of the result image tarball.
+#      #   "os": Runner's OS
+#      #   "python-version": Version of the python installed on runner.
+#      matrix: ${{ fromJSON(needs.pre-job.outputs.test-matrix-json) }}
+#
+#    env:
+#      DOCKER_BUILDKIT: 1
+#      # Set this variable to tell the agent build code that it runs in CI/CD and it needs to use caching.
+#      AGENT_BUILD_IN_CICD: "1"
+#
+#    steps:
+#      - name: Checkout repository
+#        uses: actions/checkout@v3
+#
+#      - name: Install python
+#        uses: actions/setup-python@v4
+#        with:
+#          python-version: ${{ matrix.python-version }}
+#
+#      - name: Execute the test environment deploy runner.
+#        uses: ./.github/actions/execute-runner
+#        with:
+#          runner-fqdn: "agent_build.__init__.BuildTestEnvironment"
+#
+#      - name: Download registry with previously built image.
+#        uses: actions/download-artifact@v3
+#        with:
+#          name: ${{ matrix.builder-name }}-registry
+#          path: /tmp/registry
+#
+##      - name: Spin up local registry to store result images.
+##        run: |
+##          docker run -d --rm --name registry -p 5000:5000 -v /tmp/result_registry:/var/lib/registry registry:2
+#
+#      - name: Run tests
+#        shell: bash
+#        run: |
+#          python3 -m pytest  tests/end_to_end_tests/container_image_tests/k8s_test/k8s_test.py \
+#            -k ${{ matrix.pytest-params }} \
+#            --images-registry /tmp/registry \
+#            --scalyr-api-key ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }} \
+#            --scalyr-api-read-key ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }} \
+#            --test-session-suffix ${{ github.run_id }}-${{ github.run_attempt }} \
+#
+#      - name: Notify Slack on Failure
+#        # NOTE: github.ref is set to pr ref (and not branch name, e.g. refs/pull/28/merge) for pull
+#        # requests and that's why we need this special conditional and check for github.head_ref in
+#        # case of PRs
+#        if: ${{ failure() && (github.ref == 'refs/heads/master' || github.head_ref == 'master') }}
+#        uses: act10ns/slack@87c73aef9f8838eb6feae81589a6b1487a4a9e08 # v1.6.0
+#        env:
+#          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+#        with:
+#          status: ${{ job.status }}
+#          steps: ${{ toJson(steps) }}
+#          channel: '#cloud-tech'
+
+  publish-images:
+    if: ${{ github.ref == 'refs/heads/reorganise-docker-image-builders' || github.ref_type == 'tag' }}
     needs:
       - build-images
-      - pre-job
-      - pre-build-cached-step
+      #- test-k8s-images
     runs-on: ${{ matrix.os }}
-
     strategy:
-      fail-fast: false
-      # This job receives its matrix from the preparation job. The matrix itself is created by the tests/end_to_end_tests/container_image_tests/k8s_test.py module.
-      # The matrix, for now, consists only from the 'include' part with following fields:
-      #   "pytest-params": String with all parameters for a particular test variant which then goes to "parametrize" test cases which has to be run there.
-      #   "builder-name": name of the builder that builds the target image.
-      #   "distro-name": Name of the base distribution, e.g. debian, alpine on which base the resul images are built.
-      #   "result-tarball-name": filename of the result image tarball.
-      #   "os": Runner's OS
-      #   "python-version": Version of the python installed on runner.
-      matrix: ${{ fromJSON(needs.pre-job.outputs.test-matrix-json) }}
+      matrix:
+        distro-name: [ "debian", "alpine" ]
+        builder-name:
+          - docker-json
+          - docker-syslog
+          - docker-api
+          - k8s
+          - k8s-restart-agent-on-monitor-death
 
-    env:
-      DOCKER_BUILDKIT: 1
-      # Set this variable to tell the agent build code that it runs in CI/CD and it needs to use caching.
-      AGENT_BUILD_IN_CICD: "1"
+        os: [ "ubuntu-20.04" ]
+        python-version: [ "3.8.13" ]
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Install python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Execute the test environment deploy runner.
-        uses: ./.github/actions/execute-runner
-        with:
-          runner-fqdn: "agent_build.__init__.BuildTestEnvironment"
+#    steps:
+#      - name: Checkout repository
+#        uses: actions/checkout@v3
+#
+#      - name: Log in to Docker Hub
+#        uses: docker/login-action@49ed152c8eca782a232dede0303416e8f356c37b  # v2
+#        with:
+#          username: ${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}
+#          password: ${{ secrets.DOCKER_HUB_PASSWORD_TEST_ACCOUNT }}
 
       - name: Download registry with previously built image.
         uses: actions/download-artifact@v3
         with:
-          name: ${{ matrix.builder-name }}-registry
+          name: ${{ matrix.builder-name }}-${{ matrix.distro-name }}-registry
           path: /tmp/registry
 
-#      - name: Spin up local registry to store result images.
-#        run: |
-#          docker run -d --rm --name registry -p 5000:5000 -v /tmp/result_registry:/var/lib/registry registry:2
-
-      - name: Run tests
-        shell: bash
+      - name: Publish image of the builder '${{ matrix.builder-name }}-${{ matrix.distro-name }}' using master branch commit sha '${{ github.sha }}'.
+        if: github.ref_type == 'branch' && github.ref_name == 'reorganise-docker-image-builders'
         run: |
-          python3 -m pytest  tests/end_to_end_tests/container_image_tests/k8s_test/k8s_test.py \
-            -k ${{ matrix.pytest-params }} \
-            --images-registry /tmp/registry \
-            --scalyr-api-key ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }} \
-            --scalyr-api-read-key ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }} \
-            --test-session-suffix ${{ github.run_id }}-${{ github.run_attempt }} \
+          python3 build_package_new.py ${{ matrix.builder-name }}-${{ matrix.distro-name }} \
+            publish \ 
+            --src-registry-data-dir /tmp/registry \
+            --tags "${{ github.sha }}" \
+            --user ${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}
 
-      - name: Notify Slack on Failure
-        # NOTE: github.ref is set to pr ref (and not branch name, e.g. refs/pull/28/merge) for pull
-        # requests and that's why we need this special conditional and check for github.head_ref in
-        # case of PRs
-        if: ${{ failure() && (github.ref == 'refs/heads/master' || github.head_ref == 'master') }}
-        uses: act10ns/slack@87c73aef9f8838eb6feae81589a6b1487a4a9e08 # v1.6.0
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        with:
-          status: ${{ job.status }}
-          steps: ${{ toJson(steps) }}
-          channel: '#cloud-tech'
+      - name: Get content of the VERSION file to match with current tag.
+        if: github.ref_type == 'tag'
+        id: version-file
+        run: |
+          echo "::set-output name=version::$(cat VERSION | tr -d '\n' | tr -d ' ')"
 
-#  publish-images:
-#    if: ${{ github.ref == 'refs/heads/master' || github.ref_type == 'tag' }}
-#    needs:
-#      - test-images
-#
+      - name: Publish image of the builder '${{ matrix.builder-name }}-${{ matrix.distro-name }}' using production tag '{{ github.ref_name }}'.
+        if: github.ref_type == 'tag' && github.ref_name == 'steps.version-file.outputs.version'
+        run: |
+          python3 build_package_new.py ${{ matrix.builder-name }}-${{ matrix.distro-name }} \
+            publish \ 
+            --src-registry-data-dir /tmp/registry \
+            --tags "latest,${{ github.ref_name }}" \
+            --user ${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}
+      
+      
+      
+      
+
+
 #    uses: scalyr/scalyr-agent-2/.github/workflows/publish-docker-images.yml@master
 #    secrets:
 #      SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN: ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}
