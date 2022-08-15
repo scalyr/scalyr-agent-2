@@ -129,8 +129,8 @@ jobs:
         #distro-name: [ "debian", "alpine" ]
         distro-name: [ "debian"]
         builder-name:
-          - docker-json
-#          - docker-syslog
+#          - docker-json
+          - docker-syslog
 #          - docker-api
 #          - k8s
 #          - k8s-with-openmetrics
@@ -277,8 +277,8 @@ jobs:
         #distro-name: [ "debian", "alpine" ]
         distro-name: [ "debian" ]
         builder-name:
-          - docker-json
-#          - docker-syslog
+#          - docker-json
+          - docker-syslog
 #          - docker-api
 #          - k8s
 #          - k8s-restart-agent-on-monitor-death
@@ -318,7 +318,7 @@ jobs:
         run: |
           echo "::set-output name=version::$(cat VERSION | tr -d '\n' | tr -d ' ')"
 
-      - name: Publish image of the builder '${{ matrix.builder-name }}-${{ matrix.distro-name }}' using production tag '{{ github.ref_name }}'.
+      - name: Publish image of the builder '${{ matrix.builder-name }}-${{ matrix.distro-name }}' using production tag '${{ github.ref_name }}'.
         if: github.ref_type == 'tag' && github.ref_name == 'steps.version-file.outputs.version'
         run: |
           python3 build_package_new.py ${{ matrix.builder-name }}-${{ matrix.distro-name }} \
