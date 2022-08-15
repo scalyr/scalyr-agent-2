@@ -272,6 +272,7 @@ def main():
         matrix["include"].append(
             {
                 "pytest-params": f"{image_builder_name}-{kubernetes_version}-{minikube_driver}-{container_runtime}",
+                "builder-name": image_builder_name,
                 "distro-name": image_builder_cls.BASE_IMAGE_BUILDER_STEP.base_distro.name,
                 "os": "ubuntu-20.04",
                 "python-version": "3.8.13",

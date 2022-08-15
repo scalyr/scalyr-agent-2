@@ -139,9 +139,9 @@ jobs:
         with:
           driver-opts: network=host
 
-      - name: Spin up local registry to store result images.
-        run: |
-          docker run -d --rm --name registry -p 5000:5000 -v /tmp/result_registry:/var/lib/registry registry:2
+#      - name: Spin up local registry to store result images.
+#        run: |
+#          docker run -d --rm --name registry -p 5000:5000 -v /tmp/result_registry:/var/lib/registry registry:2
 
       - name: Get fqdn of the builder '${{ matrix.builder-name }}'
         id: get-builder-fqdn
@@ -181,7 +181,7 @@ jobs:
       # This job receives its matrix from the preparation job. The matrix itself is created by the tests/end_to_end_tests/container_image_tests/k8s_test.py module.
       # The matrix, for now, consists only from the 'include' part with following fields:
       #   "pytest-params": String with all parameters for a particular test variant which then goes to "parametrize" test cases which has to be run there.
-      ##   "builder-name": name of the builder that builds the target image.
+      #   "builder-name": name of the builder that builds the target image.
       #   "distro-name": Name of the base distribution, e.g. debian, alpine on which base the resul images are built.
       #   "result-tarball-name": filename of the result image tarball.
       #   "os": Runner's OS
@@ -207,22 +207,22 @@ jobs:
         with:
           runner-fqdn: "agent_build.__init__.BuildTestEnvironment"
 
-      - name: Download registry with previously built images.
+      - name: Download registry with previously built image.
         uses: actions/download-artifact@v3
         with:
-          name: ${{ matrix.distro-name }}
-          path: /tmp/result_registry
+          name: ${{ matrix.builder-name }}-${{ matrix.distro-name }}-registry
+          path: /tmp/registry
 
-      - name: Spin up local registry to store result images.
-        run: |
-          docker run -d --rm --name registry -p 5000:5000 -v /tmp/result_registry:/var/lib/registry registry:2
+#      - name: Spin up local registry to store result images.
+#        run: |
+#          docker run -d --rm --name registry -p 5000:5000 -v /tmp/result_registry:/var/lib/registry registry:2
 
       - name: Run tests
         shell: bash
         run: |
-          python3 -m pytest  tests/end_to_end_tests/container_image_tests/k8s_test.py \
-              -k ${{ matrix.pytest-params }} \
-            --images-registry localhost:5000 \
+          python3 -m pytest  tests/end_to_end_tests/container_image_tests/k8s_test/k8s_test.py \
+            -k ${{ matrix.pytest-params }} \
+            --images-registry /tmp/registry \
             --scalyr-api-key ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }} \
             --scalyr-api-read-key ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }} \
             --test-session-suffix ${{ github.run_id }}-${{ github.run_attempt }} \
