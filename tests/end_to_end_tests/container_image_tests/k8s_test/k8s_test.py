@@ -183,6 +183,8 @@ def test_agent_pod_fails_on_k8s_monitor_fail(
             f"This test now only for a special preview build '{image_builder_name}'"
         )
 
+    timeout = TimeTracker(150)
+
     cluster_role = default_cluster_role.copy()
 
     log.info(
@@ -193,7 +195,7 @@ def test_agent_pod_fails_on_k8s_monitor_fail(
     apply_agent_service_account(cluster_role=cluster_role)
 
     log.info("Starting agent daemonset.")
-    agent_pod_name = create_agent_daemonset()
+    agent_pod_name = create_agent_daemonset(time_tracker=timeout)
     time.sleep(10)
 
     agent_log = get_agent_log_content(pod_name=agent_pod_name)
@@ -214,12 +216,12 @@ def test_agent_pod_fails_on_k8s_monitor_fail(
 
         last_state = agent_cont_status.get("lastState")
         if not last_state:
-            time.sleep(10)
+            timeout.sleep(10)
             continue
 
         terminated_state = last_state.get("terminated")
         if not terminated_state:
-            time.sleep(10)
+            timeout.sleep(10)
             continue
 
         log.info("Agent container terminated.")
@@ -237,7 +239,7 @@ def test_agent_pod_fails_on_k8s_monitor_fail(
         "Agent pod restarted as expected, returning back normal serviceaccount permissions."
     )
     apply_agent_service_account(cluster_role=default_cluster_role)
-    time.sleep(5)
+    timeout.sleep(5)
     agent_log = get_agent_log_content(pod_name=agent_pod_name)
 
     assert re.search(r"Kubernetes cache initialized in \d+\.\d+ seconds", agent_log)

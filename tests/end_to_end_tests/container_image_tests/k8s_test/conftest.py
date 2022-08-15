@@ -3,7 +3,7 @@ import subprocess
 import re
 import pathlib as pl
 import json
-from typing import List
+from typing import List, Callable, Generator
 
 import pytest
 import yaml
