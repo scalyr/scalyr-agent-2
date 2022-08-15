@@ -18,7 +18,7 @@ from agent_build.docker_image_builders import (
     ALPINE_K8S_IMAGE_BUILDERS,
     ALL_DOCKER_IMAGE_BUILDERS,
 )
-from tests.end_to_end_tests.container_image_tests.k8s_test.k8s_test import (
+from tests.end_to_end_tests.container_image_tests.k8s_test.parameters import (
     TEST_PARAMS as K8S_TESTS_PARAMS,
     EXTENDED_TEST_PARAMS as K8S_EXTENDED_TEST_PARAMS,
 )
