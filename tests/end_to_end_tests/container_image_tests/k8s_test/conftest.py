@@ -543,8 +543,7 @@ def create_agent_daemonset(
         with time_tracker(20):
             while True:
                 try:
-                    get_agent_log_content(pod_name=pod_name)
-                    break
+                    return get_agent_log_content(pod_name=pod_name)
                 except subprocess.CalledProcessError:
                     time_tracker.sleep(5, message="Can not get agent's log file in time.")
 
