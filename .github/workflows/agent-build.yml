@@ -104,13 +104,18 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     strategy:
-      # This job receives its matrix from the previous job. The matrix itself is created by the agent_build/package_builder.py module.
-      # The matrix, for now, consists only from the 'include' part with following fields:
-      #   "builder-name": name of the builder that builds the target images.
-      #   "distro-name": Name of the base distribution, e.g. debian, alpine on which base the resul images are built.
-      #   "python-version": Version of python to setup on this runner. (NOTE: version of python used in images may differ, and it specified in the source code.)
-      #   "os": Runner OS.
-      matrix: ${{ fromJSON(needs.pre-job.outputs.build-matrix-json) }}
+#      # This job receives its matrix from the previous job. The matrix itself is created by the agent_build/package_builder.py module.
+#      # The matrix, for now, consists only from the 'include' part with following fields:
+#      #   "builder-name": name of the builder that builds the target images.
+#      #   "distro-name": Name of the base distribution, e.g. debian, alpine on which base the resul images are built.
+#      #   "python-version": Version of python to setup on this runner. (NOTE: version of python used in images may differ, and it specified in the source code.)
+#      #   "os": Runner OS.
+#      matrix: ${{ fromJSON(needs.pre-job.outputs.build-matrix-json) }}
+      matrix:
+        distro-name: [ "debian", "alpine" ]
+        builder-name: [ "docker-json", "docker-syslog", "docker-api", "k8s", "k8s-restart-agent-on-monitor-death" ]
+        os: [ "ubuntu:20.04" ]
+        python-version: [ "3.8.13" ]
 
     env:
       DOCKER_BUILDKIT: 1
@@ -142,31 +147,32 @@ jobs:
         run: |
           docker run -d --rm --name registry -p 5000:5000 -v /tmp/result_registry:/var/lib/registry registry:2
 
-#      - name: Get fqdn of the builder '${{ matrix.builder-name }}'
-#        id: get-builder-fqdn
-#        run: |
-#          set -e
-#          echo "::set-output name=fqdn::$(python3 build_package_new.py ${{ matrix.builder-name }} --fqdn)"
+      - name: Get fqdn of the builder '${{ matrix.builder-name }}'
+        id: get-builder-fqdn
+        run: |
+          set -e
+          echo "::set-output name=fqdn::$(python3 build_package_new.py ${{ matrix.builder-name }}-${{ matrix.distro-name }} --fqdn)"
+
 
       - name: Perform the build of the base docker images.
         uses: ./.github/actions/execute-runner
         with:
-          runner-fqdn: "agent_build.docker_image_builders.DistroBulkImageBuilder-${{ matrix.distro-name }}"
+          runner-fqdn: ${{ steps.get-builder-fqdn.outputs.fqdn }}
 
 
       # We build all images with tha same base image all at once and store all result images in a single
       # registry.
-      - name: Build images with builder '${{ matrix.builder-name }}'
+      - name: Build images with builder '${{ matrix.builder-name }}-${{ matrix.distro-name }}'
         run: |
-          python3 build_package_new.py ${{ matrix.builder-name }} \
-            --registry localhost:5000 \
-            --push
+          python3 build_package_new.py ${{ matrix.builder-name }}-${{ matrix.distro-name }} \
+            build \
+            --output-registry-dir /tmp/result
 
       - name: Save registry data root with result images as artifact.
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.distro-name }}
-          path: /tmp/result_registry
+          name: ${{ matrix.builder-name }}-${{ matrix.distro-name }}-registry
+          path: /tmp/result/registry
           retention-days: 1
 
 

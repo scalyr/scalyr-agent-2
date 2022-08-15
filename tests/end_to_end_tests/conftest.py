@@ -33,6 +33,7 @@ IN_CICD = os.environ.get("AGENT_BUILD_IN_CICD", False)
 
 log = logging.getLogger(__name__)
 
+
 def pytest_runtest_protocol(item, nextitem):
     """
     Wrap existing pytest protocol to print special grouping directive that

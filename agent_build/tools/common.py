@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import functools
 import json
 import sys
 import subprocess
@@ -19,6 +20,8 @@ import logging
 import os
 import pathlib as pl
 from typing import List, Mapping, Dict
+
+from agent_build.tools.steps_libs.container import *
 
 # If this environment variable is set, then commands output is not suppressed.
 DEBUG = bool(os.environ.get("AGENT_BUILD_DEBUG"))
@@ -59,14 +62,17 @@ else:
     shlex_join = shlex.join
 
 
-def subprocess_command_run_with_log(func):
+COMMAND_MESSAGE_PADDING = " " * 23
+
+
+def subprocess_command_run_with_log(func, debug: bool = False):
     """
     Wrapper for 'subprocess.check_call' and 'subprocess.check_output' function that also logs
     additional info when command is executed.
     :param func: Function to wrap.
     """
 
-    def wrapper(*args, on_debug: bool = False, **kwargs):
+    def wrapper(*args, description: str = None, **kwargs):
 
         global _COMMAND_COUNTER
 
@@ -83,19 +89,22 @@ def subprocess_command_run_with_log(func):
         number = _COMMAND_COUNTER
         _COMMAND_COUNTER += 1
 
-        if on_debug:
+        message = f"### RUN COMMAND #{number}: '{cmd_str}'. ###"
+
+        if description:
+            message = f"{description}\n" f"{COMMAND_MESSAGE_PADDING}{message}"
+        if debug:
             level_log = logging.debug
         else:
             level_log = logging.info
 
-        level_log(f" ### RUN COMMAND #{number}: '{cmd_str}'. ###")
+        level_log(message)
         try:
             result = func(*args, **kwargs)
         except subprocess.CalledProcessError as e:
             level_log(f" ### COMMAND #{number} FAILED. ###\n")
             raise e from None
         else:
-            level_log("\n")
             return result
 
     return wrapper
@@ -105,123 +114,12 @@ def subprocess_command_run_with_log(func):
 check_call_with_log = subprocess_command_run_with_log(subprocess.check_call)
 check_output_with_log = subprocess_command_run_with_log(subprocess.check_output)
 
-
-class DockerContainer:
-    """
-    Simple wrapper around docker container that allows to use context manager to clean up when container is not
-    needed anymore.
-    NOTE: The 'docker' library is not used on purpose, since there's only one abstraction that is needed. Using
-    docker through the docker CLI is much easier and does not require the "docker" lib as dependency.
-    """
-
-    def __init__(
-        self,
-        name: str,
-        image_name: str,
-        ports: Dict[str, str] = None,
-        mounts: List[str] = None,
-        command: List[str] = None,
-        detached: bool = True
-    ):
-        self.name = name
-        self.image_name = image_name
-        self.mounts = mounts or []
-
-        self.ports = {}
-        ports = ports or {}
-        for name, p in ports.items():
-            host, guest = p.split(":")
-            if "/" in guest:
-                guest_port, proto = guest.split("/")
-            else:
-                guest_port = guest
-                proto = "tcp"
-            self.ports[name] = f"{host}:{guest_port}/{proto}"
-        self.command = command or []
-        self.detached = detached
-
-        self.real_ports = {}
-
-    def start(self):
-
-        # Kill the previously run container, if exists.
-        self.kill()
-
-        command_args = [
-            "docker",
-            "run",
-            "-d" if self.detached else "-i",
-            "--name",
-            self.name,
-        ]
-
-        for ports in self.ports.values():
-            command_args.append("-p")
-            command_args.append(ports)
-
-        for mount in self.mounts:
-            command_args.append("-v")
-            command_args.append(mount)
-
-        command_args.append(self.image_name)
-
-        command_args.extend(self.command)
-
-        check_call_with_log(command_args)
-
-        self.real_ports = self._get_real_ports()
-
-    def kill(self):
-        check_call_with_log(["docker", "rm", "-f", self.name])
-
-    def __enter__(self):
-        self.start()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.kill()
-
-    def _get_real_ports(self):
-        output = subprocess.check_output([
-            "docker", "container", "inspect", self.name
-        ]).decode().strip()
-        container_info = json.loads(output)[0]
-        ports_info = container_info["NetworkSettings"]["Ports"]
-
-        result = {}
-        for name, ports in self.ports.items():
-            host, guest = ports.split(":")
-            host_info = ports_info[guest][0]
-            result[name] = int(host_info["HostPort"])
-
-        return result
-
-
-class LocalRegistryContainer(DockerContainer):
-    """
-    Container start runs local docker registry inside.
-    """
-
-    def __init__(
-        self, name: str, registry_port: int, registry_data_path: pl.Path = None
-    ):
-        """
-        :param name: Name of the container.
-        :param registry_port: Host port that will be mapped to the registry's port.
-        :param registry_data_path: Host directory that will be mapped to the registry's data root.
-        """
-        super(LocalRegistryContainer, self).__init__(
-            name=name,
-            image_name="registry:2",
-            ports={
-                "registry_port": f"{registry_port}:{5000}"
-            },
-            mounts=[f"{registry_data_path}:/var/lib/registry"],
-        )
-
-    @property
-    def real_registry_port(self):
-        return self.real_ports["registry_port"]
+check_call_with_log_debug = subprocess_command_run_with_log(
+    subprocess.check_call, debug=True
+)
+check_output_with_log_debug = subprocess_command_run_with_log(
+    subprocess.check_output, debug=True
+)
 
 
 class UniqueDict(dict):
@@ -229,6 +127,7 @@ class UniqueDict(dict):
     Simple dict subclass which raises error on attempt of adding existing key.
     Needed to keep tracking that
     """
+
     def __setitem__(self, key, value):
         if key in self:
             raise ValueError(f"Key '{key}' already exists.")

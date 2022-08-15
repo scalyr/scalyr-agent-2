@@ -39,9 +39,7 @@ def pytest_generate_tests(metafunc):
     parametrize test case according to which image has to be tested.
     """
     image_builder_name = metafunc.config.getoption("image_builder_name")
-    metafunc.parametrize(
-        ["image_builder_cls"], [[image_builder_name]], indirect=True
-    )
+    metafunc.parametrize(["image_builder_cls"], [[image_builder_name]], indirect=True)
 
 
 def _call_docker(cmd_args: List[str]):
@@ -65,9 +63,14 @@ def docker_server_hostname(image_name, test_session_suffix):
     return f"{image_name}-test-{test_session_suffix}"
 
 
-
 @pytest.fixture(scope="session")
-def start_agent_container(agent_container_name, scalyr_api_key,full_image_name, tmp_path_factory, docker_server_hostname):
+def start_agent_container(
+    agent_container_name,
+    scalyr_api_key,
+    full_image_name,
+    tmp_path_factory,
+    docker_server_hostname,
+):
     """
     Returns function which starts agent docker container.
     """
@@ -78,33 +81,31 @@ def start_agent_container(agent_container_name, scalyr_api_key,full_image_name, 
     extra_config_path = tmp_path_factory.mktemp("extra-config") / "server_host.json"
 
     extra_config_path.write_text(
-        json.dumps({
-            "server_attributes": {
-                "serverHost": docker_server_hostname
-            }
-        })
+        json.dumps({"server_attributes": {"serverHost": docker_server_hostname}})
     )
 
     def start():
         # Run agent inside the container.
-        _call_docker([
-            "run",
-            "-d",
-            "--name",
-            agent_container_name,
-            "-e",
-            f"SCALYR_API_KEY={scalyr_api_key}",
-            "-v",
-            "/var/run/docker.sock:/var/scalyr/docker.sock",
-            "-v",
-            "/var/lib/docker/containers:/var/lib/docker/containers",
-            # mount extra config
-            "-v",
-            f"{extra_config_path}:/etc/scalyr-agent-2/agent.d/{extra_config_path.name}",
-            # "--platform",
-            # architecture.as_docker_platform.value,
-            full_image_name,
-        ])
+        _call_docker(
+            [
+                "run",
+                "-d",
+                "--name",
+                agent_container_name,
+                "-e",
+                f"SCALYR_API_KEY={scalyr_api_key}",
+                "-v",
+                "/var/run/docker.sock:/var/scalyr/docker.sock",
+                "-v",
+                "/var/lib/docker/containers:/var/lib/docker/containers",
+                # mount extra config
+                "-v",
+                f"{extra_config_path}:/etc/scalyr-agent-2/agent.d/{extra_config_path.name}",
+                # "--platform",
+                # architecture.as_docker_platform.value,
+                full_image_name,
+            ]
+        )
 
     yield start
     _call_docker(["kill", agent_container_name])
@@ -124,18 +125,19 @@ def start_counter_writer_container(counter_writer_container_name):
     """
     _call_docker(["rm", "-f", counter_writer_container_name])
 
-
     def start():
-        _call_docker([
-            "run",
-            "-d",
-            "--name",
-            counter_writer_container_name,
-            "ubuntu:20.04",
-            "bin/bash",
-            "-c",
-            "for i in {0..999}; do echo $i; done; sleep 10000"
-        ])
+        _call_docker(
+            [
+                "run",
+                "-d",
+                "--name",
+                counter_writer_container_name,
+                "ubuntu:20.04",
+                "bin/bash",
+                "-c",
+                "for i in {0..999}; do echo $i; done; sleep 10000",
+            ]
+        )
 
     yield start
     # cleanup.
@@ -146,14 +148,16 @@ def _get_agent_log_content(container_name: str) -> str:
     """
     Read content of the agent log file in the agent's container.
     """
-    return check_output_with_log([
-        "docker",
-        "exec",
-        "-i",
-        container_name,
-        "cat",
-        "/var/log/scalyr-agent-2/agent.log"
-    ]).decode()
+    return check_output_with_log(
+        [
+            "docker",
+            "exec",
+            "-i",
+            container_name,
+            "cat",
+            "/var/log/scalyr-agent-2/agent.log",
+        ]
+    ).decode()
 
 
 def test(
@@ -166,10 +170,12 @@ def test(
     scalyr_server,
     start_agent_container,
     start_counter_writer_container,
-    docker_server_hostname
+    docker_server_hostname,
 ):
 
-    log.info(f"Starting test. Scalyr logs can be found by the host name: {docker_server_hostname}")
+    log.info(
+        f"Starting test. Scalyr logs can be found by the host name: {docker_server_hostname}"
+    )
     start_agent_container()
 
     # Wait a little
@@ -181,12 +187,26 @@ def test(
 
     # Pre-create the agent log file so the tail command wont fail before the agent starts.
     _call_docker(
-        ["exec", "-i", agent_container_name, "touch", "/var/log/scalyr-agent-2/agent.log"]
+        [
+            "exec",
+            "-i",
+            agent_container_name,
+            "touch",
+            "/var/log/scalyr-agent-2/agent.log",
+        ]
     )
 
     # Quick check for the `scalyr-agent-2-config script.
     export_config_output = subprocess.check_output(
-        ["docker", "exec", "-i", agent_container_name, "scalyr-agent-2-config", "--export-config", "-"]
+        [
+            "docker",
+            "exec",
+            "-i",
+            agent_container_name,
+            "scalyr-agent-2-config",
+            "--export-config",
+            "-",
+        ]
     )
     assert len(export_config_output) > 0
 
@@ -194,12 +214,14 @@ def test(
     verify_logs(
         scalyr_api_read_key=scalyr_api_read_key,
         scalyr_server=scalyr_server,
-        get_agent_log_content=functools.partial(_get_agent_log_content, container_name=agent_container_name),
+        get_agent_log_content=functools.partial(
+            _get_agent_log_content, container_name=agent_container_name
+        ),
         # Since the test writer pod writes plain text counters, set this count getter.
         counter_getter=lambda e: int(e["message"].rstrip("\n")),
         counters_verification_query_filters=[
             f"$containerName=='{counter_writer_container_name}'",
-            f"$serverHost=='{docker_server_hostname}'"
+            f"$serverHost=='{docker_server_hostname}'",
         ],
     )
 

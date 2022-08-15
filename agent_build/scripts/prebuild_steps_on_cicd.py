@@ -28,9 +28,9 @@ for builder in DOCKER_IMAGE_BUILDERS.values():
 
 ALL_STEP_BUILDERS = []
 for step_id, step in ALL_STEPS_TO_PREBUILD.items():
+
     class StepWrapperRunner(Runner):
         REQUIRED_STEPS = [step]
-
 
     StepWrapperRunner.assign_fully_qualified_name(
         class_name=StepWrapperRunner.__name__,
@@ -39,10 +39,8 @@ for step_id, step in ALL_STEPS_TO_PREBUILD.items():
     )
     ALL_STEP_BUILDERS.append(StepWrapperRunner)
 
-if __name__ == '__main__':
-    matrix = {
-        "include": []
-    }
+if __name__ == "__main__":
+    matrix = {"include": []}
 
     for builder in ALL_STEP_BUILDERS:
         matrix["include"].append(

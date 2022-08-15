@@ -31,11 +31,12 @@ sys.path.append(str(SOURCE_ROOT))
 from agent_build.tools.runner import Runner
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     from agent_build.tools import common
+
     common.init_logging()
 
-    base_parser  = argparse.ArgumentParser()
+    base_parser = argparse.ArgumentParser()
     base_parser.add_argument("builder_class_fqdn")
     base_args, other_args = base_parser.parse_known_args()
 
@@ -51,4 +52,3 @@ if __name__ == '__main__':
     args = parser.parse_args(args=other_args)
 
     builder_cls.handle_command_line_arguments(args=args)
-

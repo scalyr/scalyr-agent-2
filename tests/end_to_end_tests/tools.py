@@ -152,5 +152,3 @@ class TimeTracker:
         if time.time() + delay >= timeout_time:
             raise TimeoutError(message)
         time.sleep(delay)
-
-

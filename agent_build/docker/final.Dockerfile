@@ -1,10 +1,9 @@
 ARG BASE_IMAGE_NAME
-ARG TARGETPLATFORM
 ARG IMAGE_TYPE_STAGE_NAME
 ARG PYTHON_BASE_IMAGE
 
 
-FROM ${BASE_IMAGE_NAME}:${TARGETOS}-${TARGETARCH}-${TARGETVARIANT} as scalyr-build
+FROM ${BASE_IMAGE_NAME} as scalyr-build
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
 ADD . /scalyr-agent-2
@@ -12,11 +11,7 @@ ADD . /scalyr-agent-2
 ARG BUILDER_FQDN
 
 # Build the tarball with Agent's files.
-RUN AGENT_BUILD_IN_DOCKER=1 python3 /scalyr-agent-2/agent_build/scripts/runner_helper.py ${BUILDER_FQDN} --only-filesystem-tarball /tmp/build/scalyr-agent.tar.gz
-
-# Extract tarball to the special place that can be reused by next stages.
-WORKDIR /tmp/container-fs
-RUN tar -xf /tmp/build/scalyr-agent.tar.gz
+RUN AGENT_BUILD_IN_DOCKER=1 python3 /scalyr-agent-2/agent_build/scripts/runner_helper.py ${BUILDER_FQDN} build-container-filesystem --output /tmp/container-fs
 
 WORKDIR /
 
@@ -27,10 +22,9 @@ MAINTAINER Scalyr Inc <support@scalyr.com>
 # which is given by 'BASE_IMAGE' arg.
 COPY --from=scalyr-build  /tmp/dependencies/ /
 # Copy Agent files.
-COPY --from=scalyr-build /tmp/container-fs /
+COPY --from=scalyr-build /tmp/container-fs/root /
 
 
-# Optional stage for docker-json.
 FROM scalyr-base as build-common
 MAINTAINER Scalyr Inc <support@scalyr.com>
 # Nothing to add

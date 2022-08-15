@@ -23,6 +23,7 @@
 STEP_SCRIPT_PATH="$1"
 CACHE_DIR="$2"
 STEP_OUTPUT_PATH="$3"
+SCRIPT_TYPE="$4"
 
 set -e
 
@@ -128,6 +129,10 @@ export SOURCE_ROOT
 export STEP_OUTPUT_PATH
 
 # Run the script.
-. "${STEP_SCRIPT_PATH}"
+if [ "${SCRIPT_TYPE}" = "shell" ]; then
+  . "${STEP_SCRIPT_PATH}"
+else
+  ${STEP_SCRIPT_PATH}
+fi
 
 log "=========== The Runner Step Script '$(basename "$STEP_SCRIPT_PATH")' is successfully ended ==========="

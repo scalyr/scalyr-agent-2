@@ -46,5 +46,5 @@ docker buildx build \
   --build-arg "PYTHON_BASE_IMAGE=${PYTHON_BASE_IMAGE}" \
   --build-arg "DISTRO_NAME=${DISTRO_NAME}" \
   --build-arg "COVERAGE_VERSION=${COVERAGE_VERSION}" \
-  --output "type=oci, dest=${STEP_OUTPUT_PATH}/${RESULT_IMAGE_TARBALL_NAME}" \
+  --output "type=oci,dest=${STEP_OUTPUT_PATH}/${RESULT_IMAGE_TARBALL_NAME}" \
   ${SOURCE_ROOT}

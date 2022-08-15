@@ -31,8 +31,6 @@ log = logging.getLogger(__name__)
 AGENT_LOG_LINE_TIMESTAMP = r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+Z"
 
 
-
-
 def preprocess_agent_log_messages(content: str):
 
     lines = content.splitlines(keepends=True)
@@ -86,7 +84,10 @@ def check_agent_log_for_errors(content: str):
                         to_fail = False
                         log.info(f"Ignored error: {whole_error}")
                         break
-            elif "get current leader: Temporary error seen while accessing api:" in message:
+            elif (
+                "get current leader: Temporary error seen while accessing api:"
+                in message
+            ):
                 errors_to_ignore = [
                     "socket.gaierror: [Errno -3] Try again",
                     "socket.gaierror: [Errno -3] Temporary failure in name resolution",
@@ -243,7 +244,9 @@ def verify_logs(
     first_check_agent_log_content = agent_log_content
     if not first_check_agent_log_content.endswith("\n"):
         # Get only complete lines.
-        first_check_agent_log_content = first_check_agent_log_content.rsplit(os.linesep, 1)[0]
+        first_check_agent_log_content = first_check_agent_log_content.rsplit(
+            os.linesep, 1
+        )[0]
     check_agent_log_for_errors(content=first_check_agent_log_content)
 
     log.info("Wait for agent log requests stats...")
@@ -254,7 +257,7 @@ def verify_logs(
             time_tracker.sleep(10)
 
     log.info(
-        "Verify that previously written test log file content has been uploaded to server."
+        "Verify that previously written counter messages have been uploaded to server."
     )
     while True:
         resp = ScalyrQueryRequest(
@@ -306,7 +309,9 @@ def verify_logs(
 
     # Do a final error check for agent log.
     # We also replace agent log part from the first check, so it will check only new lines.
-    second_check_agent_log_content = get_agent_log_content().replace(first_check_agent_log_content, "")
+    second_check_agent_log_content = get_agent_log_content().replace(
+        first_check_agent_log_content, ""
+    )
     check_agent_log_for_errors(content=second_check_agent_log_content)
 
 

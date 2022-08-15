@@ -104,7 +104,7 @@ def cat_files(file_paths, destination, convert_newlines=False):
 
 
 def _add_certs(
-        path: Union[str, pl.Path], intermediate_certs=True, copy_other_certs=True
+    path: Union[str, pl.Path], intermediate_certs=True, copy_other_certs=True
 ):
     """
     Create needed certificates files in the specified path.
@@ -127,9 +127,9 @@ def _add_certs(
 
 
 def add_config(
-        base_config_source_path: Union[str, pl.Path],
-        output_path: Union[str, pl.Path],
-        additional_config_paths: List[pl.Path] = None,
+    base_config_source_path: Union[str, pl.Path],
+    output_path: Union[str, pl.Path],
+    additional_config_paths: List[pl.Path] = None,
 ):
     """
     Copy config folder from the specified path to the target path.
@@ -183,8 +183,8 @@ def get_build_info():
         try:
             packager_email = (
                 subprocess.check_output("git config user.email", shell=True)
-                    .decode()
-                    .strip()
+                .decode()
+                .strip()
             )
         except subprocess.CalledProcessError:
             packager_email = "unknown"
@@ -196,8 +196,8 @@ def get_build_info():
             subprocess.check_output(
                 "git log --summary -1 | head -n 1 | cut -d ' ' -f 2", shell=True
             )
-                .decode()
-                .strip()
+            .decode()
+            .strip()
         )
 
         build_info["latest_commit"] = commit_id
@@ -205,15 +205,13 @@ def get_build_info():
         # Include the branch just for safety sake.
         branch = (
             subprocess.check_output("git branch | cut -d ' ' -f 2", shell=True)
-                .decode()
-                .strip()
+            .decode()
+            .strip()
         )
         build_info["from_branch"] = branch
 
         # Add a timestamp.
-        build_info["build_time"] = time.strftime(
-            "%Y-%m-%d %H:%M:%S UTC", time.gmtime()
-        )
+        build_info["build_time"] = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
 
         return build_info
     finally:
@@ -228,11 +226,11 @@ def get_install_info(install_type: str) -> dict:
 
 
 def build_agent_base_files(
-        output_path: pl.Path,
-        install_type: str,
-        version: str = None,
-        frozen_binary_path: pl.Path = None,
-        copy_agent_source: bool = False
+    output_path: pl.Path,
+    install_type: str,
+    version: str = None,
+    frozen_binary_path: pl.Path = None,
+    copy_agent_source: bool = False,
 ):
     """
     Create directory with agent's core files.
@@ -253,35 +251,26 @@ def build_agent_base_files(
     # Copy the monitors directory.
     monitors_path = output_path / "monitors"
     shutil.copytree(SOURCE_ROOT / "monitors", monitors_path)
-    recursively_delete_files_by_name(
-        output_path / monitors_path, "README.md"
-    )
+    recursively_delete_files_by_name(output_path / monitors_path, "README.md")
 
     # Add VERSION file.
     result_version_path = output_path / "VERSION"
     if version:
         result_version_path.write_text(version)
     else:
-        shutil.copy2(
-            SOURCE_ROOT / "VERSION", output_path / "VERSION"
-        )
+        shutil.copy2(SOURCE_ROOT / "VERSION", output_path / "VERSION")
 
     # Create bin directory with executables.
     bin_path = output_path / "bin"
 
     if frozen_binary_path:
-        shutil.copytree(
-            frozen_binary_path / ".",
-            bin_path
-        )
+        shutil.copytree(frozen_binary_path / ".", bin_path)
 
     elif copy_agent_source:
         bin_path.mkdir()
         source_code_path = output_path / "py"
 
-        shutil.copytree(
-            SOURCE_ROOT / "scalyr_agent", source_code_path / "scalyr_agent"
-        )
+        shutil.copytree(SOURCE_ROOT / "scalyr_agent", source_code_path / "scalyr_agent")
 
         agent_main_executable_path = bin_path / "scalyr-agent-2"
         agent_main_executable_path.symlink_to(
@@ -298,9 +287,7 @@ def build_agent_base_files(
         install_info_path = source_code_path / "scalyr_agent" / "install_info.json"
 
         install_info = get_install_info(install_type=install_type)
-        install_info_path.write_text(
-            json.dumps(install_info)
-        )
+        install_info_path.write_text(json.dumps(install_info))
 
         # Don't include the tests directories.  Also, don't include the .idea directory created by IDE.
         recursively_delete_dirs_by_name(
@@ -317,11 +304,11 @@ def build_agent_base_files(
 
 
 def build_linux_agent_files(
-        output_path: pl.Path,
-        install_type: str,
-        version: str = None,
-        frozen_binary_path: pl.Path = None,
-        copy_agent_source: bool = False
+    output_path: pl.Path,
+    install_type: str,
+    version: str = None,
+    frozen_binary_path: pl.Path = None,
+    copy_agent_source: bool = False,
 ):
     """
     Extend agent core files with files that are common for all Linux based distributions.
@@ -340,7 +327,7 @@ def build_linux_agent_files(
         install_type=install_type,
         version=version,
         frozen_binary_path=frozen_binary_path,
-        copy_agent_source=copy_agent_source
+        copy_agent_source=copy_agent_source,
     )
 
     # Add certificates.
@@ -358,10 +345,10 @@ def build_linux_agent_files(
 
 
 def build_linux_lfs_agent_files(
-        output_path: pl.Path,
-        version: str = None,
-        frozen_binary_path: pl.Path = None,
-        copy_agent_source: bool = False,
+    output_path: pl.Path,
+    version: str = None,
+    frozen_binary_path: pl.Path = None,
+    copy_agent_source: bool = False,
 ):
     """
     Adapt agent's Linux based files for LFS based packages such DEB,RPM or for the filesystems for our docker images.
@@ -378,7 +365,7 @@ def build_linux_lfs_agent_files(
         install_type="package",
         version=version,
         frozen_binary_path=frozen_binary_path,
-        copy_agent_source=copy_agent_source
+        copy_agent_source=copy_agent_source,
     )
 
     pl.Path(output_path, "var/log/scalyr-agent-2").mkdir(parents=True)
@@ -397,7 +384,9 @@ def build_linux_lfs_agent_files(
     )
     agent_binary_symlink_path.symlink_to(frozen_binary_symlink_target_path)
 
-    scalyr_agent_config_symlink_path = output_path / "usr/sbin" / "scalyr-agent-2-config"
+    scalyr_agent_config_symlink_path = (
+        output_path / "usr/sbin" / "scalyr-agent-2-config"
+    )
     scalyr_agent_config_symlink_target_path = pl.Path(
         "..", "share", "scalyr-agent-2", "bin", "scalyr-agent-2-config"
     )

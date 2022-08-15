@@ -101,6 +101,7 @@ def agent_environment(test_config, agent_env_settings_fields):
     Set essential environment variables for test function and unset the after.
     """
     from scalyr_agent import compat
+
     agent_settings = test_config.get("agent_settings", dict())
     for name in agent_env_settings_fields:
         value = compat.os_environ_unicode.get(name, agent_settings.get(name))
