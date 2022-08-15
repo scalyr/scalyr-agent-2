@@ -324,7 +324,7 @@ jobs:
       
 
       - name: Publish image of the builder '${{ matrix.builder-name }}-${{ matrix.distro-name }}' using production tag '${{ github.ref_name }}'.
-        if: github.ref_type == 'tag' && github.ref_name == steps.version-file.outputs.version
+        if: github.ref_type == 'tag' && github.ref_name == 'v${{steps.version-file.outputs.version}}'
         run: |
           python3 build_package_new.py ${{ matrix.builder-name }}-${{ matrix.distro-name }} \
             publish \
