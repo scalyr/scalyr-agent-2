@@ -23,6 +23,7 @@ import pytest
 
 from tests.end_to_end_tests.verify import verify_logs, ScalyrQueryRequest
 from tests.end_to_end_tests.tools import TimeTracker
+from tests.end_to_end_tests.container_image_tests.k8s_test.parameters import TEST_PARAMS, EXTENDED_TEST_PARAMS
 
 from agent_build.docker_image_builders import (
     K8S_DEFAULT_BUILDERS,
@@ -37,44 +38,6 @@ pytestmark = [
     pytest.mark.timeout(60 * 1000),
     pytest.mark.usefixtures("dump_info"),
 ]
-
-DEFAULT_KUBERNETES_VERSION = {
-    "kubernetes_version": "v1.22.7",
-    "minikube_driver": "",
-    "container_runtime": "docker",
-}
-
-KUBERNETES_VERSIONS = [
-    {
-        "kubernetes_version": "v1.20.15",
-        "minikube_driver": "",
-        "container_runtime": "docker",
-    },
-    {
-        "kubernetes_version": "v1.21.10",
-        "minikube_driver": "",
-        "container_runtime": "docker",
-    },
-    DEFAULT_KUBERNETES_VERSION,
-    {
-        "kubernetes_version": "v1.23.4",
-        "minikube_driver": "docker",
-        "container_runtime": "containerd",
-    },
-    {
-        "kubernetes_version": "v1.24.0",
-        "minikube_driver": "docker",
-        "container_runtime": "containerd",
-    },
-    {
-        "kubernetes_version": "v1.17.17",
-        "minikube_driver": "",
-        "container_runtime": "docker",
-    },
-]
-
-PARAMS = []
-EXTENDED_PARAMS = []
 
 # for builder_name, builder_cls in DOCKER_IMAGE_BUILDERS.items():
 #
@@ -102,20 +65,7 @@ EXTENDED_PARAMS = []
 #         EXTENDED_PARAMS.append(builder_params)
 #         PARAMS.append(builder_params)
 
-for builder_cls in K8S_DEFAULT_BUILDERS:
-    PARAMS.append(
-        {"image_builder_name": builder_cls.get_name(), **DEFAULT_KUBERNETES_VERSION}
-    )
 
-DEFAULT_K8S_IMAGE_BUILDER = ALL_DOCKER_IMAGE_BUILDERS["k8s-debian"]
-
-EXTENDED_PARAMS = PARAMS.copy()
-for k_v in KUBERNETES_VERSIONS:
-    EXTENDED_PARAMS.append(
-        {"image_builder_name": DEFAULT_K8S_IMAGE_BUILDER.get_name(), **k_v}
-    )
-for builder_cls in K8S_EXTENDED_BUILDERS:
-    PARAMS.append({"image_builder_name": builder_cls.get_name(), **DEFAULT_KUBERNETES_VERSION})
 
 
 def pytest_generate_tests(metafunc):
@@ -127,7 +77,7 @@ def pytest_generate_tests(metafunc):
     ]
 
     final_params = []
-    for p in EXTENDED_PARAMS:
+    for p in EXTENDED_TEST_PARAMS:
         final_params.append([p[name] for name in param_names])
 
     metafunc.parametrize(param_names, final_params, indirect=True)

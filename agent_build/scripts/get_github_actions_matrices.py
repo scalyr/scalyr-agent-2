@@ -19,8 +19,8 @@ from agent_build.docker_image_builders import (
     ALL_DOCKER_IMAGE_BUILDERS,
 )
 from tests.end_to_end_tests.container_image_tests.k8s_test.k8s_test import (
-    PARAMS as K8S_TESTS_PARAMS,
-    EXTENDED_PARAMS as K8S_EXTENDED_TEST_PARAMS,
+    TEST_PARAMS as K8S_TESTS_PARAMS,
+    EXTENDED_TEST_PARAMS as K8S_EXTENDED_TEST_PARAMS,
 )
 
 DEFAULT_IMAGE_BUILDERS = DEBIAN_IMAGE_BUILDERS[:]
