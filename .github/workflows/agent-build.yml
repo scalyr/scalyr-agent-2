@@ -114,7 +114,7 @@ jobs:
           exit 0
           echo "Test job matrix: "
           echo "$(python3 -m tests.end_to_end_tests.container_image_tests.k8s_test.k8s_test)"
-          echo "::set-output name=test-matrix-json::$(python3 -m tests.end_to_end_tests.container_image_tests.k8s_test.k8s_test --extended)"
+          echo "::set-output name=test-matrix-json::$(python3 -m tests.end_to_end_tests.container_image_tests.k8s_test.k8s_test image_build_matrix --extended)"
           python3 -m agent_build.scripts.prebuild_steps_on_cicd > pre_built_cached_steps_matrix.txt
           echo "::set-output name=pre-built-cached-steps-matrix::$(cat pre_built_cached_steps_matrix.txt)"
 
