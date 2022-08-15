@@ -24,9 +24,9 @@ jobs:
   pre-job:
     runs-on: ubuntu-20.04
     outputs:
-      pre-built-cached-steps-matrix: ${{ steps.get-job-matrices.outputs.pre-built-cached-steps-matrix }}
-      build-matrix-json: ${{ steps.get-job-matrices.outputs.build-matrix-json }}
-      test-matrix-json: ${{ steps.get-job-matrices.outputs.test-matrix-json }}
+      pre-built-cached-steps-matrix: ${{ steps.get-info.outputs.pre-built-cached-steps-matrix }}
+      build-matrix-json: ${{ steps.get-info.outputs.build-matrix-json }}
+      test-matrix-json: ${{ steps.get-info.outputs.test-matrix-json }}
 
     steps:
       - name: Checkout repository
@@ -43,7 +43,7 @@ jobs:
           runner-fqdn: "agent_build.__init__.BuildTestEnvironment"
 
       - name: "Get build and test job matrices."
-        id: get-job-matrices
+        id: get-info
         run: |
           set -e 
           echo "Test job matrix: "
@@ -51,14 +51,19 @@ jobs:
           echo "::set-output name=test-matrix-json::$(python3 -m tests.end_to_end_tests.container_image_tests.k8s_test.k8s_test --extended)"
           python3 -m agent_build.scripts.prebuild_steps_on_cicd > pre_built_cached_steps_matrix.txt
           echo "::set-output name=pre-built-cached-steps-matrix::$(cat pre_built_cached_steps_matrix.txt)"
-      
-      - name: Cache Primes
-        id: cache-primes
-        uses: actions/cache@v3
-        with:
-          path: prime-numbers
-          key: ${{ runner.os }}-primes
-      
+
+#      - name: Cache checksum of the agent_build package in order to track and run tests on changes.
+#        id: check-agent-build-changes
+#        uses: actions/cache@v3
+#        with:
+#          path: prime-numbers
+#          key: ${{ hashFiles('agent_build/**/*') }}
+#
+#      - name: Run agent_build tests.
+#        if: steps.check-agent-build-changes.outputs.cache-hit != 'true'
+#        run: |
+#          pytest
+#
 
   pre-build-cached-step:
     name: ${{ matrix.name }}
@@ -118,7 +123,14 @@ jobs:
 #      matrix: ${{ fromJSON(needs.pre-job.outputs.build-matrix-json) }}
       matrix:
         distro-name: [ "debian", "alpine" ]
-        builder-name: [ "docker-json", "docker-syslog", "docker-api", "k8s", "k8s-restart-agent-on-monitor-death" ]
+        builder-name:
+          - docker-json
+          - docker-syslog
+          - docker-api
+          - k8s
+          - k8s-with-openmetrics
+          - k8s-restart-agent-on-monitor-death
+
         os: [ "ubuntu-20.04" ]
         python-version: [ "3.8.13" ]
 
@@ -235,7 +247,6 @@ jobs:
             --scalyr-api-key ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }} \
             --scalyr-api-read-key ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }} \
             --test-session-suffix ${{ github.run_id }}-${{ github.run_attempt }} \
-            -s
 
       - name: Notify Slack on Failure
         # NOTE: github.ref is set to pr ref (and not branch name, e.g. refs/pull/28/merge) for pull
