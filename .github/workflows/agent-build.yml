@@ -302,7 +302,7 @@ jobs:
         if: github.ref_type == 'branch' && github.ref_name == 'reorganise-docker-image-builders'
         run: |
           python3 build_package_new.py ${{ matrix.builder-name }}-${{ matrix.distro-name }} \
-            publish \ 
+            publish \
             --src-registry-data-dir /tmp/registry \
             --tags "${{ github.sha }}" \
             --user ${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}
