@@ -63,16 +63,6 @@ jobs:
         with:
           runner-fqdn: "agent_build.__init__.BuildTestEnvironment"
 
-      - name: "Get build and test job matrices."
-        id: get-info
-        run: |
-          set -e 
-          echo "Test job matrix: "
-          echo "$(python3 -m tests.end_to_end_tests.container_image_tests.k8s_test.k8s_test)"
-          echo "::set-output name=test-matrix-json::$(python3 -m tests.end_to_end_tests.container_image_tests.k8s_test.k8s_test --extended)"
-          python3 -m agent_build.scripts.prebuild_steps_on_cicd > pre_built_cached_steps_matrix.txt
-          echo "::set-output name=pre-built-cached-steps-matrix::$(cat pre_built_cached_steps_matrix.txt)"
-
       - name: Determine if extended testing is needed
         #if: steps.skip_check.outputs.should_skip != 'true' && ( github.base_ref == 'master' || github.ref == 'master')
         run: |
@@ -111,6 +101,28 @@ jobs:
         if: steps.check-pull-request.outputs.is-extended == 'true' || steps.check-branch.outputs.is-extended == 'true' || steps.check-tag.outputs.is-extended == 'true'
         run: |
           echo "::set-output name=is-extended::true"
+          echo "::set-output name=build-mode-option::--extended"
+      
+
+      - name: "Get build and test job matrices."
+        id: get-info
+        run: |
+          set -e
+          echo "::set-output name=build-matrix-json::$(python3 python3 agent_build/scripts/get_github_actions_matrices.py $${{ steps.extended-check.outputs.build-mode-option }})"
+          
+          exit 0
+          echo "Test job matrix: "
+          echo "$(python3 -m tests.end_to_end_tests.container_image_tests.k8s_test.k8s_test)"
+          echo "::set-output name=test-matrix-json::$(python3 -m tests.end_to_end_tests.container_image_tests.k8s_test.k8s_test --extended)"
+          python3 -m agent_build.scripts.prebuild_steps_on_cicd > pre_built_cached_steps_matrix.txt
+          echo "::set-output name=pre-built-cached-steps-matrix::$(cat pre_built_cached_steps_matrix.txt)"
+
+      - name: "Get print job matrices."
+        run: |
+          echo "Image build job matrix: "
+          echo "$${{ steps.get-info.outputs.build-matrix-json }} | jq --color-output)"
+          
+
         
         
           

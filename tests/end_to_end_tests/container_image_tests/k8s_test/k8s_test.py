@@ -25,7 +25,9 @@ from tests.end_to_end_tests.verify import verify_logs, ScalyrQueryRequest
 from tests.end_to_end_tests.tools import TimeTracker
 
 from agent_build.docker_image_builders import (
-    DOCKER_IMAGE_BUILDERS,
+    K8S_DEFAULT_BUILDERS,
+    K8S_EXTENDED_BUILDERS,
+    ALL_DOCKER_IMAGE_BUILDERS,
 )
 
 log = logging.getLogger(__name__)
@@ -74,31 +76,46 @@ KUBERNETES_VERSIONS = [
 PARAMS = []
 EXTENDED_PARAMS = []
 
-for builder_name, builder_cls in DOCKER_IMAGE_BUILDERS.items():
+# for builder_name, builder_cls in DOCKER_IMAGE_BUILDERS.items():
+#
+#     base_distro = builder_cls.BASE_IMAGE_BUILDER_STEP.base_distro
+#     if base_distro.name == "debian":
+#         kubernetes_versions_to_test = KUBERNETES_VERSIONS[:]
+#     else:
+#         kubernetes_versions_to_test = [DEFAULT_KUBERNETES_VERSION]
+#
+#     if "k8s" not in builder_name:
+#         continue
+#
+#     builder_params = {
+#         "image_builder_name": builder_name,
+#         **DEFAULT_KUBERNETES_VERSION,
+#     }
+#
+#     if builder_name == f"k8s-{base_distro.name}" and base_distro.name == "debian":
+#         # If this is a "main build", aka 'k8s-debian' then also apply different platform testing
+#         # in extended test mode.
+#         for k_v in KUBERNETES_VERSIONS:
+#             EXTENDED_PARAMS.append({"image_builder_name": builder_name, **k_v})
+#         PARAMS.append(builder_params)
+#     else:
+#         EXTENDED_PARAMS.append(builder_params)
+#         PARAMS.append(builder_params)
 
-    base_distro = builder_cls.BASE_IMAGE_BUILDER_STEP.base_distro
-    if base_distro.name == "debian":
-        kubernetes_versions_to_test = KUBERNETES_VERSIONS[:]
-    else:
-        kubernetes_versions_to_test = [DEFAULT_KUBERNETES_VERSION]
+for builder_cls in K8S_DEFAULT_BUILDERS:
+    PARAMS.append(
+        {"image_builder_name": builder_cls.get_name(), **DEFAULT_KUBERNETES_VERSION}
+    )
 
-    if "k8s" not in builder_name:
-        continue
+DEFAULT_K8S_IMAGE_BUILDER = ALL_DOCKER_IMAGE_BUILDERS["k8s-debian"]
 
-    builder_params = {
-        "image_builder_name": builder_name,
-        **DEFAULT_KUBERNETES_VERSION,
-    }
-
-    if builder_name == f"k8s-{base_distro.name}" and base_distro.name == "debian":
-        # If this is a "main build", aka 'k8s-debian' then also apply different platform testing
-        # in extended test mode.
-        for k_v in KUBERNETES_VERSIONS:
-            EXTENDED_PARAMS.append({"image_builder_name": builder_name, **k_v})
-        PARAMS.append(builder_params)
-    else:
-        EXTENDED_PARAMS.append(builder_params)
-        PARAMS.append(builder_params)
+EXTENDED_PARAMS = PARAMS.copy()
+for k_v in KUBERNETES_VERSIONS:
+    EXTENDED_PARAMS.append(
+        {"image_builder_name": DEFAULT_K8S_IMAGE_BUILDER.get_name(), **k_v}
+    )
+for builder_cls in K8S_EXTENDED_BUILDERS:
+    PARAMS.append({"image_builder_name": builder_cls.get_name(), **DEFAULT_KUBERNETES_VERSION})
 
 
 def pytest_generate_tests(metafunc):

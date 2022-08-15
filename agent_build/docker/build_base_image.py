@@ -20,7 +20,8 @@ import re
 import subprocess
 
 from agent_build.tools.steps_libs.container import LocalRegistryContainer
-#from agent_build.tools.steps_libs.subprocess_with_log import
+
+# from agent_build.tools.steps_libs.subprocess_with_log import
 
 
 def main():

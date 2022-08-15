@@ -79,6 +79,7 @@ class DockerImageSpec:
 @dataclasses.dataclass
 class GitHubActionsSettings:
     """Dataclass that stores settings for how step has to be executed on GitHub Actions CI/CD"""
+
     cacheable: bool = False
     pre_build_in_separate_job: bool = False
 

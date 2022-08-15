@@ -284,13 +284,11 @@ _AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS = [
     # DockerPlatform.ARMV7.value,
 ]
 
-
 AGENT_DOCKER_JSON_SPEC = AgentImageTypeSpec(
     name="docker-json",
     base_config_path=SOURCE_ROOT / "docker" / "docker-json-config",
     result_image_name="scalyr-agent-docker-json",
 )
-
 
 AGENT_DOCKER_SYSLOG_SPEC = AgentImageTypeSpec(
     name="docker-syslog",
@@ -300,13 +298,11 @@ AGENT_DOCKER_SYSLOG_SPEC = AgentImageTypeSpec(
     image_type_stage_name="docker-syslog",
 )
 
-
 AGENT_DOCKER_API_SPEC = AgentImageTypeSpec(
     name="docker-api",
     base_config_path=SOURCE_ROOT / "docker" / "docker-api-config",
     result_image_name="scalyr-agent-docker-api",
 )
-
 
 AGENT_K8S_SPEC = AgentImageTypeSpec(
     name="k8s",
@@ -315,14 +311,12 @@ AGENT_K8S_SPEC = AgentImageTypeSpec(
     image_type_stage_name="k8s",
 )
 
-
 AGENT_K8S_WITH_OPENMETRICS_SPEC = AgentImageTypeSpec(
     name="k8s-with-openmetrics",
     base_config_path=SOURCE_ROOT / "docker" / "k8s-config-with-openmetrics-monitor",
     result_image_name="scalyr-k8s-agent-with-openmetrics-monitor",
     image_type_stage_name="k8s",
 )
-
 
 AGENT_K8S_RESTART_AGENT_ON_MONITOR_DEATH_SPEC = AgentImageTypeSpec(
     name="k8s-restart-agent-on-monitor-death",
@@ -398,6 +392,12 @@ class ContainerImageBuilder(Runner):
     #     super(ContainerImageBuilder, self).run(
     #         required_steps=[type(self).BASE_IMAGE_BUILDER_STEP]
     #     )
+
+    @classmethod
+    def get_name(cls):
+        return (
+            f"{cls.IMAGE_TYPE_SPEC.name}-{cls.BASE_IMAGE_BUILDER_STEP.base_distro.name}"
+        )
 
     @classmethod
     def get_all_required_steps(cls):
@@ -850,46 +850,47 @@ class K8sRestartAgentOnMonitorsDeathAlpine(ContainerImageBuilderAlpine):
     TAG_SUFFIX = "alpine"
 
 
-_DEBIAN_IMAGE_BUILDERS = [
-    DockerJsonDebian,
-    DockerSyslogDebian,
-    DockerApiDebian,
+DEBIAN_K8S_IMAGE_BUILDERS = [
     K8sDebian,
     K8sWithOpenMetricsDebian,
     K8sRestartAgentOnMonitorsDeathDebian,
 ]
 
-_ALPINE_IMAGE_BUILDERS = [
-    DockerJsonAlpine,
-    DockerSyslogAlpine,
-    DockerApiAlpine,
+ALPINE_K8S_IMAGE_BUILDERS = [
     K8sAlpine,
     K8sWithOpenMetricsAlpine,
     K8sRestartAgentOnMonitorsDeathAlpine,
 ]
 
-# Final collection of all docker image builders.
-DOCKER_IMAGE_BUILDERS: Dict[str, Type[ContainerImageBuilder]] = UniqueDict(
-    {
-        f"{b.IMAGE_TYPE_SPEC.name}-{b.BASE_IMAGE_BUILDER_STEP.base_distro.name}": b
-        for b in [
-            DockerJsonDebian,
-            DockerSyslogDebian,
-            DockerApiDebian,
-            K8sDebian,
-            K8sWithOpenMetricsDebian,
-            K8sRestartAgentOnMonitorsDeathDebian,
-            DockerJsonAlpine,
-            DockerSyslogAlpine,
-            DockerApiAlpine,
-            K8sAlpine,
-            K8sWithOpenMetricsAlpine,
-            K8sRestartAgentOnMonitorsDeathAlpine,
-        ]
-    }
+DEBIAN_IMAGE_BUILDERS = [
+    DockerJsonDebian,
+    DockerSyslogDebian,
+    DockerApiDebian,
+    *DEBIAN_K8S_IMAGE_BUILDERS,
+]
+
+ALPINE_IMAGE_BUILDERS = [
+    DockerJsonAlpine,
+    DockerSyslogAlpine,
+    DockerApiAlpine,
+    *ALPINE_K8S_IMAGE_BUILDERS,
+]
+
+ALL_DOCKER_IMAGE_BUILDERS: Dict[str, Type[ContainerImageBuilder]] = UniqueDict(
+    {b.get_name(): b for b in [*DEBIAN_IMAGE_BUILDERS, *ALPINE_IMAGE_BUILDERS]}
 )
 
-a = 10
+# # Final collection of all docker image builders.
+# DOCKER_IMAGE_BUILDERS: Dict[str, Type[ContainerImageBuilder]] = UniqueDict(
+#     {
+#         f"{b.IMAGE_TYPE_SPEC.name}-{b.BASE_IMAGE_BUILDER_STEP.base_distro.name}": b
+#         for b in [*_DEBIAN_IMAGE_BUILDERS, *_ALPINE_IMAGE_BUILDERS]
+#     }
+# )
+
+K8S_DEFAULT_BUILDERS = DEBIAN_K8S_IMAGE_BUILDERS[:]
+K8S_EXTENDED_BUILDERS = [*ALPINE_K8S_IMAGE_BUILDERS]
+
 if __name__ == "__main__":
     # We use this module as script in order to generate build job matrix for GitHub Actions.
     matrix = {"include": []}
