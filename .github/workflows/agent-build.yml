@@ -283,8 +283,8 @@ jobs:
         python-version: [ "3.8.13" ]
 
     steps:
-#      - name: Checkout repository
-#        uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
 #
 #      - name: Log in to Docker Hub
 #        uses: docker/login-action@49ed152c8eca782a232dede0303416e8f356c37b  # v2
