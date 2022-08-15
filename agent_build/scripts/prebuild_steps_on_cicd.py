@@ -22,7 +22,7 @@ ALL_STEPS_TO_PREBUILD = {}
 
 for builder in DOCKER_IMAGE_BUILDERS.values():
     for cacheable_step in builder.get_all_cacheable_steps():
-        if not cacheable_step.pre_build_in_cdcd:
+        if not cacheable_step.github_actions_settings.pre_build_in_separate_job:
             continue
         ALL_STEPS_TO_PREBUILD[cacheable_step.id] = cacheable_step
 

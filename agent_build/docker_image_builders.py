@@ -335,22 +335,6 @@ AGENT_K8S_RESTART_AGENT_ON_MONITOR_DEATH_SPEC = AgentImageTypeSpec(
 )
 
 
-DEBIAN_BASE_IMAGE_BUILDER_STEP = BaseImageBuilderStep(
-    base_distro=BaseDistroSpec(
-        name="debian",
-        python_base_image=f"python:{IMAGES_PYTHON_VERSION}-slim",
-    ),
-    supported_platforms=_AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS,
-)
-
-ALPINE_BASE_IMAGE_BUILDER_STEP = BaseImageBuilderStep(
-    BaseDistroSpec(
-        name="alpine", python_base_image=f"python:{IMAGES_PYTHON_VERSION}-alpine"
-    ),
-    supported_platforms=_AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS,
-)
-
-
 class ContainerImageBuilder(Runner):
     """
     The base builder for all docker and kubernetes based images. It builds base images for each particular
@@ -706,68 +690,77 @@ class ContainerImageBuilder(Runner):
             builder.build_container_filesystem(output_path=pl.Path(args.output))
 
 
-class DockerJsonDebian(ContainerImageBuilder):
-    BASE_IMAGE_BUILDER_STEP = DEBIAN_BASE_IMAGE_BUILDER_STEP
+class ContainerImageBuilderDebian(ContainerImageBuilder):
+    BASE_IMAGE_BUILDER_STEP = BaseImageBuilderStep(
+        base_distro=BaseDistroSpec(
+            name="debian",
+            python_base_image=f"python:{IMAGES_PYTHON_VERSION}-slim",
+        ),
+        supported_platforms=_AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS,
+    )
+
+
+class ContainerImageBuilderAlpine(ContainerImageBuilder):
+    BASE_IMAGE_BUILDER_STEP = BaseImageBuilderStep(
+        BaseDistroSpec(
+            name="alpine", python_base_image=f"python:{IMAGES_PYTHON_VERSION}-alpine"
+        ),
+        supported_platforms=_AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS,
+    )
+
+
+# Final image builder classes for Debian-base images.
+class DockerJsonDebian(ContainerImageBuilderDebian):
     IMAGE_TYPE_SPEC = AGENT_DOCKER_JSON_SPEC
 
 
-class DockerJsonAlpine(ContainerImageBuilder):
-    BASE_IMAGE_BUILDER_STEP = ALPINE_BASE_IMAGE_BUILDER_STEP
-    IMAGE_TYPE_SPEC = AGENT_DOCKER_JSON_SPEC
-    TAG_SUFFIX = "alpine"
-
-
-class DockerSyslogDebian(ContainerImageBuilder):
-    BASE_IMAGE_BUILDER_STEP = DEBIAN_BASE_IMAGE_BUILDER_STEP
+class DockerSyslogDebian(ContainerImageBuilderDebian):
     IMAGE_TYPE_SPEC = AGENT_DOCKER_SYSLOG_SPEC
 
 
-class DockerSyslogAlpine(ContainerImageBuilder):
-    BASE_IMAGE_BUILDER_STEP = ALPINE_BASE_IMAGE_BUILDER_STEP
-    IMAGE_TYPE_SPEC = AGENT_DOCKER_SYSLOG_SPEC
-    TAG_SUFFIX = "alpine"
-
-
-class DockerApiDebian(ContainerImageBuilder):
-    BASE_IMAGE_BUILDER_STEP = DEBIAN_BASE_IMAGE_BUILDER_STEP
+class DockerApiDebian(ContainerImageBuilderDebian):
     IMAGE_TYPE_SPEC = AGENT_DOCKER_API_SPEC
 
 
-class DockerApiAlpine(ContainerImageBuilder):
-    BASE_IMAGE_BUILDER_STEP = ALPINE_BASE_IMAGE_BUILDER_STEP
-    IMAGE_TYPE_SPEC = AGENT_DOCKER_API_SPEC
-    TAG_SUFFIX = "alpine"
-
-
-class K8sDebian(ContainerImageBuilder):
-    BASE_IMAGE_BUILDER_STEP = DEBIAN_BASE_IMAGE_BUILDER_STEP
+class K8sDebian(ContainerImageBuilderDebian):
     IMAGE_TYPE_SPEC = AGENT_K8S_SPEC
 
 
-class K8sAlpine(ContainerImageBuilder):
-    BASE_IMAGE_BUILDER_STEP = ALPINE_BASE_IMAGE_BUILDER_STEP
-    IMAGE_TYPE_SPEC = AGENT_K8S_SPEC
-    TAG_SUFFIX = "alpine"
-
-
-class K8sWithOpenMetricsDebian(ContainerImageBuilder):
-    BASE_IMAGE_BUILDER_STEP = DEBIAN_BASE_IMAGE_BUILDER_STEP
+class K8sWithOpenMetricsDebian(ContainerImageBuilderDebian):
     IMAGE_TYPE_SPEC = AGENT_K8S_WITH_OPENMETRICS_SPEC
 
 
-class K8sWithOpenMetricsAlpine(ContainerImageBuilder):
-    BASE_IMAGE_BUILDER_STEP = ALPINE_BASE_IMAGE_BUILDER_STEP
-    IMAGE_TYPE_SPEC = AGENT_K8S_WITH_OPENMETRICS_SPEC
-    TAG_SUFFIX = "alpine"
-
-
-class K8sRestartAgentOnMonitorsDeathDebian(ContainerImageBuilder):
-    BASE_IMAGE_BUILDER_STEP = DEBIAN_BASE_IMAGE_BUILDER_STEP
+class K8sRestartAgentOnMonitorsDeathDebian(ContainerImageBuilderDebian):
     IMAGE_TYPE_SPEC = AGENT_K8S_RESTART_AGENT_ON_MONITOR_DEATH_SPEC
 
 
-class K8sRestartAgentOnMonitorsDeathAlpine(ContainerImageBuilder):
-    BASE_IMAGE_BUILDER_STEP = ALPINE_BASE_IMAGE_BUILDER_STEP
+# Final image builder classes for Alpine-base images.
+class DockerJsonAlpine(ContainerImageBuilderAlpine):
+    IMAGE_TYPE_SPEC = AGENT_DOCKER_JSON_SPEC
+    TAG_SUFFIX = "alpine"
+
+
+class DockerSyslogAlpine(ContainerImageBuilderAlpine):
+    IMAGE_TYPE_SPEC = AGENT_DOCKER_SYSLOG_SPEC
+    TAG_SUFFIX = "alpine"
+
+
+class DockerApiAlpine(ContainerImageBuilderAlpine):
+    IMAGE_TYPE_SPEC = AGENT_DOCKER_API_SPEC
+    TAG_SUFFIX = "alpine"
+
+
+class K8sAlpine(ContainerImageBuilderAlpine):
+    IMAGE_TYPE_SPEC = AGENT_K8S_SPEC
+    TAG_SUFFIX = "alpine"
+
+
+class K8sWithOpenMetricsAlpine(ContainerImageBuilderAlpine):
+    IMAGE_TYPE_SPEC = AGENT_K8S_WITH_OPENMETRICS_SPEC
+    TAG_SUFFIX = "alpine"
+
+
+class K8sRestartAgentOnMonitorsDeathAlpine(ContainerImageBuilderAlpine):
     IMAGE_TYPE_SPEC = AGENT_K8S_RESTART_AGENT_ON_MONITOR_DEATH_SPEC
     TAG_SUFFIX = "alpine"
 
