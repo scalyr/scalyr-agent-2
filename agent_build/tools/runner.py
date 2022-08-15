@@ -948,7 +948,7 @@ class RunnerStep:
         if not self.runs_in_docker:
             env = os.environ.copy()
 
-            python_path = env["PYTHONPATH"]
+            python_path = env.get("PYTHONPATH", "")
             for p in python_path.split(os.pathsep):
                 p = pl.Path(p)
                 if not str(p).startswith(str(SOURCE_ROOT)):
