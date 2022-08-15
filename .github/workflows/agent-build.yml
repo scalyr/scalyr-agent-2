@@ -71,9 +71,13 @@ jobs:
           python3 -m agent_build.scripts.prebuild_steps_on_cicd > pre_built_cached_steps_matrix.txt
           echo "::set-output name=pre-built-cached-steps-matrix::$(cat pre_built_cached_steps_matrix.txt)"
 
-#      - name: Determine if extended testing is needed
-#        if: steps.skip_check.outputs.should_skip != 'true'
-#        run: |
+      - name: Determine if extended testing is needed
+        #if: steps.skip_check.outputs.should_skip != 'true' && ( github.base_ref == 'master' || github.ref == 'master')
+        run: |
+          echo "github.base_ref: ${{ github.base_ref }}"
+          echo "github.head_ref: ${{ github.head_ref }}"
+          echo "github.ref: ${{ github.ref }}"
+          
           
           
 
@@ -105,6 +109,7 @@ jobs:
       #   "python-version": Version of python to setup on this runner. (NOTE: version of python used in images may differ, and it specified in the source code.)
       #   "os": Runner OS.
       matrix: ${{ fromJSON(needs.pre-job.outputs.pre-built-cached-steps-matrix) }}
+
 
     env:
       DOCKER_BUILDKIT: 1
@@ -218,19 +223,28 @@ jobs:
       - build-images
       - pre-job
       - pre-build-cached-step
+
+    if:  matrix.params.extended != 'true' ||
     runs-on: ${{ matrix.os }}
 
     strategy:
       fail-fast: false
-      # This job receives its matrix from the preparation job. The matrix itself is created by the tests/end_to_end_tests/container_image_tests/k8s_test.py module.
-      # The matrix, for now, consists only from the 'include' part with following fields:
-      #   "pytest-params": String with all parameters for a particular test variant which then goes to "parametrize" test cases which has to be run there.
-      #   "builder-name": name of the builder that builds the target image.
-      #   "distro-name": Name of the base distribution, e.g. debian, alpine on which base the resul images are built.
-      #   "result-tarball-name": filename of the result image tarball.
-      #   "os": Runner's OS
-      #   "python-version": Version of the python installed on runner.
-      matrix: ${{ fromJSON(needs.pre-job.outputs.test-matrix-json) }}
+#      # This job receives its matrix from the preparation job. The matrix itself is created by the tests/end_to_end_tests/container_image_tests/k8s_test.py module.
+#      # The matrix, for now, consists only from the 'include' part with following fields:
+#      #   "pytest-params": String with all parameters for a particular test variant which then goes to "parametrize" test cases which has to be run there.
+#      #   "builder-name": name of the builder that builds the target image.
+#      #   "distro-name": Name of the base distribution, e.g. debian, alpine on which base the resul images are built.
+#      #   "result-tarball-name": filename of the result image tarball.
+#      #   "os": Runner's OS
+#      #   "python-version": Version of the python installed on runner.
+#      matrix: ${{ fromJSON(needs.pre-job.outputs.test-matrix-json) }}
+      matrix:
+
+        params:
+          - {"build-name": "docker-syslog", "distro-name": "debian", "k8s-version": "v1.17.17", "driver": "", "runtime": "docker"}
+          - {"build-name": "docker-syslog", "distro-name": "alpine", "k8s-version": "v1.17.17", "driver": "", "runtime": "docker", "extended": "true"}
+        os: [ "ubuntu-20.04" ]
+        python-version: [ "3.8.13" ]
 
     env:
       DOCKER_BUILDKIT: 1
@@ -265,7 +279,7 @@ jobs:
         shell: bash
         run: |
           python3 -m pytest  tests/end_to_end_tests/container_image_tests/k8s_test/k8s_test.py \
-            -k ${{ matrix.pytest-params }} \
+            -k ${{ matrix.params.build-name }}-${{ matrix.params.distro-name }}-${{ matrix.params.k8s-version }}-${{ matrix.params.driver }}-${{ matrix.params.runtime }} \
             --images-registry /tmp/registry \
             --scalyr-api-key ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }} \
             --scalyr-api-read-key ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }} \
