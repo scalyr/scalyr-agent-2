@@ -259,7 +259,7 @@ jobs:
       - pre-job
       - pre-build-cached-step
 
-    if:  matrix.params.extended != 'true' || needs.pre-job.outputs.is-extended == 'true'
+    if:  ${{ matrix.params.extended }} != 'true' || ${{ needs.pre-job.outputs.is-extended }} == 'true'
     runs-on: ${{ matrix.os }}
 
     strategy:
