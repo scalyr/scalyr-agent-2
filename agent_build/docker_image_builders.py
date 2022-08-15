@@ -648,7 +648,7 @@ class ContainerImageBuilder(Runner):
             help="Comma separated list of supported image platforms.",
         )
 
-        subparsers = parser.add_subparsers(dest="command", required=True)
+        subparsers = parser.add_subparsers(dest="command")
 
         build_filesystem_tarball_parser = subparsers.add_parser(
             "build-container-filesystem"
@@ -687,9 +687,13 @@ class ContainerImageBuilder(Runner):
         if args.command == "build":
             builder.build(output_registry_dir=pl.Path(args.output_registry_dir))
             exit(0)
-
-        if args.command == "build-container-filesystem":
+        elif args.command == "build-container-filesystem":
             builder.build_container_filesystem(output_path=pl.Path(args.output))
+        else:
+            if args.command is None:
+                raise RuntimeError("Unspecified command.")
+            else:
+                raise RuntimeError(f"Unknown command: {args.command}")
 
 
 class ContainerImageBuilderDebian(ContainerImageBuilder):
