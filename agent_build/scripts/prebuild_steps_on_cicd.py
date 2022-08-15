@@ -20,7 +20,7 @@ This script gathers all cacheable runner steps that are set to be pre-built in a
 import json
 
 from agent_build.tools.runner import Runner
-from agent_build.docker_image_builders import DOCKER_IMAGE_BUILDERS
+from agent_build.docker_image_builders import ALL_DOCKER_IMAGE_BUILDERS, , K8S_DEFAULT_BUILDERS
 
 ALL_RUNNERS = [*list(DOCKER_IMAGE_BUILDERS.values())]
 

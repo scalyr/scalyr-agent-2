@@ -769,10 +769,13 @@ class Runner:
         module = sys.modules[module_name]
         if module_name == "__main__":
             # if the module is main we still have to get its full name
+
+            module_file_path = pl.Path(module.__file__)
+            if module_file_path.is_absolute():
+                module_file_path = module_file_path.relative_to(SOURCE_ROOT)
+
             module_name_parts = (
-                str(pl.Path(module.__file__).relative_to(SOURCE_ROOT))
-                .strip(".py")
-                .split(os.sep)
+                str(module_file_path).strip(".py").split(os.sep)
             )
             module_name = ".".join(module_name_parts)
 
