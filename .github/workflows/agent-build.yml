@@ -229,6 +229,12 @@ jobs:
 
     strategy:
       fail-fast: false
+      matrix:
+        params:
+          - { "build-name": "docker-syslog", "distro-name": "debian", "k8s-version": "v1.17.17", "driver": "", "runtime": "docker" }
+          - { "build-name": "docker-syslog", "distro-name": "alpine", "k8s-version": "v1.17.17", "driver": "", "runtime": "docker", "extended": "true" }
+        os: [ "ubuntu-20.04" ]
+        python-version: [ "3.8.13" ]
 #      # This job receives its matrix from the preparation job. The matrix itself is created by the tests/end_to_end_tests/container_image_tests/k8s_test.py module.
 #      # The matrix, for now, consists only from the 'include' part with following fields:
 #      #   "pytest-params": String with all parameters for a particular test variant which then goes to "parametrize" test cases which has to be run there.
@@ -238,13 +244,7 @@ jobs:
 #      #   "os": Runner's OS
 #      #   "python-version": Version of the python installed on runner.
 #      matrix: ${{ fromJSON(needs.pre-job.outputs.test-matrix-json) }}
-      matrix:
 
-        params:
-          - {"build-name": "docker-syslog", "distro-name": "debian", "k8s-version": "v1.17.17", "driver": "", "runtime": "docker"}
-          - {"build-name": "docker-syslog", "distro-name": "alpine", "k8s-version": "v1.17.17", "driver": "", "runtime": "docker", "extended": "true"}
-        os: [ "ubuntu-20.04" ]
-        python-version: [ "3.8.13" ]
 
     env:
       DOCKER_BUILDKIT: 1
