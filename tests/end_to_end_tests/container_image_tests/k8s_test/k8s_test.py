@@ -144,6 +144,8 @@ def test_basic(
     agent_pod_name = create_agent_daemonset(time_tracker=timeout)
     # Wait a little.
 
+    time.sleep(20)
+
     test_writer_pod_name = start_test_log_writer_pod(time_tracker=timeout)
 
     verify_logs(

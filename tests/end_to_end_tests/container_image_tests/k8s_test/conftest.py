@@ -512,6 +512,9 @@ def create_agent_daemonset(
                 except subprocess.CalledProcessError:
                     time_tracker.sleep(5, message="Can not get agent pod name in time.")
 
+        # Also wait for the agent log file is created in the agent's container.
+
+
     yield create
 
     # Cleanup
