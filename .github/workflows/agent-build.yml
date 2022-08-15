@@ -193,26 +193,26 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     strategy:
-#      # This job receives its matrix from the previous job. The matrix itself is created by the agent_build/package_builder.py module.
-#      # The matrix, for now, consists only from the 'include' part with following fields:
-#      #   "builder-name": name of the builder that builds the target images.
-#      #   "distro-name": Name of the base distribution, e.g. debian, alpine on which base the resul images are built.
-#      #   "python-version": Version of python to setup on this runner. (NOTE: version of python used in images may differ, and it specified in the source code.)
-#      #   "os": Runner OS.
-#      matrix: ${{ fromJSON(needs.pre-job.outputs.build-matrix-json) }}
-      matrix:
-        distro-name: [ "debian", "alpine" ]
-        #distro-name: [ "debian"]
-        builder-name:
-          - docker-json
-          - docker-syslog
-          - docker-api
-          - k8s
-          - k8s-with-openmetrics
-          - k8s-restart-agent-on-monitor-death
-
-        os: [ "ubuntu-20.04" ]
-        python-version: [ "3.8.13" ]
+      # This job receives its matrix from the previous job. The matrix itself is created by the agent_build/package_builder.py module.
+      # The matrix, for now, consists only from the 'include' part with following fields:
+      #   "builder-name": name of the builder that builds the target images.
+      #   "distro-name": Name of the base distribution, e.g. debian, alpine on which base the resul images are built.
+      #   "python-version": Version of python to setup on this runner. (NOTE: version of python used in images may differ, and it specified in the source code.)
+      #   "os": Runner OS.
+      matrix: ${{ fromJSON(needs.pre-job.outputs.build-matrix-json) }}
+#      matrix:
+#        distro-name: [ "debian", "alpine" ]
+#        #distro-name: [ "debian"]
+#        builder-name:
+#          - docker-json
+#          - docker-syslog
+#          - docker-api
+#          - k8s
+#          - k8s-with-openmetrics
+#          - k8s-restart-agent-on-monitor-death
+#
+#        os: [ "ubuntu-20.04" ]
+#        python-version: [ "3.8.13" ]
 
     env:
       DOCKER_BUILDKIT: 1
