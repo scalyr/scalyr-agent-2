@@ -318,6 +318,11 @@ jobs:
         run: |
           echo "::set-output name=version::$(cat VERSION | tr -d '\n' | tr -d ' ')"
 
+      - name: Get content of the VERSION file to match with current tag.
+        run: |
+          echo "${{ steps.version-file.outputs.version }}"
+      
+
       - name: Publish image of the builder '${{ matrix.builder-name }}-${{ matrix.distro-name }}' using production tag '${{ github.ref_name }}'.
         if: github.ref_type == 'tag' && github.ref_name == steps.version-file.outputs.version
         run: |
