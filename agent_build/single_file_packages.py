@@ -8,71 +8,67 @@ import shutil
 import stat
 
 from agent_build.tools.runner import ShellScriptRunnerStep, Runner
-from agent_build.tools.constants import Architecture, PackageType, SOURCE_ROOT
+from agent_build.tools.constants import Architecture, PackageType,SOURCE_ROOT
 from agent_build.prepare_agent_filesystem import get_install_info
 
 PYTHON_BASE = ShellScriptRunnerStep(
     name="python_glibc_2_12_base",
-    script_path=pl.Path(
-        "agent_build/tools/environment_deployments/steps/frozen_binaries_prepare_base.sh"
-    ),
+    script_path=pl.Path("agent_build/tools/environment_deployments/steps/frozen_binaries_prepare_base.sh"),
     architecture=Architecture.X86_64,
     base_step="centos:6",
     cacheable=True,
-    cache_as_image=True,
+    cache_as_image=True
 )
 
 BUILD_PYTHON_GLIBC = ShellScriptRunnerStep(
     name="python_glibc_2_12_build_python",
     architecture=Architecture.X86_64,
-    script_path=pl.Path(
-        "agent_build/tools/environment_deployments/steps/frozen_binaries_build_python.sh"
-    ),
+    script_path=pl.Path("agent_build/tools/environment_deployments/steps/frozen_binaries_build_python.sh"),
     base_step=PYTHON_BASE,
-    cacheable=True,
+    cacheable=True
 )
 
 INSTALL_AGENT_REQUIREMENTS = ShellScriptRunnerStep(
     name="python_glibc_2_12_build_agent_deps",
     architecture=Architecture.X86_64,
-    script_path=pl.Path(
-        "agent_build/tools/environment_deployments/steps/frozen_binaries_build_python_dependencies.sh"
-    ),
+    script_path=pl.Path("agent_build/tools/environment_deployments/steps/frozen_binaries_build_python_dependencies.sh"),
     tracked_file_globs=[
         pl.Path("agent_build/requirement-files/main-requirements.txt"),
         pl.Path("agent_build/requirement-files/compression-requirements.txt"),
         pl.Path("agent_build/requirement-files/testing-requirements.txt"),
     ],
-    environment_variables={"PYINSTALLER_VERSION": "4.7"},
+    environment_variables={
+        "PYINSTALLER_VERSION": "4.7"
+    },
     required_steps={
         "PYTHON_BUILD": BUILD_PYTHON_GLIBC,
     },
-    base_step=PYTHON_BASE,
+    base_step=PYTHON_BASE
 )
 
 PYTHON_GLIBC_WITH_AGENT_DEPS = ShellScriptRunnerStep(
     name="python_glibc_2_12_with_deps",
     architecture=Architecture.X86_64,
-    script_path=pl.Path(
-        "agent_build/tools/environment_deployments/steps/frozen_binaries_python_with_agent_deps.sh"
-    ),
+    script_path=pl.Path("agent_build/tools/environment_deployments/steps/frozen_binaries_python_with_agent_deps.sh"),
     required_steps={
         "PYTHON_BUILD": BUILD_PYTHON_GLIBC,
         "AGENT_DEPS": INSTALL_AGENT_REQUIREMENTS,
     },
     base_step=PYTHON_BASE,
     cacheable=True,
-    cache_as_image=True,
+    cache_as_image=True
 )
 # ======
-
 
 class FrozenBinaryAgentBuilder(Runner):
     NAME = "frozen_binary_agent_builder"
     BASE_ENVIRONMENT = PYTHON_GLIBC_WITH_AGENT_DEPS
     FROZEN_BINARY_FILENAME = "scalyr-agent-2"
 
-    def __init__(self, install_type: str):
+    def __init__(
+        self,
+        install_type: str
+    ):
 
         self.install_type = install_type
 
@@ -115,14 +111,12 @@ class FrozenBinaryAgentBuilder(Runner):
         elif platform.system().lower().startswith("win"):
             monitors_to_exclude = [
                 "scalyr_agent.builtin_monitors.linux_process_metrics.py",
-                "scalyr_agent.builtin_monitors.linux_system_metrics.py",
+                "scalyr_agent.builtin_monitors.linux_system_metrics.py"
             ]
         else:
             monitors_to_exclude = []
 
-        monitors_to_import = set(all_builtin_monitor_module_names) - set(
-            monitors_to_exclude
-        )
+        monitors_to_import = set(all_builtin_monitor_module_names) - set(monitors_to_exclude)
 
         # Add packages to frozen binary paths.
         paths_to_include = [
@@ -134,14 +128,16 @@ class FrozenBinaryAgentBuilder(Runner):
 
         instalL_info_path = self.output_path / "install_info.json"
 
-        install_info = get_install_info(install_type=self.install_type)
+        install_info = get_install_info(
+            install_type=self.install_type
+        )
 
         instalL_info_path.write_text(json.dumps(install_info))
 
         version_file_path = SOURCE_ROOT / "VERSION"
         add_data = {
             instalL_info_path: "scalyr_agent",
-            version_file_path: "scalyr_agent",
+            version_file_path: "scalyr_agent"
         }
 
         # Add platform specific things.
@@ -154,9 +150,7 @@ class FrozenBinaryAgentBuilder(Runner):
                 "collectors",
             )
             paths_to_include.append(tcollectors_path)
-            add_data[
-                tcollectors_path
-            ] = "scalyr_agent/third_party/tcollector/collectors"
+            add_data[tcollectors_path] = "scalyr_agent/third_party/tcollector/collectors"
 
         hidden_imports = [*monitors_to_import, "win32timezone"]
 
@@ -180,7 +174,7 @@ class FrozenBinaryAgentBuilder(Runner):
             sys.executable,
             "-m",
             "PyInstaller",
-            # "--onefile",
+            #"--onefile",
             "-n",
             "scalyr-agent-2",
             os.path.join(agent_package_path, "agent_main_arg_parse.py"),
@@ -212,7 +206,10 @@ class FrozenBinaryAgentBuilder(Runner):
         pyinstaller_output = self.output_path / "pyinstaller"
         pyinstaller_output.mkdir(parents=True)
 
-        subprocess.check_call(command, cwd=str(pyinstaller_output))
+        subprocess.check_call(
+            command,
+            cwd=str(pyinstaller_output)
+        )
 
         frozen_binaries_path = pyinstaller_output / "dist/scalyr-agent-2"
         agent_frozen_binary_path = frozen_binaries_path / self.frozen_binary_filename
@@ -221,25 +218,30 @@ class FrozenBinaryAgentBuilder(Runner):
             agent_frozen_binary_path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP
         )
 
-        shutil.copytree(frozen_binaries_path, self.frozen_binaries_dir_path)
+        shutil.copytree(
+            frozen_binaries_path,
+            self.frozen_binaries_dir_path
+        )
 
-        subprocess.check_call(f"ls {self.output_path}", shell=True)
+        subprocess.check_call(
+            f"ls {self.output_path}", shell=True
+        )
 
 
 PREPARE_FPM_BUILDER = ShellScriptRunnerStep(
     name="fpm_builder",
     architecture=Architecture.X86_64,
-    script_path=pl.Path(
-        "agent_build/tools/environment_deployments/steps/prepare_fpm_builder.sh"
-    ),
-    tracked_file_globs=[pl.Path("agent_build/requirement-files/requirements.txt")],
+    script_path=pl.Path("agent_build/tools/environment_deployments/steps/prepare_fpm_builder.sh"),
+    tracked_file_globs=[
+        pl.Path("agent_build/requirement-files/requirements.txt")
+    ],
     required_steps={
         "PYTHON_BUILD": BUILD_PYTHON_GLIBC,
         "AGENT_DEPS": INSTALL_AGENT_REQUIREMENTS,
     },
     base_step="ubuntu:20.04",
     cacheable=True,
-    cache_as_image=True,
+    cache_as_image=True
 )
 
 
@@ -250,13 +252,26 @@ class FpmBasedPackageBuilder(Runner):
     BASE_ENVIRONMENT = PREPARE_FPM_BUILDER
     RESULT_FILENAME_GLOB_FORMAT: str
 
-    _FPM_PACKAGE_TYPES = {PackageType.DEB: "deb", PackageType.RPM: "rpm"}
+    _FPM_PACKAGE_TYPES = {
+        PackageType.DEB: "deb",
+        PackageType.RPM: "rpm"
+    }
     _FPM_ARCHITECTURES = {
-        PackageType.DEB: {Architecture.X86_64: "amd64", Architecture.ARM64: "arm64"},
-        PackageType.RPM: {Architecture.X86_64: "x86_64", Architecture.ARM64: "aarch64"},
+        PackageType.DEB: {
+            Architecture.X86_64: "amd64",
+            Architecture.ARM64: "arm64"
+        },
+        PackageType.RPM: {
+            Architecture.X86_64: "x86_64",
+            Architecture.ARM64: "aarch64"
+        }
     }
 
-    def __init__(self, version: str = None, variant: str = None):
+    def __init__(
+            self,
+            version: str = None,
+            variant: str = None
+    ):
         self.version = version
         if not self.version:
             version_file_path = SOURCE_ROOT / "VERSION"
@@ -277,7 +292,8 @@ class FpmBasedPackageBuilder(Runner):
         cls = type(self)
         package_architectures = cls._FPM_ARCHITECTURES[cls.PACKAGE_TYPE]
         glob = cls.RESULT_FILENAME_GLOB_FORMAT.format(
-            version=self.version, arch=package_architectures[cls.ARCHITECTURE]
+            version=self.version,
+            arch=package_architectures[cls.ARCHITECTURE]
         )
 
         print(glob)
@@ -295,7 +311,7 @@ class FpmBasedPackageBuilder(Runner):
             output_path=self._package_root_path,
             version=self.version,
             config_path=SOURCE_ROOT / "config",
-            frozen_binary_path=self.build_frozen_binary.frozen_binaries_dir_path,
+            frozen_binary_path=self.build_frozen_binary.frozen_binaries_dir_path
         )
 
         # Add init.d script.
@@ -303,7 +319,7 @@ class FpmBasedPackageBuilder(Runner):
         init_d_path.mkdir()
         shutil.copy2(
             _AGENT_BUILD_PATH / "linux/deb_or_rpm/files/init.d/scalyr-agent-2",
-            init_d_path,
+            init_d_path
         )
 
         if self.variant is not None:
@@ -315,7 +331,9 @@ class FpmBasedPackageBuilder(Runner):
 
         # generate changelogs
         changelogs_path = self.output_path / "package_changelogs"
-        create_change_logs(output_directory=changelogs_path)
+        create_change_logs(
+            output_directory=changelogs_path
+        )
 
         description = (
             "Scalyr Agent 2 is the daemon process Scalyr customers run on their servers to collect metrics and "
@@ -396,8 +414,9 @@ class FpmBasedPackageBuilder(Runner):
 
 BUILDERS_BUILDERS = {}
 
-for arch in [Architecture.X86_64]:
-
+for arch in [
+    Architecture.X86_64
+]:
     class DebPackageBuilder(FpmBasedPackageBuilder):
         NAME = f"deb_{arch.value}"
         ARCHITECTURE = arch
@@ -412,9 +431,7 @@ for arch in [Architecture.X86_64]:
         INSTALL_TYPE = "package"
         RESULT_FILENAME_GLOB_FORMAT = "scalyr-agent-2-{version}-1.{arch}.rpm"
 
-    BUILDERS_BUILDERS.update(
-        {
-            DebPackageBuilder.NAME: DebPackageBuilder,
-            RpmPackageBuilder.NAME: RpmPackageBuilder,
-        }
-    )
+    BUILDERS_BUILDERS.update({
+        DebPackageBuilder.NAME: DebPackageBuilder,
+        RpmPackageBuilder.NAME: RpmPackageBuilder
+    })

@@ -15,8 +15,6 @@
 
 """
 This script gathers all cacheable runner steps that are set to be pre-built in a separate GitHub Actions job.
-This helps to reduce overall build time for some artifacts such as Agent docker images because it allows
-to build its base images in parallel.
 """
 
 import json

@@ -6,7 +6,6 @@ import tests
 
 from agent_build.tools.constants import SOURCE_ROOT
 
-
 def resource_path(relative):
     """
     pyinstaller unpacks data into a temporary folder,
@@ -15,10 +14,11 @@ def resource_path(relative):
     relative - name of the resource
     """
     try:
-        if getattr(sys, "frozen") and hasattr(sys, "_MEIPASS"):
+        if getattr(sys, 'frozen') and hasattr(sys, '_MEIPASS'):
             return os.path.join(sys._MEIPASS, relative)
     except:
         return os.path.join(os.path.abspath("."), relative)
+
 
 
 # #raise RuntimeError(SOURCE_ROOT)
