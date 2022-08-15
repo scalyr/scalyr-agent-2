@@ -1,7 +1,13 @@
 # The main "setup" workflow, that calls other workflows.
 name: Docker Images Build
 
-on: [push]
+on:
+  push:
+  pull_request:
+    branches:
+      - master
+  schedule:
+    - cron: '0 4 * * *'
 
 permissions:
   contents: read
@@ -27,22 +33,34 @@ jobs:
       pre-built-cached-steps-matrix: ${{ steps.get-info.outputs.pre-built-cached-steps-matrix }}
       build-matrix-json: ${{ steps.get-info.outputs.build-matrix-json }}
       test-matrix-json: ${{ steps.get-info.outputs.test-matrix-json }}
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
 
     steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@9d116fa7e55f295019cfab7e3ab72b478bcf7fdd # v4.0.0
+        with:
+          cancel_others: 'true'
+          do_not_skip: '["workflow_dispatch", "schedule", "pull_request"]'
+          github_token: ${{ github.token }}
+
       - name: Checkout repository
+        if: steps.skip_check.outputs.should_skip != 'true'
         uses: actions/checkout@v3
 
       - name: Install python
+        if: steps.skip_check.outputs.should_skip != 'true'
         uses: actions/setup-python@v4
         with:
           python-version: "3.8.13"
 
       - name: Execute the test environment deploy runner.
+        if: steps.skip_check.outputs.should_skip != 'true'
         uses: ./.github/actions/execute-runner
         with:
           runner-fqdn: "agent_build.__init__.BuildTestEnvironment"
 
       - name: "Get build and test job matrices."
+        if: steps.skip_check.outputs.should_skip != 'true'
         id: get-info
         run: |
           set -e 
@@ -52,8 +70,10 @@ jobs:
           python3 -m agent_build.scripts.prebuild_steps_on_cicd > pre_built_cached_steps_matrix.txt
           echo "::set-output name=pre-built-cached-steps-matrix::$(cat pre_built_cached_steps_matrix.txt)"
 
-      - name: Determine if extended testing is needed
-        run: |
+#      - name: Determine if extended testing is needed
+#        if: steps.skip_check.outputs.should_skip != 'true'
+#        run: |
+          
           
 
 #      - name: Cache checksum of the agent_build package in order to track and run tests on changes.
@@ -71,6 +91,7 @@ jobs:
 
   pre-build-cached-step:
     name: ${{ matrix.name }}
+    if: needs.pre-job.outputs.should_skip != 'true'
     needs:
       - pre-job
 
