@@ -97,7 +97,7 @@ jobs:
           runner-fqdn: ${{ matrix.step-builder-fqdn }}
 
   build-images:
-    name: Build all images based on ${{ matrix.distro-name }} distribution.
+    name: Build image '${{ matrix.builder-name }}-${{ matrix.distro-name }}'.
     needs:
       - pre-job
       - pre-build-cached-step
@@ -114,7 +114,7 @@ jobs:
       matrix:
         distro-name: [ "debian", "alpine" ]
         builder-name: [ "docker-json", "docker-syslog", "docker-api", "k8s", "k8s-restart-agent-on-monitor-death" ]
-        os: [ "ubuntu:20.04" ]
+        os: [ "ubuntu-20.04" ]
         python-version: [ "3.8.13" ]
 
     env:
@@ -154,15 +154,13 @@ jobs:
           echo "::set-output name=fqdn::$(python3 build_package_new.py ${{ matrix.builder-name }}-${{ matrix.distro-name }} --fqdn)"
 
 
-      - name: Perform the build of the base docker images.
+      - name: Prepare everything what is needed by image builder '${{ matrix.builder-name }}-${{ matrix.distro-name }}'
         uses: ./.github/actions/execute-runner
         with:
           runner-fqdn: ${{ steps.get-builder-fqdn.outputs.fqdn }}
 
 
-      # We build all images with tha same base image all at once and store all result images in a single
-      # registry.
-      - name: Build images with builder '${{ matrix.builder-name }}-${{ matrix.distro-name }}'
+      - name: Build image with builder '${{ matrix.builder-name }}-${{ matrix.distro-name }}'
         run: |
           python3 build_package_new.py ${{ matrix.builder-name }}-${{ matrix.distro-name }} \
             build \
