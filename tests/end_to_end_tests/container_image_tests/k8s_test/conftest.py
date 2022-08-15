@@ -456,6 +456,31 @@ def start_test_log_writer_pod(minikube_kubectl_args):
     )
 
 
+@pytest.fixture(scope="session")
+def get_agent_log_content(minikube_kubectl_args):
+    def get(pod_name: str):
+        """
+        Read content of the agent log file in the agent pod.
+        """
+        return check_output_with_log_debug(
+            [
+                *minikube_kubectl_args,
+                "--namespace=scalyr",
+                "exec",
+                "-i",
+                pod_name,
+                "--container",
+                "scalyr-agent",
+                "--",
+                "cat",
+                "/var/log/scalyr-agent-2/agent.log",
+            ],
+            description=f"Get log content of the agent pod '{pod_name}'",
+        ).decode()
+
+    return get
+
+
 @pytest.fixture
 def create_agent_daemonset(
     agent_manifest_path,
@@ -464,6 +489,7 @@ def create_agent_daemonset(
     cluster_name,
     scalyr_namespace,
     minikube_kubectl_args,
+    get_agent_log_content
 ):
     """
     Return function which starts agent daemonset.
@@ -508,12 +534,18 @@ def create_agent_daemonset(
             while True:
                 try:
                     # Get name of the created pod.
-                    return get_pod_name()
+                    pod_name = get_pod_name()
+                    break
                 except subprocess.CalledProcessError:
                     time_tracker.sleep(5, message="Can not get agent pod name in time.")
 
         # Also wait for the agent log file is created in the agent's container.
-
+        with time_tracker(20):
+            while True:
+                try:
+                    get_agent_log_content(pod_name=pod_name)
+                except subprocess.CalledProcessError:
+                    time_tracker.sleep(5, message="Can not get agent's log file in time.")
 
     yield create
 
@@ -529,31 +561,6 @@ def create_agent_daemonset(
         ],
         description="Cleanup, delete agent's daemonset.",
     )
-
-
-@pytest.fixture(scope="session")
-def get_agent_log_content(minikube_kubectl_args):
-    def get(pod_name: str):
-        """
-        Read content of the agent log file in the agent pod.
-        """
-        return check_output_with_log_debug(
-            [
-                *minikube_kubectl_args,
-                "--namespace=scalyr",
-                "exec",
-                "-i",
-                pod_name,
-                "--container",
-                "scalyr-agent",
-                "--",
-                "cat",
-                "/var/log/scalyr-agent-2/agent.log",
-            ],
-            description=f"Get log content of the agent pod '{pod_name}'",
-        ).decode()
-
-    return get
 
 
 @pytest.fixture(scope="session")
