@@ -599,6 +599,7 @@ class ContainerImageBuilder(Runner):
         user: str,
         dest_registry_host: str = None,
         dest_registry_tls_skip_verify: bool = False,
+        dest_registry_creds: str = None
 
     ):
         # Image names from the source registry do not have any additional tags
@@ -630,6 +631,12 @@ class ContainerImageBuilder(Runner):
                     additional_options.append(
                         "--dest-tls-verify=false"
                     )
+
+                if dest_registry_creds:
+                    additional_options.extend([
+                        "--dest-creds ",
+                        dest_registry_creds
+                    ])
 
                 check_call_with_log(
                     [
@@ -748,7 +755,8 @@ class ContainerImageBuilder(Runner):
                 tags=tags,
                 user=args.user,
                 dest_registry_host=args.dest_registry_host,
-                dest_registry_tls_skip_verify=args.dest_registry_tls_skip_verify
+                dest_registry_tls_skip_verify=args.dest_registry_tls_skip_verify,
+                dest_registry_creds=args.dest_registry_creds
             )
         else:
             if args.command is None:
