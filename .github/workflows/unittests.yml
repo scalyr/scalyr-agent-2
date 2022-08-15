@@ -182,7 +182,7 @@ jobs:
           SCALYR_API_KEY: ${{ secrets.SCALYR_API_KEY }}
           READ_API_KEY: ${{ secrets.SCALYR_READ_API_KEY }}
           SCALYR_SERVER: https://agent.scalyr.com
-          AGENT_HOST_NAME: ${{ github.run_number }}
+          AGENT_HOST_NAME: agent-smoke-standalone-${{ matrix.python-version }}-${{ github.run_number }}
 
       - name: Upload pytest test results
         uses: actions/upload-artifact@v3
