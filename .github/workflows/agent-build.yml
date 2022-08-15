@@ -265,8 +265,7 @@ jobs:
   publish-images:
     if: ${{ github.ref == 'refs/heads/reorganise-docker-image-builders' || github.ref_type == 'tag' }}
     needs:
-      - build-images
-      #- test-k8s-images
+      - test-k8s-images
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -285,12 +284,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-#
-#      - name: Log in to Docker Hub
-#        uses: docker/login-action@49ed152c8eca782a232dede0303416e8f356c37b  # v2
-#        with:
-#          username: ${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}
-#          password: ${{ secrets.DOCKER_HUB_PASSWORD_TEST_ACCOUNT }}
 
       - name: Download registry with previously built image.
         uses: actions/download-artifact@v3
