@@ -61,6 +61,7 @@ jobs:
   unittests:
     name: Unittests - Python ${{ matrix.python-version }} - ${{ matrix.platform }}
     runs-on: ${{ matrix.platform }}-latest
+    timeout-minutes: 10
     defaults:
       run:
         shell: bash
@@ -135,6 +136,7 @@ jobs:
   standalone-smoketests:
     name: Standalone Smoketests - Python ${{ matrix.python-version }} - ${{ matrix.variant }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         shell: bash
