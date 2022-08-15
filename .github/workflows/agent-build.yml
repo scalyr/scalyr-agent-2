@@ -310,7 +310,7 @@ jobs:
             --src-registry-data-dir /tmp/registry \
             --tags "${{ github.sha }}" \
             --user ${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }} \
-            --dest-registry-creds "${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}:secrets.DOCKER_HUB_PASSWORD_TEST_ACCOUNT"
+            --dest-registry-creds "${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}:${{ secrets.DOCKER_HUB_PASSWORD_TEST_ACCOUNT }}"
 
       - name: Get content of the VERSION file to match with current tag.
         if: github.ref_type == 'tag'
@@ -326,7 +326,7 @@ jobs:
             --src-registry-data-dir /tmp/registry \
             --tags "latest,${{ github.ref_name }}" \
             --user ${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }} \
-            --dest-registry-creds "${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}:secrets.DOCKER_HUB_PASSWORD_TEST_ACCOUNT"
+            --dest-registry-creds "${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}:${{ secrets.DOCKER_HUB_PASSWORD_TEST_ACCOUNT }}"
       
       
       
