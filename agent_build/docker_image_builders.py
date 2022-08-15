@@ -702,6 +702,12 @@ class ContainerImageBuilder(Runner):
                  "push images to local registry."
         )
         publish_parser.add_argument(
+            "--dest-registry-creds",
+            dest="dest_registry_creds",
+            required=False,
+            help="Colon-separated user name and password to target registry to publish."
+        )
+        publish_parser.add_argument(
             "--tags",
             dest="tags",
             help="Comma-separated tags to publish."

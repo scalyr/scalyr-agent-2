@@ -52,6 +52,10 @@ jobs:
           python3 -m agent_build.scripts.prebuild_steps_on_cicd > pre_built_cached_steps_matrix.txt
           echo "::set-output name=pre-built-cached-steps-matrix::$(cat pre_built_cached_steps_matrix.txt)"
 
+      - name: Determine if extended testing is needed
+        run: |
+          
+
 #      - name: Cache checksum of the agent_build package in order to track and run tests on changes.
 #        id: check-agent-build-changes
 #        uses: actions/cache@v3
@@ -305,7 +309,8 @@ jobs:
             publish \
             --src-registry-data-dir /tmp/registry \
             --tags "${{ github.sha }}" \
-            --user ${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}
+            --user ${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }} \
+            --dest-registry-creds "${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}:secrets.DOCKER_HUB_PASSWORD_TEST_ACCOUNT"
 
       - name: Get content of the VERSION file to match with current tag.
         if: github.ref_type == 'tag'
@@ -317,10 +322,11 @@ jobs:
         if: github.ref_type == 'tag' && github.ref_name == 'steps.version-file.outputs.version'
         run: |
           python3 build_package_new.py ${{ matrix.builder-name }}-${{ matrix.distro-name }} \
-            publish \ 
+            publish \
             --src-registry-data-dir /tmp/registry \
             --tags "latest,${{ github.ref_name }}" \
-            --user ${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}
+            --user ${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }} \
+            --dest-registry-creds "${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}:secrets.DOCKER_HUB_PASSWORD_TEST_ACCOUNT"
       
       
       
