@@ -1622,10 +1622,6 @@ workflows:
      - smoke-standalone-35-rate-limit:
          context: scalyr-agent
       # NOTE: smoke test jobs below still use old smoke tests framework
-     - smoke-docker-api-raw-logs-disabled:
-         context: scalyr-agent
-     - smoke-k8s:
-         context: scalyr-agent
      - smoke-monitors-tests:
          context: scalyr-agent
  package-tests:
