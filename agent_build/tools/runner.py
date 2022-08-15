@@ -706,8 +706,7 @@ class RunnerStep:
 
         self.runs_in_docker = bool(self.initial_docker_image)
 
-        if not github_actions_settings:
-            self.github_actions_settings = GitHubActionsSettings()
+        self.github_actions_settings = github_actions_settings or  GitHubActionsSettings()
 
         self.checksum = self._calculate_checksum()
 
@@ -1290,7 +1289,7 @@ class Runner:
         if cls.BASE_ENVIRONMENT:
             result.extend(cls.BASE_ENVIRONMENT.get_all_cacheable_steps())
 
-        for req_step in cls.get_all_required_steps():
+        for req_step in cls.REQUIRED_STEPS:
             result.extend(req_step.get_all_cacheable_steps())
 
         for runner_clas in cls.REQUIRED_RUNNERS_CLASSES:

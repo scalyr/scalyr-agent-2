@@ -280,7 +280,7 @@ class AgentImageFilesystemBuilder(Runner):
 
 _AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS = [
     DockerPlatform.AMD64.value,
-    DockerPlatform.ARM64.value,
+    # DockerPlatform.ARM64.value,
     # DockerPlatform.ARMV7.value,
 ]
 
