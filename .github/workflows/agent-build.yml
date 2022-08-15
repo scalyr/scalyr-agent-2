@@ -38,8 +38,8 @@ jobs:
       build-matrix-json: ${{ steps.get-info.outputs.build-matrix-json }}
       test-matrix-json: ${{ steps.get-info.outputs.test-matrix-json }}
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
-      is-extended: ${{ staps.extended-check.outputs.is-extended }}
-      is-production-tag: ${{ staps.check-tag.outputs.is-production-tag }}
+      is-extended: ${{ steps.extended-check.outputs.is-extended }}
+      is-production-tag: ${{ steps.check-tag.outputs.is-production-tag }}
 
     steps:
       - id: skip_check
