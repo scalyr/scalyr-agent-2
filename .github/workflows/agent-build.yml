@@ -270,14 +270,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        #distro-name: [ "debian", "alpine" ]
         distro-name: [ "debian" ]
         builder-name:
           - docker-json
-#          - docker-syslog
-#          - docker-api
-#          - k8s
-#          - k8s-restart-agent-on-monitor-death
 
         os: [ "ubuntu-20.04" ]
         python-version: [ "3.8.13" ]
