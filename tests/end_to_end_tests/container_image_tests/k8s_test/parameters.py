@@ -18,7 +18,6 @@ KUBERNETES_VERSIONS = [
         "minikube_driver": "",
         "container_runtime": "docker",
     },
-    DEFAULT_KUBERNETES_VERSION,
     {
         "kubernetes_version": "v1.23.4",
         "minikube_driver": "docker",
