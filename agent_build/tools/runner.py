@@ -352,18 +352,18 @@ class RunnerStep:
         Run the step's script, whether in docker or in current system.
         """
 
-        # if self.runs_in_docker:
-        #     final_isolated_source_root = pl.Path("/tmp/agent_source")
-        #     final_cache_path = "/tmp/step_cache"
-        #     final_output_path = "/tmp/step_output"
-        # else:
-        #     final_isolated_source_root = self.get_isolated_root(work_dir=work_dir)
-        #     final_cache_path = self.get_cache_directory(work_dir=work_dir)
-        #     final_output_path = self.get_output_directory(work_dir=work_dir)
-
         isolated_source_root = self.get_isolated_root(work_dir=work_dir)
         cache_directory = self.get_cache_directory(work_dir=work_dir)
         output_directory = self.get_output_directory(work_dir=work_dir)
+
+        if self.runs_in_docker:
+            final_isolated_source_root = pl.Path("/tmp/agent_source")
+            final_cache_directory = "/tmp/step_cache"
+            final_output_directory = "/tmp/step_output"
+        else:
+            final_isolated_source_root = isolated_source_root
+            final_cache_directory = cache_directory
+            final_output_directory = output_directory
 
         if self.script_path.suffix == ".py":
             script_type = "python"
@@ -377,8 +377,8 @@ class RunnerStep:
             # and also provides some helper functions such as caching.
             "agent_build/tools/steps_libs/step_runner.sh",
             str(self.script_path),
-            str(cache_directory),
-            str(output_directory),
+            str(final_cache_directory),
+            str(final_output_directory),
             script_type,
         ]
 
@@ -403,9 +403,9 @@ class RunnerStep:
             check_call_with_log(command_args, env=env, cwd=str(isolated_source_root))
             return
 
-        docker_isolated_source_root = pl.Path("/tmp/agent_source")
-        docker_cache_directory = "/tmp/step_cache"
-        docker_output_directory = "/tmp/step_output"
+        # docker_isolated_source_root = pl.Path("/tmp/agent_source")
+        # docker_cache_directory = "/tmp/step_cache"
+        # docker_output_directory = "/tmp/step_output"
 
         # Run step in docker.
         check_call_with_log(["docker", "rm", "-f", self._step_container_name])
@@ -421,11 +421,11 @@ class RunnerStep:
         mount_options.extend(
             [
                 "-v",
-                f"{isolated_source_root}:{docker_isolated_source_root}",
+                f"{isolated_source_root}:{final_isolated_source_root}",
                 "-v",
-                f"{cache_directory}:{docker_cache_directory}",
+                f"{cache_directory}:{final_cache_directory}",
                 "-v",
-                f"{output_directory}:{docker_output_directory}",
+                f"{output_directory}:{final_output_directory}",
             ]
         )
 
@@ -441,7 +441,7 @@ class RunnerStep:
                 "--name",
                 self._step_container_name,
                 "--workdir",
-                str(docker_isolated_source_root),
+                str(final_isolated_source_root),
                 *mount_options,
                 *env_options,
                 self._base_docker_image.name,

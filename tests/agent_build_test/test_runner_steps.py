@@ -1,28 +1,27 @@
+# Copyright 2014-2022 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import pathlib as pl
-import sys
-import time
 
 import pytest
 import mock
 
 from agent_build.tools.runner import (
-    RunnerStep,
     ArtifactRunnerStep,
     DockerImageSpec,
-    DockerPlatform,
 )
-from agent_build.tools.constants import SOURCE_ROOT
-
-# def mock(path: pl.Path, path2: pl.Path):
-#     original_read_bytes = pl.Path.read_bytes
-#
-#     def mock_read_bytes(self):
-#         if self == pl.Path(path):
-#             return original_read_bytes(path2)
-#         else:
-#             return original_read_bytes(path)
-#
-#     return mock
+from agent_build.tools.constants import DockerPlatform
 
 
 @pytest.fixture
@@ -32,25 +31,6 @@ def sample_artifact_step_script():
 
 _FIXTURES_PATH = pl.Path(__file__).parent / "fixtures"
 _SAMPLE_ARTIFACT_STEP_SCRIPT_PATH = _FIXTURES_PATH / "sample_artifact_step.sh"
-
-# @pytest.fixture
-# def artifact_step_script(tmp_path):
-#
-#     step_script_path =
-#
-#     mock_script_path = tmp_path / step_script_path.name
-#     mock_script_path.write_bytes(step_script_path.read_bytes())
-#
-#     original_read_bytes = pl.Path.read_bytes
-#
-#     def mock_read_bytes(self):
-#         if self == pl.Path(step_script_path):
-#             return original_read_bytes(mock_script_path)
-#         else:
-#             return original_read_bytes(step_script_path)
-#
-#     with mock.patch("pathlib.Path.read_bytes", mock_read_bytes):
-#         yield step_script_path
 
 
 def _create_artifact_step(
@@ -195,8 +175,6 @@ def test_id_cache_invalidation(sample_artifact_step, tmp_path, step_base_image):
 
 @pytest.mark.parametrize(["step_base_image"], [[None], ["ubuntu_20_04"]], indirect=True)
 def test_artifact_step_output(sample_artifact_step, tmp_path):
-
-    tmp_path = pl.Path("/Users/arthur/work/agents/scalyr-agent-2/agent_build_output")
     sample_artifact_step.run(work_dir=tmp_path)
 
     step_output = sample_artifact_step.get_output_directory(work_dir=tmp_path)
