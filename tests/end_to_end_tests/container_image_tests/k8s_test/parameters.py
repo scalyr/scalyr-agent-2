@@ -45,10 +45,15 @@ for builder_cls in K8S_DEFAULT_BUILDERS:
 
 DEFAULT_K8S_IMAGE_BUILDER = ALL_DOCKER_IMAGE_BUILDERS["k8s-debian"]
 
-EXTENDED_TEST_PARAMS = TEST_PARAMS.copy()
+EXTENDED_TEST_PARAMS = []
 for k_v in KUBERNETES_VERSIONS:
     EXTENDED_TEST_PARAMS.append(
         {"image_builder_name": DEFAULT_K8S_IMAGE_BUILDER.get_name(), **k_v}
     )
 for builder_cls in K8S_EXTENDED_BUILDERS:
     TEST_PARAMS.append({"image_builder_name": builder_cls.get_name(), **DEFAULT_KUBERNETES_VERSION})
+
+ALL_TEST_PARAMS = [
+    *TEST_PARAMS,
+    *EXTENDED_TEST_PARAMS
+]

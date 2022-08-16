@@ -20,16 +20,15 @@ from agent_build.docker_image_builders import (
 )
 from tests.end_to_end_tests.container_image_tests.k8s_test.parameters import (
     TEST_PARAMS as K8S_TESTS_PARAMS,
-    EXTENDED_TEST_PARAMS as K8S_EXTENDED_TEST_PARAMS,
+    ALL_TEST_PARAMS as ALL_K8S_TEST_PARAMS,
 )
 
 DEFAULT_IMAGE_BUILDERS = DEBIAN_IMAGE_BUILDERS[:]
-
-EXTENDED_IMAGE_BUILDERS = [*DEFAULT_IMAGE_BUILDERS, *ALPINE_IMAGE_BUILDERS]
+EXTENDED_IMAGE_BUILDERS = [*ALPINE_IMAGE_BUILDERS]
 
 
 def get_image_build_matrix(extended: bool):
-    builders = EXTENDED_IMAGE_BUILDERS if extended else DEFAULT_IMAGE_BUILDERS
+    builders = list(ALL_DOCKER_IMAGE_BUILDERS.values()) if extended else DEFAULT_IMAGE_BUILDERS
 
     matrix = {"include": []}
 
@@ -74,10 +73,17 @@ def _get_steps_to_prebuild(builder_step_classes: List[Type[ContainerImageBuilder
     return all_runners
 
 
-def get_image_pre_built_steps_matrix(extended: bool):
-    builder_classes = EXTENDED_IMAGE_BUILDERS if extended else DEFAULT_IMAGE_BUILDERS
+DEFAULT_IMAGE_BUILDERS_PRE_BUILT_STEP_RUNNERS = _get_steps_to_prebuild(DEFAULT_IMAGE_BUILDERS)
+EXTENDED_IMAGE_BUILDERS_PRE_BUILT_STEP_RUNNERS = _get_steps_to_prebuild(EXTENDED_IMAGE_BUILDERS)
+ALL_IMAGE_BUILDERS_PRE_BUILT_STEP_RUNNERS = [
+    *DEFAULT_IMAGE_BUILDERS_PRE_BUILT_STEP_RUNNERS,
+    *EXTENDED_IMAGE_BUILDERS_PRE_BUILT_STEP_RUNNERS
+]
 
-    pre_build_step_runners = _get_steps_to_prebuild(builder_step_classes=builder_classes)
+
+def get_image_pre_built_steps_matrix(extended: bool):
+
+    pre_build_step_runners = ALL_IMAGE_BUILDERS_PRE_BUILT_STEP_RUNNERS if extended else DEFAULT_IMAGE_BUILDERS_PRE_BUILT_STEP_RUNNERS
     matrix = {"include": []}
 
     for builder_cls in pre_build_step_runners:
@@ -95,7 +101,7 @@ def get_image_pre_built_steps_matrix(extended: bool):
 
 
 def get_k8s_image_test_matrix(extended: bool):
-    params = K8S_EXTENDED_TEST_PARAMS if extended else K8S_TESTS_PARAMS
+    params = ALL_K8S_TEST_PARAMS if extended else K8S_TESTS_PARAMS
     matrix = {"include": []}
 
     for p in params:
