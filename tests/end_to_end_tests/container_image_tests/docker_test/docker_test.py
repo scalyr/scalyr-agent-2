@@ -20,6 +20,7 @@ from typing import List
 
 import pytest
 
+from agent_build.tools import check_output_with_log
 from tests.end_to_end_tests.verify import verify_logs
 from tests.end_to_end_tests.container_image_tests.docker_test.parameters import (
     ALL_DOCKER_TEST_PARAMS,
@@ -70,7 +71,7 @@ def test_basic(
     start_counter_writer_container()
 
     # Quick check for the `scalyr-agent-2-config script.
-    export_config_output = subprocess.check_output(
+    export_config_output = check_output_with_log(
         [
             "docker",
             "exec",
@@ -79,7 +80,8 @@ def test_basic(
             "scalyr-agent-2-config",
             "--export-config",
             "-",
-        ]
+        ],
+        description=f"Export config from agent in the container '{agent_container_name}'"
     )
     assert len(export_config_output) > 0
 

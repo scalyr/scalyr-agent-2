@@ -70,6 +70,8 @@ def check_agent_log_for_errors(
     ignore_predicates = ignore_predicates or []
 
     def skip_temp_hostname_resolution_error(message, additional_lines):
+        log.critical(f"MESS: {message}")
+        log.critical(f"ADD_LLL: {additional_lines}")
         if '[error="client/connectionFailed"] Failed to connect to "https://agent.scalyr.com" due to errno=-3.' not in message:
             return False
         for additional_line in additional_lines:
@@ -81,8 +83,6 @@ def check_agent_log_for_errors(
         return False
 
     ignore_predicates.append(skip_temp_hostname_resolution_error)
-
-
 
     messages = preprocess_agent_log_messages(content=content)
     error_line_pattern = re.compile(rf"{AGENT_LOG_LINE_TIMESTAMP} (ERROR|CRITICAL) .*")
