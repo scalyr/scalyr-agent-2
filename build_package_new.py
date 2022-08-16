@@ -33,14 +33,14 @@ sys.path.append(str(__SOURCE_ROOT__))
 
 from agent_build.tools.runner import Runner
 from agent_build.docker_image_builders import (
-    DOCKER_IMAGE_BUILDERS,
+    ALL_DOCKER_IMAGE_BUILDERS,
 )
 from agent_build.tools import UniqueDict, init_logging
 
 _AGENT_BUILD_PATH = __SOURCE_ROOT__ / "agent_build"
 
 
-BUILDERS: Dict[str, Runner] = UniqueDict(**DOCKER_IMAGE_BUILDERS)
+BUILDERS: Dict[str, Runner] = UniqueDict(**ALL_DOCKER_IMAGE_BUILDERS)
 
 if __name__ == "__main__":
 
