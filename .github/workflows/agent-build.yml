@@ -190,7 +190,7 @@ jobs:
           runner-fqdn: ${{ matrix.step-builder-fqdn }}
 
   build-images:
-    name: Build image '${{ matrix.builder-name }}-${{ matrix.distro-name }}'.
+    name: Build image '${{ matrix.builder-name }}'.
     needs:
       - pre-job
       - pre-build-cached-step
@@ -248,24 +248,24 @@ jobs:
         id: get-builder-fqdn
         run: |
           set -e
-          echo "::set-output name=fqdn::$(python3 build_package_new.py ${{ matrix.builder-name }}-${{ matrix.distro-name }} --fqdn)"
+          echo "::set-output name=fqdn::$(python3 build_package_new.py ${{ matrix.builder-name }} --fqdn)"
 
 
-      - name: Prepare everything what is needed by image builder '${{ matrix.builder-name }}-${{ matrix.distro-name }}'
+      - name: Prepare everything what is needed by image builder '${{ matrix.builder-name }}'
         uses: ./.github/actions/execute-runner
         with:
           runner-fqdn: ${{ steps.get-builder-fqdn.outputs.fqdn }}
 
 
-      - name: Build image with builder '${{ matrix.builder-name }}-${{ matrix.distro-name }}'
+      - name: Build image with builder '${{ matrix.builder-name }}'
         run: |
-          python3 build_package_new.py ${{ matrix.builder-name }}-${{ matrix.distro-name }} \
+          python3 build_package_new.py ${{ matrix.builder-name }} \
             build --output-registry-dir /tmp/result
 
       - name: Save registry data root with result images as artifact.
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.builder-name }}-${{ matrix.distro-name }}-registry
+          name: ${{ matrix.builder-name }}-registry
           path: /tmp/result
           retention-days: 1
 

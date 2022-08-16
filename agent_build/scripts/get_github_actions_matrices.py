@@ -140,16 +140,16 @@ def main():
 
     args = parser.parse_args()
 
+    if args.matrix_name == "pre_built_steps_matrix":
+        get_image_pre_built_steps_matrix(extended=args.extended)
+        exit(0)
+
     if args.matrix_name == "image_build_matrix":
         get_image_build_matrix(extended=args.extended)
         exit(0)
 
     if args.matrix_name == "k8s_image_test_matrix":
         get_k8s_image_test_matrix(extended=args.extended)
-        exit(0)
-
-    if args.matrix_name == "pre_built_steps_matrix":
-        get_image_pre_built_steps_matrix(extended=args.extended)
         exit(0)
 
 if __name__ == '__main__':
