@@ -85,13 +85,13 @@ jobs:
 
       - name: "Get content of the VERSION file to match with current tag."
         if: github.ref_type == 'tag'
-        id: version-file
+        id: prod-version-tag
         run: |
-          echo "::set-output name=version::$(cat VERSION | tr -d '\n' | tr -d ' ')"
+          echo "::set-output name=tag::v$(cat VERSION | tr -d '\n' | tr -d ' ')"
 
       - name: "Determine if extended testing is needed for the tag"
         id: check-tag
-        if: github.event_name == 'push' && github.ref_type == 'tag' && steps.version-file.outputs.version == 'ewfwef'
+        if: github.event_name == 'push' && github.ref_type == 'tag' && github.ref_name == steps.version-file.outputs.version
         run: |
           echo "::set-output name=is-extended::true"
           echo "::set-output name=is-production-tag::true"
