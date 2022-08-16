@@ -73,13 +73,16 @@ def check_agent_log_for_errors(
         log.critical(f"MESS: {message}")
         log.critical(f"ADD_LLL: {additional_lines}")
         if '[error="client/connectionFailed"] Failed to connect to "https://agent.scalyr.com" due to errno=-3.' not in message:
+            log.critical("NOOOOO")
             return False
+        log.critical("!!!!!!")
         for additional_line in additional_lines:
             if "socket.gaierror: [Errno -3] Try again" in additional_line:
                 return True
             if "socket.gaierror: [Errno -3] Temporary failure in name resolution" in additional_line:
                 return True
 
+        log.critical("NOOOOOO2")
         return False
 
     ignore_predicates.append(skip_temp_hostname_resolution_error)
