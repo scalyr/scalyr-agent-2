@@ -13,8 +13,9 @@
 # limitations under the License.
 
 """
-This helper script act as an entry point for builders inside docker.
+This helper script acts as an entry point for Runners allowing to execute them without direct access.
 Script caller specifies FQDN of the builder class, and script imports it and executes.
+Needed for GitHub Action CI/CD.
 """
 
 import argparse

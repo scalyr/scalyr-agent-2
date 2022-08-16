@@ -403,10 +403,6 @@ class RunnerStep:
             check_call_with_log(command_args, env=env, cwd=str(isolated_source_root))
             return
 
-        # docker_isolated_source_root = pl.Path("/tmp/agent_source")
-        # docker_cache_directory = "/tmp/step_cache"
-        # docker_output_directory = "/tmp/step_output"
-
         # Run step in docker.
         check_call_with_log(["docker", "rm", "-f", self._step_container_name])
 
@@ -631,31 +627,6 @@ class Runner:
     # This class attribute is used to find and load this runner class without direct access to it.
     _FULLY_QUALIFIED_NAME = None
 
-    # def __new__(cls, *args, **kwargs):
-    #     """
-    #     Before creating new instance of the runner, analyze its signature, and save input values that are passed to the
-    #         constructor. We need to save constructor's arguments in order to run the same Runner with the same arguments
-    #         in docker.
-    #     """
-    #     obj = super(Runner, cls).__new__(cls)
-    #
-    #     # Get signature of the constructor and save arguments according to that signature.
-    #     init_signature = inspect.signature(obj.__init__)
-    #     input_values = {}
-    #     pos_arg_count = 0
-    #     for name, param in init_signature.parameters.items():
-    #         if param.kind.POSITIONAL_ONLY:
-    #             value = args[pos_arg_count]
-    #             pos_arg_count += 1
-    #         else:
-    #             value = kwargs.get(name, param.default)
-    #
-    #         input_values[name] = value
-    #
-    #     # Set gathered input values as new runner's attribute, so it can use them later.
-    #     obj.input_values = input_values
-    #     return obj
-
     @staticmethod
     def runer_cli_command(f, run: bool = True):
         @functools.wraps
@@ -687,16 +658,11 @@ class Runner:
     def __init__(
         self,
         work_dir: pl.Path,
-        # required_runners: List["Runner"] = None,
         required_steps: List[RunnerStep] = None,
-        # base_environment: Union[RunnerStep, str] = None,
     ):
         """
-        :param required_runners: Instantiated version of runner classes that are specified in REQUIRED_RUNNERS_CLASSES
-            class attribute.
         :param required_steps: Final list of RunnerSteps to be executed by this runner. If not specified, then just
             the `REQUIRED_STEPS` class attribute is used.
-        :param base_environment: if specified, overrides the `BASE_ENVIRONMENT` class attribute.
         """
 
         self.base_environment = type(self).BASE_ENVIRONMENT
@@ -708,9 +674,6 @@ class Runner:
         self.output_path = work_dir / "runner_outputs" / output_name
 
         self._input_values = {}
-
-    # def _append_required_steps(self, required_steps: List[RunnerStep]):
-    #     self.required_steps.extend(required_steps)
 
     @classmethod
     def get_all_required_steps(cls) -> List[RunnerStep]:
@@ -885,74 +848,6 @@ class Runner:
         Function where Runners main work is performed.
         """
         pass
-
-    # @classmethod
-    # def add_command_line_arguments(cls, parser: argparse.ArgumentParser):
-    #     """
-    #     Create argparse parser with all arguments which are generated from constructor's signature.
-    #     """
-    #
-    #     parser.add_argument(
-    #         "--get-all-cacheable-steps",
-    #         dest="get_all_cacheable_steps",
-    #         action="store_true",
-    #         help="Get ids of all used cacheable steps. it is meant to be used by GitHub Actions and there's no need to "
-    #         "use it manually.",
-    #     )
-    #
-    #     parser.add_argument(
-    #         "--run-all-cacheable-steps",
-    #         dest="run_all_cacheable_steps",
-    #         action="store_true",
-    #         help="Run all used cacheable steps. it is meant to be used by GitHub Actions and there's no need to "
-    #         "use it manually.",
-    #     )
-    #
-    #     if cls.__init__ is Runner.__init__:
-    #         # Do this only if constructor was overridden in child classes.
-    #         return
-    #
-    #     runner_signature = inspect.signature(cls.__init__)
-    #     argument_docs = {}
-    #     arg_name = None
-    #     # Parse argument docstring to put them as 'help' for parser arguments.
-    #     if cls.__init__.__doc__:
-    #         for line in cls.__init__.__doc__.splitlines():
-    #             m = re.match(r"\s*:param ([a-zA-Z_]+):\s*(.*)", line.strip())
-    #             if m:
-    #                 arg_name = m.group(1)
-    #                 text = m.group(2)
-    #                 argument_docs[arg_name] = text.strip()
-    #             elif arg_name:
-    #                 argument_docs[arg_name] += line.strip()
-    #
-    #     for name, param in runner_signature.parameters.items():
-    #         arg_name = name.replace("_", "-")
-    #
-    #         if name == "self":
-    #             continue
-    #
-    #         additional_args = {}
-    #         if param.annotation is bool:
-    #             additional_args["action"] = "store_true"
-    #
-    #         if "action" not in additional_args:
-    #             if param.annotation in [List, list] or str(param.annotation).startswith(
-    #                 "typing.List"
-    #             ):
-    #                 arg_type = str
-    #             else:
-    #                 arg_type = param.annotation
-    #             additional_args["type"] = arg_type
-    #
-    #         parser.add_argument(
-    #             f"--{arg_name}",
-    #             dest=name,
-    #             default=param.default,
-    #             required=param.kind == inspect.Parameter.POSITIONAL_ONLY,
-    #             help=argument_docs.get(name),
-    #             **additional_args,
-    #         )
 
     @classmethod
     def _get_command_line_functions(cls):
