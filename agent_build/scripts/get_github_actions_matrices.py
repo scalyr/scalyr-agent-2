@@ -30,9 +30,8 @@ from typing import List, Type
 sys.path.append(str(pl.Path(__file__).parent.parent.parent))
 
 
-from agent_build.tools.runner import Runner, RunnerStep
+from agent_build.tools.runner import Runner
 from agent_build.docker_image_builders import (
-    ContainerImageBuilder,
     DEBIAN_IMAGE_BUILDERS,
     ALPINE_IMAGE_BUILDERS,
     IMAGES_PYTHON_VERSION,
@@ -162,7 +161,6 @@ def get_k8s_image_test_matrix(extended: bool):
 
     for p in params:
         image_builder_name = p["image_builder_name"]
-        image_builder_cls = ALL_DOCKER_IMAGE_BUILDERS[image_builder_name]
         kubernetes_version = p["kubernetes_version"]
         minikube_driver = p["minikube_driver"]
         container_runtime = p["container_runtime"]
@@ -171,7 +169,6 @@ def get_k8s_image_test_matrix(extended: bool):
             {
                 "pytest-params": f"{image_builder_name}-{kubernetes_version}-{minikube_driver}-{container_runtime}",
                 "builder-name": image_builder_name,
-                # "distro-name": image_builder_cls.BASE_IMAGE_BUILDER_STEP.base_distro.name,
                 "os": "ubuntu-20.04",
                 "python-version": "3.8.13",
             }

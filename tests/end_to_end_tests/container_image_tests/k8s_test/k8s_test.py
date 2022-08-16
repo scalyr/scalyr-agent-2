@@ -12,25 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import argparse
+
 import functools
-import json
 import re
 import time
 import logging
 
 import pytest
 
-from tests.end_to_end_tests.verify import verify_logs, ScalyrQueryRequest
+from tests.end_to_end_tests.verify import verify_logs
 from tests.end_to_end_tests.tools import TimeTracker
 from tests.end_to_end_tests.container_image_tests.k8s_test.parameters import (
     ALL_K8S_TEST_PARAMS,
-)
-
-from agent_build.docker_image_builders import (
-    K8S_DEFAULT_BUILDERS,
-    K8S_ADDITIONAL_BUILDERS,
-    ALL_DOCKER_IMAGE_BUILDERS,
 )
 
 log = logging.getLogger(__name__)
@@ -40,32 +33,6 @@ pytestmark = [
     pytest.mark.timeout(60 * 1000),
     pytest.mark.usefixtures("dump_info"),
 ]
-
-# for builder_name, builder_cls in DOCKER_IMAGE_BUILDERS.items():
-#
-#     base_distro = builder_cls.BASE_IMAGE_BUILDER_STEP.base_distro
-#     if base_distro.name == "debian":
-#         kubernetes_versions_to_test = KUBERNETES_VERSIONS[:]
-#     else:
-#         kubernetes_versions_to_test = [DEFAULT_KUBERNETES_VERSION]
-#
-#     if "k8s" not in builder_name:
-#         continue
-#
-#     builder_params = {
-#         "image_builder_name": builder_name,
-#         **DEFAULT_KUBERNETES_VERSION,
-#     }
-#
-#     if builder_name == f"k8s-{base_distro.name}" and base_distro.name == "debian":
-#         # If this is a "main build", aka 'k8s-debian' then also apply different platform testing
-#         # in extended test mode.
-#         for k_v in KUBERNETES_VERSIONS:
-#             EXTENDED_PARAMS.append({"image_builder_name": builder_name, **k_v})
-#         PARAMS.append(builder_params)
-#     else:
-#         EXTENDED_PARAMS.append(builder_params)
-#         PARAMS.append(builder_params)
 
 
 def pytest_generate_tests(metafunc):
@@ -111,7 +78,10 @@ def test_basic(
     test_writer_pod_name = start_test_log_writer_pod(time_tracker=timeout)
 
     def ignore_k8s_api_temporary_host_resolution_error(message, additional_lines):
-        if "[monitor:kubernetes_events_monitor]" not in message or "[monitor:kubernetes_monitor]" not in message:
+        if (
+            "[monitor:kubernetes_events_monitor]" not in message
+            or "[monitor:kubernetes_monitor]" not in message
+        ):
             return False
 
         for additional_line in additional_lines:
@@ -119,7 +89,6 @@ def test_basic(
                 return True
 
         return False
-
 
     verify_logs(
         scalyr_api_read_key=scalyr_api_read_key,
@@ -135,7 +104,7 @@ def test_basic(
             f"$k8s-cluster=='{cluster_name}'",
         ],
         time_tracker=timeout,
-        ignore_agent_errors_predicates=[ignore_k8s_api_temporary_host_resolution_error]
+        ignore_agent_errors_predicates=[ignore_k8s_api_temporary_host_resolution_error],
     )
 
     logging.info("Test passed!")

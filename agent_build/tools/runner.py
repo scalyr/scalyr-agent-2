@@ -1,4 +1,4 @@
-# Copyright 2014-2021 Scalyr Inc.
+# Copyright 2014-2022 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,25 +11,23 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+
 import argparse
 import dataclasses
 import functools
 import hashlib
-import importlib.util
 import json
 import os
 import pathlib as pl
-import re
 import shutil
 import logging
 import inspect
 import sys
-import time
-import ast
 from typing import Union, Optional, List, Dict, Type
 
 
-from agent_build.tools.constants import SOURCE_ROOT, DockerPlatform, DockerPlatformInfo
+from agent_build.tools.constants import SOURCE_ROOT, DockerPlatformInfo
 from agent_build.tools import (
     check_call_with_log,
     DockerContainer,
@@ -51,7 +49,7 @@ def remove_directory_in_docker(path: pl.Path):
 
     # In order to be able to remove the whole directory, we mount parent directory.
     with DockerContainer(
-        name=f"agent_build_step_trash_remover",
+        name="agent_build_step_trash_remover",
         image_name="ubuntu:22.04",
         mounts=[f"{path.parent}:/parent"],
         command=["rm", "-r", f"/parent/{path.name}"],
@@ -354,14 +352,14 @@ class RunnerStep:
         Run the step's script, whether in docker or in current system.
         """
 
-        if self.runs_in_docker:
-            final_isolated_source_root = pl.Path("/tmp/agent_source")
-            final_cache_path = "/tmp/step_cache"
-            final_output_path = "/tmp/step_output"
-        else:
-            final_isolated_source_root = self.get_isolated_root(work_dir=work_dir)
-            final_cache_path = self.get_cache_directory(work_dir=work_dir)
-            final_output_path = self.get_output_directory(work_dir=work_dir)
+        # if self.runs_in_docker:
+        #     final_isolated_source_root = pl.Path("/tmp/agent_source")
+        #     final_cache_path = "/tmp/step_cache"
+        #     final_output_path = "/tmp/step_output"
+        # else:
+        #     final_isolated_source_root = self.get_isolated_root(work_dir=work_dir)
+        #     final_cache_path = self.get_cache_directory(work_dir=work_dir)
+        #     final_output_path = self.get_output_directory(work_dir=work_dir)
 
         isolated_source_root = self.get_isolated_root(work_dir=work_dir)
         cache_directory = self.get_cache_directory(work_dir=work_dir)
@@ -379,8 +377,8 @@ class RunnerStep:
             # and also provides some helper functions such as caching.
             "agent_build/tools/steps_libs/step_runner.sh",
             str(self.script_path),
-            str(final_cache_path),
-            str(final_output_path),
+            str(cache_directory),
+            str(output_directory),
             script_type,
         ]
 
@@ -450,7 +448,6 @@ class RunnerStep:
                 *command_args,
             ]
         )
-        a = 10
 
     def run(self, work_dir: pl.Path):
         """

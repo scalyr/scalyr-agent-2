@@ -1,7 +1,6 @@
 from agent_build.docker_image_builders import (
     DOCKER_DEFAULT_BUILDERS,
     DOCKER_ADDITIONAL_BUILDERS,
-    ALL_DOCKER_IMAGE_BUILDERS,
 )
 
 DEFAULT_DOCKER_TEST_PARAMS = []

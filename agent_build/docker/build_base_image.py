@@ -83,11 +83,11 @@ if __name__ == "__main__":
     BASE_IMAGE_NAME_PREFIX = os.environ["BASE_IMAGE_NAME_PREFIX"]
     STEP_OUTPUT_PATH = pl.Path(os.environ["STEP_OUTPUT_PATH"])
 
-    CONTAINER_NAME = f"agent_base_image_build"
+    CONTAINER_NAME = "agent_base_image_build"
 
     registry_data_root = STEP_OUTPUT_PATH / "registry"
     with LocalRegistryContainer(
-        name=f"agent_base_image_build",
+        name="agent_base_image_build",
         registry_port=0,
         registry_data_path=registry_data_root,
     ) as reg:

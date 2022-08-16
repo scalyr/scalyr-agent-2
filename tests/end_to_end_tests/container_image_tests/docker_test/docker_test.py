@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import subprocess
 import logging
 import functools
 from typing import List
@@ -81,7 +80,7 @@ def test_basic(
             "--export-config",
             "-",
         ],
-        description=f"Export config from agent in the container '{agent_container_name}'"
+        description=f"Export config from agent in the container '{agent_container_name}'",
     )
     assert len(export_config_output) > 0
 
@@ -105,7 +104,9 @@ def test_basic(
     else:
         ignore_agent_error_predicate = None
         # Since the test writer pod writes plain text counters, set this count getter.
-        counter_getter = lambda e: int(e["message"].rstrip("\n"))
+
+        def counter_getter(e):
+            return int(e["message"].rstrip("\n"))
 
     log.info("Verify containers logs.")
     verify_logs(

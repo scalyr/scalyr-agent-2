@@ -16,7 +16,6 @@
 This module defines all possible packages of the Scalyr Agent and how they can be built.
 """
 import collections
-import concurrent.futures
 import argparse
 import dataclasses
 import enum
@@ -27,19 +26,16 @@ import re
 import tarfile
 import shutil
 import os
-import time
-from typing import List, Type, Dict, ClassVar
+from typing import List, Type, Dict
 
 from agent_build.tools.runner import (
     Runner,
     ArtifactRunnerStep,
-    RunnerStep,
     GitHubActionsSettings,
 )
 from agent_build.prepare_agent_filesystem import build_linux_lfs_agent_files, add_config
 from agent_build.tools.constants import SOURCE_ROOT, DockerPlatform, DockerPlatformInfo
 from agent_build.tools import (
-    check_output_with_log,
     UniqueDict,
     LocalRegistryContainer,
     check_call_with_log,
@@ -624,7 +620,7 @@ class ContainerImageBuilder(Runner):
         )
 
         with LocalRegistryContainer(
-            name=f"image-publish-src-registry",
+            name="image-publish-src-registry",
             registry_port=0,
             registry_data_path=src_registry_data_path / "registry",
         ) as src_reg_container:
@@ -885,33 +881,8 @@ ALL_DOCKER_IMAGE_BUILDERS: Dict[str, Type[ContainerImageBuilder]] = UniqueDict(
     {b.get_name(): b for b in [*DEBIAN_IMAGE_BUILDERS, *ALPINE_IMAGE_BUILDERS]}
 )
 
-# # Final collection of all docker image builders.
-# DOCKER_IMAGE_BUILDERS: Dict[str, Type[ContainerImageBuilder]] = UniqueDict(
-#     {
-#         f"{b.IMAGE_TYPE_SPEC.name}-{b.BASE_IMAGE_BUILDER_STEP.base_distro.name}": b
-#         for b in [*_DEBIAN_IMAGE_BUILDERS, *_ALPINE_IMAGE_BUILDERS]
-#     }
-# )
-
 K8S_DEFAULT_BUILDERS = DEBIAN_K8S_IMAGE_BUILDERS[:]
 K8S_ADDITIONAL_BUILDERS = [*ALPINE_K8S_IMAGE_BUILDERS]
 
 DOCKER_DEFAULT_BUILDERS = DEBIAN_DOCKER_IMAGE_BUILDERS
 DOCKER_ADDITIONAL_BUILDERS = [*ALPINE_DOCKER_IMAGE_BUILDERS]
-
-
-if __name__ == "__main__":
-    # We use this module as script in order to generate build job matrix for GitHub Actions.
-    matrix = {"include": []}
-
-    for builder_name, builder_cls in DOCKER_IMAGE_BUILDERS.items():
-        matrix["include"].append(
-            {
-                "builder-name": builder_name,
-                "distro-name": builder_cls.BASE_IMAGE_BUILDER_STEP.base_distro.value,
-                "python-version": f"{IMAGES_PYTHON_VERSION}",
-                "os": "ubuntu-20.04",
-            }
-        )
-
-    print(json.dumps(matrix))

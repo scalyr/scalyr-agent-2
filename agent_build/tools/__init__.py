@@ -16,8 +16,16 @@ import logging
 import os
 from typing import Mapping
 
-from agent_build.tools.steps_libs.subprocess_with_log import *
-from agent_build.tools.steps_libs.container import *
+from agent_build.tools.steps_libs.subprocess_with_log import (  # NOQA
+    check_output_with_log,
+    check_call_with_log,
+    check_output_with_log_debug,
+    check_call_with_log_debug,
+)
+from agent_build.tools.steps_libs.container import ( # NOQA
+    LocalRegistryContainer,
+    DockerContainer,
+)
 
 # If this environment variable is set, then commands output is not suppressed.
 DEBUG = bool(os.environ.get("AGENT_BUILD_DEBUG"))
