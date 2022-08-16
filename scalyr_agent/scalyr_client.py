@@ -660,8 +660,9 @@ class ScalyrClientSession(object):
                         error_code="client/requestFailed",
                     )
                 else:
-                    log.exception(
+                    log.warning(
                         "Failed to receive response due to exception.  Closing connection, will re-attempt",
+                        exc_info=True,
                         error_code="requestFailed",
                     )
                 return "requestFailed", len(body_str), response

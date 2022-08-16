@@ -29,6 +29,8 @@ github_checks:
 # correctly on codecov.io
 fixes:
   - "/home/circleci/scalyr-agent-2/::"
+  - "/home/runner/work/scalyr-agent-2/scalyr-agent-2/::"
+  - "/Users/runner/work/scalyr-agent-2/scalyr-agent-2/::"
 
 ignore:
   # Ignore tests directories for which we currently don't generate coverage

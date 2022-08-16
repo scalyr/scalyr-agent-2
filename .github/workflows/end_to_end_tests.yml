@@ -42,7 +42,7 @@ jobs:
           concurrent_skipping: 'same_content'
           do_not_skip: "${{ steps.get_events_to_not_skip.outputs.events_to_not_skip }}"
           github_token: ${{ github.token }}
-          
+
 
   # Jobs which performs basic sanity checks for the Kubernetes Monitor and Kubernetes Events Monitor
   k8s_kubernetes_monitor_tests:
@@ -352,6 +352,8 @@ jobs:
           MINIMUM_RESULTS=2 ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'-kubernetes-api-cadvisor-metrics" "container_cpu_load_average_10s "'
           # Verify locally calculated rate metrics
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'-kubernetes-api-cadvisor-metrics" "container_cpu_usage_seconds_total_rate "'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'-kubernetes-api-cadvisor-metrics" "container_network_receive_bytes_total_rate "'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'-kubernetes-api-cadvisor-metrics" "container_network_transmit_bytes_total_rate "'
 
           # 2. Verify node exporter metrics
           echo "Node exporter metrics monitor checks"
