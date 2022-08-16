@@ -23,7 +23,7 @@ import pytest
 
 from tests.end_to_end_tests.verify import verify_logs, ScalyrQueryRequest
 from tests.end_to_end_tests.tools import TimeTracker
-from tests.end_to_end_tests.container_image_tests.k8s_test.parameters import TEST_PARAMS, ALL_K8S_TEST_PARAMS
+from tests.end_to_end_tests.container_image_tests.k8s_test.parameters import ALL_K8S_TEST_PARAMS
 
 from agent_build.docker_image_builders import (
     K8S_DEFAULT_BUILDERS,
