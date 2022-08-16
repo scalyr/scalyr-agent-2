@@ -22,7 +22,7 @@ from agent_build.tools.steps_libs.subprocess_with_log import (  # NOQA
     check_output_with_log_debug,
     check_call_with_log_debug,
 )
-from agent_build.tools.steps_libs.container import ( # NOQA
+from agent_build.tools.steps_libs.container import (  # NOQA
     LocalRegistryContainer,
     DockerContainer,
 )

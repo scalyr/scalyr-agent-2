@@ -3,7 +3,7 @@ from agent_build.tools.runner import (
     EnvironmentRunnerStep,
     GitHubActionsSettings,
 )
-from agent_build.tools.constants import Architecture, SOURCE_ROOT
+from agent_build.tools.constants import SOURCE_ROOT
 
 
 # Step that runs small script which installs requirements for the test/dev environment.
