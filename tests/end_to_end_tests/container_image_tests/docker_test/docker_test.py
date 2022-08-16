@@ -118,7 +118,7 @@ def test_basic(
             f"$serverHost=='{docker_server_hostname}'",
         ],
         time_tracker=timeout_tracker,
-        ignore_agent_errors_predicate=ignore_agent_error_predicate,
+        ignore_agent_errors_predicates=[ignore_agent_error_predicate],
     )
 
     logging.info("Test passed!")

@@ -58,14 +58,31 @@ def preprocess_agent_log_messages(content: str):
 
 
 def check_agent_log_for_errors(
-    content: str, ignore_predicate: Callable[[str, List[str]], bool] = None
+    content: str, ignore_predicates: List[Callable[[str, List[str]], bool]] = None
 ):
     """
     Checks content of the agent log for errors.
     :param content: String with content of the log.
-    :param ignore_predicate: Callable which accepts error message line and following traceback (if exists) and returns
-        True whether this message has to be ignored, so the overall check will not fail.
+    :param ignore_predicates: List of callables where each accepts error message line and following traceback (if exists)
+        and returns True whether this message has to be ignored, so the overall check will not fail.
     """
+
+    ignore_predicates = ignore_predicates or []
+
+    def skip_temp_hostname_resolution_error(message, additional_lines):
+        if '[error="client/connectionFailed"] Failed to connect to "https://agent.scalyr.com" due to errno=-3.' not in message:
+            return False
+        for additional_line in additional_lines:
+            if "socket.gaierror: [Errno -3] Try again" in additional_line:
+                return True
+            if "socket.gaierror: [Errno -3] Temporary failure in name resolution" in additional_line:
+                return True
+
+        return False
+
+    ignore_predicates.append(skip_temp_hostname_resolution_error)
+
+
 
     messages = preprocess_agent_log_messages(content=content)
     error_line_pattern = re.compile(rf"{AGENT_LOG_LINE_TIMESTAMP} (ERROR|CRITICAL) .*")
@@ -105,9 +122,11 @@ def check_agent_log_for_errors(
             #             to_fail = False
             #             log.info(f"Ignored error: {whole_error}")
             #             break
-            if ignore_predicate and ignore_predicate(message, additional_lines):
-                to_fail = False
-                log.info(f"Ignored error: {whole_error}")
+            for predicate in ignore_predicates:
+                if predicate(message, additional_lines):
+                    to_fail = False
+                    log.info(f"Ignored error: {whole_error}")
+                    break
 
             if to_fail:
                 log.info(content)
@@ -224,7 +243,7 @@ def verify_logs(
     time_tracker: TimeTracker,
     write_counter_messages: Callable[[], None] = None,
     verify_ssl: bool = True,
-    ignore_agent_errors_predicate: Callable[[str, List[str]], bool] = None,
+    ignore_agent_errors_predicates: List[Callable[[str, List[str]], bool]] = None,
 ):
     """
     Do a basic verifications on agent log file.
@@ -239,9 +258,8 @@ def verify_logs(
     :param write_counter_messages: Function that writes counter messages to upload the to Scalyr.
         Can be None, for example for the kubernetes image test, where writer pod is already started.
     :param verify_ssl: Verify that agent connected with ssl enabled.
-    :param ignore_agent_errors_predicate: ignore_predicate: Callable which accepts error message line and following
-        traceback (if exists) and returns True whether this message has to be ignored, so the overall check will not
-        fail.
+    :param ignore_agent_errors_predicates: List of callables where each accepts error message line and following traceback
+        (if exists) and returns True whether this message has to be ignored, so the overall check will not fail.
     """
     if write_counter_messages:
         log.info("Write test log file messages.")
@@ -266,7 +284,7 @@ def verify_logs(
         )[0]
     check_agent_log_for_errors(
         content=first_check_agent_log_content,
-        ignore_predicate=ignore_agent_errors_predicate,
+        ignore_predicates=ignore_agent_errors_predicates,
     )
 
     log.info("Wait for agent log requests stats...")
@@ -334,7 +352,7 @@ def verify_logs(
     )
     check_agent_log_for_errors(
         content=second_check_agent_log_content,
-        ignore_predicate=ignore_agent_errors_predicate,
+        ignore_predicates=ignore_agent_errors_predicates,
     )
 
 
