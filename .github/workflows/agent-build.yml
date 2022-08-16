@@ -58,11 +58,6 @@ jobs:
         with:
           python-version: "3.8.13"
 
-#      - name: Execute the test environment deploy runner.
-#        uses: ./.github/actions/execute-runner
-#        with:
-#          runner-fqdn: "agent_build.__init__.BuildTestEnvironment"
-
       - name: Determine if extended testing is needed
         #if: steps.skip_check.outputs.should_skip != 'true' && ( github.base_ref == 'master' || github.ref == 'master')
         run: |
@@ -111,6 +106,7 @@ jobs:
           set -e
           echo "::set-output name=build-matrix-json::$(python3 agent_build/scripts/get_github_actions_matrices.py image_build_matrix ${{ steps.extended-check.outputs.build-mode-option }})"
           echo "::set-output name=pre-built-cached-steps-matrix::$(python3 agent_build/scripts/get_github_actions_matrices.py pre_built_steps_matrix ${{ steps.extended-check.outputs.build-mode-option }})"
+          echo "::set-output name=test-matrix-json::$(python3 agent_build/scripts/get_github_actions_matrices.py k8s_image_test_matrix ${{ steps.extended-check.outputs.build-mode-option }})"
           
           exit 0
           echo "Test job matrix: "
@@ -127,6 +123,8 @@ jobs:
           echo "Image pre-build steps job matrix: "
           echo '${{ steps.get-info.outputs.pre-built-cached-steps-matrix }}' | jq --color-output
           
+          echo "Image test job matrix: "
+          echo '${{ steps.get-info.outputs.test-matrix-json }}' | jq --color-output
 
         
         
