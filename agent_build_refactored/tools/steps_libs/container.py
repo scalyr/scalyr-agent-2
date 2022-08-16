@@ -12,7 +12,7 @@ class DockerContainer:
     Simple wrapper around docker container that allows to use context manager to clean up when container is not
     needed anymore.
     NOTE: The 'docker' library is not used on purpose, since there's only one abstraction that is needed. Using
-    docker through the docker CLI is much easier and does not require the "docker" lib as dependency.
+    docker through the docker CLI is much easier and does not require the "docker" lib as a dependency.
     """
 
     def __init__(
@@ -68,6 +68,10 @@ class DockerContainer:
 
         command_args.extend(self.command)
 
+        # check_call_with_log_debug(
+        #     command_args,
+        #     description=f"Start docker container '{self.name}'",
+        # )
         subprocess.check_call(
             command_args,
         )
@@ -75,6 +79,10 @@ class DockerContainer:
         self.real_ports = self._get_real_ports()
 
     def kill(self):
+        # check_call_with_log_debug(
+        #     ["docker", "rm", "-f", self.name],
+        #     description=f"Remove docker container '{self.name}'",
+        # )
         subprocess.check_call(
             ["docker", "rm", "-f", self.name],
         )
