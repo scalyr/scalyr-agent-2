@@ -333,7 +333,7 @@ jobs:
           channel: '#cloud-tech'
 
   publish-images:
-    if: ${{ needs.pre-job.outputs.is-extended && ( github.ref == 'refs/heads/reorganise-docker-image-builders' || github.ref_type == 'tag')) }}
+    if: ${{ needs.pre-job.outputs.is-extended && ( github.ref == 'refs/heads/reorganise-docker-image-builders' || github.ref_type == 'tag') }}
     needs:
       - pre-job
       - test-k8s-images
