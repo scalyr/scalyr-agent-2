@@ -6,7 +6,7 @@ import pytest
 from agent_build.tools import LocalRegistryContainer
 from agent_build.docker_image_builders import (
     ContainerImageBuilder,
-    ALL_DOCKER_IMAGE_BUILDERS
+    ALL_DOCKER_IMAGE_BUILDERS,
 )
 
 

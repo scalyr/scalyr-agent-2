@@ -1,4 +1,8 @@
-from agent_build.docker_image_builders import K8S_DEFAULT_BUILDERS, K8S_ADDITIONAL_BUILDERS, ALL_DOCKER_IMAGE_BUILDERS
+from agent_build.docker_image_builders import (
+    K8S_DEFAULT_BUILDERS,
+    K8S_ADDITIONAL_BUILDERS,
+    ALL_DOCKER_IMAGE_BUILDERS,
+)
 
 
 DEFAULT_KUBERNETES_VERSION = {
@@ -50,9 +54,8 @@ for k_v in KUBERNETES_VERSIONS:
         {"image_builder_name": _DEFAULT_K8S_IMAGE_BUILDER.get_name(), **k_v}
     )
 for builder_cls in K8S_ADDITIONAL_BUILDERS:
-    ADDITIONAL_K8S_TEST_PARAMS.append({"image_builder_name": builder_cls.get_name(), **DEFAULT_KUBERNETES_VERSION})
+    ADDITIONAL_K8S_TEST_PARAMS.append(
+        {"image_builder_name": builder_cls.get_name(), **DEFAULT_KUBERNETES_VERSION}
+    )
 
-ALL_K8S_TEST_PARAMS = [
-    *DEFAULT_K8S_TEST_PARAMS,
-    *ADDITIONAL_K8S_TEST_PARAMS
-]
+ALL_K8S_TEST_PARAMS = [*DEFAULT_K8S_TEST_PARAMS, *ADDITIONAL_K8S_TEST_PARAMS]

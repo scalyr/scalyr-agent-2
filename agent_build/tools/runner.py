@@ -774,9 +774,7 @@ class Runner:
             if module_file_path.is_absolute():
                 module_file_path = module_file_path.relative_to(SOURCE_ROOT)
 
-            module_name_parts = (
-                str(module_file_path).strip(".py").split(os.sep)
-            )
+            module_name_parts = str(module_file_path).strip(".py").split(os.sep)
             module_name = ".".join(module_name_parts)
 
         # Assign class' new alias in the target module to its FQDN.

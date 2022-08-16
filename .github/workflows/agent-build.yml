@@ -387,6 +387,7 @@ jobs:
     needs:
       - pre-job
       - test-k8s-images
+      - test-docker-images
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:

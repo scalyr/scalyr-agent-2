@@ -13,25 +13,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-import json
-import pathlib as pl
 import subprocess
 import logging
 import functools
-import os
-import time
 from typing import List
 
 import pytest
 
-from agent_build.tools import check_call_with_log, check_output_with_log
 from tests.end_to_end_tests.verify import verify_logs
-from tests.end_to_end_tests.container_image_tests.docker_test.parameters import ALL_DOCKER_TEST_PARAMS
+from tests.end_to_end_tests.container_image_tests.docker_test.parameters import (
+    ALL_DOCKER_TEST_PARAMS,
+)
 from tests.end_to_end_tests.tools import TimeTracker
 
 
 log = logging.getLogger(__name__)
+
+pytestmark = [
+    # Add timeout for all tests
+    pytest.mark.timeout(60 * 1000),
+    pytest.mark.usefixtures("dump_info"),
+]
 
 
 def pytest_generate_tests(metafunc):
@@ -50,125 +52,6 @@ def pytest_generate_tests(metafunc):
     metafunc.parametrize(param_names, final_params, indirect=True)
 
 
-def _call_docker(cmd_args: List[str]):
-    check_call_with_log(["docker", *cmd_args])
-
-
-@pytest.fixture(scope="session")
-def agent_container_name():
-    return "scalyr-agent"
-
-
-@pytest.fixture(scope="session")
-def docker_server_hostname(image_builder_name, test_session_suffix, request):
-    return f"agent-docker-image-test-{image_builder_name}-{request.node.nodeid}-{test_session_suffix}"
-
-
-@pytest.fixture
-def start_agent_container(
-    image_name,
-    agent_container_name,
-    scalyr_api_key,
-    tmp_path_factory,
-    docker_server_hostname,
-):
-    """
-    Returns function which starts agent docker container.
-    """
-
-    # Kill and remove the previous container, if exists.
-    _call_docker(["rm", "-f", agent_container_name])
-
-    extra_config_path = tmp_path_factory.mktemp("extra-config") / "server_host.json"
-
-    extra_config_path.write_text(
-        json.dumps({"server_attributes": {"serverHost": docker_server_hostname}})
-    )
-
-    def start(timeout_tracker: TimeTracker):
-        # Run agent inside the container.
-        _call_docker(
-            [
-                "run",
-                "-d",
-                "--name",
-                agent_container_name,
-                "-e",
-                f"SCALYR_API_KEY={scalyr_api_key}",
-                "-v",
-                "/var/run/docker.sock:/var/scalyr/docker.sock",
-                "-v",
-                "/var/lib/docker/containers:/var/lib/docker/containers",
-                # mount extra config
-                "-v",
-                f"{extra_config_path}:/etc/scalyr-agent-2/agent.d/{extra_config_path.name}",
-                image_name,
-            ]
-        )
-
-        with timeout_tracker(20):
-            while True:
-                try:
-                    _get_agent_log_content(container_name=agent_container_name)
-                    return agent_container_name
-                except subprocess.CalledProcessError:
-                    timeout_tracker.sleep(5, "Can not read agent's log in time.")
-
-
-    yield start
-    _call_docker(["kill", agent_container_name])
-    _call_docker(["rm", agent_container_name])
-
-
-@pytest.fixture(scope="session")
-def counter_writer_container_name():
-    return "counter-writer"
-
-
-@pytest.fixture
-def start_counter_writer_container(counter_writer_container_name):
-    """
-    Returns function which starts container that writes counter messages, which are needed to verify ingestion
-        to Scalyr servers.
-    """
-    _call_docker(["rm", "-f", counter_writer_container_name])
-
-    def start():
-        _call_docker(
-            [
-                "run",
-                "-d",
-                "--name",
-                counter_writer_container_name,
-                "ubuntu:20.04",
-                "bin/bash",
-                "-c",
-                "for i in {0..999}; do echo $i; done; sleep 10000",
-            ]
-        )
-
-    yield start
-    # cleanup.
-    _call_docker(["rm", "-f", counter_writer_container_name])
-
-
-def _get_agent_log_content(container_name: str) -> str:
-    """
-    Read content of the agent log file in the agent's container.
-    """
-    return check_output_with_log(
-        [
-            "docker",
-            "exec",
-            "-i",
-            container_name,
-            "cat",
-            "/var/log/scalyr-agent-2/agent.log",
-        ],
-        description=f"Get content of the agent log in the container '{container_name}'."
-    ).decode()
-
-
 def test_basic(
     agent_container_name,
     counter_writer_container_name,
@@ -178,11 +61,10 @@ def test_basic(
     start_agent_container,
     start_counter_writer_container,
     docker_server_hostname,
+    get_agent_log_content,
+    image_builder_name,
 ):
     timeout_tracker = TimeTracker(150)
-    log.info(
-        f"Starting test. Scalyr logs can be found by the host name: {docker_server_hostname}"
-    )
     start_agent_container(timeout_tracker=timeout_tracker)
 
     start_counter_writer_container()
@@ -201,20 +83,42 @@ def test_basic(
     )
     assert len(export_config_output) > 0
 
+    if "docker-api" in image_builder_name:
+        # In case of "docker-api" image type, there is an error message that pops up on each container log line without
+        # timestamp, ignore it for now.
+        # TODO maybe make this error as warning?
+        def ignore_agent_error_predicate(message: str, additional_lines: List[str]):
+            if (
+                "[monitor:docker_monitor]" in message
+                and "No timestamp found on line" in message
+            ):
+                return True
+
+        # it also seems like the timestamp is implicitly written to the event's message
+        # TODO need to check if that is a desired behaviour.
+        def counter_getter(e):
+            ts, message = e["message"].rstrip("\n").split(" ")
+            return int(message)
+
+    else:
+        ignore_agent_error_predicate = None
+        # Since the test writer pod writes plain text counters, set this count getter.
+        counter_getter = lambda e: int(e["message"].rstrip("\n"))
+
     log.info("Verify containers logs.")
     verify_logs(
         scalyr_api_read_key=scalyr_api_read_key,
         scalyr_server=scalyr_server,
         get_agent_log_content=functools.partial(
-            _get_agent_log_content, container_name=agent_container_name
+            get_agent_log_content, container_name=agent_container_name
         ),
-        # Since the test writer pod writes plain text counters, set this count getter.
-        counter_getter=lambda e: int(e["message"].rstrip("\n")),
+        counter_getter=counter_getter,
         counters_verification_query_filters=[
             f"$containerName=='{counter_writer_container_name}'",
             f"$serverHost=='{docker_server_hostname}'",
         ],
-        time_tracker=timeout_tracker
+        time_tracker=timeout_tracker,
+        ignore_agent_errors_predicate=ignore_agent_error_predicate,
     )
 
     logging.info("Test passed!")

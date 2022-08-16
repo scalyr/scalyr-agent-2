@@ -41,10 +41,13 @@ from agent_build.docker_image_builders import (
 
 from tests.end_to_end_tests.container_image_tests.k8s_test.parameters import (
     DEFAULT_K8S_TEST_PARAMS,
-    ALL_K8S_TEST_PARAMS
+    ALL_K8S_TEST_PARAMS,
 )
 
-from tests.end_to_end_tests.container_image_tests.docker_test.parameters import DEFAULT_DOCKER_TEST_PARAMS, ALL_DOCKER_TEST_PARAMS
+from tests.end_to_end_tests.container_image_tests.docker_test.parameters import (
+    DEFAULT_DOCKER_TEST_PARAMS,
+    ALL_DOCKER_TEST_PARAMS,
+)
 
 DEFAULT_IMAGE_BUILDERS = DEBIAN_IMAGE_BUILDERS[:]
 ADDITIONAL_IMAGE_BUILDERS = [*ALPINE_IMAGE_BUILDERS]
@@ -56,7 +59,9 @@ def get_image_build_matrix(extended: bool):
     :param extended: Build all images if True.
     """
 
-    builders = list(ALL_DOCKER_IMAGE_BUILDERS.values()) if extended else DEFAULT_IMAGE_BUILDERS
+    builders = (
+        list(ALL_DOCKER_IMAGE_BUILDERS.values()) if extended else DEFAULT_IMAGE_BUILDERS
+    )
 
     matrix = {"include": []}
 
@@ -73,7 +78,9 @@ def get_image_build_matrix(extended: bool):
     print(json.dumps(matrix))
 
 
-def _get_pre_built_step_runners(runner_classes: List[Type[Runner]]) -> List[Type[Runner]]:
+def _get_pre_built_step_runners(
+    runner_classes: List[Type[Runner]],
+) -> List[Type[Runner]]:
     """
     This function collect all required RunnerStep instances from all provided Runner classes that have to be pre-built
     on a separate job in GHA, and wraps each of them into a "dummy" Runner class that runs only that particular step.
@@ -108,11 +115,15 @@ def _get_pre_built_step_runners(runner_classes: List[Type[Runner]]) -> List[Type
 
 
 # Create "dummy" step runners for pre-built steps job matrix.
-DEFAULT_IMAGES_PRE_BUILT_STEP_RUNNERS = _get_pre_built_step_runners(DEFAULT_IMAGE_BUILDERS)
-ADDITIONAL_IMAGES_PRE_BUILT_STEP_RUNNERS = _get_pre_built_step_runners(ADDITIONAL_IMAGE_BUILDERS)
+DEFAULT_IMAGES_PRE_BUILT_STEP_RUNNERS = _get_pre_built_step_runners(
+    DEFAULT_IMAGE_BUILDERS
+)
+ADDITIONAL_IMAGES_PRE_BUILT_STEP_RUNNERS = _get_pre_built_step_runners(
+    ADDITIONAL_IMAGE_BUILDERS
+)
 EXTENDED_IMAGES_PRE_BUILT_STEP_RUNNERS = [
     *DEFAULT_IMAGES_PRE_BUILT_STEP_RUNNERS,
-    *ADDITIONAL_IMAGES_PRE_BUILT_STEP_RUNNERS
+    *ADDITIONAL_IMAGES_PRE_BUILT_STEP_RUNNERS,
 ]
 
 
@@ -121,7 +132,11 @@ def get_image_pre_built_steps_matrix(extended: bool):
     Create GHA job matrix for thejob which pre-builds runner steps which are marked to be done so.
     """
 
-    all_image_req_step_runners = EXTENDED_IMAGES_PRE_BUILT_STEP_RUNNERS if extended else DEFAULT_IMAGES_PRE_BUILT_STEP_RUNNERS
+    all_image_req_step_runners = (
+        EXTENDED_IMAGES_PRE_BUILT_STEP_RUNNERS
+        if extended
+        else DEFAULT_IMAGES_PRE_BUILT_STEP_RUNNERS
+    )
 
     matrix = {"include": []}
 
@@ -156,7 +171,7 @@ def get_k8s_image_test_matrix(extended: bool):
             {
                 "pytest-params": f"{image_builder_name}-{kubernetes_version}-{minikube_driver}-{container_runtime}",
                 "builder-name": image_builder_name,
-                #"distro-name": image_builder_cls.BASE_IMAGE_BUILDER_STEP.base_distro.name,
+                # "distro-name": image_builder_cls.BASE_IMAGE_BUILDER_STEP.base_distro.name,
                 "os": "ubuntu-20.04",
                 "python-version": "3.8.13",
             }
@@ -189,11 +204,7 @@ def main():
 
     parser.add_argument("matrix_name")
 
-    parser.add_argument(
-        "--extended",
-        required=False,
-        action="store_true"
-    )
+    parser.add_argument("--extended", required=False, action="store_true")
 
     args = parser.parse_args()
 
@@ -214,5 +225,5 @@ def main():
         exit(0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
