@@ -462,6 +462,7 @@ def get_agent_log_content(minikube_kubectl_args):
         """
         Read content of the agent log file in the agent pod.
         """
+
         return check_output_with_log_debug(
             [
                 *minikube_kubectl_args,
