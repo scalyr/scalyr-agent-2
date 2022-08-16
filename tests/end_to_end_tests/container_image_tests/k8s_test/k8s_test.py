@@ -110,6 +110,17 @@ def test_basic(
 
     test_writer_pod_name = start_test_log_writer_pod(time_tracker=timeout)
 
+    def ignore_k8s_api_temporary_host_resolution_error(message, additional_lines):
+        if "[monitor:kubernetes_events_monitor]" not in message or "[monitor:kubernetes_monitor]" not in message:
+            return False
+
+        for additional_line in additional_lines:
+            if "[Errno -3] Temporary failure in name resolution" in additional_line:
+                return True
+
+        return False
+
+
     verify_logs(
         scalyr_api_read_key=scalyr_api_read_key,
         scalyr_server=scalyr_server,
@@ -124,6 +135,7 @@ def test_basic(
             f"$k8s-cluster=='{cluster_name}'",
         ],
         time_tracker=timeout,
+        ignore_agent_errors_predicates=[ignore_k8s_api_temporary_host_resolution_error]
     )
 
     logging.info("Test passed!")
