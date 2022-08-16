@@ -91,7 +91,7 @@ jobs:
 
       - name: "Determine if extended testing is needed for the tag"
         id: check-tag
-        if: github.event_name == 'push' && github.ref_type == 'tag'
+        if: github.event_name == 'push' && github.ref_type == 'tag' && steps.version-file.outputs.version == 'ewfwef'
         run: |
           echo "::set-output name=is-extended::true"
           echo "::set-output name=is-production-tag::true"
