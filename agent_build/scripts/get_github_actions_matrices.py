@@ -42,8 +42,8 @@ from agent_build.docker_image_builders import (
 )
 
 from tests.end_to_end_tests.container_image_tests.k8s_test.parameters import (
-    TEST_PARAMS as K8S_TESTS_PARAMS,
-    ALL_TEST_PARAMS as ALL_K8S_TEST_PARAMS,
+    DEFAULT_K8S_TEST_PARAMS,
+    ALL_K8S_TEST_PARAMS
 )
 
 DEFAULT_IMAGE_BUILDERS = DEBIAN_IMAGE_BUILDERS[:]
@@ -142,7 +142,7 @@ def get_k8s_image_test_matrix(extended: bool):
     """
     Get GHA job matrix for k8s image test job.
     """
-    params = ALL_K8S_TEST_PARAMS if extended else K8S_TESTS_PARAMS
+    params = ALL_K8S_TEST_PARAMS if extended else DEFAULT_K8S_TEST_PARAMS
     matrix = {"include": []}
 
     for p in params:

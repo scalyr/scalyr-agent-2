@@ -1,4 +1,4 @@
-from agent_build.docker_image_builders import K8S_DEFAULT_BUILDERS, K8S_EXTENDED_BUILDERS, ALL_DOCKER_IMAGE_BUILDERS
+from agent_build.docker_image_builders import K8S_DEFAULT_BUILDERS, K8S_ADDITIONAL_BUILDERS, ALL_DOCKER_IMAGE_BUILDERS
 
 
 DEFAULT_KUBERNETES_VERSION = {
@@ -35,24 +35,24 @@ KUBERNETES_VERSIONS = [
     },
 ]
 
-TEST_PARAMS = []
+DEFAULT_K8S_TEST_PARAMS = []
 
 for builder_cls in K8S_DEFAULT_BUILDERS:
-    TEST_PARAMS.append(
+    DEFAULT_K8S_TEST_PARAMS.append(
         {"image_builder_name": builder_cls.get_name(), **DEFAULT_KUBERNETES_VERSION}
     )
 
-DEFAULT_K8S_IMAGE_BUILDER = ALL_DOCKER_IMAGE_BUILDERS["k8s-debian"]
+_DEFAULT_K8S_IMAGE_BUILDER = ALL_DOCKER_IMAGE_BUILDERS["k8s-debian"]
 
-EXTENDED_TEST_PARAMS = []
+ADDITIONAL_K8S_TEST_PARAMS = []
 for k_v in KUBERNETES_VERSIONS:
-    EXTENDED_TEST_PARAMS.append(
-        {"image_builder_name": DEFAULT_K8S_IMAGE_BUILDER.get_name(), **k_v}
+    ADDITIONAL_K8S_TEST_PARAMS.append(
+        {"image_builder_name": _DEFAULT_K8S_IMAGE_BUILDER.get_name(), **k_v}
     )
-for builder_cls in K8S_EXTENDED_BUILDERS:
-    TEST_PARAMS.append({"image_builder_name": builder_cls.get_name(), **DEFAULT_KUBERNETES_VERSION})
+for builder_cls in K8S_ADDITIONAL_BUILDERS:
+    ADDITIONAL_K8S_TEST_PARAMS.append({"image_builder_name": builder_cls.get_name(), **DEFAULT_KUBERNETES_VERSION})
 
-ALL_TEST_PARAMS = [
-    *TEST_PARAMS,
-    *EXTENDED_TEST_PARAMS
+ALL_K8S_TEST_PARAMS = [
+    *DEFAULT_K8S_TEST_PARAMS,
+    *ADDITIONAL_K8S_TEST_PARAMS
 ]

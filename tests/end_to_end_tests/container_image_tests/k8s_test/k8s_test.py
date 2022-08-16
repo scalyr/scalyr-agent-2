@@ -23,11 +23,11 @@ import pytest
 
 from tests.end_to_end_tests.verify import verify_logs, ScalyrQueryRequest
 from tests.end_to_end_tests.tools import TimeTracker
-from tests.end_to_end_tests.container_image_tests.k8s_test.parameters import TEST_PARAMS, ALL_TEST_PARAMS
+from tests.end_to_end_tests.container_image_tests.k8s_test.parameters import TEST_PARAMS, ALL_K8S_TEST_PARAMS
 
 from agent_build.docker_image_builders import (
     K8S_DEFAULT_BUILDERS,
-    K8S_EXTENDED_BUILDERS,
+    K8S_ADDITIONAL_BUILDERS,
     ALL_DOCKER_IMAGE_BUILDERS,
 )
 
@@ -77,7 +77,7 @@ def pytest_generate_tests(metafunc):
     ]
 
     final_params = []
-    for p in ALL_TEST_PARAMS:
+    for p in ALL_K8S_TEST_PARAMS:
         final_params.append([p[name] for name in param_names])
 
     metafunc.parametrize(param_names, final_params, indirect=True)
