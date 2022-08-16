@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-This module defines all possible packages of the Scalyr Agent and how they can be built.
+This module defines functions that prepare file structures for different agent types..
 """
 
 
