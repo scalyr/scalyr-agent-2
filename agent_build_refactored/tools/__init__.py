@@ -35,7 +35,6 @@ IN_DOCKER = bool(os.environ.get("AGENT_BUILD_IN_DOCKER"))
 
 # If this env. variable is set, than the code runs in CI/CD (e.g. Github actions)
 IN_CICD = bool(os.environ.get("AGENT_BUILD_IN_CICD"))
-IN_CICD = True
 
 
 def init_logging():
@@ -55,7 +54,7 @@ def init_logging():
 class UniqueDict(dict):
     """
     Simple dict subclass which raises error on attempt of adding existing key.
-    Needed to keep tracking that
+    Needed to keep tracking unique Runners.
     """
 
     def __setitem__(self, key, value):

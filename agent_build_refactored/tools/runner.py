@@ -70,22 +70,28 @@ class DockerImageSpec:
         Serialize docker image into file by using 'docker save' command.
         :param output_path: Result output file.
         """
-        with output_path.open("wb") as f:
-            check_call_with_log(["docker", "save", self.name], stdout=f)
+
+        check_call_with_log(
+            ["docker", "save", self.name, "--output", str(output_path)]
+        )
 
 
 @dataclasses.dataclass
 class GitHubActionsSettings:
     """Dataclass that stores settings for how step has to be executed on GitHub Actions CI/CD"""
 
+    # Flag that indicates that step has to be cached by GHA CI/CD
     cacheable: bool = False
+
+    # Flag that indicates that this step has to be executed in a separate job during GHA CI/CD run.
+    # In case of multiple, long-running steps, this has to decrease overall build time.
     pre_build_in_separate_job: bool = False
 
 
 class RunnerStep:
     """
-    Base abstraction that represents a shell/python script that has to be performed by the Runner. The step can be
-        performed directly on the current machine or inside the docker. Results of the step can be cached. The caching
+    Base abstraction that represents a shell/python script that has to be executed by the Runner. The step can be
+        executed directly on the current machine or inside the docker. Results of the step can be cached. The caching
         is mostly aimed to reduce build time on the CI/CD such as GitHub Actions. In order to achieve desired caching
         behaviour, all input data, that can affect the result, has to be taken into account.
         For now, such data is:
@@ -112,7 +118,7 @@ class RunnerStep:
             a step.
         :param base: Another 'EnvironmentRunnerStep' or docker image that will be used as base environment where this
             step will run.
-        :param required_steps: List of other steps that has to be performed in order to run this step.
+        :param required_steps: List of other steps that has to be executed in order to run this step.
         :param environment_variables: Dist with environment variables to pass to step's script.
         :param github_actions_settings: Additional setting on how step has to be executed on GitHub Actions CI/CD
         """
@@ -458,7 +464,7 @@ class RunnerStep:
 
     def run(self, work_dir: pl.Path):
         """
-        Run the step. Based on its initial data, it will be performed in docker or locally, on the current system.
+        Run the step. Based on its initial data, it will be executed in docker or locally, on the current system.
         """
 
         output_directory = self.get_output_directory(work_dir)
@@ -469,52 +475,53 @@ class RunnerStep:
         skipped = self._restore_cache(
             output_directory=output_directory, cache_directory=cache_directory
         )
-        if not skipped:
-            logging.info(f"Run step {self.name}.")
-            for step in self.required_steps.values():
-                step.run(work_dir=work_dir)
-
-            if self._base_step:
-                self._base_step.run(work_dir=work_dir)
-
-            self._remove_output_directory(output_directory=output_directory)
-            output_directory.mkdir(parents=True, exist_ok=True)
-
-            # Create directory to store only tracked files.
-            if isolated_source_root.exists():
-                shutil.rmtree(isolated_source_root)
-            isolated_source_root.mkdir(parents=True)
-
-            # Copy all tracked files into a new isolated directory.
-            for file_path in self._tracked_files:
-                dest_path = isolated_source_root / file_path.parent.relative_to(
-                    SOURCE_ROOT
-                )
-                dest_path.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(file_path, dest_path)
-
-            all_env_variables = self._get_all_environment_variables(work_dir=work_dir)
-            env_variables_str = "\n    ".join(
-                f"{n}='{v}'" for n, v in all_env_variables.items()
-            )
-            logging.info(
-                f"Start step: {self.id}\n"
-                f"Passed env. variables:\n    {env_variables_str}\n"
-            )
-            try:
-                self._run_script(work_dir=work_dir)
-            except Exception:
-                globs = [str(g) for g in self.tracked_files_globs]
-                logging.exception(
-                    f"'{type(self).__name__}' has failed. "
-                    "HINT: Make sure that you have specified all files. "
-                    f"For now, tracked files are: {globs}."
-                )
-                raise
-            finally:
-                self.cleanup()
-        else:
+        if skipped:
             log.info(f"Result if the step '{self.id}' is found in cache, skip.")
+            return
+
+        logging.info(f"Run step {self.name}.")
+        for step in self.required_steps.values():
+            step.run(work_dir=work_dir)
+
+        if self._base_step:
+            self._base_step.run(work_dir=work_dir)
+
+        self._remove_output_directory(output_directory=output_directory)
+        output_directory.mkdir(parents=True, exist_ok=True)
+
+        # Create directory to store only tracked files.
+        if isolated_source_root.exists():
+            shutil.rmtree(isolated_source_root)
+        isolated_source_root.mkdir(parents=True)
+
+        # Copy all tracked files into a new isolated directory.
+        for file_path in self._tracked_files:
+            dest_path = isolated_source_root / file_path.parent.relative_to(
+                SOURCE_ROOT
+            )
+            dest_path.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(file_path, dest_path)
+
+        all_env_variables = self._get_all_environment_variables(work_dir=work_dir)
+        env_variables_str = "\n    ".join(
+            f"{n}='{v}'" for n, v in all_env_variables.items()
+        )
+        logging.info(
+            f"Start step: {self.id}\n"
+            f"Passed env. variables:\n    {env_variables_str}\n"
+        )
+        try:
+            self._run_script(work_dir=work_dir)
+        except Exception:
+            files = [str(g) for g in self._tracked_files]
+            logging.exception(
+                f"'{type(self).__name__}' has failed. "
+                "HINT: Make sure that you have specified all files. "
+                f"For now, tracked files are: {files}."
+            )
+            raise
+        finally:
+            self.cleanup()
 
         self._save_to_cache(
             is_skipped=skipped,
@@ -559,59 +566,62 @@ class EnvironmentRunnerStep(RunnerStep):
     Specialised step which performs some actions on some environment in order to prepare if for further uses.
         If this step runs in docker, it performs its actions inside specified base docker image and produces
         new image with the result environment.
-        If step does not run in docker, then its actions are performed directly on current system.
+        If step does not run in docker, then its actions are executed directly on current system.
     """
 
     def _restore_cache(
         self, output_directory: pl.Path, cache_directory: pl.Path
     ) -> bool:
-        if self.runs_in_docker:
-            # Before the run, check if there is already an image with the same name. The name contains the checksum
-            # of all files which are used in it, so the name identity also guarantees the content identity.
-            output = (
-                check_output_with_log(
-                    ["docker", "images", "-q", self.result_image.name]
-                )
-                .decode()
-                .strip()
+        if not self.runs_in_docker:
+            return False
+
+        # Before the run, check if there is already an image with the same name. The name contains the checksum
+        # of all files which are used in it, so the name identity also guarantees the content identity.
+        output = (
+            check_output_with_log(
+                ["docker", "images", "-q", self.result_image.name]
             )
+            .decode()
+            .strip()
+        )
 
-            if output:
-                # The image already exists, skip the run.
-                logging.info(
-                    f"Image '{self.result_image.name}' already exists, skip and reuse it."
-                )
-                return True
+        if output:
+            # The image already exists, skip the run.
+            logging.info(
+                f"Image '{self.result_image.name}' already exists, skip and reuse it."
+            )
+            return True
 
-            # # If code runs in CI/CD, then check if the image file is already in cache, and we can reuse it.
-            # if common.IN_CICD:
+        # # If code runs in CI/CD, then check if the image file is already in cache, and we can reuse it.
+        # if common.IN_CICD:
 
-            # Check in step's cache for the image tarball.
-            cached_image_path = cache_directory / self.result_image.name
-            if cached_image_path.is_file():
-                logging.info(
-                    f"Cached image {self.result_image.name} file for the step '{self.name}' has been found, "
-                    f"loading and reusing it instead of building."
-                )
-                check_call_with_log(["docker", "load", "-i", str(cached_image_path)])
-                return True
+        # Check in step's cache for the image tarball.
+        cached_image_path = cache_directory / self.result_image.name
+        if cached_image_path.is_file():
+            logging.info(
+                f"Cached image {self.result_image.name} file for the step '{self.name}' has been found, "
+                f"loading and reusing it instead of building."
+            )
+            check_call_with_log(["docker", "load", "-i", str(cached_image_path)])
+            return True
 
         return False
 
     def _save_to_cache(
         self, is_skipped: bool, output_directory: pl.Path, cache_directory: pl.Path
     ):
-        # Save results in cache.
-        if self.runs_in_docker and not is_skipped:
-            check_call_with_log(
-                ["docker", "commit", self._step_container_name, self.result_image.name]
-            )
-            cache_directory.mkdir(parents=True, exist_ok=True)
-            cached_image_path = cache_directory / self.result_image.name
-            logging.info(
-                f"Saving image '{self.result_image.name}' file for the step {self.name} into cache."
-            )
-            self.result_image.save_docker_image(output_path=cached_image_path)
+        # Save results in cache if needed.
+        if not self.runs_in_docker or is_skipped:
+            return
+        check_call_with_log(
+            ["docker", "commit", self._step_container_name, self.result_image.name]
+        )
+        cache_directory.mkdir(parents=True, exist_ok=True)
+        cached_image_path = cache_directory / self.result_image.name
+        logging.info(
+            f"Saving image '{self.result_image.name}' file for the step {self.name} into cache."
+        )
+        self.result_image.save_docker_image(output_path=cached_image_path)
 
 
 class Runner:
@@ -826,7 +836,7 @@ class Runner:
 
     def _run(self):
         """
-        Function where Runners main work is performed.
+        Function where Runners main work is executed.
         """
         pass
 

@@ -68,10 +68,6 @@ class DockerContainer:
 
         command_args.extend(self.command)
 
-        # check_call_with_log_debug(
-        #     command_args,
-        #     description=f"Start docker container '{self.name}'",
-        # )
         subprocess.check_call(
             command_args,
         )
@@ -79,10 +75,6 @@ class DockerContainer:
         self.real_ports = self._get_real_ports()
 
     def kill(self):
-        # check_call_with_log_debug(
-        #     ["docker", "rm", "-f", self.name],
-        #     description=f"Remove docker container '{self.name}'",
-        # )
         subprocess.check_call(
             ["docker", "rm", "-f", self.name],
         )
