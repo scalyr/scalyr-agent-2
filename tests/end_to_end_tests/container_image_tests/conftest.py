@@ -6,7 +6,7 @@ import pytest
 from agent_build.tools import LocalRegistryContainer
 from agent_build.docker_image_builders import (
     ContainerImageBuilder,
-    DOCKER_IMAGE_BUILDERS,
+    ALL_DOCKER_IMAGE_BUILDERS
 )
 
 
@@ -23,7 +23,7 @@ def image_builder_name(request):
 
 @pytest.fixture(scope="session")
 def image_builder_cls(image_builder_name) -> Type[ContainerImageBuilder]:
-    return DOCKER_IMAGE_BUILDERS[image_builder_name]
+    return ALL_DOCKER_IMAGE_BUILDERS[image_builder_name]
 
 
 @pytest.fixture(scope="session")
