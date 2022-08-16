@@ -446,6 +446,8 @@ CALCULATE_RATE_METRIC_NAMES = {
     "kubernetes-api-cadvisor": [
         # Kubernetes API cAdvisor metrics
         "openmetrics_monitor:container_cpu_usage_seconds_total",
+        "openmetrics_monitor:container_network_receive_bytes_total",
+        "openmetrics_monitor:container_network_transmit_bytes_total",
     ],
 }
 

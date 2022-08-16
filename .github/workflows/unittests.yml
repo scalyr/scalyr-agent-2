@@ -7,6 +7,8 @@ on:
   pull_request:
     branches:
       - master
+  schedule:
+    - cron: '0 4 * * *'
 
 jobs:
   # Special job which automatically cancels old runs for the same branch, prevents runs for the
@@ -33,6 +35,9 @@ jobs:
       - pre_job
       - unittests
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
       - name: Setup Python
         uses: actions/setup-python@v4
         id: setup-python
@@ -115,6 +120,19 @@ jobs:
             test-results/junit*.xml
             .coverage
         if: ${{ success() || failure() }}
+
+      - name: Notify Slack on Failure
+        # NOTE: github.ref is set to pr ref (and not branch name, e.g. refs/pull/28/merge) for pull
+        # requests and that's why we need this special conditional and check for github.head_ref in
+        # case of PRs
+        if: ${{ failure() && (github.ref == 'refs/heads/master' || github.head_ref == 'master') }}
+        uses: act10ns/slack@87c73aef9f8838eb6feae81589a6b1487a4a9e08 # v1.6.0
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          status: ${{ job.status }}
+          steps: ${{ toJson(steps) }}
+          channel: '#cloud-tech'
 
   publish-test-results:
     runs-on: ubuntu-latest
