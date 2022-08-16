@@ -39,7 +39,7 @@ jobs:
       test-matrix-json: ${{ steps.get-info.outputs.test-matrix-json }}
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
       is-extended: ${{ steps.extended-check.outputs.is-extended }}
-      is-production-tag: ${{ steps.check-tag.outputs.is-production-tag }}
+      prod-version-tag: ${{ steps.check-tag.outputs.prod-version-tag }}
 
     steps:
       - id: skip_check
@@ -94,14 +94,6 @@ jobs:
         run: |
           echo "::set-output name=is-extended::true"
           echo "::set-output name=build-mode-option::--extended"
-          echo "::set-output name=is-production-tag::true"
-
-#      - name: "Determine if step build extended or not."
-#        id: extended-check
-#        if: steps.check-pull-request.outputs.is-extended == 'true' || steps.check-branch.outputs.is-extended == 'true' || steps.check-tag.outputs.is-extended == 'true'
-#        run: |
-#          echo "::set-output name=is-extended::true"
-#          echo "::set-output name=build-mode-option::--extended"
       
 
       - name: "Get build and test job matrices."
@@ -112,13 +104,6 @@ jobs:
           echo "::set-output name=build-matrix-json::$(python3 agent_build/scripts/get_github_actions_matrices.py image_build_matrix ${{ steps.extended-check.outputs.build-mode-option }})"
           echo "::set-output name=pre-built-cached-steps-matrix::$(python3 agent_build/scripts/get_github_actions_matrices.py pre_built_steps_matrix ${{ steps.extended-check.outputs.build-mode-option }})"
           echo "::set-output name=test-matrix-json::$(python3 agent_build/scripts/get_github_actions_matrices.py k8s_image_test_matrix ${{ steps.extended-check.outputs.build-mode-option }})"
-          
-          exit 0
-          echo "Test job matrix: "
-          echo "$(python3 -m tests.end_to_end_tests.container_image_tests.k8s_test.k8s_test)"
-          echo "::set-output name=test-matrix-json::$(python3 -m tests.end_to_end_tests.container_image_tests.k8s_test.k8s_test image_build_matrix --extended)"
-          python3 -m agent_build.scripts.prebuild_steps_on_cicd > pre_built_cached_steps_matrix.txt
-          echo "::set-output name=pre-built-cached-steps-matrix::$(cat pre_built_cached_steps_matrix.txt)"
 
       - name: "Print job matrices."
         run: |
@@ -348,21 +333,20 @@ jobs:
           channel: '#cloud-tech'
 
   publish-images:
-    if: ${{ github.ref == 'refs/heads/reorganise-docker-image-builders' || github.ref_type == 'tag' }}
+    if: ${{ needs.pre-job.outputs.is-extended && ( github.ref == 'refs/heads/reorganise-docker-image-builders' || github.ref_type == 'tag')) }}
     needs:
+      - pre-job
       - test-k8s-images
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         distro-name: [ "debian", "alpine" ]
-        #distro-name: [ "debian" ]
         builder-name:
           - docker-json
           - docker-syslog
           - docker-api
           - k8s
           - k8s-restart-agent-on-monitor-death
-
         os: [ "ubuntu-20.04" ]
         python-version: [ "3.8.13" ]
 
@@ -385,16 +369,10 @@ jobs:
             --tags "${{ github.sha }}" \
             --user ${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }} \
             --dest-registry-creds "${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}:${{ secrets.DOCKER_HUB_PASSWORD_TEST_ACCOUNT }}"
-
-
-#      - name: Get content of the VERSION file to match with current tag.
-#        if: github.ref_type == 'tag'
-#        id: version-file
-#        run: |
-#          echo "::set-output name=version::$(cat VERSION | tr -d '\n' | tr -d ' ')"
+          
 
       - name: Publish image of the builder '${{ matrix.builder-name }}-${{ matrix.distro-name }}' using production tag '${{ github.ref_name }}'.
-        if: github.ref_type == 'tag' && github.ref_name == 'v${{steps.version-file.outputs.version}}'
+        if: github.ref_type == 'tag' && github.ref_name == needs.pre-job.outputs.prod-version-tag
         run: |
           python3 build_package_new.py ${{ matrix.builder-name }}-${{ matrix.distro-name }} \
             publish \

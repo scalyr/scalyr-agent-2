@@ -219,43 +219,43 @@ def test_agent_pod_fails_on_k8s_monitor_fail(
     log.info("Test passed!")
 
 
-def main():
-    """
-    This function generates GitHub Actions tests job matrix.
-    """
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--extended", action="store_true", help="Return extended test job matrix"
-    )
-
-    args = parser.parse_args()
-
-    if args.extended:
-        params = EXTENDED_PARAMS[:]
-    else:
-        params = PARAMS[:]
-
-    matrix = {"include": []}
-
-    for p in params:
-        image_builder_name = p["image_builder_name"]
-        image_builder_cls = DOCKER_IMAGE_BUILDERS[image_builder_name]
-        kubernetes_version = p["kubernetes_version"]
-        minikube_driver = p["minikube_driver"]
-        container_runtime = p["container_runtime"]
-
-        matrix["include"].append(
-            {
-                "pytest-params": f"{image_builder_name}-{kubernetes_version}-{minikube_driver}-{container_runtime}",
-                "builder-name": image_builder_name,
-                "distro-name": image_builder_cls.BASE_IMAGE_BUILDER_STEP.base_distro.name,
-                "os": "ubuntu-20.04",
-                "python-version": "3.8.13",
-            }
-        )
-
-    print(json.dumps(matrix))
-
-
-if __name__ == "__main__":
-    main()
+# def main():
+#     """
+#     This function generates GitHub Actions tests job matrix.
+#     """
+#     parser = argparse.ArgumentParser()
+#     parser.add_argument(
+#         "--extended", action="store_true", help="Return extended test job matrix"
+#     )
+#
+#     args = parser.parse_args()
+#
+#     if args.extended:
+#         params = EXTENDED_PARAMS[:]
+#     else:
+#         params = PARAMS[:]
+#
+#     matrix = {"include": []}
+#
+#     for p in params:
+#         image_builder_name = p["image_builder_name"]
+#         image_builder_cls = DOCKER_IMAGE_BUILDERS[image_builder_name]
+#         kubernetes_version = p["kubernetes_version"]
+#         minikube_driver = p["minikube_driver"]
+#         container_runtime = p["container_runtime"]
+#
+#         matrix["include"].append(
+#             {
+#                 "pytest-params": f"{image_builder_name}-{kubernetes_version}-{minikube_driver}-{container_runtime}",
+#                 "builder-name": image_builder_name,
+#                 "distro-name": image_builder_cls.BASE_IMAGE_BUILDER_STEP.base_distro.name,
+#                 "os": "ubuntu-20.04",
+#                 "python-version": "3.8.13",
+#             }
+#         )
+#
+#     print(json.dumps(matrix))
+#
+#
+# if __name__ == "__main__":
+#     main()
