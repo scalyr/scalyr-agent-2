@@ -25,32 +25,33 @@ from typing import List
 
 import pytest
 
-from agent_build.tools import constants
-from agent_build.tools.common import check_call_with_log, check_output_with_log
-from tests.end_to_end_tests.tools import get_testing_logger
-from tests.end_to_end_tests.log_verify import verify_logs
+from agent_build.tools import check_call_with_log, check_output_with_log
+from tests.end_to_end_tests.verify import verify_logs
+from tests.end_to_end_tests.container_image_tests.docker_test.parameters import ALL_DOCKER_TEST_PARAMS
+from tests.end_to_end_tests.tools import TimeTracker
 
 
-log = get_testing_logger(__name__)
+log = logging.getLogger(__name__)
 
 
 def pytest_generate_tests(metafunc):
     """
     parametrize test case according to which image has to be tested.
     """
-    image_builder_name = metafunc.config.getoption("image_builder_name")
-    metafunc.parametrize(["image_builder_cls"], [[image_builder_name]], indirect=True)
+
+    param_names = [
+        "image_builder_name",
+    ]
+
+    final_params = []
+    for p in ALL_DOCKER_TEST_PARAMS:
+        final_params.append([p[name] for name in param_names])
+
+    metafunc.parametrize(param_names, final_params, indirect=True)
 
 
 def _call_docker(cmd_args: List[str]):
     check_call_with_log(["docker", *cmd_args])
-
-
-def build_agent_image(builder_path: pl.Path):
-    # Call the image builder script.
-    subprocess.check_call(
-        [str(builder_path), "--tags", "docker-test"],
-    )
 
 
 @pytest.fixture(scope="session")
@@ -59,15 +60,15 @@ def agent_container_name():
 
 
 @pytest.fixture(scope="session")
-def docker_server_hostname(image_name, test_session_suffix):
-    return f"{image_name}-test-{test_session_suffix}"
+def docker_server_hostname(image_builder_name, test_session_suffix, request):
+    return f"agent-docker-image-test-{image_builder_name}-{request.node.nodeid}-{test_session_suffix}"
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def start_agent_container(
+    image_name,
     agent_container_name,
     scalyr_api_key,
-    full_image_name,
     tmp_path_factory,
     docker_server_hostname,
 ):
@@ -84,7 +85,7 @@ def start_agent_container(
         json.dumps({"server_attributes": {"serverHost": docker_server_hostname}})
     )
 
-    def start():
+    def start(timeout_tracker: TimeTracker):
         # Run agent inside the container.
         _call_docker(
             [
@@ -101,11 +102,18 @@ def start_agent_container(
                 # mount extra config
                 "-v",
                 f"{extra_config_path}:/etc/scalyr-agent-2/agent.d/{extra_config_path.name}",
-                # "--platform",
-                # architecture.as_docker_platform.value,
-                full_image_name,
+                image_name,
             ]
         )
+
+        with timeout_tracker(20):
+            while True:
+                try:
+                    _get_agent_log_content(container_name=agent_container_name)
+                    return agent_container_name
+                except subprocess.CalledProcessError:
+                    timeout_tracker.sleep(5, "Can not read agent's log in time.")
+
 
     yield start
     _call_docker(["kill", agent_container_name])
@@ -117,7 +125,7 @@ def counter_writer_container_name():
     return "counter-writer"
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def start_counter_writer_container(counter_writer_container_name):
     """
     Returns function which starts container that writes counter messages, which are needed to verify ingestion
@@ -156,13 +164,12 @@ def _get_agent_log_content(container_name: str) -> str:
             container_name,
             "cat",
             "/var/log/scalyr-agent-2/agent.log",
-        ]
+        ],
+        description=f"Get content of the agent log in the container '{container_name}'."
     ).decode()
 
 
-def test(
-    agent_image,
-    full_image_name,
+def test_basic(
     agent_container_name,
     counter_writer_container_name,
     scalyr_api_key,
@@ -172,29 +179,13 @@ def test(
     start_counter_writer_container,
     docker_server_hostname,
 ):
-
+    timeout_tracker = TimeTracker(150)
     log.info(
         f"Starting test. Scalyr logs can be found by the host name: {docker_server_hostname}"
     )
-    start_agent_container()
-
-    # Wait a little
-    time.sleep(5)
+    start_agent_container(timeout_tracker=timeout_tracker)
 
     start_counter_writer_container()
-
-    time.sleep(5)
-
-    # Pre-create the agent log file so the tail command wont fail before the agent starts.
-    _call_docker(
-        [
-            "exec",
-            "-i",
-            agent_container_name,
-            "touch",
-            "/var/log/scalyr-agent-2/agent.log",
-        ]
-    )
 
     # Quick check for the `scalyr-agent-2-config script.
     export_config_output = subprocess.check_output(
@@ -223,6 +214,7 @@ def test(
             f"$containerName=='{counter_writer_container_name}'",
             f"$serverHost=='{docker_server_hostname}'",
         ],
+        time_tracker=timeout_tracker
     )
 
     logging.info("Test passed!")

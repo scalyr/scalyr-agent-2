@@ -305,7 +305,7 @@ def cluster_name(
         ],
         description=f"Load target agent image {image_name} to the minikube cluster with profile {minikube_test_profile}",
     )
-    return f"agent-image-test-{image_builder_name}-{request.node.nodeid}-{test_session_suffix}"
+    return f"agent-k8s-image-test-{image_builder_name}-{request.node.nodeid}-{test_session_suffix}"
 
 
 @pytest.fixture

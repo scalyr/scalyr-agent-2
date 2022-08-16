@@ -807,6 +807,13 @@ class DockerApiDebian(ContainerImageBuilderDebian):
     IMAGE_TYPE_SPEC = AGENT_DOCKER_API_SPEC
 
 
+DEBIAN_DOCKER_IMAGE_BUILDERS = [
+    DockerJsonDebian,
+    DockerSyslogDebian,
+    DockerApiDebian,
+]
+
+
 class K8sDebian(ContainerImageBuilderDebian):
     IMAGE_TYPE_SPEC = AGENT_K8S_SPEC
 
@@ -817,6 +824,17 @@ class K8sWithOpenMetricsDebian(ContainerImageBuilderDebian):
 
 class K8sRestartAgentOnMonitorsDeathDebian(ContainerImageBuilderDebian):
     IMAGE_TYPE_SPEC = AGENT_K8S_RESTART_AGENT_ON_MONITOR_DEATH_SPEC
+
+
+DEBIAN_K8S_IMAGE_BUILDERS = [
+    K8sDebian,
+    K8sWithOpenMetricsDebian,
+    K8sRestartAgentOnMonitorsDeathDebian,
+]
+DEBIAN_IMAGE_BUILDERS = [
+    *DEBIAN_DOCKER_IMAGE_BUILDERS,
+    *DEBIAN_K8S_IMAGE_BUILDERS
+]
 
 
 # Final image builder classes for Alpine-base images.
@@ -850,29 +868,19 @@ class K8sRestartAgentOnMonitorsDeathAlpine(ContainerImageBuilderAlpine):
     TAG_SUFFIX = "alpine"
 
 
-DEBIAN_K8S_IMAGE_BUILDERS = [
-    K8sDebian,
-    K8sWithOpenMetricsDebian,
-    K8sRestartAgentOnMonitorsDeathDebian,
+ALPINE_DOCKER_IMAGE_BUILDERS = [
+    DockerJsonAlpine,
+    DockerSyslogAlpine,
+    DockerApiAlpine,
 ]
-
 ALPINE_K8S_IMAGE_BUILDERS = [
     K8sAlpine,
     K8sWithOpenMetricsAlpine,
     K8sRestartAgentOnMonitorsDeathAlpine,
 ]
 
-DEBIAN_IMAGE_BUILDERS = [
-    DockerJsonDebian,
-    DockerSyslogDebian,
-    DockerApiDebian,
-    *DEBIAN_K8S_IMAGE_BUILDERS,
-]
-
 ALPINE_IMAGE_BUILDERS = [
-    DockerJsonAlpine,
-    DockerSyslogAlpine,
-    DockerApiAlpine,
+    *ALPINE_DOCKER_IMAGE_BUILDERS,
     *ALPINE_K8S_IMAGE_BUILDERS,
 ]
 
@@ -890,6 +898,9 @@ ALL_DOCKER_IMAGE_BUILDERS: Dict[str, Type[ContainerImageBuilder]] = UniqueDict(
 
 K8S_DEFAULT_BUILDERS = DEBIAN_K8S_IMAGE_BUILDERS[:]
 K8S_ADDITIONAL_BUILDERS = [*ALPINE_K8S_IMAGE_BUILDERS]
+
+DOCKER_DEFAULT_BUILDERS = DEBIAN_DOCKER_IMAGE_BUILDERS
+DOCKER_ADDITIONAL_BUILDERS = [*ALPINE_DOCKER_IMAGE_BUILDERS]
 
 
 

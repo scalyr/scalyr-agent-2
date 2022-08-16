@@ -36,8 +36,6 @@ from agent_build.docker_image_builders import (
     DEBIAN_IMAGE_BUILDERS,
     ALPINE_IMAGE_BUILDERS,
     IMAGES_PYTHON_VERSION,
-    DEBIAN_K8S_IMAGE_BUILDERS,
-    ALPINE_K8S_IMAGE_BUILDERS,
     ALL_DOCKER_IMAGE_BUILDERS,
 )
 
@@ -45,6 +43,8 @@ from tests.end_to_end_tests.container_image_tests.k8s_test.parameters import (
     DEFAULT_K8S_TEST_PARAMS,
     ALL_K8S_TEST_PARAMS
 )
+
+from tests.end_to_end_tests.container_image_tests.docker_test.parameters import DEFAULT_DOCKER_TEST_PARAMS, ALL_DOCKER_TEST_PARAMS
 
 DEFAULT_IMAGE_BUILDERS = DEBIAN_IMAGE_BUILDERS[:]
 ADDITIONAL_IMAGE_BUILDERS = [*ALPINE_IMAGE_BUILDERS]
@@ -156,7 +156,26 @@ def get_k8s_image_test_matrix(extended: bool):
             {
                 "pytest-params": f"{image_builder_name}-{kubernetes_version}-{minikube_driver}-{container_runtime}",
                 "builder-name": image_builder_name,
-                "distro-name": image_builder_cls.BASE_IMAGE_BUILDER_STEP.base_distro.name,
+                #"distro-name": image_builder_cls.BASE_IMAGE_BUILDER_STEP.base_distro.name,
+                "os": "ubuntu-20.04",
+                "python-version": "3.8.13",
+            }
+        )
+
+    print(json.dumps(matrix))
+
+
+def get_docker_images_test_matrix(extended: bool):
+    params = ALL_DOCKER_TEST_PARAMS if extended else DEFAULT_DOCKER_TEST_PARAMS
+    matrix = {"include": []}
+
+    for p in params:
+        image_builder_name = p["image_builder_name"]
+
+        matrix["include"].append(
+            {
+                "pytest-params": f"{image_builder_name}",
+                "builder-name": image_builder_name,
                 "os": "ubuntu-20.04",
                 "python-version": "3.8.13",
             }
@@ -188,6 +207,10 @@ def main():
 
     if args.matrix_name == "k8s_image_test_matrix":
         get_k8s_image_test_matrix(extended=args.extended)
+        exit(0)
+
+    if args.matrix_name == "docker_image_test_matrix":
+        get_docker_images_test_matrix(extended=args.extended)
         exit(0)
 
 
