@@ -1,9 +1,9 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.33 "in development" - August 27, 2022
+## 2.1.33 "Chaavis" - August 17, 2022
 <!---
-Packaged by Dominic LoBue <dominicl@sentinelone.com> on Jul 27, 2022 12:29 -0800
+Packaged by Dominic LoBue <dominicl@sentinelone.com> on Aug 17, 2022 12:29 -0800
 --->
 
 Improvements:
@@ -16,7 +16,6 @@ Other:
 * Changed log severity level from ``ERROR`` to ``WARNING`` for non-fatal and temporary network client error.
 * Update agent packages to also bundle new LetsEncrypt CA root certificate (ISRG Root X2). Some of the environments use LetsEncrypt issued certificates.
 * Update agent code base to log a warning with the server side SSL certificate in PEM format on SSL certificate validation failure for easier troubleshooting.
-
 
 Bug fix:
 * Set new option ``stop_agent_on_failure`` to ``True`` for the Kubernetes monitor in the agent image for Kubernetes, which has to solve issue with agent not sending pod logs because its Kubernetes monitor is failed.

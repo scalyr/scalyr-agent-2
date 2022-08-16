@@ -16,4 +16,6 @@ pympler==1.0.1; python_version >= '3.7'
 # used by Python 2.7 tests
 pympler==0.8; python_version < '3.7'
 
-docker==4.4.4
+# note: 5.0 drops support for Python 2.7 so we can't use it for our Python 2.7 unit tests target
+docker==5.0.3; python_version >= '3.6'
+docker==4.4.4; python_version < '3.6'
