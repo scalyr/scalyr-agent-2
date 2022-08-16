@@ -68,14 +68,19 @@ jobs:
           echo "github.ref_type: ${{ github.ref_type }}"
           echo "github.ref_name: ${{ github.ref_name }}"
 
-      - name: "Determine if extended testing is needed for the pull request"
-        id: check-pull-request
-        if: github.event_name == 'pull_request' && github.base_ref == 'master'
-        run: echo "::set-output name=is-extended::true"
+#      - name: "Determine if extended testing is needed for the pull request"
+#        id: check-pull-request
+#        if: github.event_name == 'pull_request' && github.base_ref == 'master'
+#        run: echo "::set-output name=is-extended::true"
+
+#      - name: "Determine if extended testing is needed for the branch"
+#        id: check-branch
+#        if: github.event_name == 'push' && github.ref_type == 'branch' && github.ref_name == 'master'
+#        run: echo "::set-output name=is-extended::true"
 
       - name: "Determine if extended testing is needed for the branch"
         id: check-branch
-        if: github.event_name == 'push' && github.ref_type == 'branch' && github.ref_name == 'master'
+        if: github.event_name == 'push'
         run: echo "::set-output name=is-extended::true"
 
       - name: "Get content of the VERSION file to match with current tag."
