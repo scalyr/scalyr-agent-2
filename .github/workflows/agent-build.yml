@@ -200,7 +200,7 @@ jobs:
       # This job receives its matrix from the previous job. The matrix itself is created by the agent_build/package_builder.py module.
       # The matrix, for now, consists only from the 'include' part with following fields:
       #   "builder-name": name of the builder that builds the target images.
-      #   "distro-name": Name of the base distribution, e.g. debian, alpine on which base the resul images are built.
+      ##   "distro-name": Name of the base distribution, e.g. debian, alpine on which base the resul images are built.
       #   "python-version": Version of python to setup on this runner. (NOTE: version of python used in images may differ, and it specified in the source code.)
       #   "os": Runner OS.
       matrix: ${{ fromJSON(needs.pre-job.outputs.build-matrix-json) }}
@@ -281,21 +281,15 @@ jobs:
 
     strategy:
       fail-fast: false
-      matrix:
-        params:
-          - { "build-name": "docker-syslog", "distro-name": "debian", "k8s-version": "v1.17.17", "driver": "", "runtime": "docker" }
-          - { "build-name": "docker-syslog", "distro-name": "alpine", "k8s-version": "v1.17.17", "driver": "", "runtime": "docker", "extended": "true" }
-        os: [ "ubuntu-20.04" ]
-        python-version: [ "3.8.13" ]
-#      # This job receives its matrix from the preparation job. The matrix itself is created by the tests/end_to_end_tests/container_image_tests/k8s_test.py module.
-#      # The matrix, for now, consists only from the 'include' part with following fields:
-#      #   "pytest-params": String with all parameters for a particular test variant which then goes to "parametrize" test cases which has to be run there.
-#      #   "builder-name": name of the builder that builds the target image.
-#      #   "distro-name": Name of the base distribution, e.g. debian, alpine on which base the resul images are built.
-#      #   "result-tarball-name": filename of the result image tarball.
-#      #   "os": Runner's OS
-#      #   "python-version": Version of the python installed on runner.
-#      matrix: ${{ fromJSON(needs.pre-job.outputs.test-matrix-json) }}
+      # This job receives its matrix from the preparation job. The matrix itself is created by the tests/end_to_end_tests/container_image_tests/k8s_test.py module.
+      # The matrix, for now, consists only from the 'include' part with following fields:
+      #   "pytest-params": String with all parameters for a particular test variant which then goes to "parametrize" test cases which has to be run there.
+      #   "builder-name": name of the builder that builds the target image.
+      ##   "distro-name": Name of the base distribution, e.g. debian, alpine on which base the resul images are built.
+      #   "result-tarball-name": filename of the result image tarball.
+      #   "os": Runner's OS
+      #   "python-version": Version of the python installed on runner.
+      matrix: ${{ fromJSON(needs.pre-job.outputs.test-matrix-json) }}
 
 
     env:
