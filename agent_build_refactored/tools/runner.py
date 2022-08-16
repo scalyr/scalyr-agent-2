@@ -105,6 +105,17 @@ class RunnerStep:
         environment_variables: Dict[str, str] = None,
         github_actions_settings: "GitHubActionsSettings" = None,
     ):
+        """
+        :param name: Name of the step.
+        :param script_path: Path of the shell or Python script which has to be executed by step.
+        :param tracked_files_globs: List of file paths or globs to track their content while calculating cache key for
+            a step.
+        :param base: Another 'EnvironmentRunnerStep' or docker image that will be used as base environment where this
+            step will run.
+        :param required_steps: List of other steps that has to be performed in order to run this step.
+        :param environment_variables: Dist with environment variables to pass to step's script.
+        :param github_actions_settings: Additional setting on how step has to be executed on GitHub Actions CI/CD
+        """
         self.name = name
         script_path = pl.Path(script_path)
         if script_path.is_absolute():
@@ -607,9 +618,6 @@ class Runner:
     """
     Abstraction which combines several RunnerStep instances in order to execute them and to use their results
         in order to perform its own work.
-
-    It also allows to run itself through command line, by generating command line argument from the signature
-        of its constructor. This feature, for example, is used by Runner to run itself in docker.
     """
 
     # List of Runner steps which are required by this Runner. All steps which are meant to be cached by GitHub Actions
@@ -627,40 +635,13 @@ class Runner:
     # This class attribute is used to find and load this runner class without direct access to it.
     _FULLY_QUALIFIED_NAME = None
 
-    @staticmethod
-    def runer_cli_command(f, run: bool = True):
-        @functools.wraps
-        def wrapper(self, *args, **kwargs):
-            # Get signature of the function and save arguments according to its signature.
-            input_values = {}
-            pos_arg_count = 0
-            for name, param in inspect.signature(f).parameters.items():
-                if param.kind.POSITIONAL_ONLY:
-                    value = args[pos_arg_count]
-                    pos_arg_count += 1
-                else:
-                    value = kwargs.get(name, param.default)
-
-                input_values[name] = value
-
-            # Set gathered input values as new runner's attribute, so it can use them later.
-            self._input_values = input_values
-
-            if run:
-                self.run()
-            return f(self, *args, **kwargs)
-
-        setattr(wrapper, "is_cli_command", True)
-        setattr(wrapper, "original", f)
-
-        return wrapper
-
     def __init__(
         self,
         work_dir: pl.Path,
         required_steps: List[RunnerStep] = None,
     ):
         """
+        :param work_dir: Path to the directory where Runner will store its results and intermediate data.
         :param required_steps: Final list of RunnerSteps to be executed by this runner. If not specified, then just
             the `REQUIRED_STEPS` class attribute is used.
         """
