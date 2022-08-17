@@ -82,7 +82,7 @@ class BaseDistroSpec:
 
     # Short name of the distribution, e.g. 'debian', 'alpine'
     name: str
-    # Name of the base image which Python e.g. python:slim, python-alpine,
+    # Name of the base image with Python, e.g. python:slim, python-alpine,
     python_base_image: str
 
 
