@@ -43,6 +43,38 @@ jobs:
           do_not_skip: "${{ steps.get_events_to_not_skip.outputs.events_to_not_skip }}"
           github_token: ${{ github.token }}
 
+  coverage:
+    runs-on: ubuntu-latest
+    if: success() || failure()
+    needs:
+      - pre_job
+      - k8s-smoketest
+      - docker-smoketest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        id: setup-python
+        with:
+          python-version: 3.8
+      - name: Install pycoverage
+        run: pip install coverage==4.5.4
+      - name: Download coverage reports
+        uses: actions/download-artifact@v3
+        with:
+          path: reports
+
+      - name: Prepare Coverage Data for codecov.io
+        run: |
+          coverage combine reports/**/.coverage
+          coverage xml -i -o coverage.xml
+
+      - name: Upload Coverage to Codecov.io
+        uses: codecov/codecov-action@81cd2dc8148241f03f5839d295e000b8f761e378 # pin@v3
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: true
 
   # Jobs which performs basic sanity checks for the Kubernetes Monitor and Kubernetes Events Monitor
   k8s_kubernetes_monitor_tests:
@@ -434,31 +466,13 @@ jobs:
         run: |
           source ./.circleci/smoketest_k8s.sh scalyr/scalyr-agent-ci-unittest:4 150 no_delete_existing_k8s_objs
 
-      - name: Prepare Coverage Data for codecov.io and Combine it and Upload it to S3
-        env:
-          COVERAGE_AWS_ACCESS_KEY_ID: ${{ secrets.COVERAGE_AWS_ACCESS_KEY_ID }}
-          COVERAGE_AWS_ACCESS_KEY_SECRET: ${{ secrets.COVERAGE_AWS_ACCESS_KEY_SECRET }}
-          CIRCLE_BRANCH: ${{ github.head_ref || github.ref_name}}
-          CIRCLE_SHA1: ${{ github.sha }}
-        run: |
-          ls -la .coverage* || true
-
-          # Ensure consistent paths for all the code coverage reports
-          sed -i "s#/usr/share/scalyr-agent-2/py/#${{ github.workspace }}#g" .coverage
-
-          # Prepare coverage for codecov.io
-          coverage xml --rcfile=.coveragerc_ci -i -o coverage.xml
-
-          # Combine it and upload it to S3
-          coverage combine --rcfile=.coveragerc_ci || true
-          export PYTHONPATH=.
-          ./scripts/circleci/upload-coverage-data-to-s3.py ".coverage"
-
-      - name: Upload Coverage to Codecov.io
-        uses: codecov/codecov-action@v3
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
         with:
-          files: ./coverage.xml
-          fail_ci_if_error: true
+          name: k8s-smoketest
+          path: |
+            .coverage
+        if: ${{ success() || failure() }}
 
       - name: Notify Slack on Failure
         # NOTE: github.ref is set to pr ref (and not branch name, e.g. refs/pull/28/merge) for pull
@@ -510,31 +524,13 @@ jobs:
         run: |
           source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 docker-${{ matrix.variant.log_mode }} ${{ matrix.variant.timeout }}
 
-      - name: Prepare Coverage Data for codecov.io and Combine it and Upload it to S3
-        env:
-          COVERAGE_AWS_ACCESS_KEY_ID: ${{ secrets.COVERAGE_AWS_ACCESS_KEY_ID }}
-          COVERAGE_AWS_ACCESS_KEY_SECRET: ${{ secrets.COVERAGE_AWS_ACCESS_KEY_SECRET }}
-          CIRCLE_BRANCH: ${{ github.head_ref || github.ref_name}}
-          CIRCLE_SHA1: ${{ github.sha }}
-        run: |
-          ls -la .coverage* || true
-
-          # Ensure consistent paths for all the code coverage reports
-          sed -i "s#/usr/share/scalyr-agent-2/py/#${{ github.workspace }}#g" .coverage
-
-          # Prepare coverage for codecov.io
-          coverage xml --rcfile=.coveragerc_ci -i -o coverage.xml
-
-          # Combine it and upload it to S3
-          coverage combine --rcfile=.coveragerc_ci || true
-          export PYTHONPATH=.
-          ./scripts/circleci/upload-coverage-data-to-s3.py ".coverage"
-
-      - name: Upload Coverage to Codecov.io
-        uses: codecov/codecov-action@v3
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
         with:
-          files: ./coverage.xml
-          fail_ci_if_error: true
+          name: docker-smoketest-${{ matrix.variant.log_mode }}
+          path: |
+            .coverage
+        if: ${{ success() || failure() }}
 
       - name: Notify Slack on Failure
         # NOTE: github.ref is set to pr ref (and not branch name, e.g. refs/pull/28/merge) for pull
