@@ -12,6 +12,9 @@ Improvements:
 Kubernetes Explorer:
 * Update code to calculate per second rate for various metrics used by Kubernetes Explorer on the client (agent) side. This may result in slight CPU and memory usage increase when using Kubernetes Explorer functionality.
 
+Windows:
+* Add new ``json`` config option to the ``windows_event_log`` monitor. When this option is set to true, events are formatted as JSON.
+
 Other:
 * Changed log severity level from ``ERROR`` to ``WARNING`` for non-fatal and temporary network client error.
 * Update agent packages to also bundle new LetsEncrypt CA root certificate (ISRG Root X2). Some of the environments use LetsEncrypt issued certificates.
