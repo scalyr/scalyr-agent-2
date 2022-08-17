@@ -124,7 +124,7 @@ jobs:
     if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
     with:
-      python-version: 3.5.9
+      python-version: 2.7.17
       codespeed_executable: "Python 2.7.17 - idle conf 2"
       agent_config: "benchmarks/configs/agent_no_monitored_logs_no_monitors.json"
       agent_server_host: "ci-codespeed-benchmarks-py27-idle-conf-2"
@@ -146,7 +146,7 @@ jobs:
     if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
     with:
-      python-version: 3.5.9
+      python-version: 2.7.17
       codespeed_executable: "Python 2.7.17 - loaded conf 1"
       agent_config: "benchmarks/configs/agent_single_50mb_access_log_file.json"
       agent_pre_run_command: "wget --directory-prefix=/tmp https://github.com/scalyr/codespeed-agent-fixtures/raw/master/fixtures/logs/access_log_50_mb.log"
@@ -176,7 +176,7 @@ jobs:
     if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
     with:
-      python-version: 3.5.9
+      python-version: 2.7.17
       codespeed_executable: "Python 2.7.17 - loaded conf 2"
       agent_config: "benchmarks/configs/agent_single_growing_log_file_with_shell_and_url_monitor.json"
       run_time: 140
@@ -204,7 +204,7 @@ jobs:
     if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
     with:
-      python-version: 3.5.9
+      python-version: 2.7.17
       codespeed_executable: "Python 2.7.17 - loaded conf 3"
       agent_config: "benchmarks/configs/agent_single_growing_log_file.json"
       # NOTE: We set agent run time slightly longer than the insert script time run so we give a chance for memory and
@@ -237,7 +237,7 @@ jobs:
     if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
     with:
-      python-version: 3.5.9
+      python-version: 2.7.17
       codespeed_executable: "Python 2.7.17 - loaded conf 5"
       agent_config: "benchmarks/configs/agent_single_50mb_genlog_500k_line_file.json"
       agent_pre_run_command: "wget --directory-prefix=/tmp https://github.com/scalyr/codespeed-agent-fixtures/raw/master/fixtures/logs/scalyr_genlog_500k_line_50_mb.log"
