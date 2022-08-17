@@ -16,6 +16,7 @@ import enum
 import pathlib as pl
 
 SOURCE_ROOT = pl.Path(__file__).parent.parent.parent.absolute()
+AGENT_BUILD_PATH = SOURCE_ROOT / "agent_build"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -32,7 +33,10 @@ class DockerPlatformInfo:
 
     @property
     def to_dashed_str(self):
-        return f"{self.os}-{self.architecture}-{self.variant or ''}"
+        result = f"{self.os}-{self.architecture}"
+        if self.variant:
+            result = f"{result}-{self.variant}"
+        return result
 
 
 class DockerPlatform(enum.Enum):
