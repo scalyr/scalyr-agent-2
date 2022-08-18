@@ -90,7 +90,7 @@ jobs:
         run: echo ::set-output name=commit-date::$(git show --quiet --date='format-local:%Y-%m-%d %H:%M:%S' --format="%cd" ${{ github.sha }} )
 
       - name: Pre-Run Command
-        if: inputs.agent_pre_run_command != ""
+        if: inputs.agent_pre_run_command != ''
         run: ${{ inputs.agent_pre_run_command }}
 
       - name: Run Agent And Capture Resource Utilization
@@ -121,7 +121,7 @@ jobs:
           echo ::set-output name=bg-pid::$!
 
       - name: Run any post agent run script
-        if: inputs.agent_post_run_command != ""
+        if: inputs.agent_post_run_command != ''
         run: |
           sleep 2
           ${{ inputs.agent_post_run_command }}
