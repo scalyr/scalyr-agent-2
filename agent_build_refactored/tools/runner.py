@@ -71,9 +71,7 @@ class DockerImageSpec:
         :param output_path: Result output file.
         """
 
-        check_call_with_log(
-            ["docker", "save", self.name, "--output", str(output_path)]
-        )
+        check_call_with_log(["docker", "save", self.name, "--output", str(output_path)])
 
 
 @dataclasses.dataclass
@@ -496,9 +494,7 @@ class RunnerStep:
 
         # Copy all tracked files into a new isolated directory.
         for file_path in self._tracked_files:
-            dest_path = isolated_source_root / file_path.parent.relative_to(
-                SOURCE_ROOT
-            )
+            dest_path = isolated_source_root / file_path.parent.relative_to(SOURCE_ROOT)
             dest_path.mkdir(parents=True, exist_ok=True)
             shutil.copy2(file_path, dest_path)
 
@@ -577,13 +573,8 @@ class EnvironmentRunnerStep(RunnerStep):
 
         # Before the run, check if there is already an image with the same name. The name contains the checksum
         # of all files which are used in it, so the name identity also guarantees the content identity.
-        output = (
-            check_output_with_log(
-                ["docker", "images", "-q", self.result_image.name]
-            )
-            .decode()
-            .strip()
-        )
+        output_bytes = check_output_with_log(["docker", "images", "-q", self.result_image.name])
+        output = output_bytes.decode().strip()
 
         if output:
             # The image already exists, skip the run.
@@ -766,7 +757,7 @@ class Runner:
             if self.base_environment:
                 self.base_environment.run(work_dir=self.work_dir)
 
-            for required_step in self.required_steps:
+            for required_step in self.get_all_required_steps():
                 required_step.run(work_dir=self.work_dir)
 
             if self.required_runners:

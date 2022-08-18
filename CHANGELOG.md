@@ -19,9 +19,10 @@ Other:
 * Changed log severity level from ``ERROR`` to ``WARNING`` for non-fatal and temporary network client error.
 * Update agent packages to also bundle new LetsEncrypt CA root certificate (ISRG Root X2). Some of the environments use LetsEncrypt issued certificates.
 * Update agent code base to log a warning with the server side SSL certificate in PEM format on SSL certificate validation failure for easier troubleshooting.
+* Upgrade various bundled dependencies (orjson, docker).
 
-Bug fix:
-* Set new option ``stop_agent_on_failure`` to ``True`` for the Kubernetes monitor in the agent image for Kubernetes, which has to solve issue with agent not sending pod logs because its Kubernetes monitor is failed.
+Bug fixes:
+* Set new  ``stop_agent_on_failure`` monitor config option to ``True`` for the Kubernetes monitor (``scalyr_agent.builtin_monitors.kubernetes_monitor``) in the agent Docker image for Kubernetes deployments. This solves an issue where under some rare edge cases, Kubernetes Monitor would exit, but the agent would not be restarted which would cause pod logs to stop being ingested.
 
 ## 2.1.32 "Occao" - July 27, 2022
 
