@@ -68,7 +68,7 @@ elif GITHUB_EVENT_NAME == "push" and GITHUB_REF_TYPE == "tag":
 if limited_run:
     used_image_builders = DEBIAN_IMAGE_BUILDERS[:]
 else:
-    used_image_builders = ALL_IMAGE_BUILDERS
+    used_image_builders = list(ALL_IMAGE_BUILDERS.values())
 
 agent_images_build_matrix = {"include": []}
 for builder_cls in used_image_builders:
