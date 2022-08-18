@@ -47,4 +47,4 @@ docker buildx build \
   --build-arg "DISTRO_NAME=${DISTRO_NAME}" \
   --build-arg "COVERAGE_VERSION=${COVERAGE_VERSION}" \
   --output "type=oci,dest=${STEP_OUTPUT_PATH}/${RESULT_IMAGE_TARBALL_NAME}" \
-  ${SOURCE_ROOT}
+  "${SOURCE_ROOT}"

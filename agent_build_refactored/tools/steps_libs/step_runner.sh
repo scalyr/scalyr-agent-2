@@ -130,6 +130,7 @@ export STEP_OUTPUT_PATH
 
 # Run the script.
 if [ "${SCRIPT_TYPE}" = "shell" ]; then
+    # shellcheck disable=SC1090
   . "${STEP_SCRIPT_PATH}"
 else
   ${STEP_SCRIPT_PATH}

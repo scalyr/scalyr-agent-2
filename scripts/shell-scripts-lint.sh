@@ -42,4 +42,5 @@ shellcheck -S info benchmarks/scripts/*.sh
 shellcheck -S info installer/scripts/*.sh
 shellcheck -S info scripts/*.sh
 shellcheck -S info scripts/circleci/*.sh
+# shellcheck disable=SC2046
 shellcheck -S info $(find agent_build_refactored -name "*.sh")
