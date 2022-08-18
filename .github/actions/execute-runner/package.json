@@ -1,0 +1,22 @@
+{
+  "name": "perform-deployment",
+  "version": "1.0.0",
+  "description": "This action uses python module `agent_build/tools/environment_deployments.py` to perform some deployment which is defined in it. The main purpose of the action is to cache results of this deployment to the GitHub Actions cache. Since the deployments consist of  steps, and different deployments can use the same step, then it's more reasonable to cache each step separately. That means that the regular [@actions/cache](https://github.com/actions/cache)  is not enough, and we need to use more flexible JS scripting to call GitHub Actions caching dynamically.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@actions/cache": "^1.0.8",
+    "@actions/core": "^1.6.0",
+    "@actions/github": "^5.0.0",
+    "buffer": "^6.0.3",
+    "child_process": "^1.0.2",
+    "fs": "0.0.1-security",
+    "path": "^0.12.7",
+    "readline": "^1.3.0"
+  }
+}

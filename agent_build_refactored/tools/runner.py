@@ -573,7 +573,9 @@ class EnvironmentRunnerStep(RunnerStep):
 
         # Before the run, check if there is already an image with the same name. The name contains the checksum
         # of all files which are used in it, so the name identity also guarantees the content identity.
-        output_bytes = check_output_with_log(["docker", "images", "-q", self.result_image.name])
+        output_bytes = check_output_with_log(
+            ["docker", "images", "-q", self.result_image.name]
+        )
         output = output_bytes.decode().strip()
 
         if output:
