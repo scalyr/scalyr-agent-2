@@ -179,9 +179,6 @@ class BaseImageBuilderStep(ArtifactRunnerStep):
         self.base_distro = base_distro
         self.supported_platforms = supported_platforms
 
-    def __post_init__(self):
-        pass
-
 
 @dataclasses.dataclass
 class AgentImageTypeSpec:
