@@ -7,7 +7,7 @@ Packaged by Dominic LoBue <dominicl@sentinelone.com> on Aug 17, 2022 12:29 -0800
 --->
 
 Improvements:
-* Add option ``stop_agent_on_failure`` for each monitor's configuration. If `true`, the agent will stop if that monitor fails. Set to `true` by deafult for the Kubernetes monitor (``scalyr_agent.builtin_monitors.kubernetes_monitor``) to ensure a restart of the agent's pod. 
+* Add option ``stop_agent_on_failure`` for each monitor's configuration. If `true`, the agent will stop if the monitor fails. For Kubernetes deployments this is `true` by default for the the Kubernetes monitor (``scalyr_agent.builtin_monitors.kubernetes_monitor``), to ensure a restart of the agent's pod if the monitor fails. 
 
 Kubernetes Explorer:
 * Update code to calculate per second rate for various metrics used by Kubernetes Explorer on the client (agent) side. This may result in slight CPU and memory usage increase when using Kubernetes Explorer functionality.
