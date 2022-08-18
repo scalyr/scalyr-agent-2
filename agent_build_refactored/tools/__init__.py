@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 import os
 from typing import Mapping
 
@@ -27,28 +26,17 @@ from agent_build_refactored.tools.steps_libs.container import (  # NOQA
     DockerContainer,
 )
 
+from agent_build_refactored.tools.steps_libs.build_logging import (  # NOQA
+    init_logging,
+)
+from agent_build_refactored.tools.steps_libs.constants import IN_DOCKER  # NOQA
+
+
 # If this environment variable is set, then commands output is not suppressed.
 DEBUG = bool(os.environ.get("AGENT_BUILD_DEBUG"))
 
-# If this env. variable is set, then the code runs inside the docker.
-IN_DOCKER = bool(os.environ.get("AGENT_BUILD_IN_DOCKER"))
-
 # If this env. variable is set, than the code runs in CI/CD (e.g. Github actions)
 IN_CICD = bool(os.environ.get("AGENT_BUILD_IN_CICD"))
-
-
-def init_logging():
-    """
-    Init logging and defined additional logging fields to logger.
-    """
-
-    # If the code runs in docker, then add such field to the log message.
-    in_docker_field_format = "[IN_DOCKER]" if IN_DOCKER else ""
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format=f"[%(levelname)s][%(module)s:%(lineno)s]{in_docker_field_format} %(message)s",
-    )
 
 
 class UniqueDict(dict):

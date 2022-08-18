@@ -16,10 +16,13 @@ import enum
 import pathlib as pl
 
 SOURCE_ROOT = pl.Path(__file__).parent.parent.parent.absolute()
+AGENT_BUILD_PATH = SOURCE_ROOT / "agent_build"
 
 
 @dataclasses.dataclass(frozen=True)
 class DockerPlatformInfo:
+    """Dataclass with information about docker platform, e.g. linux/amd64, linux/arm/v7, etc."""
+
     os: str
     architecture: str
     variant: str = None
@@ -32,7 +35,11 @@ class DockerPlatformInfo:
 
     @property
     def to_dashed_str(self):
-        return f"{self.os}-{self.architecture}-{self.variant or ''}"
+        """Replaces slash to dash in platform's canonical format."""
+        result = f"{self.os}-{self.architecture}"
+        if self.variant:
+            result = f"{result}-{self.variant}"
+        return result
 
 
 class DockerPlatform(enum.Enum):
