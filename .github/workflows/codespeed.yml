@@ -101,6 +101,7 @@ jobs:
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
+    secrets: inherit
     with:
       python-version: 2.7.17
       codespeed_executable: "Python 2.7.17 - idle conf 1"
@@ -112,6 +113,7 @@ jobs:
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
+    secrets: inherit
     with:
       python-version: 3.5.9
       codespeed_executable: "Python 3.5.9 - idle conf 1"
@@ -123,6 +125,7 @@ jobs:
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
+    secrets: inherit
     with:
       python-version: 2.7.17
       codespeed_executable: "Python 2.7.17 - idle conf 2"
@@ -134,6 +137,7 @@ jobs:
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
+    secrets: inherit
     with:
       python-version: 3.5.9
       codespeed_executable: "Python 3.5.9 - idle conf 2"
@@ -145,6 +149,7 @@ jobs:
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
+    secrets: inherit
     with:
       python-version: 2.7.17
       codespeed_executable: "Python 2.7.17 - loaded conf 1"
@@ -159,6 +164,7 @@ jobs:
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
+    secrets: inherit
     with:
       python-version: 3.5.9
       codespeed_executable: "Python 3.5.9 - loaded conf 1"
@@ -175,6 +181,7 @@ jobs:
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
+    secrets: inherit
     with:
       python-version: 2.7.17
       codespeed_executable: "Python 2.7.17 - loaded conf 2"
@@ -189,6 +196,7 @@ jobs:
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
+    secrets: inherit
     with:
       python-version: 3.5.9
       codespeed_executable: "Python 3.5.9 - loaded conf 2"
@@ -203,6 +211,7 @@ jobs:
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
+    secrets: inherit
     with:
       python-version: 2.7.17
       codespeed_executable: "Python 2.7.17 - loaded conf 3"
@@ -222,6 +231,7 @@ jobs:
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
+    secrets: inherit
     with:
       python-version: 3.5.9
       codespeed_executable: "Python 3.5.9 - loaded conf 4"
@@ -236,6 +246,7 @@ jobs:
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
+    secrets: inherit
     with:
       python-version: 2.7.17
       codespeed_executable: "Python 2.7.17 - loaded conf 5"
@@ -250,6 +261,7 @@ jobs:
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
+    secrets: inherit
     with:
       python-version: 3.5.9
       codespeed_executable: "Python 3.5.9 - loaded conf 5"

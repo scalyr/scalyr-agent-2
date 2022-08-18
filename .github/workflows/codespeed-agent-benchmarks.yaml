@@ -75,7 +75,6 @@ jobs:
           python-version: ${{ inputs.python-version }}
 
       - name: Install Deps
-        shell: bash
         run: |
           python -m pip install --upgrade pip
           pip install -r benchmarks/scripts/requirements.txt
@@ -84,8 +83,18 @@ jobs:
           # different version than the one which is bundled with the agent
           pip install "cffi==1.12.3"
 
+      - name: Capture commit date
+        id: commit-date
+        env:
+          TZ: UTC
+        run: echo ::set-output name=commit-date::$(git show --quiet --date='format-local:%Y-%m-%d %H:%M:%S' --format="%cd" ${{ github.sha }} )
+
+      - name: Pre-Run Command
+        if: inputs.agent_pre_run_command != ""
+        run: ${{ inputs.agent_pre_run_command }}
+
       - name: Run Agent And Capture Resource Utilization
-        shell: bash
+        id: run-agent
         env:
           CODESPEED_AUTH: ${{ secrets.CODESPEED_AUTH }}
           CODESPEED_URL: "https://scalyr-agent-codespeed.herokuapp.com/"
@@ -102,52 +111,37 @@ jobs:
           SCALYR_SERVER_ATTRIBUTES: "{\"serverHost\": \"${{ inputs.agent_server_host }}\"}"
           CAPTURE_AGENT_STATUS_METRICS: ${{ inputs.capture_agent_status_metrics }}
           DRY_RUN: ${{ inputs.dry_run }}
+          COMMIT_DATE: ${{ steps.commit-date.outputs.commit-date }}
+          PYTHONPATH: .
         run: |
           # Create directories which are needed by the agent process
           mkdir -p ~/scalyr-agent-dev/{log,config,data}
-
-          # NOTE: We explicitly specify a commit date to avoid CodeSpeed from
-          # late setting the actual date once it fetches all the commits for a
-          # branch / revision
-          export TZ=UTC
-          export COMMIT_DATE=$(git show --quiet --date='format-local:%Y-%m-%d %H:%M:%S' --format="%cd" ${{ github.sha }} )
-          export PYTHONPATH=.
-
-          # Run any pre agent run script (if defined)
-          if [ ! -z "${{ inputs.agent_pre_run_command }}" ]; then
-              echo "::group::Running agent pre run command..."
-              ${{ inputs.agent_pre_run_command }}
-              echo "::endgroup::"
-          fi
-
           # Run the agent process and capture the metrics
-          ./benchmarks/scripts/start-agent-and-capture-metrics.sh "${{ github.sha }}" &> /tmp/capture_script.log &
-          CAPTURE_SCRIPT_PID=$!
+          ./benchmarks/scripts/start-agent-and-capture-metrics.sh "${{ github.sha }}" &
+          echo ::set-output name=bg-pid::$!
 
-          # Run any post agent run script (if defined)
-          # NOTE: We intentionally sleep for a bit to give agent time to fully
-          # start up
-          if [ ! -z "${{ inputs.agent_post_run_command }}" ]; then
-              echo "::group::Running agent post run command..."
-              sleep 2
-              ${{ inputs.agent_post_run_command }}
-              echo "::endgroup::"
-          fi
+      - name: Run any post agent run script
+        if: inputs.agent_post_run_command != ""
+        run: |
+          sleep 2
+          ${{ inputs.agent_post_run_command }}
 
-          # Wait for capture script to finish
-          echo "::group::Waiting for capture script to finish"
-          set +e
-          sh -c 'tail -n +0 -F /tmp/capture_script.log | { sed "/Run completed, stopping the agent process./ q" && kill $$ ;}'
-          wait ${CAPTURE_SCRIPT_PID} || true
-          set -e
-          echo "::endgroup::"
+      - name: Wait for agent to finish
+        timeout-minutes: 10
+        run: wait ${{ steps.run-agent.outputs.bg-pid }} || true
 
-          # Send line count values for various log levels (if enabled)
-          if [ "${{ inputs.capture_line_counts }}" = "true" ]; then
-              echo "::group::Sending log level line count values to codespeed"
-              ./benchmarks/scripts/send-log-level-counts-to-codespeed.sh "${{ github.sha }}"
-              echo "::endgroup::"
-          fi
+      - name: Send line count values for various log levels
+        if: inputs.capture_line_counts && ! inputs.dry_run
+        env:
+          CODESPEED_AUTH: ${{ secrets.CODESPEED_AUTH }}
+          CODESPEED_URL: "https://scalyr-agent-codespeed.herokuapp.com/"
+          CODESPEED_PROJECT: "scalyr-agent-2-procbenchmarks"
+          CODESPEED_EXECUTABLE: ${{ inputs.codespeed_executable }}
+          CODESPEED_ENVIRONMENT: ${{ inputs.codespeed_environment }}
+          CODESPEED_BRANCH: ${{ github.head_ref || github.ref_name }}
+          COMMIT_DATE: ${{ steps.commit-date.outputs.commit-date }}
+          PYTHONPATH: .
+        run: ./benchmarks/scripts/send-log-level-counts-to-codespeed.sh "${{ github.sha }}"
 
       - name: Upload log artifacts
         uses: actions/upload-artifact@v3
