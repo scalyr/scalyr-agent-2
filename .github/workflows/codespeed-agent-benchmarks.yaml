@@ -108,6 +108,8 @@ jobs:
           RUN_TIME: ${{ inputs.run_time }}
           CAPTURE_INTERVAL: ${{ inputs.capture_interval }}
           AGENT_CONFIG_FILE: ${{ inputs.agent_config }}
+          SCALYR_SERVER: https://agent.scalyr.com
+          SCALYR_API_KEY: ${{ secrets.SCALYR_API_KEY }}
           SCALYR_SERVER_ATTRIBUTES: "{\"serverHost\": \"${{ inputs.agent_server_host }}\"}"
           CAPTURE_AGENT_STATUS_METRICS: ${{ inputs.capture_agent_status_metrics }}
           DRY_RUN: ${{ inputs.dry_run }}
