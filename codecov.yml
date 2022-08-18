@@ -31,6 +31,7 @@ fixes:
   - "/home/circleci/scalyr-agent-2/::"
   - "/home/runner/work/scalyr-agent-2/scalyr-agent-2/::"
   - "/Users/runner/work/scalyr-agent-2/scalyr-agent-2/::"
+  - "/usr/share/scalyr-agent-2/py/::"
 
 ignore:
   # Ignore tests directories for which we currently don't generate coverage
