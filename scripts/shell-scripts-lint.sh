@@ -42,3 +42,4 @@ shellcheck -S info benchmarks/scripts/*.sh
 shellcheck -S info installer/scripts/*.sh
 shellcheck -S info scripts/*.sh
 shellcheck -S info scripts/circleci/*.sh
+shellcheck -S info agent_build_refactored/**/*.sh

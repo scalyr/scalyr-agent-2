@@ -63,7 +63,7 @@ def main():
 
         assert (
             len(found) == 1
-        ), "Number of result image tarball for each platform-specific builder step has to be 1."
+        ), f"Number of result image tarball for each platform-specific builder step has to be 1, but got '{found}'"
 
         tarball_path = found[0]
 

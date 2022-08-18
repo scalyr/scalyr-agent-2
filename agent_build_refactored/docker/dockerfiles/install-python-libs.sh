@@ -17,7 +17,7 @@ set -e
 
 REQUIREMENTS_FILES="agent_build/requirement-files"
 
-# orjson is wheel is not available for armv7 + musl yet so we exclude it here. We can't exclude it
+# orjson wheel is not available for armv7 + musl yet so we exclude it here. We can't exclude it
 # with pip environment markers since they are not specific enough.
 if [ "$TARGETVARIANT" = "v7" ] && [ "$DISTRO_NAME" = "alpine" ]; then
   sed -i '/^orjson/d' "${REQUIREMENTS_FILES}/main-requirements.txt"
