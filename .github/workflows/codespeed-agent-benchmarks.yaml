@@ -130,7 +130,7 @@ jobs:
 
       - name: Wait for agent to finish
         timeout-minutes: 10
-        run: wait ${{ steps.run-agent.outputs.bg-pid }} || true
+        run: tail --pid ${{ steps.run-agent.outputs.bg-pid }} -f /dev/null || true
 
       - name: Send line count values for various log levels
         if: inputs.capture_line_counts && ! inputs.dry_run
@@ -142,6 +142,8 @@ jobs:
           CODESPEED_ENVIRONMENT: ${{ inputs.codespeed_environment }}
           CODESPEED_BRANCH: ${{ github.head_ref || github.ref_name }}
           COMMIT_DATE: ${{ steps.commit-date.outputs.commit-date }}
+          CAPTURE_AGENT_STATUS_METRICS: ${{ inputs.capture_agent_status_metrics }}
+          DRY_RUN: ${{ inputs.dry_run }}
           PYTHONPATH: .
         run: ./benchmarks/scripts/send-log-level-counts-to-codespeed.sh "${{ github.sha }}"
 
