@@ -3093,7 +3093,7 @@ class Configuration(object):
         self.__verify_or_set_optional_int(
             config,
             "memory_profiler_max_items",
-            100,
+            50,
             description,
             apply_defaults,
             env_aware=True,
