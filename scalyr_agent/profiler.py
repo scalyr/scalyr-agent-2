@@ -306,7 +306,7 @@ class PymplerPeriodicMemorySummaryCaptureThread(StoppableThread):
         *args,
         **kwargs
     ):
-        # type: (int, Any, Any) -> None
+        # type: (int, int, int, bool, Any, Any) -> None
         """
         :param capture_interval: How often to capture memory usage snapshot.
         :type capture_interval: ``int``
@@ -412,7 +412,7 @@ class TracemallocPeriodicMemorySummaryCaptureThread(StoppableThread):
         *args,
         **kwargs
     ):
-        # type: (int, Any, Any) -> None
+        # type: (int, int, int, bool, Any, Any) -> None
         """
         :param capture_interval: How often to capture memory usage snapshot.
         :type capture_interval: ``int``
