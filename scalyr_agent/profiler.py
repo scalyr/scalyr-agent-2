@@ -37,6 +37,7 @@ from io import open
 
 import six
 
+
 try:
     import yappi
 except ImportError:
@@ -50,6 +51,16 @@ try:
     from pympler import tracker
 except ImportError:
     pympler = None
+
+try:
+    # Only available in stdlib of Python >= 3.4
+    import tracemalloc
+
+    # Only available in stdlib of Python >= 3.5
+    import linecache
+except ImportError:
+    tracemalloc = None
+    linecache = None
 
 from scalyr_agent.configuration import Configuration
 import scalyr_agent.scalyr_logging as scalyr_logging
@@ -281,22 +292,31 @@ class CPUProfiler(BaseProfiler):
         )
 
 
-class PeriodicMemorySummaryCaptureThread(StoppableThread):
+class PymplerPeriodicMemorySummaryCaptureThread(StoppableThread):
     """
     Thread which periodically captures memory summary using pympler package.
     """
 
-    def __init__(self, capture_interval=10, *args, **kwargs):
+    def __init__(
+        self,
+        capture_interval=10,
+        max_lines=50,
+        max_frames=1,
+        include_traceback=False,
+        *args,
+        **kwargs
+    ):
         # type: (int, Any, Any) -> None
         """
         :param capture_interval: How often to capture memory usage snapshot.
         :type capture_interval: ``int``
         """
-        super(PeriodicMemorySummaryCaptureThread, self).__init__(
-            name="PeriodicMemorySummaryCaptureThread"
+        super(PymplerPeriodicMemorySummaryCaptureThread, self).__init__(
+            name="PymplerPeriodicMemorySummaryCaptureThread"
         )
 
         self._capture_interval = capture_interval
+        self._max_lines = max_lines
 
         self._profiling_data = []  # type: List[Dict[str, Any]]
         self._tracker = tracker.SummaryTracker()
@@ -306,7 +326,7 @@ class PeriodicMemorySummaryCaptureThread(StoppableThread):
         while self._run_state.is_running():
             global_log.log(
                 scalyr_logging.DEBUG_LEVEL_5,
-                "Performing periodic memory usage capture",
+                "Performing periodic memory usage capture using pympler",
             )
             self._capture_snapshot()
             self._run_state.sleep_but_awaken_if_stopped(timeout=self._capture_interval)
@@ -326,7 +346,7 @@ class PeriodicMemorySummaryCaptureThread(StoppableThread):
         all_objects = muppy.get_objects()
         all_objects = self._filter_muppy_objects(all_objects)
         sum1 = summary.summarize(all_objects)
-        data = summary.format_(sum1, limit=50)
+        data = summary.format_(sum1, limit=self._max_lines)
 
         item = {
             "timestamp": capture_time,
@@ -355,9 +375,178 @@ class PeriodicMemorySummaryCaptureThread(StoppableThread):
         for item in all_objects:
             if isinstance(item, dict) and "_profiling_data" in item:
                 continue
-            elif isinstance(item, PeriodicMemorySummaryCaptureThread):
+            elif isinstance(item, PymplerPeriodicMemorySummaryCaptureThread):
                 continue
             result.append(item)
+        return result
+
+
+class TracemallocPeriodicMemorySummaryCaptureThread(StoppableThread):
+    """
+    Thread which periodically captures memory summary using tracemalloc package from Python 3 stdlib.
+    """
+
+    # By default we exclude some stdlib code + this module to avoid noise
+    # TODO: Depending on the installation (system python vs venv, etc., we may also need a filter to
+    # exclude stdlib stuff since in some cases it doesn't get excluded by default)
+    if tracemalloc:
+        TRACES_FILTERS = [
+            tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
+            tracemalloc.Filter(False, "<frozen importlib._bootstrap_external>"),
+            tracemalloc.Filter(False, "<unknown>"),
+            tracemalloc.Filter(False, tracemalloc.__file__),
+            tracemalloc.Filter(False, linecache.__file__),
+            tracemalloc.Filter(False, __file__),
+            # local dev environment
+            tracemalloc.Filter(False, "**/.pyenv/*"),
+        ]
+    else:
+        TRACES_FILTERS = []
+
+    def __init__(
+        self,
+        capture_interval=10,
+        max_lines=50,
+        max_frames=1,
+        include_traceback=False,
+        *args,
+        **kwargs
+    ):
+        # type: (int, Any, Any) -> None
+        """
+        :param capture_interval: How often to capture memory usage snapshot.
+        :type capture_interval: ``int``
+        """
+        super(TracemallocPeriodicMemorySummaryCaptureThread, self).__init__(
+            name="TracemallocPeriodicMemorySummaryCaptureThread"
+        )
+
+        self._capture_interval = capture_interval
+        self._max_lines = max_lines
+        self._max_frames = max_frames
+        self._include_traceback = include_traceback
+
+        self._profiling_data = []  # type: List[Dict[str, Any]]
+        self._previous_snapshot = None
+
+    def run_and_propagate(self):
+        # type: () -> None
+        # NOTE: .start() should be called as soon as possible, but that's not easily possible with
+        # our current config and profiling abstraction. In case late start() call results in too
+        # much missed profiling data from early start up code, we will need to add new environment
+        # variable which calls tracemalloc.start() as early as possible when that env variable is
+        # set.
+        tracemalloc.start(self._max_frames)
+
+        while self._run_state.is_running():
+            global_log.log(
+                scalyr_logging.DEBUG_LEVEL_1,
+                "Performing periodic memory usage capture using tracemalloc",
+            )
+            self._capture_snapshot()
+            self._run_state.sleep_but_awaken_if_stopped(timeout=self._capture_interval)
+
+    def stop(self):
+        tracemalloc.stop()
+        super(TracemallocPeriodicMemorySummaryCaptureThread, self).stop()
+
+    def get_profiling_data(self):
+        # type: () -> List[Dict[str, Any]]
+        return self._profiling_data
+
+    def _capture_snapshot(self):
+        # type: () -> None
+        """
+        Capture memory usage snapshot.
+        """
+        capture_time = int(time.time())
+
+        # 1. Capture aggregate values
+        snapshot = tracemalloc.take_snapshot()
+        snapshot = snapshot.filter_traces(self.TRACES_FILTERS)
+
+        item = {
+            "timestamp": capture_time,
+            "data": self._format_snapshot(snapshot),
+            "type": "aggregated",
+        }
+        self._profiling_data.append(item)
+
+        # 2. Capture diff since the last capture
+        if self._previous_snapshot:
+            item = {
+                "timestamp": capture_time,
+                "data": self._format_snapshot(snapshot, diff=True),
+                "type": "diff",
+            }
+            self._profiling_data.append(item)
+
+        self._previous_snapshot = snapshot
+
+    def _format_snapshot(self, snapshot, diff=False):
+        """
+        Format snapshot statistics data in a user-friendly format.
+        """
+        if diff:
+            stats = snapshot.compare_to(self._previous_snapshot, "lineno")[
+                : self._max_lines
+            ]
+        else:
+            stats = snapshot.statistics("lineno")[: self._max_lines]
+
+        if self._include_traceback and not diff:
+            # We only generate more extensive report with traceback for non-diff reports
+            stats_tb = snapshot.statistics("traceback")[: self._max_lines]
+        else:
+            stats_tb = []
+
+        items_tb_count = len(stats_tb)
+
+        result = []
+        for index, stat in enumerate(stats, 0):
+            frame = stat.traceback[0]
+
+            if diff:
+                if stat.size_diff > 0:
+                    size_diff_str = "+%s" % (stat.size_diff)
+                else:
+                    size_diff_str = stat.size_diff
+
+                if stat.count_diff > 0:
+                    count_diff_str = "+%s" % (stat.count_diff)
+                else:
+                    count_diff_str = stat.count_diff
+
+                item = "#%s: %s:%s: %.1f KiB (%s bytes), %d count (%s)" % (
+                    index + 1,
+                    frame.filename,
+                    frame.lineno,
+                    stat.size / 1024,
+                    size_diff_str,
+                    stat.count,
+                    count_diff_str,
+                )
+
+            else:
+                item = "#%s: %s:%s: %.1f KiB, %d count" % (
+                    index + 1,
+                    frame.filename,
+                    frame.lineno,
+                    stat.size / 1024,
+                    stat.count,
+                )
+
+            line = linecache.getline(frame.filename, frame.lineno).strip()
+
+            if line:
+                item += "\n\t%s" % (line)
+
+            if items_tb_count > index:
+                tb = "\n\t".join(stats_tb[index - 1].traceback.format())
+                item += "\n\nTraceback:\n\n%s\b" % (tb)
+
+            result.append(item)
+
         return result
 
 
@@ -365,27 +554,40 @@ class MemoryProfiler(BaseProfiler):
     """
     Class for profiling agent memory usage.
 
-    It relies on the "pympler" package. It works by starting a background thread which periodically
-    captures memory usage summary.
+    It relies on the "pympler" / "tracemalloc" package. It works by starting a background thread
+    which periodically captures memory usage summary.
     """
 
     def __init__(self, config):
         super(MemoryProfiler, self).__init__(config=config)
 
-        if config.enable_profiling and not pympler:
-            global_log.warning(
-                "Profiling is enabled, but the `pympler` module couldn't be loaded. "
-                "You need to install `pympler` in order to use profiling.  This can be done "
-                "via pip:  pip install pympler"
-            )
-            self._is_available = False
-        else:
-            self._is_available = True
+        if config.enable_profiling:
+            if config.memory_profiler not in ["pympler", "tracemalloc"]:
+                raise ValueError(
+                    "Unsupported memory profiler: %s" % (config.memory_profiler)
+                )
+
+            if config.memory_profiler == "pympler" and not pympler:
+                global_log.warning(
+                    "Profiling is enabled, but the `pympler` module couldn't be loaded. "
+                    "You need to install `pympler` in order to use profiling.  This can be done "
+                    "via pip:  pip install pympler"
+                )
+            elif config.memory_profiler == "tracemalloc" and not tracemalloc:
+                global_log.warning(
+                    "Profiling is enabled, but the `tracemalloc` module couldn't be loaded. "
+                    "treacemalloc is only available when using Python >= 3.4 "
+                )
+            else:
+                self._is_available = True
 
         self._data_file_path = os.path.join(
             config.agent_log_path, config.memory_profile_log_name
         )
         self._capture_interval = 10
+        self._max_lines = config.memory_profiler_max_lines
+        self._max_frames = config.memory_profiler_max_frames
+        self._include_traceback = config.memory_profiler_include_traceback
 
         self._running = False
         self._periodic_thread = None
@@ -401,12 +603,31 @@ class MemoryProfiler(BaseProfiler):
 
         global_log.log(
             scalyr_logging.DEBUG_LEVEL_0,
-            "Starting memory profiling. Capture interval: %d seconds, duration: %d seconds"
-            % (self._capture_interval, self._profile_end - self._profile_start),
+            "Starting memory profiling. Capture interval: %d seconds, duration: %d seconds, max lines: %d, max frames: %d, include traceback: %s"
+            % (
+                self._capture_interval,
+                self._profile_end - self._profile_start,
+                self._max_lines,
+                self._max_frames,
+                self._include_traceback,
+            ),
         )
 
-        self._periodic_thread = PeriodicMemorySummaryCaptureThread(
-            capture_interval=self._capture_interval, name="MemoryCaptureThread"
+        if config.memory_profiler == "pympler":
+            periodic_thread_cls = PymplerPeriodicMemorySummaryCaptureThread
+        elif config.memory_profiler == "tracemalloc":
+            periodic_thread_cls = TracemallocPeriodicMemorySummaryCaptureThread
+        else:
+            raise ValueError(
+                "Unsupported memory profiler: %s" % (config.memory_profiler)
+            )
+
+        self._periodic_thread = periodic_thread_cls(
+            capture_interval=self._capture_interval,
+            max_lines=self._max_lines,
+            max_frames=self._max_frames,
+            include_traceback=self._include_traceback,
+            name="MemoryCaptureThread",
         )
         self._periodic_thread.setDaemon(True)
         self._periodic_thread.start()
@@ -436,7 +657,6 @@ class MemoryProfiler(BaseProfiler):
             for item in profiling_data:
                 if item["type"] == "aggregated":
                     type_string = "(aggregated values)"
-                    pass
                 elif item["type"] == "diff":
                     type_string = "(diff since the last capture)"
                 else:

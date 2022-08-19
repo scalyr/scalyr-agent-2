@@ -432,8 +432,12 @@ class Configuration(object):
             if self.enable_profiling and self.__log_warnings:
                 self.__logger.info(
                     "Profiling is enabled, will ingest CPU profiling (%s) and memory "
-                    "profiling (%s) data by default"
-                    % (self.profile_log_name, self.memory_profile_log_name),
+                    "profiling (%s) data by default. Using %s memory profiler."
+                    % (
+                        self.profile_log_name,
+                        self.memory_profile_log_name,
+                        self.__config["memory_profiler"],
+                    ),
                     limit_once_per_x_secs=86400,
                     limit_key="profiling-enabled-ingest",
                 )
@@ -1122,6 +1126,26 @@ class Configuration(object):
     @property
     def enable_profiling(self):
         return self.__get_config().get_bool("enable_profiling")
+
+    @property
+    def memory_profiler(self):
+        return self.__get_config().get_string("memory_profiler")
+
+    @property
+    def memory_profiler_max_lines(self):
+        return self.__get_config().get_int("memory_profiler_max_lines")
+
+    @property
+    # NOTE: Currently only applicable to tracemalloc profiler
+    # Number of traceback frames to include wich each reported line. More frames means more context.
+    def memory_profiler_max_frames(self):
+        return self.__get_config().get_int("memory_profiler_max_frames")
+
+    @property
+    # NOTE: Currently only applicable to tracemalloc profiler
+    # Set to true to include additional context / traceback with each reported line.
+    def memory_profiler_include_traceback(self):
+        return self.__get_config().get_bool("memory_profiler_include_traceback")
 
     @property
     def max_profile_interval_minutes(self):
@@ -3052,6 +3076,41 @@ class Configuration(object):
         self.__verify_or_set_optional_bool(
             config,
             "enable_profiling",
+            False,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_string(
+            config,
+            "memory_profiler",
+            "pympler",
+            description,
+            apply_defaults,
+            valid_values=["pympler", "tracemalloc"],
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_int(
+            config,
+            "memory_profiler_max_lines",
+            100,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        # Right now only applicable to tracemalloc
+        self.__verify_or_set_optional_int(
+            config,
+            "memory_profiler_max_frames",
+            10,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        # Right now only applicable to tracemalloc
+        self.__verify_or_set_optional_bool(
+            config,
+            "memory_profiler_include_traceback",
             False,
             description,
             apply_defaults,
