@@ -99,7 +99,7 @@ for step in _all_used_runner_steps.values():
 
     # Since this runner class is created dynamically we have to generate a constant fqdn for it.
     StepWrapperRunner.assign_fully_qualified_name(
-        class_name=StepWrapperRunner.__name__,
+        class_name="pre-built-",
         module_name=__name__,
         class_name_suffix=step.id,
     )

@@ -11,6 +11,11 @@ on:
 permissions:
   contents: read
 
+env:
+  DOCKER_BUILDKIT: 1
+  # Set this variable to tell the agent build code that it runs in CI/CD and it needs to use caching.
+  AGENT_BUILD_IN_CICD: "1"
+
 # This job skips another workflows with identical content and also generates strategy matrices for all further jobs.
 # Since we do a "limited" run on non-master custom branch, it generates matrices with different size according to
 # that information.
@@ -40,7 +45,9 @@ jobs:
 
       - name: "Get matrices for all further jobs."
         id: get-job-matrices
+        shell: bash
         run: |
+          set -e
           python3 agent_build_refactored/scripts/get_github_actions_job_matrices.py \
             --event_name "${{ github.event_name }}" \
             --base_ref "${{ github.base_ref }}" \
@@ -71,18 +78,13 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     strategy:
-      # This job receives its matrix from the previous job. The matrix itself is created by the agent_build_refactored/scripts/get_github_actions_job_matrices.py  script.
+      # This job receives its matrix from the 'pre-job' job. The matrix itself is created by the agent_build_refactored/scripts/get_github_actions_job_matrices.py  script.
       # The matrix, for now, consists only from the 'include' part with following fields:
       #   "name": Name of the build job. (Not used in actiual build process, but just gives meaningful name to the job).
       #   "step-runner-fqdn": Fully qualified name of the builder class that has to run the cached step.
       #   "python-version": Version of python to setup on this runner. (NOTE: version of python used in images may differ, and it specified in the source code.)
       #   "os": Runner OS.
       matrix: ${{ fromJSON(needs.pre-job.outputs.pre_build_steps_matrix_json) }}
-
-    env:
-      DOCKER_BUILDKIT: 1
-      # Set this variable to tell the agent build code that it runs in CI/CD and it needs to use caching.
-      AGENT_BUILD_IN_CICD: "1"
 
     steps:
       - name: Checkout repository
@@ -114,18 +116,13 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     strategy:
-      # This job receives its matrix from the previous job. The matrix itself is created by the agent_build_refactored/scripts/get_github_actions_job_matrices.py script.
+      # This job receives its matrix from the 'pre-job' job. The matrix itself is created by the agent_build_refactored/scripts/get_github_actions_job_matrices.py script.
       # The matrix, for now, consists only from the 'include' part with following fields:
       #   "builder-name": name of the builder that builds the target images.
-      #   "builder-fqdn": Fully qualified name of the builder to find its cached steps..
-      #   "python-version": Version of python to setup on this runner. (NOTE: version of python used in images may differ, and it specified in the source code.)
+      #   "builder-fqdn": Fully qualified name of the builder to find its cached steps.
+      #   "python-version": Version of python to set up on this runner. (NOTE: version of python used in images may differ, and it specified in the source code.)
       #   "os": Runner OS.
       matrix: ${{ fromJSON(needs.pre-job.outputs.agent_image_build_matrix_json) }}
-
-    env:
-      DOCKER_BUILDKIT: 1
-      # Set this variable to tell the agent build code that it runs in CI/CD and it needs to use caching.
-      AGENT_BUILD_IN_CICD: "1"
 
     steps:
       - name: Checkout repository
