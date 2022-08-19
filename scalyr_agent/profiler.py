@@ -595,7 +595,7 @@ class MemoryProfiler(BaseProfiler):
 
         global_log.log(
             scalyr_logging.DEBUG_LEVEL_0,
-            "Starting memory profiling. Capture interval: %d seconds, duration: %d seconds, max lines: %d, max frames: %d, include traceback: %s"
+            "Starting memory profiling. Capture interval: %d seconds, duration: %d seconds, max items: %d, number of frames: %d, include traceback: %s"
             % (
                 self._capture_interval,
                 self._profile_end - self._profile_start,
