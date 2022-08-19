@@ -150,6 +150,7 @@ jobs:
       - name: Upload log artifacts
         uses: actions/upload-artifact@v3
         with:
+          name: agent-logs-${{ github.job }}
           path: |
             ~/scalyr-agent-dev/log
         if: ${{ success() || failure() }}
