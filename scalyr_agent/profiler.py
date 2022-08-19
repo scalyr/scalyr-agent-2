@@ -488,19 +488,11 @@ class TracemallocPeriodicMemorySummaryCaptureThread(StoppableThread):
         Format snapshot statistics data in a user-friendly format.
         """
         if diff:
-            stats = snapshot.compare_to(self._previous_snapshot, "lineno")[
+            stats = snapshot.compare_to(self._previous_snapshot, "traceback")[
                 : self._max_items
             ]
         else:
-            stats = snapshot.statistics("lineno")[: self._max_items]
-
-        if self._include_traceback and not diff:
-            # We only generate more extensive report with traceback for non-diff reports
-            stats_tb = snapshot.statistics("traceback")[: self._max_items]
-        else:
-            stats_tb = []
-
-        items_tb_count = len(stats_tb)
+            stats = snapshot.statistics("traceback")[: self._max_items]
 
         result = []
         for index, stat in enumerate(stats, 0):
@@ -541,9 +533,9 @@ class TracemallocPeriodicMemorySummaryCaptureThread(StoppableThread):
             if line:
                 item += "\n\t%s" % (line)
 
-            if items_tb_count > index:
-                tb = "\n\t".join(stats_tb[index - 1].traceback.format())
-                item += "\n\nTraceback:\n\n%s\b" % (tb)
+            if self._include_traceback:
+                tb = "\n\t".join(stat.traceback.format())
+                item += "\n\nTraceback (most recent call first):\n\n%s\b" % (tb)
 
             result.append(item)
 
