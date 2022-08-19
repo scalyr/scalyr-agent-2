@@ -300,7 +300,7 @@ class PymplerPeriodicMemorySummaryCaptureThread(StoppableThread):
     def __init__(
         self,
         capture_interval=10,
-        max_lines=50,
+        max_items=50,
         max_frames=1,
         include_traceback=False,
         *args,
@@ -316,7 +316,7 @@ class PymplerPeriodicMemorySummaryCaptureThread(StoppableThread):
         )
 
         self._capture_interval = capture_interval
-        self._max_lines = max_lines
+        self._max_items = max_items
 
         self._profiling_data = []  # type: List[Dict[str, Any]]
         self._tracker = tracker.SummaryTracker()
@@ -346,7 +346,7 @@ class PymplerPeriodicMemorySummaryCaptureThread(StoppableThread):
         all_objects = muppy.get_objects()
         all_objects = self._filter_muppy_objects(all_objects)
         sum1 = summary.summarize(all_objects)
-        data = summary.format_(sum1, limit=self._max_lines)
+        data = summary.format_(sum1, limit=self._max_items)
 
         item = {
             "timestamp": capture_time,
@@ -406,7 +406,7 @@ class TracemallocPeriodicMemorySummaryCaptureThread(StoppableThread):
     def __init__(
         self,
         capture_interval=10,
-        max_lines=50,
+        max_items=50,
         max_frames=1,
         include_traceback=False,
         *args,
@@ -422,7 +422,7 @@ class TracemallocPeriodicMemorySummaryCaptureThread(StoppableThread):
         )
 
         self._capture_interval = capture_interval
-        self._max_lines = max_lines
+        self._max_items = max_items
         self._max_frames = max_frames
         self._include_traceback = include_traceback
 
@@ -489,14 +489,14 @@ class TracemallocPeriodicMemorySummaryCaptureThread(StoppableThread):
         """
         if diff:
             stats = snapshot.compare_to(self._previous_snapshot, "lineno")[
-                : self._max_lines
+                : self._max_items
             ]
         else:
-            stats = snapshot.statistics("lineno")[: self._max_lines]
+            stats = snapshot.statistics("lineno")[: self._max_items]
 
         if self._include_traceback and not diff:
             # We only generate more extensive report with traceback for non-diff reports
-            stats_tb = snapshot.statistics("traceback")[: self._max_lines]
+            stats_tb = snapshot.statistics("traceback")[: self._max_items]
         else:
             stats_tb = []
 
@@ -585,7 +585,7 @@ class MemoryProfiler(BaseProfiler):
             config.agent_log_path, config.memory_profile_log_name
         )
         self._capture_interval = 10
-        self._max_lines = config.memory_profiler_max_lines
+        self._max_items = config.memory_profiler_max_items
         self._max_frames = config.memory_profiler_max_frames
         self._include_traceback = config.memory_profiler_include_traceback
 
@@ -607,7 +607,7 @@ class MemoryProfiler(BaseProfiler):
             % (
                 self._capture_interval,
                 self._profile_end - self._profile_start,
-                self._max_lines,
+                self._max_items,
                 self._max_frames,
                 self._include_traceback,
             ),
@@ -624,7 +624,7 @@ class MemoryProfiler(BaseProfiler):
 
         self._periodic_thread = periodic_thread_cls(
             capture_interval=self._capture_interval,
-            max_lines=self._max_lines,
+            max_items=self._max_items,
             max_frames=self._max_frames,
             include_traceback=self._include_traceback,
             name="MemoryCaptureThread",

@@ -7,8 +7,8 @@ Packaged by Dominic LoBue <dominicl@sentinelone.com> on Sep 17, 2022 12:29 -0800
 --->
 
 Improvements:
-* Add support for tracemalloc based memory profiler (``"memory_profiler": "tracemalloc" config option``). Keep in mind that tracemalloc is only available when running the agent under >= Python 3.4.
-* Add new ``memory_profiler_max_lines`` config option which sets maximum number of lines for the top items reported by the memory profiler.
+* Add support for tracemalloc based memory profiler (``"memory_profiler": "tracemalloc"`` config option). Keep in mind that tracemalloc is only available when running the agent under >= Python 3.5.
+* Add new ``memory_profiler_max_items`` config option which sets maximum number of items by memory usage reported by the memory profiler.
 
 ## 2.1.33 "Chaavis" - August 17, 2022
 <!---

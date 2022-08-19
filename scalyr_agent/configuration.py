@@ -1132,8 +1132,8 @@ class Configuration(object):
         return self.__get_config().get_string("memory_profiler")
 
     @property
-    def memory_profiler_max_lines(self):
-        return self.__get_config().get_int("memory_profiler_max_lines")
+    def memory_profiler_max_items(self):
+        return self.__get_config().get_int("memory_profiler_max_items")
 
     @property
     # NOTE: Currently only applicable to tracemalloc profiler
@@ -3092,7 +3092,7 @@ class Configuration(object):
         )
         self.__verify_or_set_optional_int(
             config,
-            "memory_profiler_max_lines",
+            "memory_profiler_max_items",
             100,
             description,
             apply_defaults,
