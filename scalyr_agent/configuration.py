@@ -1137,9 +1137,9 @@ class Configuration(object):
 
     @property
     # NOTE: Currently only applicable to tracemalloc profiler
-    # Number of traceback frames to include wich each reported line. More frames means more context.
-    def memory_profiler_max_frames(self):
-        return self.__get_config().get_int("memory_profiler_max_frames")
+    # Number of traceback frames to capture for each reported line. More frames mean more context.
+    def memory_profiler_frames_count(self):
+        return self.__get_config().get_int("memory_profiler_frames_count")
 
     @property
     # NOTE: Currently only applicable to tracemalloc profiler
@@ -3101,7 +3101,7 @@ class Configuration(object):
         # Right now only applicable to tracemalloc
         self.__verify_or_set_optional_int(
             config,
-            "memory_profiler_max_frames",
+            "memory_profiler_frames_count",
             10,
             description,
             apply_defaults,

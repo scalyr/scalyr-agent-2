@@ -301,7 +301,7 @@ class PymplerPeriodicMemorySummaryCaptureThread(StoppableThread):
         self,
         capture_interval=10,
         max_items=50,
-        max_frames=1,
+        frames_count=1,
         include_traceback=False,
         *args,
         **kwargs
@@ -407,7 +407,7 @@ class TracemallocPeriodicMemorySummaryCaptureThread(StoppableThread):
         self,
         capture_interval=10,
         max_items=50,
-        max_frames=1,
+        frames_count=1,
         include_traceback=False,
         *args,
         **kwargs
@@ -423,7 +423,7 @@ class TracemallocPeriodicMemorySummaryCaptureThread(StoppableThread):
 
         self._capture_interval = capture_interval
         self._max_items = max_items
-        self._max_frames = max_frames
+        self._frames_count = frames_count
         self._include_traceback = include_traceback
 
         self._profiling_data = []  # type: List[Dict[str, Any]]
@@ -436,7 +436,7 @@ class TracemallocPeriodicMemorySummaryCaptureThread(StoppableThread):
         # much missed profiling data from early start up code, we will need to add new environment
         # variable which calls tracemalloc.start() as early as possible when that env variable is
         # set.
-        tracemalloc.start(self._max_frames)
+        tracemalloc.start(self._frames_count)
 
         while self._run_state.is_running():
             global_log.log(
@@ -586,7 +586,7 @@ class MemoryProfiler(BaseProfiler):
         )
         self._capture_interval = 10
         self._max_items = config.memory_profiler_max_items
-        self._max_frames = config.memory_profiler_max_frames
+        self._frames_count = config.memory_profiler_frames_count
         self._include_traceback = config.memory_profiler_include_traceback
 
         self._running = False
@@ -608,7 +608,7 @@ class MemoryProfiler(BaseProfiler):
                 self._capture_interval,
                 self._profile_end - self._profile_start,
                 self._max_items,
-                self._max_frames,
+                self._frames_count,
                 self._include_traceback,
             ),
         )
@@ -625,7 +625,7 @@ class MemoryProfiler(BaseProfiler):
         self._periodic_thread = periodic_thread_cls(
             capture_interval=self._capture_interval,
             max_items=self._max_items,
-            max_frames=self._max_frames,
+            frames_count=self._frames_count,
             include_traceback=self._include_traceback,
             name="MemoryCaptureThread",
         )
