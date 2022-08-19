@@ -26,7 +26,8 @@ import mock
 from scalyr_agent.profiler import ScalyrProfiler
 from scalyr_agent.profiler import CPUProfiler
 from scalyr_agent.profiler import MemoryProfiler
-from scalyr_agent.profiler import PeriodicMemorySummaryCaptureThread
+from scalyr_agent.profiler import PymplerPeriodicMemorySummaryCaptureThread
+from scalyr_agent.profiler import TracemallocPeriodicMemorySummaryCaptureThread
 from scalyr_agent.util import StoppableThread
 
 
@@ -40,15 +41,37 @@ MOCK_YAPPI.is_running.return_value = True
 MOCK_YAPPI.get_func_stats.return_value.save = mock_write_profiling_data
 
 MOCK_PYMPLER = mock.Mock()
+MOCK_TRACEMALLOC = mock.Mock()
+
+MOCK_SNAPSHOT = mock.Mock()
+MOCK_SNAPSHOT_2 = mock.Mock()
+MOCK_SNAPSHOT_2.statistics.return_value = []
+
+MOCK_TRACEMALLOC.take_snapshot.return_value = MOCK_SNAPSHOT
+MOCK_SNAPSHOT.filter_tracers.return_value = MOCK_SNAPSHOT_2
 
 MOCK_CONFIG = mock.Mock()
 MOCK_CONFIG.enable_profiling = True
+MOCK_CONFIG.memory_profiler = "pympler"
+MOCK_CONFIG.memory_profiler_max_lines = 100
+MOCK_CONFIG.memory_profiler_max_frames = 10
+MOCK_CONFIG.memory_profiler_include_traceback = False
 MOCK_CONFIG.agent_log_path = ""
 MOCK_CONFIG.profile_log_name = ""
 MOCK_CONFIG.memory_profile_log_name = ""
 
+MOCK_CONFIG_TRACEMALLOC = mock.Mock()
+MOCK_CONFIG_TRACEMALLOC.enable_profiling = True
+MOCK_CONFIG_TRACEMALLOC.memory_profiler = "tracemalloc"
+MOCK_CONFIG_TRACEMALLOC.memory_profiler_max_lines = 100
+MOCK_CONFIG_TRACEMALLOC.memory_profiler_max_frames = 10
+MOCK_CONFIG_TRACEMALLOC.memory_profiler_include_traceback = False
+MOCK_CONFIG_TRACEMALLOC.agent_log_path = ""
+MOCK_CONFIG_TRACEMALLOC.profile_log_name = ""
+MOCK_CONFIG_TRACEMALLOC.memory_profile_log_name = ""
 
-class MockPeriodicMemorySummaryCaptureThread(PeriodicMemorySummaryCaptureThread):
+
+class BaseMockPeriodicMemorySummaryCaptureThread(object):
     _profiling_data = [{"type": "aggregated", "timestamp": 1, "data": ["a", "b"]}]
 
     def __init__(self, capture_interval=10, *args, **kwargs):
@@ -56,6 +79,26 @@ class MockPeriodicMemorySummaryCaptureThread(PeriodicMemorySummaryCaptureThread)
 
     def run_and_propagate(self):
         pass
+
+    def stop(self):
+        pass
+
+    def _capture_snapshot(self):
+        pass
+
+
+class PymplerMockPeriodicMemorySummaryCaptureThread(
+    BaseMockPeriodicMemorySummaryCaptureThread,
+    PymplerPeriodicMemorySummaryCaptureThread,
+):
+    pass
+
+
+class TracemallocMockPeriodicMemorySummaryCaptureThread(
+    BaseMockPeriodicMemorySummaryCaptureThread,
+    TracemallocPeriodicMemorySummaryCaptureThread,
+):
+    pass
 
 
 class ScalyrProfilerTestCase(unittest.TestCase):
@@ -125,7 +168,7 @@ class CPUProfilerTestCase(unittest.TestCase):
         self.assertFalse(is_file_path_empty(data_file_path))
 
 
-class MemoryProfilerTestCase(unittest.TestCase):
+class PymplerMemoryProfilerTestCase(unittest.TestCase):
     @mock.patch("scalyr_agent.profiler.pympler", None)
     def test_is_running_pympler_module_not_available(self):
         MOCK_CONFIG.enable_profiling = True
@@ -143,8 +186,8 @@ class MemoryProfilerTestCase(unittest.TestCase):
         self.assertFalse(profiler._is_running())
 
     @mock.patch(
-        "scalyr_agent.profiler.PeriodicMemorySummaryCaptureThread",
-        MockPeriodicMemorySummaryCaptureThread,
+        "scalyr_agent.profiler.PymplerPeriodicMemorySummaryCaptureThread",
+        PymplerMockPeriodicMemorySummaryCaptureThread,
     )
     @mock.patch("scalyr_agent.profiler.pympler", MOCK_PYMPLER)
     def test_profiling_data_is_written_on_stop(self):
@@ -172,6 +215,63 @@ class MemoryProfilerTestCase(unittest.TestCase):
             self.assertTrue(profiler._is_running())
         finally:
             profiler._stop(MOCK_CONFIG, None)
+
+        self.assertFalse(profiler._is_running())
+
+        # Verify data is written on _stop method call
+        self.assertTrue(
+            os.path.isfile(data_file_path), "File %s doesn't exist" % (data_file_path)
+        )
+        self.assertFalse(is_file_path_empty(data_file_path))
+
+
+class TracemallocMemoryProfilerTestCase(unittest.TestCase):
+    @mock.patch("scalyr_agent.profiler.tracemalloc", None)
+    def test_is_running_pympler_module_not_available(self):
+        MOCK_CONFIG.enable_profiling = True
+
+        profiler = MemoryProfiler(config=MOCK_CONFIG_TRACEMALLOC)
+        self.assertFalse(profiler._is_available)
+        self.assertFalse(profiler._is_running())
+
+    @mock.patch("scalyr_agent.profiler.tracemalloc", MOCK_TRACEMALLOC)
+    def test_is_running_yappi_module_available(self):
+        MOCK_CONFIG.enable_profiling = True
+
+        profiler = MemoryProfiler(config=MOCK_CONFIG_TRACEMALLOC)
+        self.assertTrue(profiler._is_available)
+        self.assertFalse(profiler._is_running())
+
+    @mock.patch(
+        "scalyr_agent.profiler.TracemallocPeriodicMemorySummaryCaptureThread",
+        TracemallocMockPeriodicMemorySummaryCaptureThread,
+    )
+    @mock.patch("scalyr_agent.profiler.tracemalloc", MOCK_TRACEMALLOC)
+    def test_profiling_data_is_written_on_stop(self):
+        # Verify data is written on _stop method call
+        data_file_fd, data_file_path = tempfile.mkstemp()
+
+        # NOTE: We close the fd here because we open it again below. This way file deletion at
+        # the end works correctly on Windows.
+        os.close(data_file_fd)
+
+        MOCK_CONFIG_TRACEMALLOC.enable_profiling = True
+        MOCK_CONFIG_TRACEMALLOC.memory_profile_log_name = data_file_path
+
+        self.assertTrue(
+            os.path.isfile(data_file_path), "File %s doesn't exist" % (data_file_path)
+        )
+        self.assertTrue(is_file_path_empty(data_file_path))
+
+        profiler = MemoryProfiler(config=MOCK_CONFIG_TRACEMALLOC)
+        self.assertTrue(profiler._is_available)
+        self.assertFalse(profiler._is_running())
+
+        try:
+            profiler._start(MOCK_CONFIG_TRACEMALLOC, None)
+            self.assertTrue(profiler._is_running())
+        finally:
+            profiler._stop(MOCK_CONFIG_TRACEMALLOC, None)
 
         self.assertFalse(profiler._is_running())
 
