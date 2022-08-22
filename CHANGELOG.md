@@ -1,6 +1,17 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.34 "TBD" - September 17, 2022
+<!---
+Packaged by Dominic LoBue <dominicl@sentinelone.com> on Sep 17, 2022 12:29 -0800
+--->
+
+Improvements:
+* Add support for tracemalloc based memory profiler (``"memory_profiler": "tracemalloc"`` config option). Keep in mind that tracemalloc is only available when running the agent under >= Python 3.5.
+* Add new ``memory_profiler_max_items`` config option which sets maximum number of items by memory usage reported by the memory profiler.
+* Add new ``enable_cpu_profiling`` and ``enable_memory_profiling`` config option with which user can enable either CPU or memory profiler, or both. Existing ``enable_profiling`` config behavior didn't change and setting it to ``true`` will enable both profilers (CPU and memory).
+* Allow user to specify additional trace filters (path globs) for tracemalloc memory profiler using ``memory_profiler_ignore_path_globs`` config option. (e.g. ``memory_profiler_ignore_path_globs: ["**/scalyr_agent/util.py", "**/scalyr_agent/json_lib/**"]``).
+
 ## 2.1.33 "Chaavis" - August 17, 2022
 <!---
 Packaged by Dominic LoBue <dominicl@sentinelone.com> on Aug 17, 2022 12:29 -0800
@@ -22,7 +33,7 @@ Other:
 * Upgrade various bundled dependencies (orjson, docker).
 
 Bug fixes:
-* Set new ``stop_agent_on_failure`` monitor config option to ``true`` in the agent Docker image for Kubernetes deployments. Solves an issue, present in some rare edge cases, where the Kubernetes Monitor (``scalyr_agent.builtin_monitors.kubernetes_monitor``) exits, but the agent continues to run. The agent's pod will restart if the monitor fails. 
+* Set new ``stop_agent_on_failure`` monitor config option to ``true`` in the agent Docker image for Kubernetes deployments. Solves an issue, present in some rare edge cases, where the Kubernetes Monitor (``scalyr_agent.builtin_monitors.kubernetes_monitor``) exits, but the agent continues to run. The agent's pod will restart if the monitor fails.
 
 ## 2.1.32 "Occao" - July 27, 2022
 

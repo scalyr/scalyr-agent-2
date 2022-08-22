@@ -1687,6 +1687,8 @@ class TestConfiguration(TestConfigurationBase):
                         fake_env[field] = "deflate"
                     elif field == "max_send_rate_enforcement":
                         fake_env[field] = "legacy"
+                    elif field == "memory_profiler":
+                        fake_env[field] = "pympler"
                     else:
                         self.assertNotEquals(
                             FAKE_STRING,
