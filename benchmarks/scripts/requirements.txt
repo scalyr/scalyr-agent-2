@@ -2,3 +2,4 @@ requests==2.25.1
 # TODO: Add back latest version when we switch to Python 3 only and update benchmarks/scripts/send_usage_data_to_codespeed.py file
 #numpy
 psutil==5.7.0
+six==1.13.0

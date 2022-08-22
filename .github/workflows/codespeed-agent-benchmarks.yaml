@@ -1,0 +1,169 @@
+name: Codespeed Agent Benchmark Reusable Workflow
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        description: Python Version
+        type: string
+        required: true
+      agent_config:
+        description: "Path to the agent config file to use."
+        type: string
+        required: true
+      codespeed_executable:
+        description: "CodeSpeed executable name."
+        type: string
+        required: true
+      codespeed_environment:
+        description: "CodeSpeed environment name."
+        type: string
+        default: GitHub Hosted Action Runner
+        required: false
+      run_time:
+        description: "How long to run the capture for (in seconds)."
+        type: number
+        default: 120
+        required: false
+      capture_interval:
+        description: "How often to capture agent process level metrics during the process run time (in seconds)."
+        type: number
+        default: 5
+        required: false
+      agent_pre_run_command:
+        description: "Optional bash command / script to run before starting the agent and the metrics capture script."
+        type: string
+        default: ""
+        required: false
+      agent_post_run_command:
+        description: "Optional bash command / script to run after starting the agent and the metrics capture script."
+        type: string
+        default: ""
+        required: false
+      agent_server_host:
+        description: "Value for the server_attributes.serverHost agent configuration option."
+        type: string
+        default: "ci-codespeed-benchmarks"
+        required: false
+      capture_agent_status_metrics:
+        description: "True to capture additional metrics exposed via agent status command."
+        type: boolean
+        default: false
+        required: false
+      capture_line_counts:
+        description: "True to submit log line counts for each log level to CodeSpeed."
+        type: boolean
+        default: false
+        required: false
+      dry_run:
+        description: "True to enable dry run which runs the benchmarks without submitting data to CodeSpeed."
+        type: boolean
+        default: false
+        required: false
+
+jobs:
+  codespeed-reusable-workflow:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        id: setup-python
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Install Deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r benchmarks/scripts/requirements.txt
+
+          # Workaround for issue with cffi library on the system using
+          # different version than the one which is bundled with the agent
+          pip install "cffi==1.12.3"
+
+      - name: Capture commit date
+        id: commit-date
+        env:
+          TZ: UTC
+        run: echo ::set-output name=commit-date::$(git show --quiet --date='format-local:%Y-%m-%d %H:%M:%S' --format="%cd" ${{ github.sha }} )
+
+      - name: Pre-Run Command
+        if: inputs.agent_pre_run_command != ''
+        run: ${{ inputs.agent_pre_run_command }}
+
+      - name: Run Agent And Capture Resource Utilization
+        id: run-agent
+        env:
+          CODESPEED_AUTH: ${{ secrets.CODESPEED_AUTH }}
+          CODESPEED_URL: "https://scalyr-agent-codespeed.herokuapp.com/"
+          CODESPEED_PROJECT: "scalyr-agent-2-procbenchmarks"
+          CODESPEED_EXECUTABLE: ${{ inputs.codespeed_executable }}
+          CODESPEED_ENVIRONMENT: ${{ inputs.codespeed_environment }}
+          CODESPEED_BRANCH: ${{ github.head_ref || github.ref_name }}
+          # NOTE: "idle" agent process (which monitors no logs but just runs the linux process
+          # monitor for the agent process) should stabilize in a couple of minutes so it makes
+          # no sense to run that benchmark longer.
+          RUN_TIME: ${{ inputs.run_time }}
+          CAPTURE_INTERVAL: ${{ inputs.capture_interval }}
+          AGENT_CONFIG_FILE: ${{ inputs.agent_config }}
+          SCALYR_SERVER: https://agent.scalyr.com
+          SCALYR_API_KEY: ${{ secrets.SCALYR_API_KEY }}
+          SCALYR_SERVER_ATTRIBUTES: "{\"serverHost\": \"${{ inputs.agent_server_host }}\"}"
+          CAPTURE_AGENT_STATUS_METRICS: ${{ inputs.capture_agent_status_metrics }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          COMMIT_DATE: ${{ steps.commit-date.outputs.commit-date }}
+          PYTHONPATH: .
+        run: |
+          # Create directories which are needed by the agent process
+          mkdir -p ~/scalyr-agent-dev/{log,config,data}
+          # Run the agent process and capture the metrics
+          ./benchmarks/scripts/start-agent-and-capture-metrics.sh "${{ github.sha }}" &
+          echo ::set-output name=bg-pid::$!
+
+      - name: Run any post agent run script
+        if: inputs.agent_post_run_command != ''
+        run: |
+          sleep 2
+          ${{ inputs.agent_post_run_command }}
+
+      - name: Wait for agent to finish
+        timeout-minutes: 10
+        run: tail --pid ${{ steps.run-agent.outputs.bg-pid }} -f /dev/null || true
+
+      - name: Send line count values for various log levels
+        if: inputs.capture_line_counts && ! inputs.dry_run
+        env:
+          CODESPEED_AUTH: ${{ secrets.CODESPEED_AUTH }}
+          CODESPEED_URL: "https://scalyr-agent-codespeed.herokuapp.com/"
+          CODESPEED_PROJECT: "scalyr-agent-2-procbenchmarks"
+          CODESPEED_EXECUTABLE: ${{ inputs.codespeed_executable }}
+          CODESPEED_ENVIRONMENT: ${{ inputs.codespeed_environment }}
+          CODESPEED_BRANCH: ${{ github.head_ref || github.ref_name }}
+          COMMIT_DATE: ${{ steps.commit-date.outputs.commit-date }}
+          CAPTURE_AGENT_STATUS_METRICS: ${{ inputs.capture_agent_status_metrics }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          PYTHONPATH: .
+        run: ./benchmarks/scripts/send-log-level-counts-to-codespeed.sh "${{ github.sha }}"
+
+      - name: Upload log artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: agent-logs-${{ inputs.agent_server_host }}
+          path: |
+            ~/scalyr-agent-dev/log
+        if: ${{ success() || failure() }}
+
+      - name: Notify Slack on Failure
+        # NOTE: github.ref is set to pr ref (and not branch name, e.g. refs/pull/28/merge) for pull
+        # requests and that's why we need this special conditional and check for github.head_ref in
+        # case of PRs
+        if: ${{ failure() && (github.ref == 'refs/heads/master' || github.head_ref == 'master') }}
+        uses: act10ns/slack@87c73aef9f8838eb6feae81589a6b1487a4a9e08 # v1.6.0
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          status: ${{ job.status }}
+          steps: ${{ toJson(steps) }}
+          channel: '#cloud-tech'
