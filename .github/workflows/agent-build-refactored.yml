@@ -23,6 +23,7 @@ jobs:
   pre-job:
     runs-on: ubuntu-20.04
     outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
       # The following outputs will be used by the other jobs below as their strategy matrices.
       pre_build_steps_matrix_json: ${{ steps.init-matrices.outputs.pre_build_steps_matrix_json }}
       agent_image_build_matrix_json: ${{ steps.init-matrices.outputs.agent_image_build_matrix_json }}
