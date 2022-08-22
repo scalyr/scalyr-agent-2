@@ -1610,20 +1610,6 @@ jobs:
 
 workflows:
  version: 2
- smoke-tests:
-   <<: *skip_release_build_branch_push
-   jobs:
-     - smoke-standalone-27:
-         context: scalyr-agent
-     - smoke-standalone-35:
-         context: scalyr-agent
-     - smoke-standalone-38:
-         context: scalyr-agent
-     - smoke-standalone-35-rate-limit:
-         context: scalyr-agent
-      # NOTE: smoke test jobs below still use old smoke tests framework
-     - smoke-monitors-tests:
-         context: scalyr-agent
  package-tests:
    <<: *skip_release_build_branch_push
    jobs:
@@ -1669,23 +1655,6 @@ workflows:
      - ami-tests-stable-linux:
           context: scalyr-agent
           <<: *master_and_release_only
-     # - send-benchmark-results-and-graphs-to-slack:
-     #     requires:
-     #       - benchmarks-idle-agent-py-27
-     #       - benchmarks-idle-agent-py-35
-     #       - benchmarks-idle-agent-no-monitors-py-27
-     #       - benchmarks-idle-agent-no-monitors-py-35
-     #       - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27
-     #       - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35
-     #       - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27
-     #       - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35
-     #       - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27
-     #       - benchmarks-loaded-agent_2-growing_logs-monitors-multiprocess-2-worker-20mb-py-35
-     #       - benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-27
-     #       - benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-35
-     #     <<: *benchmarks_master_and_release_only
-
-
  # We run AMI based package install tests which utilize installer script on
  # daily basis.
  # This helps us detect various installer script and other potential upstream
