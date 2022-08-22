@@ -23,8 +23,8 @@ jobs:
   pre-job:
     runs-on: ubuntu-20.04
     outputs:
-      pre_build_steps_matrix_json: ${{ steps.get-job-matrices.outputs.pre_build_steps_matrix_json }}
-      agent_image_build_matrix_json: ${{ steps.get-job-matrices.outputs.agent_image_build_matrix_json }}
+      pre_build_steps_matrix_json: ${{ steps.init-matrices.outputs.pre_build_steps_matrix_json }}
+      agent_image_build_matrix_json: ${{ steps.init-matrices.outputs.agent_image_build_matrix_json }}
 
     steps:
       - id: skip_check
@@ -43,28 +43,44 @@ jobs:
         with:
           python-version: "3.8.13"
 
-      - name: "Get matrices for all further jobs."
-        id: get-job-matrices
-        shell: bash
-        run: |
-          set -e
-          python3 agent_build_refactored/scripts/get_github_actions_job_matrices.py \
-            --event_name "${{ github.event_name }}" \
-            --base_ref "${{ github.base_ref }}" \
-            --ref_type "${{ github.ref_type }}" \
-            --ref_name "${{ github.ref_name }}" > job_matrices.json
-          
-          echo "::set-output name=pre_build_steps_matrix_json::$(cat job_matrices.json | jq -c '.pre_build_steps_matrix')"
-          echo "::set-output name=agent_image_build_matrix_json::$(cat job_matrices.json | jq -c '.agent_image_build_matrix')"
+      - name: Init job matrices
+        uses: ./.github/actions/init-job-matrices
+        id: init-matrices
+        with:
+          images-to-build: |
+            [
+              { "name": "docker-json-debian", "basic": true },
+              { "name": "docker-syslog-debian" "basic": true },
+              { "name": "docker-api-debian" "basic": true },
+              { "name": "k8s-debian" "basic": true },
+              { "name": "docker-json-alpine" },
+              { "name": "docker-syslog-alpine" },
+              { "name": "docker-api-alpine" },
+              { "name": "k8s-alpine" }
+            ]
 
-      - name: "Print job matrices."
-        run: |
+#      - name: "Get matrices for all further jobs."
+#        id: get-job-matrices
+#        shell: bash
+#        run: |
+#          set -e
+#          python3 agent_build_refactored/scripts/get_github_actions_job_matrices.py \
+#            --event_name "${{ github.event_name }}" \
+#            --base_ref "${{ github.base_ref }}" \
+#            --ref_type "${{ github.ref_type }}" \
+#            --ref_name "${{ github.ref_name }}" > job_matrices.json
+#
+#          echo "::set-output name=pre_build_steps_matrix_json::$(cat job_matrices.json | jq -c '.pre_build_steps_matrix')"
+#          echo "::set-output name=agent_image_build_matrix_json::$(cat job_matrices.json | jq -c '.agent_image_build_matrix')"
 
-          echo "Image pre-build steps job matrix: "
-          echo '${{ steps.get-job-matrices.outputs.agent_image_build_matrix_json }}' | jq --color-output
-          
-          echo "Image build job matrix: "
-          echo '${{ steps.get-job-matrices.outputs.pre_build_steps_matrix_json }}' | jq --color-output
+#      - name: "Print job matrices."
+#        run: |
+#
+#          echo "Image pre-build steps job matrix: "
+#          echo '${{ steps.get-job-matrices.outputs.agent_image_build_matrix_json }}' | jq --color-output
+#
+#          echo "Image build job matrix: "
+#          echo '${{ steps.get-job-matrices.outputs.pre_build_steps_matrix_json }}' | jq --color-output
 
 
   # This job pre-executes and caches Runner steps that has to be executed in a separate job.
