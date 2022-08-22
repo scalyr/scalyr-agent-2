@@ -112,7 +112,7 @@ class BaseProfiler(six.with_metaclass(ABCMeta)):
     @abstractmethod
     def is_profiling_enabled(self, config):
         # type: (Configuration) -> bool
-        raise NotImplemented("is_profiling_enabled() not implemented")
+        raise NotImplementedError("is_profiling_enabled() not implemented")
 
     def update(self, config, current_time=None):
         # type: (Configuration, Optional[float]) -> None
