@@ -474,7 +474,7 @@ class RunnerStep:
             output_directory=output_directory, cache_directory=cache_directory
         )
         if skipped:
-            log.info(f"Result if the step '{self.id}' is found in cache, skip.")
+            log.info(f"Result of the step '{self.id}' is found in cache, skip.")
             return
 
         logging.info(f"Run step {self.name}.")

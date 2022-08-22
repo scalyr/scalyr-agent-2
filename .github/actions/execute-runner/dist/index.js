@@ -57978,12 +57978,13 @@ async function checkAndSaveCache(
 
     // Skip files. Cache can be only the directory.
     if (!fs.lstatSync(fullPath).isDirectory()) {
+        console.log(`File ${fullPath} is skipped.`)
         return
     }
 
     // If there's no cache hit, then save directory to the cache now.
     if (isHit) {
-        console.log(`Cache for the step with key ${cacheKey} has been hit. Skip saving.`)
+        console.log(`Step cache with key ${cacheKey} already exist, skip saving.`)
     }
     else {
         console.log(`Save cache for the step with key ${cacheKey}.`)
@@ -57991,9 +57992,8 @@ async function checkAndSaveCache(
         try {
             await cache.saveCache([fullPath], cacheKey)
         } catch (error) {
-            console.warn(
-                `Can not save cache by key ${cacheKey}.
-                It seems that seems that it has been saved somewhere else.\nOriginal message: ${error}`
+            console.log(
+            `Cache with key ${cacheKey} should have been already saved by another job, skip.\nOriginal message: ${error}`
             )
         }
     }
@@ -58047,8 +58047,9 @@ async function executeRunner() {
     const finalCacheSuffix = `${cacheKeyRunnerPart}-${cacheVersionSuffix}`
 
     // Run through step names and look if the is any existing cache for them.
+    console.log("Restoring steps caches.");
     for (let name of step_cache_names) {
-        console.log(name);
+        console.log(`Check cache for step ${name}`);
         cacheHits[name] = await checkAndGetCache(
             name,
             cacheDir,
@@ -58065,9 +58066,10 @@ async function executeRunner() {
     );
 
     // Run through the cache folder and save any cached directory within, that is not yet cached.
+    console.log("Saving step caches.");
     const filenames = fs.readdirSync(cacheDir);
     for (const name of filenames) {
-        console.log(name);
+        console.log(`Save cache for step ${name}`);
         await checkAndSaveCache(
             name,
             cacheDir,
