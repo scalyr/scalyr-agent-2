@@ -72,6 +72,22 @@ __all__ = ["ScalyrProfiler"]
 
 global_log = scalyr_logging.getLogger(__name__)
 
+# Default trace filters for tracemalloc
+if tracemalloc:
+    # By default we exclude some stdlib code + this module to avoid noise
+    DEFAULT_TRACES_FILTERS = [
+        tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
+        tracemalloc.Filter(False, "<frozen importlib._bootstrap_external>"),
+        tracemalloc.Filter(False, "<unknown>"),
+        tracemalloc.Filter(False, tracemalloc.__file__),
+        tracemalloc.Filter(False, linecache.__file__),
+        tracemalloc.Filter(False, __file__),
+        # local dev environment
+        tracemalloc.Filter(False, "**/.pyenv/*"),
+    ]
+else:
+    DEFAULT_TRACES_FILTERS = []
+
 
 class ScalyrProfiler(object):
     """
@@ -316,10 +332,11 @@ class PymplerPeriodicMemorySummaryCaptureThread(StoppableThread):
         max_items=50,
         frames_count=1,
         include_traceback=False,
+        ignore_path_globs=None,
         *args,
         **kwargs
     ):
-        # type: (int, int, int, bool, Any, Any) -> None
+        # type: (int, int, int, bool, Optional[List[six.text_type]], Any, Any) -> None
         """
         :param capture_interval: How often to capture memory usage snapshot.
         :type capture_interval: ``int``
@@ -328,6 +345,8 @@ class PymplerPeriodicMemorySummaryCaptureThread(StoppableThread):
             name="PymplerPeriodicMemorySummaryCaptureThread"
         )
 
+        # NOTE: frames_count, include_traceback and ignore_path_globs are currently ignored /
+        # not supported by pympler profiler
         self._capture_interval = capture_interval
         self._max_items = max_items
 
@@ -399,34 +418,17 @@ class TracemallocPeriodicMemorySummaryCaptureThread(StoppableThread):
     Thread which periodically captures memory summary using tracemalloc package from Python 3 stdlib.
     """
 
-    # By default we exclude some stdlib code + this module to avoid noise
-    # TODO: Depending on the installation (system python vs venv, etc., we may also need a filter to
-    # exclude stdlib stuff since in some cases it doesn't get excluded by default)
-    # TODO: It may be a good idea to also allow user to set ignored globs via config option.
-    if tracemalloc:
-        TRACES_FILTERS = [
-            tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
-            tracemalloc.Filter(False, "<frozen importlib._bootstrap_external>"),
-            tracemalloc.Filter(False, "<unknown>"),
-            tracemalloc.Filter(False, tracemalloc.__file__),
-            tracemalloc.Filter(False, linecache.__file__),
-            tracemalloc.Filter(False, __file__),
-            # local dev environment
-            tracemalloc.Filter(False, "**/.pyenv/*"),
-        ]
-    else:
-        TRACES_FILTERS = []
-
     def __init__(
         self,
         capture_interval=10,
         max_items=50,
         frames_count=1,
         include_traceback=False,
+        ignore_path_globs=None,
         *args,
         **kwargs
     ):
-        # type: (int, int, int, bool, Any, Any) -> None
+        # type: (int, int, int, bool, Optional[List[six.text_type]], Any, Any) -> None
         """
         :param capture_interval: How often to capture memory usage snapshot.
         :type capture_interval: ``int``
@@ -439,6 +441,7 @@ class TracemallocPeriodicMemorySummaryCaptureThread(StoppableThread):
         self._max_items = max_items
         self._frames_count = frames_count
         self._include_traceback = include_traceback
+        self._ignore_path_globs = ignore_path_globs or []
 
         self._profiling_data = []  # type: List[Dict[str, Any]]
         self._previous_snapshot = None
@@ -457,6 +460,17 @@ class TracemallocPeriodicMemorySummaryCaptureThread(StoppableThread):
                 scalyr_logging.DEBUG_LEVEL_1,
                 "Performing periodic memory usage capture using tracemalloc",
             )
+
+            trace_filters_str = ",".join(
+                [
+                    trace_filter.filename_pattern
+                    for trace_filter in self._get_traces_filters()
+                ]
+            )
+            global_log.log(
+                scalyr_logging.DEBUG_LEVEL_1,
+                "Using tracemalloc trace filters: %s" % (trace_filters_str),
+            )
             self._capture_snapshot()
             self._run_state.sleep_but_awaken_if_stopped(timeout=self._capture_interval)
 
@@ -468,6 +482,16 @@ class TracemallocPeriodicMemorySummaryCaptureThread(StoppableThread):
         # type: () -> List[Dict[str, Any]]
         return self._profiling_data
 
+    def _get_traces_filters(self):
+        # type: () -> List[tracemalloc.Filter]
+        filters = []
+        filters.extend(DEFAULT_TRACES_FILTERS)
+
+        for path_glob in self._ignore_path_globs:
+            filters.append(tracemalloc.Filter(False, path_glob))
+
+        return filters
+
     def _capture_snapshot(self):
         # type: () -> None
         """
@@ -475,9 +499,11 @@ class TracemallocPeriodicMemorySummaryCaptureThread(StoppableThread):
         """
         capture_time = int(time.time())
 
+        traces_filters = self._get_traces_filters()
+
         # 1. Capture aggregate values
         snapshot = tracemalloc.take_snapshot()
-        snapshot = snapshot.filter_traces(self.TRACES_FILTERS)
+        snapshot = snapshot.filter_traces(traces_filters)
 
         item = {
             "timestamp": capture_time,
@@ -596,6 +622,7 @@ class MemoryProfiler(BaseProfiler):
         self._max_items = config.memory_profiler_max_items
         self._frames_count = config.memory_profiler_frames_count
         self._include_traceback = config.memory_profiler_include_traceback
+        self._ignore_path_globs = config.memory_profiler_ignore_path_globs
 
         self._running = False
         self._periodic_thread = None
@@ -638,6 +665,7 @@ class MemoryProfiler(BaseProfiler):
             max_items=self._max_items,
             frames_count=self._frames_count,
             include_traceback=self._include_traceback,
+            ignore_path_globs=self._ignore_path_globs,
             name="MemoryCaptureThread",
         )
         self._periodic_thread.setDaemon(True)

@@ -1183,6 +1183,14 @@ class Configuration(object):
         return self.__get_config().get_bool("memory_profiler_include_traceback")
 
     @property
+    # NOTE: Currently only applicable to tracemalloc profiler
+    # A list of path globs which should be ignored by the tracemalloc memory profiler. Only
+    # applicable when memory profiler is set to tracemalloc.
+    # For example: memory_profiler_ignore_path_globs: ["**/scalyr_agent/configuration.py", "**/scalyr_agent/util.py", "**/scalyr_agent/json_lib/**"]
+    def memory_profiler_ignore_path_globs(self):
+        return self.__get_config().get_json_array("memory_profiler_ignore_path_globs")
+
+    @property
     def max_profile_interval_minutes(self):
         return self.__get_config().get_int("max_profile_interval_minutes")
 
@@ -3163,6 +3171,14 @@ class Configuration(object):
             config,
             "memory_profiler_include_traceback",
             False,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_array_of_strings(
+            config,
+            "memory_profiler_ignore_path_globs",
+            [],
             description,
             apply_defaults,
             env_aware=True,
