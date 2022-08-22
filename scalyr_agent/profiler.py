@@ -402,6 +402,7 @@ class TracemallocPeriodicMemorySummaryCaptureThread(StoppableThread):
     # By default we exclude some stdlib code + this module to avoid noise
     # TODO: Depending on the installation (system python vs venv, etc., we may also need a filter to
     # exclude stdlib stuff since in some cases it doesn't get excluded by default)
+    # TODO: It may be a good idea to also allow user to set ignored globs via config option.
     if tracemalloc:
         TRACES_FILTERS = [
             tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
