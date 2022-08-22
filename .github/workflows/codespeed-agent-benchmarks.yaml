@@ -1,8 +1,14 @@
-name: Codespeed Agent Benchmark Reusable Workflow
+# Workflow which performs end to end benchmarking of the agent process - it relies on starting up
+# the agent and exercising various code with different config option.
+name: Codespeed Agent Benchmark
 
 on:
   workflow_call:
     inputs:
+      job_name:
+        description: "Github Action job name. Used to display user friendly job name in the UI."
+        type: string
+        required: true
       python-version:
         description: Python Version
         type: string
@@ -62,7 +68,8 @@ on:
         required: false
 
 jobs:
-  codespeed-reusable-workflow:
+  codespeed-agent-benchmark:
+    name: ${{ inputs.job_name }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -78,10 +85,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r benchmarks/scripts/requirements.txt
-
-          # Workaround for issue with cffi library on the system using
-          # different version than the one which is bundled with the agent
-          pip install "cffi==1.12.3"
 
       - name: Capture commit date
         id: commit-date

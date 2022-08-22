@@ -101,6 +101,7 @@ jobs:
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
     secrets: inherit
     with:
+      job_name: benchmarks-idle-agent-py-27
       python-version: 2.7.17
       codespeed_executable: "Python 2.7.17 - idle conf 1"
       agent_config: "benchmarks/configs/agent_no_monitored_logs.json"
@@ -113,6 +114,7 @@ jobs:
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
     secrets: inherit
     with:
+      job_name: benchmarks-idle-agent-py-35
       python-version: 3.5.9
       codespeed_executable: "Python 3.5.9 - idle conf 1"
       agent_config: "benchmarks/configs/agent_no_monitored_logs.json"
@@ -125,6 +127,7 @@ jobs:
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
     secrets: inherit
     with:
+      job_name: benchmarks-idle-agent-no-monitors-py-27
       python-version: 2.7.17
       codespeed_executable: "Python 2.7.17 - idle conf 2"
       agent_config: "benchmarks/configs/agent_no_monitored_logs_no_monitors.json"
@@ -137,6 +140,7 @@ jobs:
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
     secrets: inherit
     with:
+      job_name: benchmarks-idle-agent-no-monitors-py-35
       python-version: 3.5.9
       codespeed_executable: "Python 3.5.9 - idle conf 2"
       agent_config: "benchmarks/configs/agent_no_monitored_logs_no_monitors.json"
@@ -149,6 +153,7 @@ jobs:
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
     secrets: inherit
     with:
+      job_name: benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27
       python-version: 2.7.17
       codespeed_executable: "Python 2.7.17 - loaded conf 1"
       agent_config: "benchmarks/configs/agent_single_50mb_access_log_file.json"
@@ -164,6 +169,7 @@ jobs:
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
     secrets: inherit
     with:
+      job_name: benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35
       python-version: 3.5.9
       codespeed_executable: "Python 3.5.9 - loaded conf 1"
       agent_config: "benchmarks/configs/agent_single_50mb_access_log_file.json"
@@ -181,6 +187,7 @@ jobs:
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
     secrets: inherit
     with:
+      job_name: benchmarks-loaded-agent-single-growing-log-file-20mb-py-27
       python-version: 2.7.17
       codespeed_executable: "Python 2.7.17 - loaded conf 2"
       agent_config: "benchmarks/configs/agent_single_growing_log_file_with_shell_and_url_monitor.json"
@@ -196,6 +203,7 @@ jobs:
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
     secrets: inherit
     with:
+      job_name: benchmarks-loaded-agent-single-growing-log-file-20mb-py-35
       python-version: 3.5.9
       codespeed_executable: "Python 3.5.9 - loaded conf 2"
       agent_config: "benchmarks/configs/agent_single_growing_log_file_with_shell_and_url_monitor.json"
@@ -211,6 +219,7 @@ jobs:
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
     secrets: inherit
     with:
+      job_name: benchmarks-loaded-agent-single-growing-log-file-180mb-py-27
       python-version: 2.7.17
       codespeed_executable: "Python 2.7.17 - loaded conf 3"
       agent_config: "benchmarks/configs/agent_single_growing_log_file.json"
@@ -231,6 +240,7 @@ jobs:
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
     secrets: inherit
     with:
+      job_name: benchmarks-loaded-agent_2-growing_logs-monitors-multiprocess-2-worker-20mb-py-35
       python-version: 3.5.9
       codespeed_executable: "Python 3.5.9 - loaded conf 4"
       agent_config: "benchmarks/configs/agent_2-growing_logs-monitors-multiprocess-2-worker.json"
@@ -246,6 +256,7 @@ jobs:
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
     secrets: inherit
     with:
+      job_name: benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-27
       python-version: 2.7.17
       codespeed_executable: "Python 2.7.17 - loaded conf 5"
       agent_config: "benchmarks/configs/agent_single_50mb_genlog_500k_line_file.json"
@@ -261,6 +272,7 @@ jobs:
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
     secrets: inherit
     with:
+      job_name: benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-35
       python-version: 3.5.9
       codespeed_executable: "Python 3.5.9 - loaded conf 5"
       agent_config: "benchmarks/configs/agent_single_50mb_genlog_500k_line_file.json"
