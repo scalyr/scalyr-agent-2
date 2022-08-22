@@ -121,6 +121,25 @@ class ScalyrProfilerTestCase(unittest.TestCase):
 
 
 class CPUProfilerTestCase(unittest.TestCase):
+    def test_is_profiling_enabled(self):
+        MOCK_CONFIG.enable_profiling = True
+        MOCK_CONFIG.enable_cpu_profiling = False
+
+        profiler = CPUProfiler(config=MOCK_CONFIG)
+        self.assertTrue(profiler.is_profiling_enabled(config=MOCK_CONFIG))
+
+        MOCK_CONFIG.enable_profiling = False
+        MOCK_CONFIG.enable_cpu_profiling = True
+
+        profiler = CPUProfiler(config=MOCK_CONFIG)
+        self.assertTrue(profiler.is_profiling_enabled(config=MOCK_CONFIG))
+
+        MOCK_CONFIG.enable_profiling = False
+        MOCK_CONFIG.enable_cpu_profiling = False
+
+        profiler = CPUProfiler(config=MOCK_CONFIG)
+        self.assertFalse(profiler.is_profiling_enabled(config=MOCK_CONFIG))
+
     @mock.patch("scalyr_agent.profiler.yappi", None)
     def test_is_running_yappi_module_not_available(self):
         MOCK_CONFIG.enable_profiling = True
@@ -169,6 +188,25 @@ class CPUProfilerTestCase(unittest.TestCase):
 
 
 class PymplerMemoryProfilerTestCase(unittest.TestCase):
+    def test_is_profiling_enabled(self):
+        MOCK_CONFIG.enable_profiling = True
+        MOCK_CONFIG.enable_memory_profiling = False
+
+        profiler = MemoryProfiler(config=MOCK_CONFIG)
+        self.assertTrue(profiler.is_profiling_enabled(config=MOCK_CONFIG))
+
+        MOCK_CONFIG.enable_profiling = False
+        MOCK_CONFIG.enable_memory_profiling = True
+
+        profiler = MemoryProfiler(config=MOCK_CONFIG)
+        self.assertTrue(profiler.is_profiling_enabled(config=MOCK_CONFIG))
+
+        MOCK_CONFIG.enable_profiling = False
+        MOCK_CONFIG.enable_memory_profiling = False
+
+        profiler = MemoryProfiler(config=MOCK_CONFIG)
+        self.assertFalse(profiler.is_profiling_enabled(config=MOCK_CONFIG))
+
     @mock.patch("scalyr_agent.profiler.pympler", None)
     def test_is_running_pympler_module_not_available(self):
         MOCK_CONFIG.enable_profiling = True
@@ -226,9 +264,28 @@ class PymplerMemoryProfilerTestCase(unittest.TestCase):
 
 
 class TracemallocMemoryProfilerTestCase(unittest.TestCase):
+    def test_is_profiling_enabled(self):
+        MOCK_CONFIG_TRACEMALLOC.enable_profiling = True
+        MOCK_CONFIG_TRACEMALLOC.enable_memory_profiling = False
+
+        profiler = MemoryProfiler(config=MOCK_CONFIG)
+        self.assertTrue(profiler.is_profiling_enabled(config=MOCK_CONFIG_TRACEMALLOC))
+
+        MOCK_CONFIG_TRACEMALLOC.enable_profiling = False
+        MOCK_CONFIG_TRACEMALLOC.enable_memory_profiling = True
+
+        profiler = MemoryProfiler(config=MOCK_CONFIG)
+        self.assertTrue(profiler.is_profiling_enabled(config=MOCK_CONFIG_TRACEMALLOC))
+
+        MOCK_CONFIG_TRACEMALLOC.enable_profiling = False
+        MOCK_CONFIG_TRACEMALLOC.enable_memory_profiling = False
+
+        profiler = MemoryProfiler(config=MOCK_CONFIG)
+        self.assertFalse(profiler.is_profiling_enabled(config=MOCK_CONFIG_TRACEMALLOC))
+
     @mock.patch("scalyr_agent.profiler.tracemalloc", None)
     def test_is_running_pympler_module_not_available(self):
-        MOCK_CONFIG.enable_profiling = True
+        MOCK_CONFIG_TRACEMALLOC.enable_profiling = True
 
         profiler = MemoryProfiler(config=MOCK_CONFIG_TRACEMALLOC)
         self.assertFalse(profiler._is_available)
@@ -236,7 +293,7 @@ class TracemallocMemoryProfilerTestCase(unittest.TestCase):
 
     @mock.patch("scalyr_agent.profiler.tracemalloc", MOCK_TRACEMALLOC)
     def test_is_running_yappi_module_available(self):
-        MOCK_CONFIG.enable_profiling = True
+        MOCK_CONFIG_TRACEMALLOC.enable_profiling = True
 
         profiler = MemoryProfiler(config=MOCK_CONFIG_TRACEMALLOC)
         self.assertTrue(profiler._is_available)

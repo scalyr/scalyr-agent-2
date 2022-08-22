@@ -428,21 +428,23 @@ class Configuration(object):
                     limit_key="instrumentation-interval-too-low",
                 )
 
-            # add in the profile logs if we have enabled profiling
-            if self.enable_profiling and self.__log_warnings:
-                self.__logger.info(
-                    "Profiling is enabled, will ingest CPU profiling (%s) and memory "
-                    "profiling (%s) data by default. Using %s memory profiler."
-                    % (
-                        self.profile_log_name,
-                        self.memory_profile_log_name,
-                        self.__config["memory_profiler"],
-                    ),
-                    limit_once_per_x_secs=86400,
-                    limit_key="profiling-enabled-ingest",
-                )
+            enable_cpu_profiling = self.enable_profiling or self.enable_cpu_profiling
+            enable_memory_profiling = (
+                self.enable_profiling or self.enable_memory_profiling
+            )
 
-                # 1. CPU profiling
+            # add in the profile logs if we have enabled profiling
+            # 1. CPU profiling
+            if enable_cpu_profiling:
+                if self.__log_warnings:
+                    log_path = os.path.join(self.agent_log_path, self.profile_log_name)
+                    self.__logger.info(
+                        "CPU profiling is enabled, will ingest CPU profiling (%s) data."
+                        % (log_path),
+                        limit_once_per_x_secs=86400,
+                        limit_key="cpu-profiling-enabled-ingest",
+                    )
+
                 profile_config = JsonObject(
                     path=self.profile_log_name,
                     copy_from_start=True,
@@ -454,7 +456,23 @@ class Configuration(object):
                 )
                 self.__log_configs.append(profile_config)
 
-                # 2. Memory profiling
+            # 2. Memory profiling
+            if enable_memory_profiling:
+                if self.__log_warnings:
+                    log_path = os.path.join(
+                        self.agent_log_path, self.memory_profile_log_name
+                    )
+                    self.__logger.info(
+                        "Memory profiling is enabled, will ingest memory "
+                        "profiling (%s) data by default. Using %s memory profiler."
+                        % (
+                            log_path,
+                            self.__config["memory_profiler"],
+                        ),
+                        limit_once_per_x_secs=86400,
+                        limit_key="memory-profiling-enabled-ingest",
+                    )
+
                 profile_config = JsonObject(
                     path=self.memory_profile_log_name,
                     copy_from_start=True,
@@ -1125,7 +1143,24 @@ class Configuration(object):
 
     @property
     def enable_profiling(self):
+        """
+        Set to True to enable CPU and memory profiling.
+        """
         return self.__get_config().get_bool("enable_profiling")
+
+    @property
+    def enable_cpu_profiling(self):
+        """
+        Set to True to enable CPU profiling.
+        """
+        return self.__get_config().get_bool("enable_cpu_profiling")
+
+    @property
+    def enable_memory_profiling(self):
+        """
+        Set to True to enable memory profiling.
+        """
+        return self.__get_config().get_bool("enable_memory_profiling")
 
     @property
     def memory_profiler(self):
@@ -3076,6 +3111,22 @@ class Configuration(object):
         self.__verify_or_set_optional_bool(
             config,
             "enable_profiling",
+            False,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_bool(
+            config,
+            "enable_cpu_profiling",
+            False,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_bool(
+            config,
+            "enable_memory_profiling",
             False,
             description,
             apply_defaults,

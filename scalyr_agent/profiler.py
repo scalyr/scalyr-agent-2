@@ -34,6 +34,8 @@ import random
 import time
 import traceback
 from io import open
+from abc import ABCMeta
+from abc import abstractmethod
 
 import six
 
@@ -91,9 +93,9 @@ class ScalyrProfiler(object):
         self.__memory_profiler.update(config=config, current_time=current_time)
 
 
-class BaseProfiler(object):
+class BaseProfiler(six.with_metaclass(ABCMeta)):
     """
-    Base class for various profilers.
+    Base class to be inherited by various profilers.
     """
 
     def __init__(self, config):
@@ -106,6 +108,11 @@ class BaseProfiler(object):
 
         # Indicates if this profiler is enabled in the configuration
         self._is_enabled = False
+
+    @abstractmethod
+    def is_profiling_enabled(self, config):
+        # type: (Configuration) -> bool
+        raise NotImplemented("is_profiling_enabled() not implemented")
 
     def update(self, config, current_time=None):
         # type: (Configuration, Optional[float]) -> None
@@ -120,7 +127,7 @@ class BaseProfiler(object):
 
         try:
             # check if profiling is enabled in the config and turn it on/off if necessary
-            if config.enable_profiling:
+            if self.is_profiling_enabled(config=config):
                 if not self._is_enabled:
                     self._update_start_interval(config, current_time)
                     self._is_enabled = True
@@ -196,15 +203,18 @@ class CPUProfiler(BaseProfiler):
     def __init__(self, config):
         super(CPUProfiler, self).__init__(config=config)
 
-        if config.enable_profiling and not yappi:
-            global_log.warning(
-                "Profiling is enabled, but the `yappi` module couldn't be loaded. "
-                "You need to install `yappi` in order to use profiling.  This can be done "
-                "via pip:  pip install yappi"
-            )
-            self._is_available = False
-        else:
-            self._is_available = True
+        enable_profiling = self.is_profiling_enabled(config=config)
+
+        if enable_profiling:
+            if not yappi:
+                global_log.warning(
+                    "Profiling is enabled, but the `yappi` module couldn't be loaded. "
+                    "You need to install `yappi` in order to use profiling.  This can be done "
+                    "via pip:  pip install yappi"
+                )
+                self._is_available = False
+            else:
+                self._is_available = True
 
         self._data_file_path = os.path.join(
             config.agent_log_path, config.profile_log_name
@@ -218,6 +228,9 @@ class CPUProfiler(BaseProfiler):
         # ensure the random clock is consistent for the life of the agent.
         # random clocks can still be manually overridden in the agent.json
         self._allowed_clocks = self._allowed_clocks[:2]
+
+    def is_profiling_enabled(self, config):
+        return config.enable_profiling or config.enable_cpu_profiling
 
     def _is_running(self):
         return yappi and yappi.is_running()
@@ -553,7 +566,9 @@ class MemoryProfiler(BaseProfiler):
     def __init__(self, config):
         super(MemoryProfiler, self).__init__(config=config)
 
-        if config.enable_profiling:
+        enable_profiling = self.is_profiling_enabled(config=config)
+
+        if enable_profiling:
             if config.memory_profiler not in ["pympler", "tracemalloc"]:
                 raise ValueError(
                     "Unsupported memory profiler: %s" % (config.memory_profiler)
@@ -583,6 +598,9 @@ class MemoryProfiler(BaseProfiler):
 
         self._running = False
         self._periodic_thread = None
+
+    def is_profiling_enabled(self, config):
+        return config.enable_profiling or config.enable_memory_profiling
 
     def _is_running(self):
         return self._running
