@@ -1,5 +1,5 @@
 name: "Init job matrices"
-description: ""
+description: "This action accepts matrices for the jobs that are used in the agent-build workflow and excludes job that are must not be executed in mon-master runs."
 
 inputs:
   images-to-build:
@@ -17,16 +17,9 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - name: Get images build matrix.
-      id:
-      shell: bash
-      run: |
-        cat <<EOT >> /tmp/build-matrices/images-build-matrix.json
-        ${{ inputs.object }}
-        EOT
-
-    - name: Get final job matrices
+    - name: Get job matrices.
       id: get-job-matrices
+      shell: bash
       env:
         GITHUB_EVENT_NAME: ${{ github.event_name }}"
         GITHUB_BASE_REF: ${{ github.base_ref }}
@@ -34,18 +27,24 @@ runs:
         GITHUB_REF_NAME: ${{ github.ref_name }}
       run: |
         set -e
-        python3 agent_build_refactored/scripts/get_github_actions_job_matrices.py \
-          --images-build-matrix-json-file /tmp/build-matrices/images-build-matrix.json \
-        > final_matrices.json
         
-        echo "::set-output name=pre_build_steps_matrix_json::$(cat final_matrices.json | jq -c '.pre_build_steps_matrix')"
-        echo "::set-output name=agent_image_build_matrix_json::$(cat final_matrices.json | jq -c '.agent_image_build_matrix')"
+        cat <<EOT >> /tmp/images-build-matrix.json
+        ${{ inputs.images-to-build }}
+        EOT
+        
+        python3 agent_build_refactored/scripts/get_github_actions_job_matrices.py \
+          --images-build-matrix-json-file /tmp/images-build-matrix.json \
+          > /tmp/final_matrices.json
+        
+        echo "::set-output name=pre_build_steps_matrix_json::$(cat /tmp/final_matrices.json | jq -c '.pre_build_steps_matrix')"
+        echo "::set-output name=agent_image_build_matrix_json::$(cat /tmp/final_matrices.json | jq -c '.agent_image_build_matrix')"
 
-    - name: "Print job matrices."
+    - name: Print job matrices
+      shell: bash
       run: |
 
         echo "Image pre-build steps job matrix: "
-        echo '${{ steps.get-job-matrices.outputs.agent_image_build_matrix_json }}' | jq --color-output
+        echo '${{ steps.get-job-matrices.outputs.pre_build_steps_matrix_json }}' | jq --color-output
         
         echo "Image build job matrix: "
-        echo '${{ steps.get-job-matrices.outputs.pre_build_steps_matrix_json }}' | jq --color-output
+        echo '${{ steps.get-job-matrices.outputs.agent_image_build_matrix_json }}' | jq --color-output
