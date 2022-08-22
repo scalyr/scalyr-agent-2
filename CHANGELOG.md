@@ -9,6 +9,7 @@ Packaged by Dominic LoBue <dominicl@sentinelone.com> on Sep 17, 2022 12:29 -0800
 Improvements:
 * Add support for tracemalloc based memory profiler (``"memory_profiler": "tracemalloc"`` config option). Keep in mind that tracemalloc is only available when running the agent under >= Python 3.5.
 * Add new ``memory_profiler_max_items`` config option which sets maximum number of items by memory usage reported by the memory profiler.
+* Add new ``enable_cpu_profiling`` and ``enable_memory_profiling`` config option with which user can enable either CPU or memory profiler, or both. Existing ``enable_profiling`` config behavior didn't change and setting it to ``true`` will enable both profilers (CPU and memory).
 
 ## 2.1.33 "Chaavis" - August 17, 2022
 <!---
