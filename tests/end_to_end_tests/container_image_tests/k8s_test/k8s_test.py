@@ -29,7 +29,7 @@ log = logging.getLogger(__name__)
 
 pytestmark = [
     # Add timeout for all tests
-    pytest.mark.timeout(60 * 1000),
+    pytest.mark.timeout(60 * 10),
     pytest.mark.usefixtures("dump_info"),
 ]
 
