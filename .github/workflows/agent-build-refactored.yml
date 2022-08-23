@@ -53,7 +53,7 @@ jobs:
         id: init-matrices
         with:
 
-          # In the 'non-master' runs we only build debian-based imags.
+          # In the 'non-master' runs we only build debian-based images.
           images-to-build: |
             [
               { "name": "docker-json-debian", "basic": true },
