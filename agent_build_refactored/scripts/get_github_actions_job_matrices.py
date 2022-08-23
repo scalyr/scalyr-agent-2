@@ -109,7 +109,7 @@ for step in _all_used_runner_steps.values():
 
 
 def main():
-    run_type_name = "limited" if master_run else "full"
+    run_type_name = "master" if master_run else "non-master"
     print(
         f"Doing {run_type_name} workflow run.",
         file=sys.stderr
