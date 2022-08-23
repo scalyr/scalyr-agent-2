@@ -1,6 +1,5 @@
 import logging
 import pytest
-import hashlib
 import json
 import subprocess
 from typing import List
@@ -27,9 +26,7 @@ def agent_container_name():
 
 @pytest.fixture(scope="session")
 def docker_server_hostname(image_builder_name, test_session_suffix, request):
-    sha256 = hashlib.sha256()
-    sha256.update(request.node.nodeid.encode())
-    return f"agent-docker-image-test-{image_builder_name}-{sha256.hexdigest()}-{test_session_suffix}"
+    return f"agent-docker-image-test-{image_builder_name}-{request.node.nodeid}-{test_session_suffix}"
 
 
 @pytest.fixture

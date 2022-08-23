@@ -34,20 +34,6 @@ pytestmark = [
 ]
 
 
-# def pytest_generate_tests(metafunc):
-#     param_names = [
-#         "image_builder_name",
-#         "kubernetes_version",
-#         "minikube_driver",
-#         "container_runtime",
-#     ]
-#
-#     final_params = []
-#     for p in ALL_K8S_TEST_PARAMS:
-#         final_params.append([p[name] for name in param_names])
-#
-#     metafunc.parametrize(param_names, final_params, indirect=True)
-
 @pytest.fixture(scope="session")
 def dump_info(minikube_kubectl_args, minikube_test_profile):
     """Dump useful environment information before/after the test case."""
