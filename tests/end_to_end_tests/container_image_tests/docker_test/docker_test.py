@@ -21,7 +21,7 @@ import pytest
 
 from agent_build_refactored.tools import check_output_with_log
 from tests.end_to_end_tests.verify import verify_logs
-from tests.end_to_end_tests.tools import TimeTracker
+from tests.end_to_end_tests.tools import TimeoutTracker
 
 
 log = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ def test_basic(
     get_agent_log_content,
     image_builder_name,
 ):
-    timeout_tracker = TimeTracker(150)
+    timeout_tracker = TimeoutTracker(150)
     start_agent_container(timeout_tracker=timeout_tracker)
 
     start_counter_writer_container()
@@ -101,7 +101,7 @@ def test_basic(
             f"$containerName=='{counter_writer_container_name}'",
             f"$serverHost=='{docker_server_hostname}'",
         ],
-        time_tracker=timeout_tracker,
+        timeout_tracker=timeout_tracker,
         ignore_agent_errors_predicates=[ignore_agent_error_predicate],
     )
 

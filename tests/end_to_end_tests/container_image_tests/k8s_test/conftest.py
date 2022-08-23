@@ -14,7 +14,7 @@ from agent_build_refactored.tools import (
     check_output_with_log,
     check_output_with_log_debug,
 )
-from tests.end_to_end_tests.tools import TimeTracker
+from tests.end_to_end_tests.tools import TimeoutTracker
 
 
 log = logging.getLogger(__name__)
@@ -391,7 +391,7 @@ def start_test_log_writer_pod(minikube_kubectl_args):
         description="Remove existing counter messages writer pod.",
     )
 
-    def start(time_tracker: TimeTracker):
+    def start(time_tracker: TimeoutTracker):
         check_call_with_log(
             [*minikube_kubectl_args, "apply", "-f", str(manifest_path)],
             description="Create new deployment with counter messages writer pod.",
@@ -487,7 +487,7 @@ def create_agent_daemonset(
     )
 
     # Create agent's daemonset.
-    def create(time_tracker: TimeTracker):
+    def create(time_tracker: TimeoutTracker):
         check_call_with_log(
             [*minikube_kubectl_args, "apply", "-f", str(agent_manifest_path)],
             description="Create agent daemonset.",

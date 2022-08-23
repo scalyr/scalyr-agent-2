@@ -6,7 +6,7 @@ import subprocess
 from typing import List
 
 from agent_build_refactored.tools import check_call_with_log, check_output_with_log
-from tests.end_to_end_tests.tools import TimeTracker
+from tests.end_to_end_tests.tools import TimeoutTracker
 
 log = logging.getLogger(__name__)
 
@@ -77,7 +77,7 @@ def start_agent_container(
         json.dumps({"server_attributes": {"serverHost": docker_server_hostname}})
     )
 
-    def start(timeout_tracker: TimeTracker):
+    def start(timeout_tracker: TimeoutTracker):
         # Run agent inside the container.
 
         additional_options = []

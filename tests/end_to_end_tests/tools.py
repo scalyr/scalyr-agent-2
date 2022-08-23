@@ -119,7 +119,7 @@ class AgentCommander:
         self._check_call_command(["stop"])
 
 
-class TimeTracker:
+class TimeoutTracker:
     """
     Simple abstraction that kept tracking time and can be used to timeout test cases.
     """

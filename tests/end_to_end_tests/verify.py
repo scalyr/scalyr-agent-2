@@ -22,7 +22,7 @@ from typing import Callable, List, Any
 
 import requests
 
-from tests.end_to_end_tests.tools import AgentCommander, TimeTracker
+from tests.end_to_end_tests.tools import AgentCommander, TimeoutTracker
 
 
 log = logging.getLogger(__name__)
@@ -217,7 +217,7 @@ def verify_logs(
     get_agent_log_content: Callable[[], str],
     counters_verification_query_filters: List[str],
     counter_getter: Callable[[Any], int],
-    time_tracker: TimeTracker,
+    timeout_tracker: TimeoutTracker,
     write_counter_messages: Callable[[], None] = None,
     verify_ssl: bool = True,
     ignore_agent_errors_predicates: List[Callable[[str, List[str]], bool]] = None,
@@ -232,6 +232,7 @@ def verify_logs(
     :param counters_verification_query_filters:  List of Scalyr query language filters which are required to fetch
         messages that are ingested by the 'write_counter_messages'
     :param counter_getter: Function which should return counter from the ingested message.
+    :param timeout_tracker: Instance of the TimeoutTracker.
     :param write_counter_messages: Function that writes counter messages to upload the to Scalyr.
         Can be None, for example for the kubernetes image test, where writer pod is already started.
     :param verify_ssl: Verify that agent connected with ssl enabled.
@@ -266,10 +267,10 @@ def verify_logs(
 
     log.info("Wait for agent log requests stats...")
 
-    with time_tracker(80, "Can not wait more for requests stats."):
+    with timeout_tracker(80, "Can not wait more for requests stats."):
         while not check_requests_stats_in_agent_log(content=get_agent_log_content()):
             log.info("   Request stats haven't been found yet, retry...")
-            time_tracker.sleep(10)
+            timeout_tracker.sleep(10)
 
     log.info(
         "Verify that previously written counter messages have been uploaded to server."

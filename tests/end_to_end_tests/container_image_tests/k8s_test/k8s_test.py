@@ -22,7 +22,7 @@ import pytest
 
 from agent_build_refactored.tools import check_output_with_log_debug
 from tests.end_to_end_tests.verify import verify_logs
-from tests.end_to_end_tests.tools import TimeTracker
+from tests.end_to_end_tests.tools import TimeoutTracker
 
 
 log = logging.getLogger(__name__)
@@ -108,7 +108,7 @@ def test_basic(
     start_test_log_writer_pod,
     get_agent_log_content,
 ):
-    timeout = TimeTracker(150)
+    timeout = TimeoutTracker(150)
 
     log.info(
         f"Starting test. Scalyr logs can be found by the cluster name: {cluster_name}"
@@ -147,7 +147,7 @@ def test_basic(
             "$app=='test-log-writer'",
             f"$k8s-cluster=='{cluster_name}'",
         ],
-        time_tracker=timeout,
+        timeout_tracker=timeout,
         ignore_agent_errors_predicates=[ignore_k8s_api_temporary_host_resolution_error],
     )
 
@@ -175,7 +175,7 @@ def test_agent_pod_fails_on_k8s_monitor_fail(
             f"This test now only for a special preview build '{image_builder_name}'"
         )
 
-    timeout = TimeTracker(150)
+    timeout = TimeoutTracker(150)
 
     cluster_role = default_cluster_role.copy()
 

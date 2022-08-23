@@ -26,11 +26,11 @@ from typing import List
 
 import pytest
 
-from tests.end_to_end_tests.tools import AgentPaths
+from tests.end_to_end_tests.tools import AgentPaths, TimeoutTracker
 from tests.end_to_end_tests.verify import (
     verify_logs,
     TEST_LOG_MESSAGE_COUNT,
-    verify_agent_status,
+    verify_agent_status
 )
 from agent_build.tools.constants import SOURCE_ROOT
 
@@ -175,7 +175,7 @@ def _write_counter_messages_to_test_log(upload_test_log_path: pl.Path):
             test_log_write_file.flush()
 
 
-@pytest.mark.timeout(200)
+@pytest.mark.timeout(300)
 def test_basic(
     scalyr_api_key,
     scalyr_server,
@@ -191,6 +191,9 @@ def test_basic(
     Verify agent log for errors, write test messages to a test log file and check if
     those messages are reached the Scalyr server.
     """
+
+    timeout = TimeoutTracker(200)
+
     upload_test_log_path = agent_paths.logs_dir / "test.log"
 
     default_config["logs"] = [
@@ -211,6 +214,7 @@ def test_basic(
             f"$logfile=='{upload_test_log_path}'" f"$serverHost=='{server_host}'",
         ],
         counter_getter=lambda e: e["attributes"]["count"],
+        timeout_tracker=timeout,
         write_counter_messages=functools.partial(
             _write_counter_messages_to_test_log,
             upload_test_log_path=upload_test_log_path,
@@ -221,7 +225,7 @@ def test_basic(
     agent_commander.stop()
 
 
-@pytest.mark.timeout(40)
+@pytest.mark.timeout(100)
 def test_with_failing_essential_monitor(
     scalyr_api_key,
     scalyr_server,
@@ -235,6 +239,9 @@ def test_with_failing_essential_monitor(
     Check that special 'stop_agent_on_failure' directive in a monitor's config
     make the whole agent fail if the monitor fails too.
     """
+
+    timeout = TimeoutTracker(40)
+
     test_monitors_path = pl.Path(__file__).parent / "fixtures"
 
     default_config.update(
@@ -259,7 +266,7 @@ def test_with_failing_essential_monitor(
 
     log.info('Wait until agent crashes because of the fail of the "essential" monitor.')
     while agent_commander.is_running:
-        time.sleep(0.1)
+        timeout.sleep(0.1)
 
     log_content = agent_paths.agent_log_path.read_text()
 
@@ -286,7 +293,7 @@ def test_with_failing_essential_monitor(
     )
 
 
-@pytest.mark.timeout(40)
+@pytest.mark.timeout(100)
 def test_with_failing_non_essential_monitors(
     scalyr_api_key,
     scalyr_server,
@@ -300,6 +307,9 @@ def test_with_failing_non_essential_monitors(
     Test the 'stop_agent_on_failure' option is set to False or default.
     Agent, for the backward compatibility reasons, must not fail with those "non-essential" monitors.
     """
+
+    timeout = TimeoutTracker(40)
+
     test_monitors_path = pl.Path(__file__).parent / "fixtures"
 
     default_config.update(
@@ -349,7 +359,7 @@ def test_with_failing_non_essential_monitors(
         log.info(
             f"Monitors {list(alive_monitors.keys())} are still alive, retry later."
         )
-        time.sleep(5)
+        timeout.sleep(5)
 
     log_content = agent_paths.agent_log_path.read_text()
 
