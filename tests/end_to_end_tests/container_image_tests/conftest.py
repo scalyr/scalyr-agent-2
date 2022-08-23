@@ -6,7 +6,7 @@ import pytest
 from agent_build_refactored.tools import LocalRegistryContainer
 from agent_build_refactored.docker_image_builders import (
     ContainerImageBuilder,
-    ALL_IMAGE_BUILDERS
+    ALL_IMAGE_BUILDERS,
 )
 
 
@@ -15,14 +15,14 @@ def pytest_addoption(parser):
         "--images-registry",
         dest="images_registry",
         required=False,
-        help="Path to directory with registry data root which contains image to test."
+        help="Path to directory with registry data root which contains image to test.",
     )
     parser.addoption(
         "--image-builder-name",
         dest="image_builder_name",
         required=True,
         choices=list(ALL_IMAGE_BUILDERS.keys()),
-        help="Name of the image builder that builds image to test."
+        help="Name of the image builder that builds image to test.",
     )
 
 
@@ -54,10 +54,7 @@ def source_registry_path(image_builder_cls, request, tmp_path_factory):
 
 
 @pytest.fixture(scope="session")
-def all_image_names_to_publish(
-    image_builder_cls,
-    source_registry_path
-):
+def all_image_names_to_publish(image_builder_cls, source_registry_path):
     """
     Registry that contains target image. It may be an externally specified one, or if omitted,
         new local registry with image is created.

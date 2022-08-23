@@ -25,7 +25,7 @@ def pytest_addoption(parser):
         "--kubernetes-version",
         dest="kubernetes_version",
         default="v1.24.3",
-        help="Version of the Kubernetes for the image test."
+        help="Version of the Kubernetes for the image test.",
     )
     parser.addoption(
         "--minikube-driver",

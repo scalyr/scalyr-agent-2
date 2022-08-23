@@ -30,7 +30,7 @@ from tests.end_to_end_tests.tools import AgentPaths, TimeoutTracker
 from tests.end_to_end_tests.verify import (
     verify_logs,
     TEST_LOG_MESSAGE_COUNT,
-    verify_agent_status
+    verify_agent_status,
 )
 from agent_build.tools.constants import SOURCE_ROOT
 

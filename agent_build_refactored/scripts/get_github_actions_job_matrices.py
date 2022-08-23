@@ -71,12 +71,12 @@ else:
     master_run = False
 
 
-ALL_USED_RUNNERS = {
-    **ALL_IMAGE_BUILDERS
-}
+ALL_USED_RUNNERS = {**ALL_IMAGE_BUILDERS}
 
 
-def _get_runners_all_pre_built_steps(runners: List[Type[Runner]]) -> Dict[str, RunnerStep]:
+def _get_runners_all_pre_built_steps(
+    runners: List[Type[Runner]],
+) -> Dict[str, RunnerStep]:
     """
     Get collection of all RunnerSteps that are used by the Runners from the given list.
     :return: Dict with all used RunnerSteps. Step ID - key, step - value.
@@ -124,10 +124,7 @@ def _apply_job_defaults(job: Dict[str, str]):
 
 def main():
     run_type_name = "master" if master_run else "non-master"
-    print(
-        f"Doing {run_type_name} workflow run.",
-        file=sys.stderr
-    )
+    print(f"Doing {run_type_name} workflow run.", file=sys.stderr)
     print(
         f"event_name: {GITHUB_EVENT_NAME}\n"
         f"base_ref: {GITHUB_BASE_REF}\n"
@@ -141,27 +138,25 @@ def main():
         "--images-build-matrix-json-file",
         dest="images_build_matrix_json_file",
         required=True,
-        help="Path to a JSON file with images build job matrix."
+        help="Path to a JSON file with images build job matrix.",
     )
     parser.add_argument(
         "--k8s-images-test-matrix-json-file",
         dest="k8s_images_test_matrix_json_file",
         required=True,
-        help="Path to a JSON file with Kubernetes images test job matrix."
+        help="Path to a JSON file with Kubernetes images test job matrix.",
     )
     parser.add_argument(
         "--docker-images-test-matrix-json-file",
         dest="docker_images_test_matrix_json_file",
         required=True,
-        help="Path to a JSON file with docker images test job matrix."
+        help="Path to a JSON file with docker images test job matrix.",
     )
 
     args = parser.parse_args()
     images_build_matrix_json_file_path = pl.Path(args.images_build_matrix_json_file)
 
-    images_build_matrix = json.loads(
-        images_build_matrix_json_file_path.read_text()
-    )
+    images_build_matrix = json.loads(images_build_matrix_json_file_path.read_text())
 
     # List of all runners that are used by this workflow run.
     used_runners = []
@@ -183,7 +178,9 @@ def main():
         result_images_build_matrix["include"].append(job)
         used_runners.append(builder)
 
-    k8s_images_test_matrix_json_file_path = pl.Path(args.k8s_images_test_matrix_json_file)
+    k8s_images_test_matrix_json_file_path = pl.Path(
+        args.k8s_images_test_matrix_json_file
+    )
 
     # Generate a final agent k8s image test job matrix and filter out job for non-master run, if needed.
     k8s_images_test_matrix = json.loads(
@@ -199,7 +196,9 @@ def main():
         result_k8s_images_test_matrix["include"].append(job)
 
     # Generate a final agent docker image test job matrix and filter out job for non-master run, if needed.
-    docker_images_test_matrix_json_file_path = pl.Path(args.docker_images_test_matrix_json_file)
+    docker_images_test_matrix_json_file_path = pl.Path(
+        args.docker_images_test_matrix_json_file
+    )
     docker_images_test_matrix = json.loads(
         docker_images_test_matrix_json_file_path.read_text()
     )
@@ -213,9 +212,7 @@ def main():
         result_docker_images_test_matrix["include"].append(job)
 
     # Get pre-built steps that are used by this workflow and create matrix for a pre-built steps.
-    pre_built_steps = _get_runners_all_pre_built_steps(
-        runners=used_runners
-    )
+    pre_built_steps = _get_runners_all_pre_built_steps(runners=used_runners)
     pre_build_steps_matrix = {"include": []}
 
     for pre_built_step in pre_built_steps.values():
@@ -234,7 +231,7 @@ def main():
         "agent_image_build_matrix": result_images_build_matrix,
         "k8s_test_matrix_json": result_k8s_images_test_matrix,
         "docker_test_matrix_json": result_docker_images_test_matrix,
-        "to_publish": to_publish
+        "to_publish": to_publish,
     }
 
     print(json.dumps(all_matrices))
