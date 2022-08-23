@@ -1,13 +1,24 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.34 "TBD" - September 17, 2022
+<!---
+Packaged by Dominic LoBue <dominicl@sentinelone.com> on Sep 17, 2022 12:29 -0800
+--->
+
+Improvements:
+* Add support for tracemalloc based memory profiler (``"memory_profiler": "tracemalloc"`` config option). Keep in mind that tracemalloc is only available when running the agent under >= Python 3.5.
+* Add new ``memory_profiler_max_items`` config option which sets maximum number of items by memory usage reported by the memory profiler.
+* Add new ``enable_cpu_profiling`` and ``enable_memory_profiling`` config option with which user can enable either CPU or memory profiler, or both. Existing ``enable_profiling`` config behavior didn't change and setting it to ``true`` will enable both profilers (CPU and memory).
+* Allow user to specify additional trace filters (path globs) for tracemalloc memory profiler using ``memory_profiler_ignore_path_globs`` config option. (e.g. ``memory_profiler_ignore_path_globs: ["**/scalyr_agent/util.py", "**/scalyr_agent/json_lib/**"]``).
+
 ## 2.1.33 "Chaavis" - August 17, 2022
 <!---
 Packaged by Dominic LoBue <dominicl@sentinelone.com> on Aug 17, 2022 12:29 -0800
 --->
 
 Improvements:
-* Add option ``stop_agent_on_failure`` for the monitor config, which ensures that the agent will also stop if that monitor fails.
+* Add option ``stop_agent_on_failure`` for each monitor's configuration. If ``true``, the agent will stop if the monitor fails. For Kubernetes deployments this is `true` by default for the Kubernetes monitor (``scalyr_agent.builtin_monitors.kubernetes_monitor``). The agent's pod will restart if the monitor fails.
 
 Kubernetes Explorer:
 * Update code to calculate per second rate for various metrics used by Kubernetes Explorer on the client (agent) side. This may result in slight CPU and memory usage increase when using Kubernetes Explorer functionality.
@@ -22,7 +33,7 @@ Other:
 * Upgrade various bundled dependencies (orjson, docker).
 
 Bug fixes:
-* Set new  ``stop_agent_on_failure`` monitor config option to ``True`` for the Kubernetes monitor (``scalyr_agent.builtin_monitors.kubernetes_monitor``) in the agent Docker image for Kubernetes deployments. This solves an issue where under some rare edge cases, Kubernetes Monitor would exit, but the agent would not be restarted which would cause pod logs to stop being ingested.
+* Set new ``stop_agent_on_failure`` monitor config option to ``true`` in the agent Docker image for Kubernetes deployments. Solves an issue, present in some rare edge cases, where the Kubernetes Monitor (``scalyr_agent.builtin_monitors.kubernetes_monitor``) exits, but the agent continues to run. The agent's pod will restart if the monitor fails.
 
 ## 2.1.32 "Occao" - July 27, 2022
 
@@ -37,7 +48,7 @@ Windows:
 
 Bug fixes:
 * Fix a bug with ``import_vars`` functionality which didn't work correctly when the same variable name prefix was used (e.g. ``SCALYR_FOO_TEST``, ``SCALYR_FOO``).
-* Fix a bug with handling the log file of the Kubernetes Event Monitor twice, which led to duplication in the agent's status. 
+* Fix a bug with handling the log file of the Kubernetes Event Monitor twice, which led to duplication in the agent's status.
 * Fix a bug in scalyr-agent-2-config ``--export-config``, ``import-config`` options caused by Python 2 and 3 code incompatibility.
 * Fix a bug with the wrong executable ``scalyr-agent-2-config`` in Docker and Kubernetes, due to which it could not be used.
 
