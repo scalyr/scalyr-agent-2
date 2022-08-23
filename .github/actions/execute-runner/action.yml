@@ -1,0 +1,24 @@
+name: 'Execute runner.'
+description: |
+  Prepares current machine by performing the set of the runner steps, which are defined in the 'agent_build/tools/runner.py' module.
+inputs:
+  runner-fqdn:
+    description: "FQDN of the runner"
+    required: true
+
+  cache-key-runner-part:
+    description: | 
+      Part of a cache key that represents system and architecture of the current runner. This is needed to provide 
+      prevent cache collisions for the same step which runs on different environments.
+
+    default: ${{ matrix.os }}-${{ runner.os }}-${{ runner.arch }}
+    required: true
+
+  cache-version-suffix:
+    description: "Cache key suffix. Can be changed when it is needed to invalidate the cache."
+    required: false
+    default: v21
+
+runs:
+  using: 'node12'
+  main: 'dist/index.js'

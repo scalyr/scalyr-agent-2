@@ -474,7 +474,7 @@ class RunnerStep:
             output_directory=output_directory, cache_directory=cache_directory
         )
         if skipped:
-            log.info(f"Result if the step '{self.id}' is found in cache, skip.")
+            log.info(f"Result of the step '{self.id}' is found in cache, skip.")
             return
 
         logging.info(f"Run step {self.name}.")
@@ -573,7 +573,9 @@ class EnvironmentRunnerStep(RunnerStep):
 
         # Before the run, check if there is already an image with the same name. The name contains the checksum
         # of all files which are used in it, so the name identity also guarantees the content identity.
-        output_bytes = check_output_with_log(["docker", "images", "-q", self.result_image.name])
+        output_bytes = check_output_with_log(
+            ["docker", "images", "-q", self.result_image.name]
+        )
         output = output_bytes.decode().strip()
 
         if output:
