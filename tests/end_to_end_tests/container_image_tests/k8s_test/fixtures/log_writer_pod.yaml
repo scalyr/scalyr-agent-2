@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-log-writer
+spec:
+  selector:
+    matchLabels:
+      app: test-log-writer
+  template:
+    metadata:
+      labels:
+        app: test-log-writer
+    spec:
+      containers:
+        - name: "log-writer"
+          image: ubuntu:20.04
+          command: ["/bin/bash"]
+          args: ["-c", "for i in {0..999}; do echo $i; done; sleep 10000"]
+
+      nodeSelector:
+        kubernetes.io/os: linux

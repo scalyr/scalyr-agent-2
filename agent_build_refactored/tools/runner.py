@@ -640,7 +640,7 @@ class Runner:
 
     def __init__(
         self,
-        work_dir: pl.Path,
+        work_dir: pl.Path = None,
         required_steps: List[RunnerStep] = None,
     ):
         """
@@ -653,9 +653,9 @@ class Runner:
         self.required_steps = required_steps or type(self).REQUIRED_STEPS[:]
         self.required_runners = {}
 
-        self.work_dir = work_dir
+        self.work_dir = work_dir or SOURCE_ROOT / "agent_build_output"
         output_name = type(self).get_fully_qualified_name().replace(".", "_")
-        self.output_path = work_dir / "runner_outputs" / output_name
+        self.output_path = self.work_dir / "runner_outputs" / output_name
 
         self._input_values = {}
 

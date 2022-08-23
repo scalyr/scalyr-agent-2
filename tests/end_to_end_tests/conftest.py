@@ -19,6 +19,7 @@ some common options and fixtures such as Scalyr credentials etc.
 """
 
 import json
+import logging
 import os
 import pathlib as pl
 import time
@@ -29,6 +30,8 @@ from _pytest.runner import pytest_runtest_protocol as orig_pytest_runtest_protoc
 from agent_build.tools.constants import SOURCE_ROOT
 
 IN_CICD = os.environ.get("AGENT_BUILD_IN_CICD", False)
+
+log = logging.getLogger(__name__)
 
 
 def pytest_runtest_protocol(item, nextitem):

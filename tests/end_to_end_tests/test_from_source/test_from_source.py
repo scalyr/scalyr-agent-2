@@ -56,7 +56,7 @@ def agent_paths():
 @pytest.fixture
 def server_host(test_session_suffix, request):
     # Make server host unique for each test case
-    return f"agent-source-code-e2e-test-{request.node}-{test_session_suffix}"
+    return f"agent-source-code-e2e-test-{request.node.nodeid}-{test_session_suffix}"
 
 
 def _call_agent(cmd_args: List[str]):

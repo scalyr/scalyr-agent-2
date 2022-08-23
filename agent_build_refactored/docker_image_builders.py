@@ -581,9 +581,9 @@ class ContainerImageBuilder(Runner):
                 src_registry_data_path=pl.Path(args.src_registry_data_dir),
                 tags=tags,
                 user=args.user,
-                dst_registry_host=args.dest_registry_host,
-                dst_registry_tls_skip_verify=args.dest_registry_tls_skip_verify,
-                dst_registry_creds=args.dest_registry_creds,
+                dst_registry_host=args.dst_registry_host,
+                dst_registry_tls_skip_verify=args.dst_registry_tls_skip_verify,
+                dst_registry_creds=args.dst_registry_creds,
             )
             exit(0)
         else:
