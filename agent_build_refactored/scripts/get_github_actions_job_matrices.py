@@ -15,7 +15,7 @@
 
 """
 This script gets job matrices that are specified in the workflow and filters out jobs that are not supposed to be
-in the "limited" run - run which is not from 'master' branch or not from 'master'-targeted PR.
+in the "master" run - run which is only from 'master' branch or from 'master'-targeted PR.
 
 It also generates matrix for job that have to run a special pre-built steps.
 """
@@ -38,32 +38,33 @@ from agent_build_refactored.docker_image_builders import (
     ALL_IMAGE_BUILDERS,
 )
 
-# We expect some info from the GitHub actions context to determine if the run is limited or not.
+# We expect some info from the GitHub actions context to determine if the run is 'master-only' or not.
 GITHUB_EVENT_NAME = os.environ.get("GITHUB_EVENT_NAME", "")
 GITHUB_BASE_REF = os.environ.get("GITHUB_BASE_REF", "")
 GITHUB_REF_TYPE = os.environ.get("GITHUB_REF_TYPE", "")
 GITHUB_REF_NAME = os.environ.get("GITHUB_REF_NAME", "")
 
-limited_run = True
-
-# We do a full workflow run on:
+# We do a full, 'master' workflow run on:
 # pull request against the 'master' branch.
 if GITHUB_EVENT_NAME == "pull_request" and GITHUB_BASE_REF == "master":
-    limited_run = False
+    master_run = True
 # push to the 'master' branch
 elif (
     GITHUB_EVENT_NAME == "push"
     and GITHUB_REF_TYPE == "branch"
     and GITHUB_REF_NAME == "master"
 ):
-    limited_run = False
+    master_run = True
 
 # push to a "production" tag.
 elif GITHUB_EVENT_NAME == "push" and GITHUB_REF_TYPE == "tag":
     version_file_path = SOURCE_ROOT / "VERSION"
     current_version = version_file_path.read_text().strip()
     if GITHUB_REF_NAME == f"v{current_version}":
-        limited_run = False
+        master_run = True
+
+else:
+    master_run = False
 
 
 ALL_USED_RUNNERS = {
@@ -108,7 +109,7 @@ for step in _all_used_runner_steps.values():
 
 
 def main():
-    run_type_name = "limited" if limited_run else "full"
+    run_type_name = "limited" if master_run else "full"
     print(
         f"Doing {run_type_name} workflow run.",
         file=sys.stderr
@@ -142,10 +143,10 @@ def main():
     # Generate a final agent image build job matrix and filter out job for non-limited run, if needed.
     result_images_build_matrix = {"include": []}
     for job in images_build_matrix:
-        is_basic = job.get("basic", False)
+        is_master_run_only = job.get("master_run_only", True)
 
-        # Skip job which id not basic if run is not limited.
-        if not is_basic and limited_run:
+        # If this is non-master run, skip jobs which are not supposed to be in it.
+        if is_master_run_only and not master_run:
             continue
 
         # Set default valued for some essential matrix values, if not specified.
