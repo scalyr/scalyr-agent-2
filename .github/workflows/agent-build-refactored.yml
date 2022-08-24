@@ -60,37 +60,49 @@ jobs:
           # In the 'non-master' runs we only build debian-based images.
           images-to-build: |
             [
-              { "name": "docker-json-debian", "master_run_only": false },
-              { "name": "docker-syslog-debian", "master_run_only": false },
-              { "name": "docker-api-debian", "master_run_only": false },
-              { "name": "k8s-debian", "master_run_only": false }
+              { "name": "docker-json-debian", "master_run_only": false }
+            ]
+#          images-to-build: |
+#            [
+#              { "name": "docker-json-debian", "master_run_only": false },
+#              { "name": "docker-syslog-debian", "master_run_only": false },
+#              { "name": "docker-api-debian", "master_run_only": false },
+#              { "name": "k8s-debian", "master_run_only": false },
 #              { "name": "docker-json-alpine", "master_run_only": true },
 #              { "name": "docker-syslog-alpine", "master_run_only": true },
 #              { "name": "docker-api-alpine", "master_run_only": true },
 #              { "name": "k8s-alpine", "master_run_only": true }
-            ]
+#            ]
 
           k8s-images-tests: |
             [
               { "name": "k8s-debian", "k8s_version": "v1.24.3", "driver": "docker", "runtime": "containerd", "master_run_only": false }
+            ]
+#          k8s-images-tests: |
+#            [
+#              { "name": "k8s-debian", "k8s_version": "v1.24.3", "driver": "docker", "runtime": "containerd", "master_run_only": false },
 #              { "name": "k8s-alpine", "k8s_version": "v1.24.3", "driver": "docker", "runtime": "containerd", "master_run_only": true },
 #
 #              { "name": "k8s-debian", "k8s_version": "v1.17.17", "driver": "docker", "runtime": "docker", "master_run_only": true },
 #              { "name": "k8s-debian", "k8s_version": "v1.20.15", "driver": "docker", "runtime": "docker", "master_run_only": true },
 #              { "name": "k8s-debian", "k8s_version": "v1.21.10", "driver": "docker", "runtime": "docker", "master_run_only": true },
 #              { "name": "k8s-debian", "k8s_version": "v1.22.7", "driver": "docker", "runtime": "docker", "master_run_only": true }
-            ]
+#            ]
 
           docker-images-tests: |
             [
               { "name": "docker-json-debian", "master_run_only": false }
+            ]
+#          docker-images-tests: |
+#            [
+#              { "name": "docker-json-debian", "master_run_only": false },
 #              { "name": "docker-syslog-debian", "master_run_only": false },
 #              { "name": "docker-api-debian", "master_run_only": false },
 #
 #              { "name": "docker-json-alpine", "master_run_only": true },
 #              { "name": "docker-syslog-alpine", "master_run_only": true },
 #              { "name": "docker-api-alpine", "master_run_only": true }
-            ]
+#            ]
 
 
   # This job pre-executes and caches Runner steps that has to be executed in a separate job.
