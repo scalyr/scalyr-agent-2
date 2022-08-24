@@ -61,7 +61,7 @@ jobs:
           images-to-build: |
             [
               { "name": "docker-json-debian", "master_run_only": false },
-              { "name": "k8s-debian", "master_run_only": false },
+              { "name": "k8s-debian", "master_run_only": false }
             ]
 #          images-to-build: |
 #            [
