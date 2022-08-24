@@ -60,7 +60,8 @@ jobs:
           # In the 'non-master' runs we only build debian-based images.
           images-to-build: |
             [
-              { "name": "docker-json-debian", "master_run_only": false }
+              { "name": "docker-json-debian", "master_run_only": false },
+              { "name": "k8s-debian", "master_run_only": false },
             ]
 #          images-to-build: |
 #            [
