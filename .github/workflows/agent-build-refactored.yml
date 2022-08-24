@@ -63,7 +63,7 @@ jobs:
               { "name": "docker-json-debian", "master_run_only": false },
               { "name": "docker-syslog-debian", "master_run_only": false },
               { "name": "docker-api-debian", "master_run_only": false },
-              { "name": "k8s-debian", "master_run_only": false },
+              { "name": "k8s-debian", "master_run_only": false }
 #              { "name": "docker-json-alpine", "master_run_only": true },
 #              { "name": "docker-syslog-alpine", "master_run_only": true },
 #              { "name": "docker-api-alpine", "master_run_only": true },
@@ -72,7 +72,7 @@ jobs:
 
           k8s-images-tests: |
             [
-              { "name": "k8s-debian", "k8s_version": "v1.24.3", "driver": "docker", "runtime": "containerd", "master_run_only": false },
+              { "name": "k8s-debian", "k8s_version": "v1.24.3", "driver": "docker", "runtime": "containerd", "master_run_only": false }
 #              { "name": "k8s-alpine", "k8s_version": "v1.24.3", "driver": "docker", "runtime": "containerd", "master_run_only": true },
 #
 #              { "name": "k8s-debian", "k8s_version": "v1.17.17", "driver": "docker", "runtime": "docker", "master_run_only": true },
@@ -83,7 +83,7 @@ jobs:
 
           docker-images-tests: |
             [
-              { "name": "docker-json-debian", "master_run_only": false },
+              { "name": "docker-json-debian", "master_run_only": false }
 #              { "name": "docker-syslog-debian", "master_run_only": false },
 #              { "name": "docker-api-debian", "master_run_only": false },
 #
