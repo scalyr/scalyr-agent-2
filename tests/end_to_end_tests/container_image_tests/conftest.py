@@ -92,5 +92,5 @@ def container_agent_paths():
     return AgentPaths(
         configs_dir=pl.Path("/etc/scalyr-agent-2"),
         logs_dir=pl.Path("/var/log/scalyr-agent-2"),
-        install_root=pl.Path("/usr/share/scalur-agent-2")
+        install_root=pl.Path("/usr/share/scalur-agent-2"),
     )

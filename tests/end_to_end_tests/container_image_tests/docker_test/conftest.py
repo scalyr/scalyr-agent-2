@@ -60,9 +60,13 @@ def docker_agent_commander(container_agent_paths, agent_container_name):
     """
     return AgentCommander(
         executable_args=[
-            "docker", "exec", "-t", agent_container_name, "scalyr-agent-2"
+            "docker",
+            "exec",
+            "-t",
+            agent_container_name,
+            "scalyr-agent-2",
         ],
-        agent_paths=container_agent_paths
+        agent_paths=container_agent_paths,
     )
 
 
@@ -76,7 +80,7 @@ def start_agent_container(
     image_builder_name,
     get_agent_log_content,
     docker_agent_commander,
-    start_collecting_agent_logs
+    start_collecting_agent_logs,
 ):
     """
     Returns function which starts agent docker container.
@@ -127,16 +131,22 @@ def start_agent_container(
         # Create a function which reads content of the log file of the started agent inside the container..
         def collect_logs():
             try:
-                return check_output_with_log([
-                    "docker", "exec", "-i", agent_container_name, "tail", "-f", "/var/log/scalyr-agent-2/agent.log"
-                ])
+                return check_output_with_log(
+                    [
+                        "docker",
+                        "exec",
+                        "-i",
+                        agent_container_name,
+                        "tail",
+                        "-f",
+                        "/var/log/scalyr-agent-2/agent.log",
+                    ]
+                )
             except subprocess.CalledProcessError as e:
                 return e.stdout
 
         # This function will be executed by a special log collector fixture to collect logs and dump them at the end.
-        start_collecting_agent_logs(
-            log_collector_func=collect_logs
-        )
+        start_collecting_agent_logs(log_collector_func=collect_logs)
 
         return agent_container_name
 

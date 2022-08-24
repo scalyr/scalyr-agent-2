@@ -461,11 +461,14 @@ def get_agent_log_content(minikube_kubectl_args):
 
 
 @pytest.fixture
-def create_agent_commander(container_agent_paths, minikube_kubectl_args, scalyr_namespace):
+def create_agent_commander(
+    container_agent_paths, minikube_kubectl_args, scalyr_namespace
+):
     """
     Fixture function which creates AgentCommander instance that can operate
     with agent that runs inside Kubernetes pod.
     """
+
     def create(agent_pod_name: str):
         return AgentCommander(
             executable_args=[
@@ -478,9 +481,9 @@ def create_agent_commander(container_agent_paths, minikube_kubectl_args, scalyr_
                 "--container",
                 "scalyr-agent",
                 "--",
-                "scalyr-agent-2"
+                "scalyr-agent-2",
             ],
-            agent_paths=container_agent_paths
+            agent_paths=container_agent_paths,
         )
 
     return create
@@ -497,7 +500,7 @@ def create_agent_daemonset(
     get_agent_log_content,
     create_agent_commander,
     get_pod_status,
-    start_collecting_agent_logs
+    start_collecting_agent_logs,
 ):
     """
     Return function which starts agent daemonset.
@@ -546,7 +549,9 @@ def create_agent_daemonset(
                     pod_name = get_pod_name()
                     break
                 except subprocess.CalledProcessError:
-                    timeout_tracker.sleep(5, message="Can not get agent pod name in time.")
+                    timeout_tracker.sleep(
+                        5, message="Can not get agent pod name in time."
+                    )
 
         # Check that pod is in "Running" phase.
         with timeout_tracker(20):
@@ -561,31 +566,33 @@ def create_agent_daemonset(
         # Also check that agent inside that pod is running.
         with timeout_tracker(20):
             while not agent_commander.is_running:
-                timeout_tracker.sleep(5, message="Agent hasn't started in a given time.")
+                timeout_tracker.sleep(
+                    5, message="Agent hasn't started in a given time."
+                )
 
         # Create a function which reads content of the log file of the started agent inside the pod.
         def collect_agent_logs():
             try:
-                return check_output_with_log([
-                    *minikube_kubectl_args,
-                    "--namespace=scalyr",
-                    "exec",
-                    "-i",
-                    pod_name,
-                    "--container",
-                    "scalyr-agent",
-                    "--",
-                    "tail",
-                    "-f",
-                    "/var/log/scalyr-agent-2/agent.log"
-                ])
+                return check_output_with_log(
+                    [
+                        *minikube_kubectl_args,
+                        "--namespace=scalyr",
+                        "exec",
+                        "-i",
+                        pod_name,
+                        "--container",
+                        "scalyr-agent",
+                        "--",
+                        "tail",
+                        "-f",
+                        "/var/log/scalyr-agent-2/agent.log",
+                    ]
+                )
             except subprocess.CalledProcessError as e:
                 return e.stdout
 
         # This function will be executed by a special log collector fixture to collect logs and dump them at the end.
-        start_collecting_agent_logs(
-            log_collector_func=collect_agent_logs
-        )
+        start_collecting_agent_logs(log_collector_func=collect_agent_logs)
 
         return pod_name
 
@@ -623,7 +630,13 @@ def get_pod_metadata(minikube_kubectl_args):
             description=f"Get metadata of the pod: {pod_name}",
         ).decode()
 
-        return json.loads(pod_metadata_output)
+        try:
+            decoded_metadata = json.loads(pod_metadata_output)
+        except json.JSONDecodeError:
+            log.error(f"Error while decoding pod metadata JSON. Original metadata string: {pod_metadata_output}.")
+            raise
+
+        return decoded_metadata
 
     return get
 
