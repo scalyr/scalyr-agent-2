@@ -64,32 +64,32 @@ jobs:
               { "name": "docker-syslog-debian", "master_run_only": false },
               { "name": "docker-api-debian", "master_run_only": false },
               { "name": "k8s-debian", "master_run_only": false },
-              { "name": "docker-json-alpine", "master_run_only": true },
-              { "name": "docker-syslog-alpine", "master_run_only": true },
-              { "name": "docker-api-alpine", "master_run_only": true },
-              { "name": "k8s-alpine", "master_run_only": true }
+#              { "name": "docker-json-alpine", "master_run_only": true },
+#              { "name": "docker-syslog-alpine", "master_run_only": true },
+#              { "name": "docker-api-alpine", "master_run_only": true },
+#              { "name": "k8s-alpine", "master_run_only": true }
             ]
 
           k8s-images-tests: |
             [
               { "name": "k8s-debian", "k8s_version": "v1.24.3", "driver": "docker", "runtime": "containerd", "master_run_only": false },
-              { "name": "k8s-alpine", "k8s_version": "v1.24.3", "driver": "docker", "runtime": "containerd", "master_run_only": true },
-            
-              { "name": "k8s-debian", "k8s_version": "v1.17.17", "driver": "docker", "runtime": "docker", "master_run_only": true },
-              { "name": "k8s-debian", "k8s_version": "v1.20.15", "driver": "docker", "runtime": "docker", "master_run_only": true },
-              { "name": "k8s-debian", "k8s_version": "v1.21.10", "driver": "docker", "runtime": "docker", "master_run_only": true },
-              { "name": "k8s-debian", "k8s_version": "v1.22.7", "driver": "docker", "runtime": "docker", "master_run_only": true }
+#              { "name": "k8s-alpine", "k8s_version": "v1.24.3", "driver": "docker", "runtime": "containerd", "master_run_only": true },
+#
+#              { "name": "k8s-debian", "k8s_version": "v1.17.17", "driver": "docker", "runtime": "docker", "master_run_only": true },
+#              { "name": "k8s-debian", "k8s_version": "v1.20.15", "driver": "docker", "runtime": "docker", "master_run_only": true },
+#              { "name": "k8s-debian", "k8s_version": "v1.21.10", "driver": "docker", "runtime": "docker", "master_run_only": true },
+#              { "name": "k8s-debian", "k8s_version": "v1.22.7", "driver": "docker", "runtime": "docker", "master_run_only": true }
             ]
 
           docker-images-tests: |
             [
               { "name": "docker-json-debian", "master_run_only": false },
-              { "name": "docker-syslog-debian", "master_run_only": false },
-              { "name": "docker-api-debian", "master_run_only": false },
-              
-              { "name": "docker-json-alpine", "master_run_only": true },
-              { "name": "docker-syslog-alpine", "master_run_only": true },
-              { "name": "docker-api-alpine", "master_run_only": true }
+#              { "name": "docker-syslog-debian", "master_run_only": false },
+#              { "name": "docker-api-debian", "master_run_only": false },
+#
+#              { "name": "docker-json-alpine", "master_run_only": true },
+#              { "name": "docker-syslog-alpine", "master_run_only": true },
+#              { "name": "docker-api-alpine", "master_run_only": true }
             ]
 
 
@@ -321,58 +321,60 @@ jobs:
           steps: ${{ toJson(steps) }}
           channel: '#cloud-tech'
 
-  publish-images:
-    if: ${{ needs.pre-job.outputs.to_publish == 'true'}}
-    needs:
-      - pre-job
-      - test-k8s-images
-      - test-docker-images
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ ubuntu-20.04 ]
-        python-version: [ 3.10.6 ]
-        name:
-          - docker-json-debian
-          - docker-syslog-debian
-          - docker-api-debian
-          - k8s-debian
-          - docker-json-alpine
-          - docker-syslog-alpine
-          - docker-api-alpine
-          - k8s-alpine
+# Uncomment when old build workflow is replaced.
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Download registry with previously built image
-        uses: actions/download-artifact@v3
-        with:
-          name: ${{ matrix.name }}-registry
-          path: /tmp/registry
-
-      - name: Publish image of the builder '${{ matrix.name }}' using master branch commit sha '${{ github.sha }}'
-        if: github.ref_type == 'branch'
-        run: |
-          python3 build_package_new_refactored.py ${{ matrix.name }} \
-            publish \
-            --src-registry-data-dir /tmp/registry \
-            --tags "${{ github.sha }}" \
-            --user ${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }} \
-            --dst-registry-creds "${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}:${{ secrets.DOCKER_HUB_PASSWORD_TEST_ACCOUNT }}"
-          
-
-      - name: Publish image of the builder '${{ matrix.name }}' using production tag '${{ github.ref_name }}'
-        if: github.ref_type == 'tag'
-        run: |
-          python3 build_package_new_refactored.py ${{ matrix.name }} \
-            publish \
-            --src-registry-data-dir /tmp/registry \
-            --tags "latest,${{ github.ref_name }}" \
-            --user ${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }} \
-            --dst-registry-creds "${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}:${{ secrets.DOCKER_HUB_PASSWORD_TEST_ACCOUNT }}"
-      
+#  publish-images:
+#    if: ${{ needs.pre-job.outputs.to_publish == 'true'}}
+#    needs:
+#      - pre-job
+#      - test-k8s-images
+#      - test-docker-images
+#    runs-on: ${{ matrix.os }}
+#    strategy:
+#      fail-fast: false
+#      matrix:
+#        os: [ ubuntu-20.04 ]
+#        python-version: [ 3.10.6 ]
+#        name:
+#          - docker-json-debian
+#          - docker-syslog-debian
+#          - docker-api-debian
+#          - k8s-debian
+#          - docker-json-alpine
+#          - docker-syslog-alpine
+#          - docker-api-alpine
+#          - k8s-alpine
+#
+#    steps:
+#      - name: Checkout repository
+#        uses: actions/checkout@v3
+#
+#      - name: Download registry with previously built image
+#        uses: actions/download-artifact@v3
+#        with:
+#          name: ${{ matrix.name }}-registry
+#          path: /tmp/registry
+#
+#      - name: Publish image of the builder '${{ matrix.name }}' using master branch commit sha '${{ github.sha }}'
+#        if: github.ref_type == 'branch'
+#        run: |
+#          python3 build_package_new_refactored.py ${{ matrix.name }} \
+#            publish \
+#            --src-registry-data-dir /tmp/registry \
+#            --tags "${{ github.sha }}" \
+#            --user ${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }} \
+#            --dst-registry-creds "${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}:${{ secrets.DOCKER_HUB_PASSWORD_TEST_ACCOUNT }}"
+#
+#
+#      - name: Publish image of the builder '${{ matrix.name }}' using production tag '${{ github.ref_name }}'
+#        if: github.ref_type == 'tag'
+#        run: |
+#          python3 build_package_new_refactored.py ${{ matrix.name }} \
+#            publish \
+#            --src-registry-data-dir /tmp/registry \
+#            --tags "latest,${{ github.ref_name }}" \
+#            --user ${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }} \
+#            --dst-registry-creds "${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}:${{ secrets.DOCKER_HUB_PASSWORD_TEST_ACCOUNT }}"
+#
       
       

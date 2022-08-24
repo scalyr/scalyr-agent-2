@@ -633,7 +633,9 @@ def get_pod_metadata(minikube_kubectl_args):
         try:
             decoded_metadata = json.loads(pod_metadata_output)
         except json.JSONDecodeError:
-            log.error(f"Error while decoding pod metadata JSON. Original metadata string: {pod_metadata_output}.")
+            log.error(
+                f"Error while decoding pod metadata JSON. Original metadata string: {pod_metadata_output}."
+            )
             raise
 
         return decoded_metadata
