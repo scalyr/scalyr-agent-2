@@ -8,6 +8,7 @@ from agent_build_refactored.docker_image_builders import (
     ContainerImageBuilder,
     ALL_IMAGE_BUILDERS,
 )
+from tests.end_to_end_tests.tools import AgentPaths
 
 
 def pytest_addoption(parser):
@@ -84,3 +85,12 @@ def all_image_names_to_publish(image_builder_cls, source_registry_path):
 def image_name(all_image_names_to_publish):
     # Get the first name of of all available names to use it for all main tests.
     return all_image_names_to_publish[0]
+
+
+@pytest.fixture
+def container_agent_paths():
+    return AgentPaths(
+        configs_dir=pl.Path("/etc/scalyr-agent-2"),
+        logs_dir=pl.Path("/var/log/scalyr-agent-2"),
+        install_root=pl.Path("/usr/share/scalur-agent-2")
+    )

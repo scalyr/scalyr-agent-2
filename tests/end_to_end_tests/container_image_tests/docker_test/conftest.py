@@ -1,11 +1,12 @@
 import logging
+import subprocess
+
 import pytest
 import json
-import subprocess
 from typing import List
 
 from agent_build_refactored.tools import check_call_with_log, check_output_with_log
-from tests.end_to_end_tests.tools import TimeoutTracker
+from tests.end_to_end_tests.tools import TimeoutTracker, AgentCommander
 
 log = logging.getLogger(__name__)
 
@@ -52,6 +53,20 @@ def get_agent_log_content():
 
 
 @pytest.fixture
+def docker_agent_commander(container_agent_paths, agent_container_name):
+    """
+    Instance of the agent commander that can operate with agent that runs inside
+    the docker container.
+    """
+    return AgentCommander(
+        executable_args=[
+            "docker", "exec", "-t", agent_container_name, "scalyr-agent-2"
+        ],
+        agent_paths=container_agent_paths
+    )
+
+
+@pytest.fixture
 def start_agent_container(
     image_name,
     agent_container_name,
@@ -60,6 +75,8 @@ def start_agent_container(
     docker_server_hostname,
     image_builder_name,
     get_agent_log_content,
+    docker_agent_commander,
+    start_collecting_agent_logs
 ):
     """
     Returns function which starts agent docker container.
@@ -102,13 +119,26 @@ def start_agent_container(
             ]
         )
 
+        # Agent inside the created container needs time to fully start.
         with timeout_tracker(20):
-            while True:
-                try:
-                    get_agent_log_content(container_name=agent_container_name)
-                    return agent_container_name
-                except subprocess.CalledProcessError:
-                    timeout_tracker.sleep(5, "Can not read agent's log in time.")
+            while not docker_agent_commander.is_running:
+                timeout_tracker.sleep(5, "Agent hasn't started in a given time.")
+
+        # Create a function which reads content of the log file of the started agent inside the container..
+        def collect_logs():
+            try:
+                return check_output_with_log([
+                    "docker", "exec", "-i", agent_container_name, "tail", "-f", "/var/log/scalyr-agent-2/agent.log"
+                ])
+            except subprocess.CalledProcessError as e:
+                return e.stdout
+
+        # This function will be executed by a special log collector fixture to collect logs and dump them at the end.
+        start_collecting_agent_logs(
+            log_collector_func=collect_logs
+        )
+
+        return agent_container_name
 
     yield start
     _call_docker(["kill", agent_container_name])

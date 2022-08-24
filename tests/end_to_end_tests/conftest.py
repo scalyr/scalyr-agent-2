@@ -23,6 +23,8 @@ import logging
 import os
 import pathlib as pl
 import time
+import concurrent.futures
+from typing import Callable, List
 
 import pytest
 from _pytest.runner import pytest_runtest_protocol as orig_pytest_runtest_protocol
@@ -144,3 +146,40 @@ def test_session_suffix(request, config_file):
 def agent_version():
     version_file = SOURCE_ROOT / "VERSION"
     return version_file.read_text().strip()
+
+
+@pytest.fixture
+def collected_agent_logs() -> List[str]:
+    """
+    List of strings with logs of the agents that were started during current test case.
+    When fixture is finalized, it prints all collected logs for debug purposes.
+    """
+    logs = []
+    yield logs
+
+    agent_logs = ""
+    for i, agent_log in enumerate(logs):
+        agent_logs = f"Agent log from run {i}:\n{agent_log}\n"
+
+    log.info(agent_logs)
+
+
+@pytest.fixture
+def start_collecting_agent_logs(collected_agent_logs):
+    """
+    Fixture function which accepts "log collector" functions which has to continuously collect agent logs and return
+    them at the end. This function will run that collector function in a separate thread and put its result in the
+    final collected agent logs fixture.
+    """
+    executor = concurrent.futures.ThreadPoolExecutor()
+    futures = []
+
+    def start_collecting(log_collector_func: Callable[[], str]):
+        future = executor.submit(log_collector_func)
+        futures.append(future)
+
+    yield start_collecting
+
+    for f in futures:
+        result = f.result()
+        collected_agent_logs.append(result.decode(errors="replace"))

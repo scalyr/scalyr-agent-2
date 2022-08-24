@@ -94,16 +94,16 @@ def test_basic(
     start_test_log_writer_pod,
     get_agent_log_content,
 ):
-    timeout = TimeoutTracker(150)
+    timeout_tracker = TimeoutTracker(150)
 
     log.info(
         f"Starting test. Scalyr logs can be found by the cluster name: {cluster_name}"
     )
     apply_agent_service_account()
 
-    agent_pod_name = create_agent_daemonset(time_tracker=timeout)
+    agent_pod_name = create_agent_daemonset(timeout_tracker=timeout_tracker)
 
-    test_writer_pod_name = start_test_log_writer_pod(time_tracker=timeout)
+    test_writer_pod_name = start_test_log_writer_pod(timeout_tracker=timeout_tracker)
 
     def ignore_k8s_api_temporary_host_resolution_error(message, additional_lines):
         if (
@@ -133,7 +133,7 @@ def test_basic(
             "$app=='test-log-writer'",
             f"$k8s-cluster=='{cluster_name}'",
         ],
-        timeout_tracker=timeout,
+        timeout_tracker=timeout_tracker,
         ignore_agent_errors_predicates=[ignore_k8s_api_temporary_host_resolution_error],
     )
 
@@ -173,7 +173,7 @@ def test_agent_pod_fails_on_k8s_monitor_fail(
     apply_agent_service_account(cluster_role=cluster_role)
 
     log.info("Starting agent daemonset.")
-    agent_pod_name = create_agent_daemonset(time_tracker=timeout)
+    agent_pod_name = create_agent_daemonset(timeout_tracker=timeout)
     time.sleep(10)
 
     agent_log = get_agent_log_content(pod_name=agent_pod_name)

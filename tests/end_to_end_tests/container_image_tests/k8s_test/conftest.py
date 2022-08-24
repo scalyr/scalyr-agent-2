@@ -14,7 +14,7 @@ from agent_build_refactored.tools import (
     check_output_with_log,
     check_output_with_log_debug,
 )
-from tests.end_to_end_tests.tools import TimeoutTracker
+from tests.end_to_end_tests.tools import TimeoutTracker, AgentCommander
 
 
 log = logging.getLogger(__name__)
@@ -391,7 +391,7 @@ def start_test_log_writer_pod(minikube_kubectl_args):
         description="Remove existing counter messages writer pod.",
     )
 
-    def start(time_tracker: TimeoutTracker):
+    def start(timeout_tracker: TimeoutTracker):
         check_call_with_log(
             [*minikube_kubectl_args, "apply", "-f", str(manifest_path)],
             description="Create new deployment with counter messages writer pod.",
@@ -413,12 +413,12 @@ def start_test_log_writer_pod(minikube_kubectl_args):
             return output.decode().strip()
 
         # Get name of the created pod.
-        with time_tracker(20):
+        with timeout_tracker(20):
             while True:
                 try:
                     return get_pod_name()
                 except subprocess.CalledProcessError:
-                    time_tracker.sleep(5)
+                    timeout_tracker.sleep(5)
                     continue
 
     yield start
@@ -461,6 +461,32 @@ def get_agent_log_content(minikube_kubectl_args):
 
 
 @pytest.fixture
+def create_agent_commander(container_agent_paths, minikube_kubectl_args, scalyr_namespace):
+    """
+    Fixture function which creates AgentCommander instance that can operate
+    with agent that runs inside Kubernetes pod.
+    """
+    def create(agent_pod_name: str):
+        return AgentCommander(
+            executable_args=[
+                *minikube_kubectl_args,
+                "--namespace",
+                "scalyr",
+                "exec",
+                "-i",
+                agent_pod_name,
+                "--container",
+                "scalyr-agent",
+                "--",
+                "scalyr-agent-2"
+            ],
+            agent_paths=container_agent_paths
+        )
+
+    return create
+
+
+@pytest.fixture
 def create_agent_daemonset(
     agent_manifest_path,
     prepare_agent_configmap,
@@ -469,6 +495,9 @@ def create_agent_daemonset(
     scalyr_namespace,
     minikube_kubectl_args,
     get_agent_log_content,
+    create_agent_commander,
+    get_pod_status,
+    start_collecting_agent_logs
 ):
     """
     Return function which starts agent daemonset.
@@ -487,7 +516,7 @@ def create_agent_daemonset(
     )
 
     # Create agent's daemonset.
-    def create(time_tracker: TimeoutTracker):
+    def create(timeout_tracker: TimeoutTracker):
         check_call_with_log(
             [*minikube_kubectl_args, "apply", "-f", str(agent_manifest_path)],
             description="Create agent daemonset.",
@@ -509,25 +538,56 @@ def create_agent_daemonset(
             )
             return output.decode().strip()
 
-        with time_tracker(20):
+        # Wait until agent pod is created.
+        with timeout_tracker(20):
             while True:
                 try:
                     # Get name of the created pod.
                     pod_name = get_pod_name()
                     break
                 except subprocess.CalledProcessError:
-                    time_tracker.sleep(5, message="Can not get agent pod name in time.")
+                    timeout_tracker.sleep(5, message="Can not get agent pod name in time.")
 
-        # Also wait for the agent log file is created in the agent's container.
-        with time_tracker(20):
+        # Check that pod is in "Running" phase.
+        with timeout_tracker(20):
             while True:
-                try:
-                    get_agent_log_content(pod_name=pod_name)
-                    return pod_name
-                except subprocess.CalledProcessError:
-                    time_tracker.sleep(
-                        5, message="Can not get agent's log file in time."
-                    )
+                status = get_pod_status(pod_name=pod_name)
+                if status["phase"] == "Running":
+                    break
+                timeout_tracker.sleep(5, message="Agent pod's phase is not running.")
+
+        agent_commander = create_agent_commander(agent_pod_name=pod_name)
+
+        # Also check that agent inside that pod is running.
+        with timeout_tracker(20):
+            while not agent_commander.is_running:
+                timeout_tracker.sleep(5, message="Agent hasn't started in a given time.")
+
+        # Create a function which reads content of the log file of the started agent inside the pod.
+        def collect_agent_logs():
+            try:
+                return check_output_with_log([
+                    *minikube_kubectl_args,
+                    "--namespace=scalyr",
+                    "exec",
+                    "-i",
+                    pod_name,
+                    "--container",
+                    "scalyr-agent",
+                    "--",
+                    "tail",
+                    "-f",
+                    "/var/log/scalyr-agent-2/agent.log"
+                ])
+            except subprocess.CalledProcessError as e:
+                return e.stdout
+
+        # This function will be executed by a special log collector fixture to collect logs and dump them at the end.
+        start_collecting_agent_logs(
+            log_collector_func=collect_agent_logs
+        )
+
+        return pod_name
 
     yield create
 
