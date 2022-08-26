@@ -879,7 +879,7 @@ and System sources:
             result = api_class(self._config, self._logger, channels)
 
             if api_class == NewJsonApi:
-                self.log_config["parser"] = "dottedJson"
+                self.log_config["parser"] = "dottedEscapedJson"
         else:
             if channels:
                 msg = (
