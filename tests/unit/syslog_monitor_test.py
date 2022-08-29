@@ -926,6 +926,48 @@ class SyslogDefaultRequestParserTestCase(SyslogMonitorTestCase):
         self.assertEqual(parser._remaining, bytearray())
         self.assertEqual(parser._offset, 0)
 
+    def test_process_success_no_existing_buffer_recv_multiple_complete_messages_invalid_utf8_data(
+        self,
+    ):
+        mock_socket = mock.Mock()
+        mock_handle_frame = mock.Mock()
+        max_buffer_size = 1024
+
+        invalid_utf8_data = "ž".encode("utf-16")
+
+        mock_msg_1 = (
+            b"<14>Dec 24 16:12:48 hosttest.example.com tag-1-0-17[2593]: Hey diddle diddle %s, The Cat and the Fiddle, The Cow jump'd over the Spoon\n"
+            % (invalid_utf8_data)
+        )
+        mock_msg_2 = (
+            b"<14>Dec 24 16:12:48 hosttest.example.com tag-2-0-17[2593]: Hey diddle diddle %s, The Cat and the Fiddle, The Cow jump'd over the Spoon\n"
+            % (invalid_utf8_data)
+        )
+        mock_msg_3 = (
+            b"<14>Dec 24 16:12:48 hosttest.example.com tag-3-0-17[2593]: Hey diddle diddle %s, The Cat and the Fiddle, The Cow jump'd over the Spoon\n"
+            % (invalid_utf8_data)
+        )
+        mock_data = mock_msg_1 + mock_msg_2 + mock_msg_3
+
+        # byte sequence which falls outside of utf-8 range should be ignored
+        mock_msg_1_expected = b"<14>Dec 24 16:12:48 hosttest.example.com tag-1-0-17[2593]: Hey diddle diddle ~\x01, The Cat and the Fiddle, The Cow jump'd over the Spoon\n"
+
+        parser = SyslogRequestParser(
+            socket=mock_socket, max_buffer_size=max_buffer_size
+        )
+        parser.process(mock_data, mock_handle_frame)
+
+        # Ensure handle_frame has been called once per message
+        self.assertEqual(mock_handle_frame.call_count, 3)
+        self.assertEqual(
+            six.ensure_binary(mock_handle_frame.call_args_list[0][0][0]),
+            mock_msg_1_expected.strip(),
+        )
+
+        # Verify internal state is correctly reset
+        self.assertEqual(parser._remaining, bytearray())
+        self.assertEqual(parser._offset, 0)
+
 
 class SyslogTCPRequestParserTestCase(SyslogMonitorTestCase):
     def test_eagain_is_handled_correctly(self):

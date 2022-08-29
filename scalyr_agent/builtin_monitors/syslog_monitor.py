@@ -490,7 +490,7 @@ class SyslogUDPHandler(six.moves.socketserver.BaseRequestHandler):
     """
 
     def handle(self):
-        data = six.ensure_text(self.request[0].strip())
+        data = six.ensure_text(self.request[0].strip(), errors="ignore")
         self.server.syslog_handler.handle(data)
 
 
@@ -628,7 +628,7 @@ class SyslogRequestParser(object):
             frame_length = frame_end - self._offset
 
             frame_data = six.ensure_text(
-                self._remaining[self._offset : frame_end].strip()
+                self._remaining[self._offset : frame_end].strip(), "utf-8", "ignore"
             )
             handle_frame(frame_data)
             frames_handled += 1
