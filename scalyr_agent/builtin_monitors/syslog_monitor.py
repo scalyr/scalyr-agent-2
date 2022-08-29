@@ -490,7 +490,7 @@ class SyslogUDPHandler(six.moves.socketserver.BaseRequestHandler):
     """
 
     def handle(self):
-        data = six.ensure_text(self.request[0].strip(), errors="ignore")
+        data = six.ensure_text(self.request[0].strip(), "utf-8", errors="ignore")
         self.server.syslog_handler.handle(data)
 
 
@@ -613,7 +613,9 @@ class SyslogRequestParser(object):
                     )
 
                     # skip invalid bytes which can appear because of the buffer overflow.
-                    frame_data = six.ensure_text(self._remaining, errors="ignore")
+                    frame_data = six.ensure_text(
+                        self._remaining, "utf-8", errors="ignore"
+                    )
                     handle_frame(frame_data)
 
                     frames_handled += 1
@@ -1421,9 +1423,8 @@ class SyslogHandler(object):
         """
         Feed syslog messages to the appropriate loggers.
         """
-
         # one more time ensure that we don't have binary string.
-        data = six.ensure_text(data)
+        data = six.ensure_text(data, "utf-8", errors="ignore")
 
         if self.__docker_logging:
             self.__handle_docker_logs(data)
