@@ -11,6 +11,7 @@ Improvements:
 * Add new ``memory_profiler_max_items`` config option which sets maximum number of items by memory usage reported by the memory profiler.
 * Add new ``enable_cpu_profiling`` and ``enable_memory_profiling`` config option with which user can enable either CPU or memory profiler, or both. Existing ``enable_profiling`` config behavior didn't change and setting it to ``true`` will enable both profilers (CPU and memory).
 * Allow user to specify additional trace filters (path globs) for tracemalloc memory profiler using ``memory_profiler_ignore_path_globs`` config option. (e.g. ``memory_profiler_ignore_path_globs: ["**/scalyr_agent/util.py", "**/scalyr_agent/json_lib/**"]``).
+* Update syslog_monitor to ignore errors when decoding data from bytes into unicode if data falls outside of the utf-8 range.
 
 ## 2.1.33 "Chaavis" - August 17, 2022
 <!---
