@@ -952,6 +952,8 @@ class SyslogDefaultRequestParserTestCase(SyslogMonitorTestCase):
 
         # byte sequence which falls outside of utf-8 range should be ignored
         mock_msg_1_expected = b"<14>Dec 24 16:12:48 hosttest.example.com tag-1-0-17[2593]: Hey diddle diddle ~\x01, The Cat and the Fiddle, The Cow jump'd over the Spoon\n"
+        mock_msg_2_expected = b"<14>Dec 24 16:12:48 hosttest.example.com tag-2-0-17[2593]: Hey diddle diddle ~\x01, The Cat and the Fiddle, The Cow jump'd over the Spoon\n"
+        mock_msg_3_expected = b"<14>Dec 24 16:12:48 hosttest.example.com tag-3-0-17[2593]: Hey diddle diddle ~\x01, The Cat and the Fiddle, The Cow jump'd over the Spoon\n"
 
         parser = SyslogRequestParser(
             socket=mock_socket, max_buffer_size=max_buffer_size
@@ -963,6 +965,14 @@ class SyslogDefaultRequestParserTestCase(SyslogMonitorTestCase):
         self.assertEqual(
             six.ensure_binary(mock_handle_frame.call_args_list[0][0][0]),
             mock_msg_1_expected.strip(),
+        )
+        self.assertEqual(
+            six.ensure_binary(mock_handle_frame.call_args_list[1][0][0]),
+            mock_msg_2_expected.strip(),
+        )
+        self.assertEqual(
+            six.ensure_binary(mock_handle_frame.call_args_list[2][0][0]),
+            mock_msg_3_expected.strip(),
         )
 
         # Verify internal state is correctly reset
