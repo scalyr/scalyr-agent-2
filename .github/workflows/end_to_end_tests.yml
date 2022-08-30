@@ -173,14 +173,14 @@ jobs:
           daemonset_yaml_path: "tests/e2e/scalyr-agent-2-daemonset.yaml"
 
       - name: Verify data has been ingested
-        timeout-minutes: 5
+        timeout-minutes: 14
         env:
           # Needed for scalyr-tool
           scalyr_readlog_token: "${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }}"
           SCALYR_AGENT_POD_NAME: "${{ env.SCALYR_AGENT_POD_NAME }}"
           K8S_NODE_NAME: "${{ env.K8S_NODE_NAME }}"
         run: |
-          export RETRY_ATTEMPTS="10"
+          export RETRY_ATTEMPTS="14"
           export SLEEP_DELAY="10"
 
           # Verify agent is running
@@ -360,7 +360,7 @@ jobs:
           K8S_NODE_NAME: "${{ env.K8S_NODE_NAME }}"
           K8S_CLUSTER_NAME: "${{ env.K8S_CLUSTER_NAME }}"
         run: |
-          export RETRY_ATTEMPTS="10"
+          export RETRY_ATTEMPTS="14"
           export SLEEP_DELAY="10"
 
           # Verify agent is running
