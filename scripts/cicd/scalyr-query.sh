@@ -28,23 +28,27 @@ MINIMUM_RESULTS=${MINIMUM_RESULTS:-"1"}
 
 SCALYR_TOOL_QUERY=$1
 
+echo_with_date() {
+    date +"[%Y-%m-%d %H:%M:%S] $*"
+}
+
 function retry_on_failure {
   i=1
 
   until [ "${i}" -gt "${RETRY_ATTEMPTS}" ]
   do
-     echo ""
+     echo_with_date ""
      # shellcheck disable=SC2145
-     echo "Running function \"$@\" attempt ${i}/${RETRY_ATTEMPTS}..."
-     echo ""
+     echo_with_date "Running function \"$@\" attempt ${i}/${RETRY_ATTEMPTS}..."
+     echo_with_date ""
 
      exit_code=0
      "$@" && break
      exit_code=$?
 
-     echo ""
-     echo "Function returned non-zero status code, sleeping ${SLEEP_DELAY}s before next attempt.."
-     echo ""
+     echo_with_date ""
+     echo_with_date "Function returned non-zero status code, sleeping ${SLEEP_DELAY}s before next attempt.."
+     echo_with_date ""
 
      i=$((i+1))
 
@@ -60,22 +64,22 @@ function retry_on_failure {
 }
 
 function query_scalyr {
-    echo "Using query '${SCALYR_TOOL_QUERY}'"
+    echo_with_date "Using query '${SCALYR_TOOL_QUERY}'"
 
     RESULT=$(eval "scalyr query '${SCALYR_TOOL_QUERY}' --columns='timestamp,severity,message' --start='20m' --count='100' --output multiline")
     RESULT_LINES=$(echo -e "${RESULT}" | sed '/^$/d' | wc -l)
 
-    echo "Results for query '${SCALYR_TOOL_QUERY}':"
-    echo ""
+    echo_with_date "Results for query '${SCALYR_TOOL_QUERY}':"
+    echo_with_date ""
     echo -e "${RESULT}"
 
     if [ "${RESULT_LINES}" -lt ${MINIMUM_RESULTS} ]; then
-        echo ""
-        echo "Expected at least ${MINIMUM_RESULTS} matching lines, got ${RESULT_LINES}."
+        echo_with_date ""
+        echo_with_date "Expected at least ${MINIMUM_RESULTS} matching lines, got ${RESULT_LINES}."
         return 1
     fi
 
-    echo ""
+    echo_with_date ""
     echo -e "\xE2\x9C\x94 Found ${RESULT_LINES} matching log lines"
     return 0
 }

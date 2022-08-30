@@ -5,7 +5,7 @@ inputs:
   minikube_version:
     description: "Minikube version to use"
     required: false
-    default: "v1.26.0"
+    default: "v1.26.1"
   k8s_version:
     description: "Kubernetes version to be installed by minikube (if any)"
     required: false
@@ -52,6 +52,13 @@ runs:
       if: ${{ inputs.k8s_version != '' }}
       shell: bash
       run: |
+        # Workaround to ensure we use kubectl version which comes with a specific k8s release as
+        # part of minikube and not system level kubectl. This is important because system version
+        # of kubectl may be different and incompatible with the k8s version we are installing via
+        # minikube.
+        which kubectl
+        rm /usr/local/bin/kubectl || true
+        ln -sf $(which minikube) /usr/local/bin/kubectl
         echo "kubectl version"
         kubectl version
         echo ""

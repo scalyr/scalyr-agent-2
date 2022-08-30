@@ -30,7 +30,7 @@ jobs:
 
   coverage:
     runs-on: ubuntu-latest
-    if: success() || failure()
+    if: (success() || failure()) && (${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }})
     needs:
       - pre_job
       - unittests
@@ -65,11 +65,15 @@ jobs:
   unittests:
     name: Unittests - Python ${{ matrix.python-version }} - ${{ matrix.platform }}
     runs-on: ${{ matrix.platform }}-latest
+
+    needs: pre_job
+    # NOTE: We always want to run job on master branch
+    if: (success() || failure()) && (${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }})
+
     timeout-minutes: 10
     defaults:
       run:
         shell: bash
-    needs: pre_job
     strategy:
       fail-fast: false
       matrix:
@@ -140,11 +144,15 @@ jobs:
   standalone-smoketests:
     name: Standalone Smoketests - Python ${{ matrix.python-version }} - ${{ matrix.variant }}
     runs-on: ubuntu-latest
+
+    needs: pre_job
+    # NOTE: We always want to run job on master branch
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
+
     timeout-minutes: 10
     defaults:
       run:
         shell: bash
-    needs: pre_job
     strategy:
       fail-fast: false
       matrix:
@@ -213,10 +221,14 @@ jobs:
     name: Monitor Smoketests - Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+
+    needs: pre_job
+    # NOTE: We always want to run job on master branch
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
+
     defaults:
       run:
         shell: bash
-    needs: pre_job
     strategy:
       fail-fast: false
       matrix:

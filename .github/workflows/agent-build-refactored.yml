@@ -20,7 +20,7 @@ env:
 # Since we can do a "master" run (on push and PR to a master branch) and "non-master" run, it generates matrices with different
 #  size according to that information.
 jobs:
-  pre-job:
+  pre_job:
     runs-on: ubuntu-20.04
     outputs:
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
@@ -66,25 +66,24 @@ jobs:
               { "name": "k8s-alpine", "master_run_only": true }
             ]
 
-
   # This job pre-executes and caches Runner steps that has to be executed in a separate job.
   # For example, we build platform-specific base docker images in a separate jobs to reduce overall build time, because
   # some of base images are built with using QEMU.
   pre-build-cached-step:
     name: ${{ matrix.name }}
-    if: needs.pre-job.outputs.should_skip != 'true'
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
     needs:
-      - pre-job
+      - pre_job
 
     runs-on: ${{ matrix.os }}
     strategy:
-      # This job receives its matrix from the 'pre-job' job. The matrix itself is created by the .github/actions/init-job-matrices action.
+      # This job receives its matrix from the 'pre_job' job. The matrix itself is created by the .github/actions/init-job-matrices action.
       # The matrix, for now, consists only from the 'include' part with following fields:
       #   "name": Name of the build job. (Not used in actiual build process, but just gives meaningful name to the job).
       #   "step-runner-fqdn": Fully qualified name of the builder class that has to run the cached step.
       #   "python-version": Version of python to setup on this runner. (NOTE: version of python used in images may differ, and it specified in the source code.)
       #   "os": Runner OS.
-      matrix: ${{ fromJSON(needs.pre-job.outputs.pre_build_steps_matrix_json) }}
+      matrix: ${{ fromJSON(needs.pre_job.outputs.pre_build_steps_matrix_json) }}
 
     steps:
       - name: Checkout repository
@@ -111,12 +110,12 @@ jobs:
   build-images:
     name: Build image '${{ matrix.name }}'
     needs:
-      - pre-job
+      - pre_job
       - pre-build-cached-step
     runs-on: ${{ matrix.os }}
 
     strategy:
-      # This job receives its matrix from the 'pre-job' job. The matrix itself is created by the .github/actions/init-job-matrices action.
+      # This job receives its matrix from the 'pre_job' job. The matrix itself is created by the .github/actions/init-job-matrices action.
       # The matrix, for now, consists only from the 'include' part with following fields:
       #   "name": name of the builder that builds the target images.
       #   "master_run_only": If 'true' then it this package will be included only in a "master" workflow run.
@@ -125,7 +124,7 @@ jobs:
       #   "builder-fqdn": Fully qualified name of the builder to find its cached steps.
       #   "python-version": Version of python to set up on this runner. (NOTE: version of python used in images may differ, and it specified in the source code.)
       #   "os": Runner OS.
-      matrix: ${{ fromJSON(needs.pre-job.outputs.agent_image_build_matrix_json) }}
+      matrix: ${{ fromJSON(needs.pre_job.outputs.agent_image_build_matrix_json) }}
 
     steps:
       - name: Checkout repository

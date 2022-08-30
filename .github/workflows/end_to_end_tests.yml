@@ -84,7 +84,7 @@ jobs:
 
     needs: pre_job
     # NOTE: We always want to run job on master branch
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' && (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
 
     strategy:
       fail-fast: false
@@ -173,14 +173,14 @@ jobs:
           daemonset_yaml_path: "tests/e2e/scalyr-agent-2-daemonset.yaml"
 
       - name: Verify data has been ingested
-        timeout-minutes: 5
+        timeout-minutes: 14
         env:
           # Needed for scalyr-tool
           scalyr_readlog_token: "${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }}"
           SCALYR_AGENT_POD_NAME: "${{ env.SCALYR_AGENT_POD_NAME }}"
           K8S_NODE_NAME: "${{ env.K8S_NODE_NAME }}"
         run: |
-          export RETRY_ATTEMPTS="10"
+          export RETRY_ATTEMPTS="14"
           export SLEEP_DELAY="10"
 
           # Verify agent is running
@@ -259,7 +259,7 @@ jobs:
 
     needs: pre_job
     # NOTE: We always want to run job on master branch
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' && ( github.ref == 'refs/heads/master' || github.base_ref == 'master' ) }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || ( github.ref == 'refs/heads/master' || github.base_ref == 'master' ) }}
 
     strategy:
       fail-fast: false
@@ -360,7 +360,7 @@ jobs:
           K8S_NODE_NAME: "${{ env.K8S_NODE_NAME }}"
           K8S_CLUSTER_NAME: "${{ env.K8S_CLUSTER_NAME }}"
         run: |
-          export RETRY_ATTEMPTS="8"
+          export RETRY_ATTEMPTS="14"
           export SLEEP_DELAY="10"
 
           # Verify agent is running
@@ -434,7 +434,7 @@ jobs:
   k8s-smoketest:
     runs-on: ubuntu-latest
     needs: pre_job
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
@@ -452,7 +452,7 @@ jobs:
       - name: Setup minikube k8s cluster
         uses: ./.github/actions/setup-minikube-cluster/
         with:
-          k8s_version: v1.18.0
+          k8s_version: v1.22.0
           minikube_driver: ""
           container_runtime: "docker"
           github_token: "${{ secrets.GITHUB_TOKEN }}"
@@ -490,7 +490,7 @@ jobs:
   docker-smoketest:
     name: Docker Smoketest - ${{ matrix.variant.log_mode }}
     needs: pre_job
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -549,7 +549,7 @@ jobs:
   agent-source-tests:
     runs-on: ${{ matrix.os }}
     needs: pre_job
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
     container: ${{ matrix.container }}
     strategy:
       matrix:
