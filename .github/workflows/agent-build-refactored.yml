@@ -66,13 +66,12 @@ jobs:
               { "name": "k8s-alpine", "master_run_only": true }
             ]
 
-
   # This job pre-executes and caches Runner steps that has to be executed in a separate job.
   # For example, we build platform-specific base docker images in a separate jobs to reduce overall build time, because
   # some of base images are built with using QEMU.
   pre-build-cached-step:
     name: ${{ matrix.name }}
-    if: needs.pre-job.outputs.should_skip != 'true'
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
     needs:
       - pre-job
 

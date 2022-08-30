@@ -84,7 +84,7 @@ jobs:
 
     needs: pre_job
     # NOTE: We always want to run job on master branch
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' && (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
 
     strategy:
       fail-fast: false
@@ -259,7 +259,7 @@ jobs:
 
     needs: pre_job
     # NOTE: We always want to run job on master branch
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' && ( github.ref == 'refs/heads/master' || github.base_ref == 'master' ) }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || ( github.ref == 'refs/heads/master' || github.base_ref == 'master' ) }}
 
     strategy:
       fail-fast: false
@@ -434,7 +434,7 @@ jobs:
   k8s-smoketest:
     runs-on: ubuntu-latest
     needs: pre_job
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' && (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
@@ -490,7 +490,7 @@ jobs:
   docker-smoketest:
     name: Docker Smoketest - ${{ matrix.variant.log_mode }}
     needs: pre_job
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' && (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -549,7 +549,7 @@ jobs:
   agent-source-tests:
     runs-on: ${{ matrix.os }}
     needs: pre_job
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' && (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
     container: ${{ matrix.container }}
     strategy:
       matrix:
