@@ -1,7 +1,7 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.34 "TBD" - September 17, 2022
+## 2.1.34 "Tadongolia" - August 30, 2022
 <!---
 Packaged by Dominic LoBue <dominicl@sentinelone.com> on Sep 17, 2022 12:29 -0800
 --->
@@ -12,6 +12,9 @@ Improvements:
 * Add new ``enable_cpu_profiling`` and ``enable_memory_profiling`` config option with which user can enable either CPU or memory profiler, or both. Existing ``enable_profiling`` config behavior didn't change and setting it to ``true`` will enable both profilers (CPU and memory).
 * Allow user to specify additional trace filters (path globs) for tracemalloc memory profiler using ``memory_profiler_ignore_path_globs`` config option. (e.g. ``memory_profiler_ignore_path_globs: ["**/scalyr_agent/util.py", "**/scalyr_agent/json_lib/**"]``).
 * Update syslog_monitor to ignore errors when decoding data from bytes into unicode if data falls outside of the utf-8 range.
+
+Bug fixes:
+* Update windows_event_log_monitor to handle embedded double quotes in fields.
 
 ## 2.1.33 "Chaavis" - August 17, 2022
 <!---

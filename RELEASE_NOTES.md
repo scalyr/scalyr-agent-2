@@ -9,6 +9,227 @@ incompatible changes have been made in that release.
 For a list of all the changes in a particular release, please refer to the changelog file -
 https://github.com/scalyr/scalyr-agent-2/blob/master/CHANGELOG.md.
 
+## 2.1.34 "Tadongolia" - August 30, 2022
+<!---
+Packaged by Dominic LoBue <dominicl@sentinelone.com> on Sep 17, 2022 12:29 -0800
+--->
+
+Improvements:
+* Add support for tracemalloc based memory profiler (``"memory_profiler": "tracemalloc"`` config option). Keep in mind that tracemalloc is only available when running the agent under >= Python 3.5.
+* Add new ``memory_profiler_max_items`` config option which sets maximum number of items by memory usage reported by the memory profiler.
+* Add new ``enable_cpu_profiling`` and ``enable_memory_profiling`` config option with which user can enable either CPU or memory profiler, or both. Existing ``enable_profiling`` config behavior didn't change and setting it to ``true`` will enable both profilers (CPU and memory).
+* Allow user to specify additional trace filters (path globs) for tracemalloc memory profiler using ``memory_profiler_ignore_path_globs`` config option. (e.g. ``memory_profiler_ignore_path_globs: ["**/scalyr_agent/util.py", "**/scalyr_agent/json_lib/**"]``).
+* Update syslog_monitor to ignore errors when decoding data from bytes into unicode if data falls outside of the utf-8 range.
+
+Bug fixes:
+* Update windows_event_log_monitor to handle embedded double quotes in fields.
+
+## 2.1.33 "Chaavis" - August 17, 2022
+<!---
+Packaged by Dominic LoBue <dominicl@sentinelone.com> on Aug 17, 2022 12:29 -0800
+--->
+
+Improvements:
+* Add option ``stop_agent_on_failure`` for each monitor's configuration. If ``true``, the agent will stop if the monitor fails. For Kubernetes deployments this is `true` by default for the Kubernetes monitor (``scalyr_agent.builtin_monitors.kubernetes_monitor``). The agent's pod will restart if the monitor fails.
+
+Kubernetes Explorer:
+* Update code to calculate per second rate for various metrics used by Kubernetes Explorer on the client (agent) side. This may result in slight CPU and memory usage increase when using Kubernetes Explorer functionality.
+
+Windows:
+* Add new ``json`` config option to the ``windows_event_log`` monitor. When this option is set to true, events are formatted as JSON.
+
+Other:
+* Changed log severity level from ``ERROR`` to ``WARNING`` for non-fatal and temporary network client error.
+* Update agent packages to also bundle new LetsEncrypt CA root certificate (ISRG Root X2). Some of the environments use LetsEncrypt issued certificates.
+* Update agent code base to log a warning with the server side SSL certificate in PEM format on SSL certificate validation failure for easier troubleshooting.
+* Upgrade various bundled dependencies (orjson, docker).
+
+Bug fixes:
+* Set new ``stop_agent_on_failure`` monitor config option to ``true`` in the agent Docker image for Kubernetes deployments. Solves an issue, present in some rare edge cases, where the Kubernetes Monitor (``scalyr_agent.builtin_monitors.kubernetes_monitor``) exits, but the agent continues to run. The agent's pod will restart if the monitor fails.
+
+## 2.1.32 "Occao" - July 27, 2022
+
+<!---
+Packaged by Dominic LoBue <dominicl@sentinelone.com> on Jul 27, 2022 12:29 -0800
+--->
+
+Windows:
+* Fix bug in Windows System Metrics and Windows Process Metrics monitor where user wasn't able to override / change default sampling rating of 30 seconds (``sample_interval`` monitor config option).
+* Update Windows Process Metrics monitor to log a message in case process with the specified pid / command line string is not found when retrieving process metrics.
+* Update Windows Process Metrics monitor to throw an error in case invalid monitor configuration is specified (neither "pid" nor "commandline" config option is specified or both config options which are mutually exclusive are specified).
+
+Bug fixes:
+* Fix a bug with ``import_vars`` functionality which didn't work correctly when the same variable name prefix was used (e.g. ``SCALYR_FOO_TEST``, ``SCALYR_FOO``).
+* Fix a bug with handling the log file of the Kubernetes Event Monitor twice, which led to duplication in the agent's status.
+* Fix a bug in scalyr-agent-2-config ``--export-config``, ``import-config`` options caused by Python 2 and 3 code incompatibility.
+* Fix a bug with the wrong executable ``scalyr-agent-2-config`` in Docker and Kubernetes, due to which it could not be used.
+
+Docker images:
+* Upgrade various dependencies: orjson, requests, zstandard, lz4, docker.
+
+Other:
+* Support for Python 2.6 has been dropped.
+* Support for ``ujson`` JSON library (``json_library`` configuration option) has been removed in favor of ``orjson``.
+* Update agent log messages to include full name of the module which produced the message.
+
+## 2.1.31 "Irati" - Jun 28, 2022
+
+<!---
+Packaged by Dominic LoBue <dominicl@sentinelone.com> on Jun 28, 2022 12:29 -0800
+--->
+
+Windows:
+* Update base Python interpreter for Windows MSI package from 3.8 to 3.10.
+* Upgrade various bundled dependencies (pywin32, orjson, urllib3, six).
+
+Bug fixes:
+* Fix a regression introduced in v2.1.29 which would cause the agent to inadvertently skip connectivity check on startup.
+* Default value for ``check_remote_if_no_tty`` config option is ``False``. Previously the changelog entry incorrectly stated it defaults to ``True``. This means that a connectivity check is not performed on startup if tty is not available.
+* Fix a bug in syslog monitor on Windows under Python 3 which would prevent TCP handler from working.
+* Fixed agent checkpoint selection bug that could cause old log files to be re-uploaded.
+* Small bug with command line argument parsing for the Agent. Agent raised unhandled exception instead of normal argparse error message when agent main command wasn't specified.
+* Fix a bug in the Agent's custom JSON parser, which did not raise error on unexpected ending of the JSON document which might be caused by a JSON syntax error.
+
+Docker images:
+* Upgrade orjson dependency
+
+Other:
+* Monitor ``emit_value()`` method now correctly sanitizes / escapes metric field names which are "reserved" (logfile, metric, value, serverHost, instance, severity). This is done to prevent possible collisions with special / reserved metric event attribute names which could cause issues with some queries. Metric field names which are escaped get added ``_`` suffix (e.g. ``metric`` becomes ``metric_``).
+* Upgrade dependency ``requests`` library to 2.25.1.
+* Failed docker container metric status requests from the docker client now logged as warnings instead of errors.
+
+## 2.1.30 "Heturn" - May 17, 2022
+
+<!---
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on May 17, 2022 23:04 -0800
+--->
+
+Kubernetes:
+* Agent has been updated to periodically try to re-read Kubernetes authentication token value from ``/var/run/secrets/kubernetes.io/serviceaccount/token`` file on disk (every 5 minutes by default). This way agent also supports Kubernetes deployments where token files are periodically automatically refreshed / rotated (e.g. https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#service-account-token-volume-projection).
+* Fix an edge case with handling empty ``resourceVersion`` value in the Kubernetes Events Monitor.
+
+Docker images:
+* Upgrade Python used by Docker images from 3.8.12 to 3.8.13.
+
+Bug fixes:
+* Fix minimum Python version detection in the deb/rpm package pre/post install script and make sure agent packages also support Python >= 3.10 (e.g. Ubuntu 22.04). Contributed by Arkadiusz Skalski (@askalski85).
+
+Other:
+* Update the code to log connection related errors which are retried and are not fatal under WARNING instead of ERROR log level.
+* Update agent start up log message to use format which is supported by the agent message parser.
+
+## 2.1.29 "Auter" - Mar 15, 2022
+
+<!---
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Mar 15, 2022 23:04 -0800
+--->
+
+Docker images:
+* Kubernetes Docker image (``scalyr-k8s-agent``) has been updated to ignore checkpoint data for ephemeral log files (anything matching ``/var/log/scalyr-agent-2/*.log``) on agent start up. Those log files are ephemeral (aka only available during container runtime) which means we don't want to re-use checkpoints for those log files across pod restarts (recreations). Previously, those checkpoints were preserved across restarts which meant that on subsequent pod restarts some of the early internal agent log messages produced by the agent during start up phase were not ingested.
+
+Bug fixes:
+* Kubernetes monitor now correctly dynamically detects pod metadata changes (e.g. annotations) when using containerd runtime. Previously metadata updates were not detected dynamically which meant agent needed to be restarted to pick up any metadata changes (such as Scalyr related annotations).
+
+## 2.1.28 "Dryria" - Feb 23, 2022
+
+<!---
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Feb 23, 2022 23:04 -0800
+--->
+
+Improvements:
+* Docker and Kubernetes monitors now support parsing date and time information from the container log lines with custom timezones (aka non UTC).
+
+Docker images:
+* Docker images now include udatetime time dependency which should speed up parsing date and time information from Docker container log lines.
+* Upgrade zstandard and orjson dependency used by the Docker image.
+
+## 2.1.27 "Thonia" - Jan 27, 2022
+
+<!---
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Jan 27, 2022 23:04 -0800
+--->
+
+Improvements:
+* Add new ``debug_level_logger_names`` config option. With this config option user can specify a list of logger names for which to set debug log level for. Previously user could only set debug level for all the loggers. This comes handy when we want to set debug level for a single of subset of loggers (e.g. for a single monitor).
+* If profiling is enabled (``enable_profiling`` configuration option), memory profiling data will be ingested by default (CPU profiling data was already being ingested when profiling was enabled, but not memory one).
+
+Docker images:
+* Upgrade Python used by Docker images from 3.8.10 to 3.8.12.
+* Base distribution version for non slim Alpine Linux based images has been upgraded from Debian Buster (10) to Debian Bullseye (11).
+
+Bug fixes:
+* Fix a bug with the URL monitor not working correctly with POST methods when ``request_data`` was specified under Python 3.
+
+## 2.1.26 "Yavin" - Jan 12, 2022
+
+<!---
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Jan 12, 2022 23:04 -0800
+--->
+
+Improvements:
+* Add ``collect_replica_metrics`` config option to the MySQL monitor. When this option is set to False (for backward compatibility reasons it defaults to True) we don't try to collect replica metrics and as such, user which is used to connect to the database only needs PROCESS permissions and nothing else.
+* Add support for specifying new ``server_url`` config option for each session worker. This allows user to configure different session workers to use different server urls (e.g. some workers send data to agent.scalyr.com and other send data to eu.scalyr.com).
+
+Other:
+* Update agent to also log response ``message`` field value when we receive ``error/client/badParam`` status code from the API to make troubleshooting easier.
+
+Docker Images:
+* Docker images now utilize Python 3.8 (in the past they used Python 2.7).
+* Docker images are now also produced and pushed to the registry for the ``linux/arm64`` and ``linux/arm/v7`` architecture.
+* Docker image now includes ``pympler`` dependency by default. This means memory profiling can be enabled via the agent configuration option without the need to modify and re-build the Docker image.
+* ``ujson`` dependency has been removed from the Docker image in favor of ``orjson`` which is more performant and now used by default.
+* Alpine based Docker images which are 50% small than regular Debian bullseye-slim based ones are now available. Alpine based images contains ``-alpine`` tag name suffix.
+
+## 2.1.25 "Hamarus" - Nov 17, 2021
+
+<!---
+Packaged by Yan Shnayder <yans@sentinelone.com> on Nov 17, 2021 14:10 -0800
+--->
+
+Other:
+* Added a LetsEncrypt root certificate to the Agent's included certificate bundle.
+* Update Kubernetes monitor to log a message under INFO log level that some container level metrics won't be available when detected runtime is ``containerd`` and not ``docker`` and container level metrics reporting is enabled.
+
+Bug fixes:
+* Fix plaintext mode in the Graphite monitor.
+* Update Linux system metric monitor so it doesn't print an error and ignores ``/proc/net/netstat`` lines we don't support metrics for.
+
+## 2.1.24 "Xuntian" - Oct 26, 2021
+
+<!---
+Packaged by Yan Shnayder <yans@sentinelone.com> on Oct 26, 2021 14:10 -0800
+--->
+
+Improvements:
+* Implemented optional line merging when running in Docker based Kubernetes to work around Docker's own 16KB line length limit. Use the ``merge_json_parsed_lines`` config option or ``SCALYR_MERGE_JSON_PARSED_LINES`` environment variable to enable this functionality.
+
+Bug fixes:
+* Update agent to throw more user-friendly error when we fail to parse fragment file due to invalid content.
+
+## 2.1.23 "Whipple" - Sept 16, 2021
+
+<!---
+Packaged by Steven Czerwinski <stevenc@sentinelone.com> on Sep 16, 2021 10:10 -0800
+--->
+
+Bug fixes:
+* Fix docker container builder scripts to only use `buildx` if it is available.
+* Fix memory leak in the Syslog monitor which is caused by a bug in standard TCP/UDP servers in Python 3 (https://bugs.python.org/issue37193). The version of Python for Windows was updated to 3.8.10. For Linux users, who run agent on Python 3 and use Syslog monitor, it is also recommended to check if their Python 3 installation is up to date and has appropriate bug fixes.
+* Fix bug in the copying manager which works with monitor (such as Docker or Syslog monitor). This bug might cause re-uploading of the old log messages in some edge cases.
+
+## 2.1.22 "Volans" - Aug 11, 2021
+
+<!---
+Packaged by Oliver Hsu <oliverhs@sentinelone.com> on Aug 11, 2021 21:00 -0800
+--->
+
+Bug fixes:
+* Don't log "skipping copying log lines" messages in case number of last produced bytes is 0.
+* Fix Kubernetes Agent DaemonSet liveness probe timeout too short and unhealthy agent pod not restarting when a liveness probe timeout occurs.
+
+Other:
+* Update Windows Event Log monitor to emit a warning if ``maximum_records_per_source`` config option is set to a non-default value when using a new event API where that config option has no affect.
+
 ## 2.1.21 "Ultramarine" - Jun 1, 2021
 
 * This is the last release that still supports Python 2.6. This version of the agent will emit a
