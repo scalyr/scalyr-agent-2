@@ -221,7 +221,7 @@ if ("$event_log_output" -notmatch "Level")   { Throw "Event log monitor didnt em
 # Verify that the event we inserted exists
 if ("$event_log_output" -notmatch "ScalyrAgentTest")   { Throw "Matching event not found in event log" };
 # TODO: Find out how to make this powershell script to write event logs with non-ASCII characters.
-if ("$event_log_output" -notmatch 'Scalyr automated tests event \\\\"with quoted text\\\\" .+')   { Throw "Matching event not found in event log" };
+if ("$event_log_output" -notmatch 'Scalyr automated tests event \\"with quoted text\\" .+')   { Throw "Matching event not found in event log" };
 
 #
 # Verify agent start up line
