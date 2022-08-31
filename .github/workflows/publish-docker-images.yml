@@ -86,7 +86,7 @@ jobs:
         with:
           status: ${{ job.status }}
           steps: ${{ toJson(steps) }}
-          channel: '#cloud-tech'
+          channel: '#eng-dataset-cloud-tech'
 
   publish-release:
     needs: [ publish-temp-release ]
@@ -122,4 +122,4 @@ jobs:
         with:
           status: ${{ job.status }}
           steps: ${{ toJson(steps) }}
-          channel: '#cloud-tech'
+          channel: '#eng-dataset-cloud-tech'
