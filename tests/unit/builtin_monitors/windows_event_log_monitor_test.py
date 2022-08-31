@@ -148,6 +148,34 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
             {"a": "aa", "b": {"0": "b1", "1": "b2"}, "c": "cc"},
         )
 
+        self.assertEqual(
+            scalyr_agent.builtin_monitors.windows_event_log_monitor._convert_json_array_to_object(
+                [{"a": 1, "b": 2}, {"c": 3, "d": 4}]
+            ),
+            {"0": {"a": 1, "b": 2}, "1": {"c": 3, "d": 4}}
+        )
+
+        self.assertEqual(
+            scalyr_agent.builtin_monitors.windows_event_log_monitor._convert_json_array_to_object(
+                [{"a": 1, "b": 2, "@Name": "n"}, {"c": 3,"d": 4}]
+            ),
+            {"n": {"a": 1, "b": 2}, "1": {"c": 3, "d": 4}}
+        )
+
+        self.assertEqual(
+            scalyr_agent.builtin_monitors.windows_event_log_monitor._convert_json_array_to_object(
+                [{"a": 1, "b": 2, "@Name": "n"}, {"c": 3, "d": 4, "@Name": "n"}]
+            ),
+            {"n": {"a": 1, "b": 2}, "n1": {"c": 3, "d": 4}}
+        )
+
+        self.assertEqual(
+            scalyr_agent.builtin_monitors.windows_event_log_monitor._convert_json_array_to_object(
+                [{"a": 1, "@Name": "n"}, {"b": 2, "@Name": "n2"}, {"c": 3, "@Name": "n"}]
+            ),
+            {"n": {"a": 1}, "n2": {"b": 2}, "2": {"c": 3, "@Name": "n"}}
+        )
+
     @skipIf(sys.platform != "Windows", "Skipping tests under non-Windows platform")
     def test_strip_xmltodict_prefixes(self):
         self.assertEqual(
