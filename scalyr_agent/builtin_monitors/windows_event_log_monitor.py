@@ -703,13 +703,13 @@ def _convert_json_array_to_object(x):
         # Otherwise the (stringified) index number becomes the field name.
         rv = {}
         for i in range(len(x)):
-            if isinstance(x[i], dict) and '@Name' in x[i]:
-                orig_name = name = x[i].pop('@Name')
+            if isinstance(x[i], dict) and "@Name" in x[i]:
+                orig_name = name = x[i].pop("@Name")
                 if name in rv:
                     name += str(i)
                     # Fallback to the original behavior if this pathological case occurs
                     if name in rv:
-                        x[i]['@Name'] = orig_name
+                        x[i]["@Name"] = orig_name
                         rv[str(i)] = _convert_json_array_to_object(x[i])
                         continue
                 rv[name] = _convert_json_array_to_object(x[i])
