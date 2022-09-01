@@ -17,7 +17,7 @@ An [Agent Plugin](https://app.scalyr.com/help/scalyr-agent#plugins) is a compone
 
 1\. Install the Scalyr Agent
 
-If you haven't already done so, install the [Scalyr Agent](https://app.scalyr.com/help/welcome). We recommend you install the Agent on each server running Redis. Your data will automatically be tagged for the server it came from, and the Agent can also collect system metrics, and log files.
+If you haven't already, install the [Scalyr Agent](https://app.scalyr.com/help/welcome). We recommend you install the Agent on each server running Redis. Your data will automatically be tagged for the server it came from, and the Agent can also collect system metrics and log files.
 
 
 2\. Configure the Scalyr Agent to import the Redis SLOWLOG
@@ -32,7 +32,7 @@ Find the `monitors: [ ... ]` section and add a `{...}` stanza with the `module` 
       }
     ]
 
-This default configuration is for a Redis server without a password, located at `localhost:6379`. To change these defaults, add a `hosts [...]` array. Then add and set a `{...}` stanza for each host with the applicable `host`, `port` and `password` properties. An example for two hosts, with passwords:
+This default configuration is for a Redis server without a password, located at `localhost:6379`. To change these defaults, add a `hosts [...]` array. Then add and set a `{...}` stanza for each host with the applicable `host`, `port`, and `password` properties. An example for two hosts, with passwords:
 
     monitors: [
       {
