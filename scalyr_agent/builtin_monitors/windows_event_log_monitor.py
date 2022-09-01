@@ -41,7 +41,7 @@ except ImportError as e:
     windll = None
 
 import scalyr_agent.util as scalyr_util
-from scalyr_agent import ScalyrMonitor, define_config_option
+from scalyr_agent import ScalyrMonitor, define_config_option, define_log_field
 import scalyr_agent.scalyr_logging as scalyr_logging
 
 __author__ = "imron@scalyr.com"
@@ -146,6 +146,8 @@ define_config_option(
     default=False,
     convert_to=bool,
 )
+
+define_log_field(__monitor__, "monitor", "Always ``windows_event_log_monitor``.")
 
 
 class Api(object):
@@ -683,6 +685,7 @@ class NewJsonApi(NewApi):
             "SystemTime"
         ]
         event_json["name"] = self._logger.name
+        event_json["monitor"] = "windows_event_log_monitor"
         self._logger.emit_value("unused", scalyr_util.json_encode(event_json))
 
         self._bookmark_lock.acquire()
