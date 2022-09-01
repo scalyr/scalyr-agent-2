@@ -30,7 +30,7 @@ from scalyr_agent import ScalyrMonitor, define_config_option, define_log_field
 __monitor__ = __name__
 
 define_config_option(
-    __monitor__, "module", "Always ``scalyr_agent.builtin_monitors.shell_monitor``"
+    __monitor__, "module", "Always `scalyr_agent.builtin_monitors.shell_monitor`"
 )
 define_config_option(
     __monitor__,
@@ -70,7 +70,8 @@ define_config_option(
     max_value=10000,
 )
 
-define_log_field(__monitor__, "monitor", "Always shell_monitor`.")
+define_log_field(__monitor__, "monitor", "Always `shell_monitor`.")
+define_log_field(__monitor__, "metric", "Always `output`.")
 define_log_field(
     __monitor__,
     "instance",
@@ -81,7 +82,6 @@ define_log_field(
     "command",
     "The shell command for this plugin instance, for example `uname -r`.",
 )
-define_log_field(__monitor__, "metric", "Always `output`.")
 define_log_field(
     __monitor__,
     "value",
@@ -100,7 +100,7 @@ define_log_field(
 define_log_field(
     __monitor__,
     "exit_code",
-    "Exit code for the shell command.",
+    "Exit status of the command. Zero is success. Non-zero is failure.",
 )
 
 
