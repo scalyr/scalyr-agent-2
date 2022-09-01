@@ -130,7 +130,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "tcp_buffer_size",
-    "Optional (defaults to 8K). Maximum buffer size for a single TCP syslog message. "
+    "Optional (defaults to `8192`). Maximum buffer size for a single TCP syslog message. "
     "Per [RFC 5425](https://datatracker.ietf.org/doc/html/rfc5425#section-4.3.1) "
     "(syslog over TCP/TLS), syslog receivers MUST be able to support messages at least "
     "2048 bytes long, and SHOULD support messages up to 8192 bytes long.",
@@ -178,7 +178,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "log_flush_delay",
-    "Optional (defaults to 1.0). Time in seconds to wait between flushing the log file "
+    "Optional (defaults to `1.0`). Time in seconds to wait between flushing the log file "
     "containing the syslog messages.",
     convert_to=float,
     default=1.0,
@@ -212,8 +212,8 @@ define_config_option(
 define_config_option(
     __monitor__,
     "tcp_message_delimiter",
-    "Which character sequence to use for a message delimiter or suffix. Defaults to `\n`. "
-    "Some implementations, such as the Python syslog handler, use the null character `\000`; "
+    "Which character sequence to use for a message delimiter or suffix. Defaults to `\\ n`. "
+    "Some implementations, such as the Python syslog handler, use the null character `\\ 000`; "
     "messages can have new lines without the use of framing.",
     default="\n",
     convert_to=six.text_type,
@@ -232,8 +232,9 @@ define_config_option(
     __monitor__,
     "docker_regex",
     "Regular expression to parse docker logs from a syslog message, when the tag sent to syslog "
-    "only has the container id. If a message matches this regex, then everything *after* "
-    "the full matching expression is logged to a file named docker-<container-name>.log.",
+    'has the container id. Defaults to `"^.*([a-z0-9]{12})\[\d+\]: ?"`. If a message matches '
+    "this regex, then everything *after* the full matching expression is logged to a file named "
+    "`docker-<container-name>.log`.",
     convert_to=six.text_type,
     default=r"^.*([a-z0-9]{12})\[\d+\]: ?",
 )
@@ -242,8 +243,9 @@ define_config_option(
     __monitor__,
     "docker_regex_full",
     "Regular expression for parsing docker logs from a syslog message, when the tag sent to syslog "
-    "has the container name and id. If a message matches this regex, then everything *after* "
-    "the full matching expression is logged to a file named docker-<container-name>.log.",
+    'has the container name and id. Defaults to `"^.*([^/]+)/([^[]+)\[\d+\]: ?"`. If a message '
+    "matches this regex, then everything *after* the full matching expression is logged to a file "
+    "named `docker-<container-name>.log`.",
     convert_to=six.text_type,
     default=r"^.*([^/]+)/([^[]+)\[\d+\]: ?",
 )
@@ -251,7 +253,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "docker_expire_log",
-    "Optional (defaults to 300). The number of seconds of inactivity from a specific container "
+    "Optional (defaults to `300`). The number of seconds of inactivity from a specific container "
     "before the log file is removed. The log will be created again if a new message is received "
     "from the container.",
     default=300,
@@ -272,7 +274,7 @@ define_config_option(
     "Optional (defaults to `/var/scalyr/docker.sock`). Sets the Unix socket to communicate with the "
     "docker API. Only relevant when `mode` is set to `docker`, to look up container names by their "
     "ids.  WARNING: you must set the `api_socket` configuration option in the docker monitor to the "
-    "same value. Note: You must map the host's /run/docker.sock to the same value as specified here, "
+    "same value. Note: You must map the host's `/run/docker.sock` to the same value as specified here, "
     "with the -v parameter, for example `docker run -v /run/docker.sock:/var/scalyr/docker.sock ...`.",
     convert_to=six.text_type,
     default="/var/scalyr/docker.sock",
@@ -281,7 +283,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "docker_api_version",
-    "Optional (defaults to 'auto'). Version of the Docker API to use when communicating. "
+    "Optional (defaults to `auto`). Version of the Docker API to use when communicating. "
     "WARNING: you must set the `docker_api_version` configuration option in the docker monitor "
     "to the same value.",
     convert_to=six.text_type,
@@ -291,7 +293,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "docker_logfile_template",
-    "Optional (defaults to 'containers/${CNAME}.log'). Template used to create the log file paths, "
+    "Optional (defaults to `containers/${CNAME}.log`). Template used to create the log file paths, "
     "to save docker logs sent by other containers with syslog. The variables $CNAME and $CID will "
     "be substituted with the name and id of the container that is emitting the logs. If the path "
     "is not absolute, then it is assumed to be relative to the main Scalyr Agent log directory.",
@@ -311,8 +313,8 @@ define_config_option(
 define_config_option(
     __monitor__,
     "docker_cid_clean_time_secs",
-    "Optional (defaults to 5.0). Number of seconds to wait between cleaning the docker id "
-    "to container name cache.",
+    "Optional (defaults to `5.0`). Number of seconds to wait between cleaning the docker id "
+    "to container name cache. Fractional values are supported.",
     convert_to=float,
     default=5.0,
 )
@@ -331,7 +333,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "docker_check_for_unused_logs_mins",
-    "Optional (defaults to 60). Number of minutes to wait between checks for log files matching "
+    "Optional (defaults to `60`). Number of minutes to wait between checks for log files matching "
     "the `docker_logfile_template` that haven't been written to for a while, and can be deleted.",
     convert_to=int,
     default=60,
@@ -340,7 +342,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "docker_delete_unused_logs_hours",
-    "Optional (defaults to 24). Number of hours to wait before deleting log files matching the "
+    "Optional (defaults to `24`). Number of hours to wait before deleting log files matching the "
     "`docker_logfile_template`.",
     convert_to=int,
     default=24,
