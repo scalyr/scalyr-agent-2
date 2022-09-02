@@ -105,9 +105,9 @@ CONFIG_OPTIONS = [
     ),
     dict(
         option_name="commandline",
-        option_description="A regular expression which will match the command line or name of the process you're "
-        "interested in, as shown in the output of ``tasklist`` or ``wmic process list``. (If "
-        "multiple processes match the same command line pattern, only one will be monitored.)",
+        option_description="A regular expression, matching on the command line output of "
+        "`tasklist`, or `wmic process list`. Selects the process of interest. If multiple "
+        "processes match, only metrics from the first match are imported.",
         default=None,
         convert_to=six.text_type,
     ),
