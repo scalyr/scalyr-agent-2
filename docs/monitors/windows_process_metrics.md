@@ -93,9 +93,9 @@ In the UI, each event has the fields:
 | Field       | Meaning |
 |---|---|
 | `monitor` | Always `windows_process_metrics`. |
-| `instance`| The `id` value from Step **2**, e.g. `tomcat`. |
+| `instance`| The `id` value from Step **2**, for example `tomcat`. |
 | `app`     | Same as `instance`; created for compatibility with the original Scalyr Agent. |
-| `metric`  | Name of the metric, e.g. "winproc.cpu". Some metrics have additional fields; see the [Metrics Reference](#metrics). |
+| `metric`  | Name of the metric, for example "winproc.cpu". Some metrics have additional fields; see the [Metrics Reference](#metrics). |
 | `value`   | Value of the metric. |
 
 &nbsp;
