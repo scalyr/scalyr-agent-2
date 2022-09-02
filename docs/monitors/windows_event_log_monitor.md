@@ -25,4 +25,147 @@ If you haven't already, install the [Scalyr Agent](https://app.scalyr.com/help/w
 
 2\. Configure the Scalyr Agent to import Event Logs
 
-Open the Scalyr Agent configuration file, located at `C:\Program Files (x86)\Scalyr
+Open the `agent.json` configuration file, located at `C:\Program Files (x86)\Scalyr\Config`. 
+
+Find the `monitors: [ ... ]` section and add a `{...}` stanza with the `module` property set for the windows event log:
+
+    monitors: [
+      {
+         module:      "scalyr_agent.builtin_monitors.windows_event_log_monitor",
+      }
+    ]
+
+
+### Windows Vista and Later
+
+You can configure the EvtLog API to query events on any channel with XPath. See the
+[Event log](https://msdn.microsoft.com/en-us/library/windows/desktop/dd996910.aspx) documentation for more
+details. For example:
+
+    monitors: [
+      {
+        module: "scalyr_agent.builtin_monitors.windows_event_log_monitor",
+        channels: [
+            { "channel": [ "Application", "Security", "System" ],
+              "query": "*[System/Level=0 or System/Level=1 or System/Level=2 or System/Level=3 or System/Level=4]"
+            }
+        ]
+      }
+    ]
+
+`channels` is a list of `{...}` dict objects, each with `channel` and `query` properties. When not set it defaults to `[ {"channel" : ["Application", "Security", "System"], "query": "*"}]`, which imports all events from the Application, Security, and System channels.
+
+The `channel` property is a list of channels to import events from, and the `query` property is an XPath expression. Events matching the `query`, from the channels in `channel`, are imported. In the above example, the Agent will import Critical (1), Error (2), Warning (3), and Information (4) events from the Application, Security and System channels.
+
+This example imports Critical (1) events for the Application channel; and Critical (1), Error (2), and Warning (3) events for the System and Security channels:
+
+    monitors: [
+      {
+        module: "scalyr_agent.builtin_monitors.windows_event_log_monitor",
+        channels: [
+            { "channel": ["Application"],
+              "query": "*[System/Level=1]"
+            },
+            {
+              "channel": ["Security", "System" ],
+              "query": "*[System/Level=0 or System/Level=1 or System/Level=2 or System/Level=3]"
+            }
+        ]
+      }
+    ]
+
+
+You can also select events with the <Channel> tag, in the XML of an event. Go to:
+
+    Run > eventvwr.msc > *select event you want to import* > Event Properties > Details > Select XML
+
+For example, Microsoft-Windows-AAD/Operational events have the tag:
+
+    <Channel>Microsoft-Windows-AAD/Operational</Channel>
+
+To configure the Agent to listen to Critical (1), Error (2), Warning (3), and Information (4) events from this channel:
+
+    monitors: [
+      {
+        module: "scalyr_agent.builtin_monitors.windows_event_log_monitor",
+        channels: [
+            { "channel": ["Microsoft-Windows-AAD/Operational"],
+              "query": "*[System/Level=0 or System/Level=1 or System/Level=2 or System/Level=3 or System/Level=4]"
+            }
+        ]
+      }
+    ]
+
+
+### Windows Server 2003
+
+For Windows versions earlier than Vista, the Agent uses the older Event Log API.
+
+This example configures the Agent, running on Windows Server 2003, to import Error and Warning level events from
+the Application, Security and System sources:
+
+    monitors: [
+      {
+        module:                  "scalyr_agent.builtin_monitors.windows_event_log_monitor",
+        sources:                 "Application, Security, System",
+        event_types:             "Error, Warning",
+      }
+    ]
+
+`sources` is a comma separated list of event sources to import events from. It defaults to `Application, Security, System`. `event_types` is a comma separated list of event types to import. Valid values are: `All` (the default), `Error`, `Warning`, `Information`, `AuditSuccess` and `AuditFailure`. In the above example, only Error and Warning events from Application, Security, and System sources are imported.
+
+
+3\. (Optional) Set more configuration options
+
+You can format imported events as JSON. Simply add and set `json: true` in the configuration file. For example:
+
+    monitors: [
+      {
+        module: "scalyr_agent.builtin_monitors.windows_event_log_monitor",
+        json: true,
+        channels: [
+            { "channel": [ "Application", "Security", "System" ],
+              "query": "*[System/Level=0 or System/Level=1 or System/Level=2 or System/Level=3 or System/Level=4]"
+            }
+        ]
+      }
+    ]
+
+
+See [Configuration Options](#options) below for more options. You can set a remote domain, server, username, and password; the number of records to read from the end of each log source; and the time to wait before logging similar errors.
+
+
+4\. Save and confirm
+
+Save the `agent.json` file. The Agent will detect changes within 30 seconds. Wait a few minutes for data to send.
+
+You can check the [Agent Status](https://app.scalyr.com/help/scalyr-agent#agentStatus), which includes information about all running monitors.
+
+Log into DataSet and query [monitor = 'windows_process_metrics'](https://app.scalyr.com/events?filter=monitor+%3D+%27windows_event_log%27). This will show all data collected by this plugin, across all servers.
+
+<a name="options"></a>
+## Configuration Options
+
+| Property                     | Description | 
+| ---                          | --- | 
+| `module`                     | Always `scalyr_agent.builtin_monitors.windows_event_log_monitor` | 
+| `sources`                    | Optional (defaults to `Application, Security, System`). A comma separated list of sources to import events from. (Not valid for Vista and later; use `channels` instead.) | 
+| `event_types`                | Optional (defaults to `All`). A comma separated list of event types to import. Valid values are: `All`, `Error`, `Warning`, `Information`, `AuditSuccess`, and `AuditFailure`. (Not valid for Vista and later; use `channels` instead.) | 
+| `channels`                   | Optional (defaults to `[{"channel" : ["Application", "Security", "System"], "query": "*"}]`). A list of dict objects specifying a list of channels and an XPath query for those channels. (Only available on Windows Vista and later.) | 
+| `maximum_records_per_source` | Optional (defaults to `10000`). Maximum number of records to read from the end of each log source per gather_sample. | 
+| `error_repeat_interval`      | Optional (defaults to `300`). Number of seconds to wait before logging similar errors in the event log. | 
+| `server_name`                | Optional (defaults to `localhost`). The remote server to import events from. | 
+| `remote_user`                | Optional (defaults to `none`). Username for authentication on the remote server. This option is only valid on Windows Vista and above. | 
+| `remote_password`            | Optional (defaults to `none`). Password to use for authentication on the remote server.  This option is only valid on Windows Vista and above. | 
+| `remote_domain`              | Optional (defaults to `none`). The domain for the remote user account. This option is only valid on Windows Vista and above. | 
+| `json`                       | Optional (defaults to `false`). Format events as json? Supports inclusion of all event fields. This option is only valid on Windows Vista and above. | 
+
+<a name="events"></a>
+## Event Reference
+
+In the UI, each event has the fields:
+
+| Field                                           | Description | 
+| ---                                             | --- | 
+| `monitor`                                       | Always `windows_event_log_monitor`. | 
+| `Channel (Vista and later), Source (pre-Vista)` | The event channel/source name, taken from the Windows field `Event.System.EventRecordID`/`event.SourceName`. | 
