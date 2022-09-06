@@ -165,7 +165,16 @@ Log into DataSet and query [monitor = 'windows_process_metrics'](https://app.sca
 
 In the UI, each event has the fields:
 
-| Field                                           | Description | 
-| ---                                             | --- | 
-| `monitor`                                       | Always `windows_event_log_monitor`. | 
-| `Channel (Vista and later), Source (pre-Vista)` | The event channel/source name, taken from the Windows field `Event.System.EventRecordID`/`event.SourceName`. | 
+| Field           | Description | 
+| ---             | --- | 
+| `monitor`       | Always `windows_event_log_monitor`. | 
+| `Channel`       | The event channel name, taken from the `Event.System.Channel` field. Only for Vista and above; see `Source` for pre-Vista Windows versions. | 
+| `EventRecordID` | The event record number, taken from the `Event.System.EventRecordID` field. Only for Vista and above; see `RecordNumber` for pre-Vista versions. | 
+| `SystemTime`    | The time the event was generated, taken from the `Event.System.TimeCreated.SystemTime` field. Only for Vista and above; see `RecordNumber` for pre-Vista versions. | 
+| `EventId`       | The event id, taken from the `Event.System.EventID` field on Vista and above; and from `event.EventID` for pre-Vista versions. | 
+| `Source`        | The event source name, taken from the `event.SourceName` field. Only for pre-Vista versions of Windows; see `Channel` for Vista and above. | 
+| `RecordNumber`  | The event record number, taken from the `event.RecordNumber` field. Only for pre-Vista versions of Windows; see `SystemTime` for Vista and above. | 
+| `TimeGenerated` | The time the event was generated. Only for pre-Vista versions of Windows; see `SystemTime` for Vista and above. | 
+| `Type`          | The event type. Only for pre-Vista versions of Windows. | 
+| `Category`      | The event category, taken from the `event.EventCategory` Windows field. Only for pre-Vista versions of Windows. | 
+| `EventMsg`      | The contents of the event message from the Windows Event Log. Only for pre-Vista versions of Windows. | 
