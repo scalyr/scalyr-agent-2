@@ -25,7 +25,7 @@ If you haven't already, install the [Scalyr Agent](https://app.scalyr.com/help/w
 
 2\. Configure the Scalyr Agent to import Event Logs
 
-Open the `agent.json` configuration file, located at `C:\Program Files (x86)\Scalyr\Config`. 
+Open the `agent.json` configuration file, located at `C:\Program Files (x86)\Scalyr\Config`.
 
 Find the `monitors: [ ... ]` section and add a `{...}` stanza with the `module` property set for the windows event log:
 
