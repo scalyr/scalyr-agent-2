@@ -109,7 +109,7 @@ CONFIG_OPTIONS = [
         "for the `instance` field. This is especially useful if you are running multiple "
         "instances of this plugin to import metrics from multiple processes. Each instance "
         "has a separate `{...}` stanza in the configuration file "
-        "(`C:\Program Files (x86)\Scalyr\config\agent.json`).",
+        r"(`C:\Program Files (x86)\Scalyr\config\agent.json`).",
         required_option=True,
         convert_to=six.text_type,
     ),
