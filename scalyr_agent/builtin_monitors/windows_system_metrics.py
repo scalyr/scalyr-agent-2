@@ -589,7 +589,7 @@ define_log_field(__monitor__, "value", "The metric value.")
 
 class SystemMonitor(ScalyrMonitor):
     # fmt: off
-    """
+    r"""
 # Windows System Metrics
 
 Import CPU consumption, memory usage, and other metrics for a Windows server.

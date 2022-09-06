@@ -82,7 +82,7 @@ define_log_field(__monitor__, "value", "The value reported by the device.")
 
 class SNMPMonitor(ScalyrMonitor):  # pylint: disable=monitor-not-included-for-win32
     # fmt: off
-    """
+    r"""
 # SNMP
 
 Import values from one or more SNMP-enabled devices.

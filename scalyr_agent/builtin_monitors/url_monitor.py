@@ -154,7 +154,7 @@ class NoRedirection(six.moves.urllib.request.HTTPErrorProcessor):
 # UrlMonitor implementation
 class UrlMonitor(ScalyrMonitor):
     # fmt: off
-    """
+    r"""
 # HTTP
 
 GET data from an HTTP or HTTPS URL. You can also POST requests.

@@ -518,7 +518,7 @@ def commandline_matcher(regex, flags=re.IGNORECASE):
 
 class ProcessMonitor(ScalyrMonitor):
     # fmt: off
-    """
+    r"""
     # Windows Process Metrics
 
     Import CPU consumption, memory usage, and other metrics for a process, or group of processes, on a Windows server.

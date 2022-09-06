@@ -1644,7 +1644,7 @@ class SyslogServer(object):
 
 class SyslogMonitor(ScalyrMonitor):
     # fmt: off
-    """
+    r"""
 # Syslog
 
 Import logs from an application or device that supports syslog.

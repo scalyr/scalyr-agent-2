@@ -417,7 +417,7 @@ class RedisHost(object):
 
 class RedisMonitor(ScalyrMonitor):  # pylint: disable=monitor-not-included-for-win32
     # fmt: off
-    """
+    r"""
 # Redis
 
 Import the Redis SLOWLOG.

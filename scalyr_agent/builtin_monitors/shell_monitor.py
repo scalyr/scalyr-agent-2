@@ -112,7 +112,7 @@ __first_line_pattern__ = re.compile("[^\r\n]+")
 # ShellMonitor implementation
 class ShellMonitor(ScalyrMonitor):
     # fmt: off
-    """
+    r"""
 # Shell Agent Plugin
 
 Execute a shell command, and import the output.
