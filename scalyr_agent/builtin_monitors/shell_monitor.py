@@ -244,7 +244,7 @@ For help, contact Support.
             s,
             extra_fields={
                 "command": self.command,
-                "length": (len(output) - 1),
+                "length": len(output),
                 "duration": duration,
                 "exit_code": exit_code,
             },
