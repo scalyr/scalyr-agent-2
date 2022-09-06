@@ -232,7 +232,7 @@ define_config_option(
     __monitor__,
     "docker_regex",
     "Regular expression to parse docker logs from a syslog message, when the tag sent to syslog "
-    'has the container id. Defaults to `"^.*([a-z0-9]{12})\[\d+\]: ?"`. If a message matches '
+    r'has the container id. Defaults to `"^.*([a-z0-9]{12})\[\d+\]: ?"`. If a message matches '
     "this regex, then everything *after* the full matching expression is logged to a file named "
     "`docker-<container-name>.log`.",
     convert_to=six.text_type,
@@ -243,7 +243,7 @@ define_config_option(
     __monitor__,
     "docker_regex_full",
     "Regular expression for parsing docker logs from a syslog message, when the tag sent to syslog "
-    'has the container name and id. Defaults to `"^.*([^/]+)/([^[]+)\[\d+\]: ?"`. If a message '
+    r'has the container name and id. Defaults to `"^.*([^/]+)/([^[]+)\[\d+\]: ?"`. If a message '
     "matches this regex, then everything *after* the full matching expression is logged to a file "
     "named `docker-<container-name>.log`.",
     convert_to=six.text_type,
