@@ -75,7 +75,7 @@ This example imports Critical (1) events for the Application channel; and Critic
     ]
 
 
-You can also select events with the <Channel> tag, in the XML of an event. Go to:
+You can also select events with the `<Channel>` tag, in the XML of an event. Go to:
 
     Run > eventvwr.msc > *select event you want to import* > Event Properties > Details > Select XML
 
@@ -151,7 +151,7 @@ Log into DataSet and query [monitor = 'windows_process_metrics'](https://app.sca
 | `module`                     | Always `scalyr_agent.builtin_monitors.windows_event_log_monitor` | 
 | `sources`                    | Optional (defaults to `Application, Security, System`). A comma separated list of sources to import events from. (Not valid for Vista and later; use `channels` instead.) | 
 | `event_types`                | Optional (defaults to `All`). A comma separated list of event types to import. Valid values are: `All`, `Error`, `Warning`, `Information`, `AuditSuccess`, and `AuditFailure`. (Not valid for Vista and later; use `channels` instead.) | 
-| `channels`                   | Optional (defaults to `[{"channel" : ["Application", "Security", "System"], "query": "*"}]`). A list of dict objects specifying a list of channels and an XPath query for those channels. (Only available on Windows Vista and later.) | 
+| `channels`                   | Optional (defaults to `[{"channel" : ["Application", "Security", "System"], "query": "*"}]`). A list of dict objects specifying a list of channels, and an XPath query for those channels. (Only available on Windows Vista and later.) | 
 | `maximum_records_per_source` | Optional (defaults to `10000`). Maximum number of records to read from the end of each log source per gather_sample. | 
 | `error_repeat_interval`      | Optional (defaults to `300`). Number of seconds to wait before logging similar errors in the event log. | 
 | `server_name`                | Optional (defaults to `localhost`). The remote server to import events from. | 
@@ -168,13 +168,13 @@ In the UI, each event has the fields:
 | Field           | Description | 
 | ---             | --- | 
 | `monitor`       | Always `windows_event_log_monitor`. | 
-| `Channel`       | The event channel name, taken from the `Event.System.Channel` field. Only for Vista and above; see `Source` for pre-Vista Windows versions. | 
+| `Channel`       | The event channel name, taken from the `Event.System.Channel` field. Only for Vista and above; see `Source` for pre-Vista versions. | 
 | `EventRecordID` | The event record number, taken from the `Event.System.EventRecordID` field. Only for Vista and above; see `RecordNumber` for pre-Vista versions. | 
 | `SystemTime`    | The time the event was generated, taken from the `Event.System.TimeCreated.SystemTime` field. Only for Vista and above; see `RecordNumber` for pre-Vista versions. | 
-| `EventId`       | The event id, taken from the `Event.System.EventID` field on Vista and above; and from `event.EventID` for pre-Vista versions. | 
+| `EventId`       | The event id, taken from the `Event.System.EventID` field on Vista and above, and from `event.EventID` for pre-Vista versions. | 
 | `Source`        | The event source name, taken from the `event.SourceName` field. Only for pre-Vista versions of Windows; see `Channel` for Vista and above. | 
 | `RecordNumber`  | The event record number, taken from the `event.RecordNumber` field. Only for pre-Vista versions of Windows; see `SystemTime` for Vista and above. | 
 | `TimeGenerated` | The time the event was generated. Only for pre-Vista versions of Windows; see `SystemTime` for Vista and above. | 
 | `Type`          | The event type. Only for pre-Vista versions of Windows. | 
-| `Category`      | The event category, taken from the `event.EventCategory` Windows field. Only for pre-Vista versions of Windows. | 
+| `Category`      | The event category, taken from the `event.EventCategory` field. Only for pre-Vista versions of Windows. | 
 | `EventMsg`      | The contents of the event message from the Windows Event Log. Only for pre-Vista versions of Windows. | 

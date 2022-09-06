@@ -87,7 +87,6 @@ Metrics recorded by this plugin:
 
 | Metric                     | Fields             | Description |
 |---|---|---|
-
 | `winsys.network.bytes`   | `direction=sent` | Bytes transmitted by the network interfaces. The value is cumulative since boot. |
 | `winsys.network.bytes`   | `direction=recv` | Bytes received by the network interfaces. The value is cumulative since boot. |
 | `winsys.network.packets` | `direction=sent` | Number of packets transmitted by the network interfaces. The value is cumulative since boot. |

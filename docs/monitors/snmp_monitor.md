@@ -13,7 +13,7 @@ You can use Object Identifiers (OIDs) or Management Information Base (MIB) varia
 
 1\. Install the Scalyr Agent
 
-The [Scalyr Agent](https://app.scalyr.com/help/welcome) must be installed on a host to import device values. We recommend you install the Agent on each server you want to monitor. Your data will automatically be tagged for the server it came from. The Agent can also collect system metrics and log files.
+The [Scalyr Agent](https://app.scalyr.com/help/welcome) must be installed on a host to import device values. We recommend you install the Agent on each server you want to monitor. Your data will automatically be tagged for the server it came from, and the Agent can also collect system metrics and log files.
 
 
 2\. Set OID objects and MIB variables, and assign them to groups
@@ -35,7 +35,7 @@ For MIB variables, add and set the `mib_path`, and `oid_groups` properties. For 
 
 `mib_path` sets the path to the MIB files. In the above example, `/usr/share/mibs` has MIB files describing IF-MIB, and its related MIBs.
 
-`oid_groups` maps a list of OIDs and MIB variables to a "group" (key name). This lets you import a set of values from multiple devices in Step 3. In the above example, "group1" imports the `IF-MIB::ifInOctets` value, and the `1.3.6.1.2.1.2.2.1.16.1` value. The `IF-MIB::ifDescr` value is imported by "group2".
+`oid_groups` maps a list of OIDs and MIB variables to a "group" (key name). This lets you import a set of values from multiple devices in the next step. In the above example, "group1" imports the `IF-MIB::ifInOctets` value, and the `1.3.6.1.2.1.2.2.1.16.1` value. The `IF-MIB::ifDescr` value is imported by "group2".
 
 
 3\. Set target devices
@@ -67,7 +67,7 @@ Add a `poll_targets: [...]` array to map "groups" to target devices
       ]
     }
 
-Each `{...}` target object, has a `targets` and `oids` property. `targets` is an array of target `{...}` objects. Each sets the `host` and `port` for the device. `port` defaults to `161` if not set.
+Each `{...}` target object, has a `targets` and `oids` property. `targets` is an array of target `{...}` objects. Each sets the `host` and `port` for the device. If not set, `port` defaults to `161`.
 
 The `oids` property is a list of "groups" (key names) from Step 2. Device values for each "group" will be imported from each target. In the above example, two targets are set. The first imports "group1" and "group2" device values from `demo.snmplabs.com`, on the default port of `161`, and `demo.snmplabs.com`, on port `1161`. The second imports "group2" values from `demo.snmplabs.com`, on port `3161`.
 
