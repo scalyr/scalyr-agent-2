@@ -466,7 +466,7 @@ define_log_field(__monitor__, "monitor", "Always `windows_process_metrics`.")
 define_log_field(
     __monitor__,
     "instance",
-    "The `id` value from Step **2**, for example `tomcat`.",
+    "The `id` value, for example `tomcat`.",
 )
 define_log_field(
     __monitor__,
@@ -567,7 +567,7 @@ class ProcessMonitor(ScalyrMonitor):
     You can check the [Agent Status](https://app.scalyr.com/help/scalyr-agent#agentStatus), which includes information about all running monitors.
 
 
-    4.\ Configure the process metrics dashboard for each `id`
+    4\. Configure the process metrics dashboard for each `id`
 
     Log into Scalyr and click Dashboards > Windows Process Metrics. At the top of the dashboard you can select the `serverHost` and `process` of interest. (We map the `instance` field, explained above, to `process`).
 
@@ -577,9 +577,7 @@ class ProcessMonitor(ScalyrMonitor):
         // clause in the Scalyr Agent configuration file (agent.json).
         values: [ "agent" ]
 
-    The "agent" id is used to report metrics for the Scalyr Agent.
-
-    Add each `id` you created to the `values` list. For example, to add "tomcat":
+    The "agent" id is used to report metrics for the Scalyr Agent. Add each `id` you created to the `values` list. For example, to add "tomcat":
 
         values: [ "agent", "tomcat" ]
 

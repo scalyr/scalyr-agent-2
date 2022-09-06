@@ -88,7 +88,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "protocols",
-    'Optional (defaults to `"tcp:601, udp:514"`). A string of port:protocols, separated '
+    'Optional (defaults to `"tcp:601, udp:514"`). A string of `protocol:port`s, separated '
     "by commas. Sets the ports on which the Scalyr Agent will accept messages. We recommend "
     "TCP for reliability and performance, whenever possible.",
     convert_to=six.text_type,
@@ -155,7 +155,7 @@ define_config_option(
     "max_log_size",
     "Optional (defaults to `none`). Maximum size of the log file, before rotation. If `none`, "
     "the default value is set from the global `log_rotation_max_bytes` "
-    "[Agent configuration option](/help/scalyr-agent-env-aware), which defaults to 20*1024*1024. "
+    r"[Agent configuration option](https://app.scalyr.com/help/scalyr-agent-env-aware), which defaults to `20*1024*1024`. "
     "Set to `0` for infinite size. Rotation does not show in Scalyr; this property is only "
     "relevant for managing disk space on the host running the Agent. A very small limit could "
     "cause dropped logs if there is a temporary network outage, and the log overflows before "
@@ -169,7 +169,7 @@ define_config_option(
     "max_log_rotations",
     "Optional (defaults to `none`). Maximum number of log rotations, before older log files are "
     "deleted. If `none`, the value is set from the global level `log_rotation_backup_count` "
-    "[Agent configuration option](/help/scalyr-agent-env-aware), which defaults to `2`. "
+    "[Agent configuration option](https://app.scalyr.com/help/scalyr-agent-env-aware), which defaults to `2`. "
     "Set to `0` for infinite rotations.",
     convert_to=int,
     default=None,
@@ -273,8 +273,8 @@ define_config_option(
     "docker_api_socket",
     "Optional (defaults to `/var/scalyr/docker.sock`). Sets the Unix socket to communicate with the "
     "docker API. Only relevant when `mode` is set to `docker`, to look up container names by their "
-    "ids.  WARNING: you must set the `api_socket` configuration option in the docker monitor to the "
-    "same value. Note: You must map the host's `/run/docker.sock` to the same value as specified here, "
+    "ids. You must set the `api_socket` configuration option in the docker monitor to the "
+    "same value. You must also map the host's `/run/docker.sock` to the same value as specified here, "
     "with the -v parameter, for example `docker run -v /run/docker.sock:/var/scalyr/docker.sock ...`.",
     convert_to=six.text_type,
     default="/var/scalyr/docker.sock",
@@ -293,7 +293,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "docker_logfile_template",
-    "Optional (defaults to `containers/${CNAME}.log`). Template used to create the log file paths, "
+    "Optional (defaults to `containers/${CNAME}.log`). Template used to create log file paths "
     "to save docker logs sent by other containers with syslog. The variables $CNAME and $CID will "
     "be substituted with the name and id of the container that is emitting the logs. If the path "
     "is not absolute, then it is assumed to be relative to the main Scalyr Agent log directory.",
@@ -304,7 +304,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "docker_cid_cache_lifetime_secs",
-    "Optional (defaults to 300). Controls the docker id to container name cache expiration. "
+    "Optional (defaults to `300`). Controls the docker id to container name cache expiration. "
     "After this number of seconds of inactivity, the cache entry is evicted.",
     convert_to=float,
     default=300.0,
@@ -1653,7 +1653,7 @@ An [Agent Plugin](https://app.scalyr.com/help/scalyr-agent#plugins) is a compone
 
 TCP and UDP protocols are supported. We recommend TCP for reliability and performance, whenever possible.
 
-**For Docker**: We recommend the `json` logging driver. This plugin imports Docker logs configured for the `syslog` driver. Containers on localhost must run the Scalyr Agent and this plugin. Set the `mode` [configuration option](#docker) to `docker`.
+**For Docker**: We recommend the `json` logging driver. This plugin imports Docker logs configured for the `syslog` driver. Containers on localhost must run the Scalyr Agent and this plugin. Set the `mode` [configuration option](#options) to `docker`.
 
 
 ## Installation
@@ -1681,7 +1681,7 @@ Find the `monitors: [ ... ]` section, and add a `{...}` stanza with the `module`
       }
     ]
 
-The `protocols` property is a string of protocol:port combinations, separated by commas. In the above example, the Agent accepts syslog messages on TCP port 601, and UDP port 514. Note that on Linux, the Scalyr Agent must run as root to use port numbers 1024 or lower.
+The `protocols` property is a string of `protocol:port` combinations, separated by commas. In the above example, the Agent accepts syslog messages on TCP port 601, and UDP port 514. Note that on Linux, the Scalyr Agent must run as root to use port numbers 1024 or lower.
 
 To accept syslog connections from devices other than localhost, for example a firewall or router on the network, add and set  `accept_remote_connections: true`. The Agent will accept connections from any host.
 

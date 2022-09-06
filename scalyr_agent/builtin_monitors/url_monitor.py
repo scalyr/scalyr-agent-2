@@ -102,7 +102,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "log_all_lines",
-    "Optional (defaults to `false`). If `true`, all from the request response are imported. "
+    "Optional (defaults to `false`). If `true`, all lines from the request response are imported. "
     "If 'false`, only the first line is imported.",
     default=False,
 )
@@ -110,7 +110,7 @@ define_config_option(
     __monitor__,
     "max_characters",
     "Optional (defaults to `200`). Maximum characters to import from the request. You may "
-    "set a value up to `10000`, however we currently truncate all fields to `3500` characters.",
+    "set a value up to `10000`, but we currently truncate all fields to `3500` characters.",
     default=200,
     convert_to=int,
     min_value=0,

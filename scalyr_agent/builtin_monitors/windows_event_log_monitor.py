@@ -85,7 +85,7 @@ define_config_option(
     __monitor__,
     "channels",
     'Optional (defaults to `[{"channel" : ["Application", "Security", "System"], "query": "*"}]`). '
-    "A list of dict objects specifying a list of channels and an XPath query for those channels. "
+    "A list of dict objects specifying a list of channels, and an XPath query for those channels. "
     "(Only available on Windows Vista and later.)",
     convert_to=None,
 )
@@ -160,7 +160,7 @@ define_log_field(
     __monitor__,
     "Channel",
     "The event channel name, taken from the `Event.System.Channel` field. "
-    "Only for Vista and above; see `Source` for pre-Vista Windows versions.",
+    "Only for Vista and above; see `Source` for pre-Vista versions.",
 )
 define_log_field(
     __monitor__,
@@ -177,7 +177,7 @@ define_log_field(
 define_log_field(
     __monitor__,
     "EventId",
-    "The event id, taken from the `Event.System.EventID` field on Vista and above; "
+    "The event id, taken from the `Event.System.EventID` field on Vista and above, "
     "and from `event.EventID` for pre-Vista versions.",
 )
 define_log_field(
@@ -206,7 +206,7 @@ define_log_field(
 define_log_field(
     __monitor__,
     "Category",
-    "The event category, taken from the `event.EventCategory` Windows field. "
+    "The event category, taken from the `event.EventCategory` field. "
     "Only for pre-Vista versions of Windows.",
 )
 define_log_field(
@@ -868,7 +868,7 @@ This example imports Critical (1) events for the Application channel; and Critic
     ]
 
 
-You can also select events with the <Channel> tag, in the XML of an event. Go to:
+You can also select events with the `<Channel>` tag, in the XML of an event. Go to:
 
     Run > eventvwr.msc > *select event you want to import* > Event Properties > Details > Select XML
 

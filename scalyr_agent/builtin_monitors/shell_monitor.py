@@ -48,7 +48,7 @@ define_config_option(
     "extract",
     'Optional (defaults to ""). '
     "A regular expression, applied to the command output. Lets you extract "
-    "the data of interest. Must include a matching group (i.e. a subexpression enclosed "
+    "data of interest. Must include a matching group (i.e. a subexpression enclosed "
     "in parentheses). Only the content of the matching group is imported.",
     default="",
 )
@@ -81,7 +81,7 @@ define_log_field(
 define_log_field(
     __monitor__,
     "command",
-    "The shell command for this plugin instance, for example `uname -r`.",
+    "The shell command, for example `uname -r`.",
 )
 define_log_field(
     __monitor__,
@@ -115,7 +115,7 @@ class ShellMonitor(ScalyrMonitor):
     r"""
 # Shell Agent Plugin
 
-Execute a shell command, and import the output.
+Execute a shell command and import the output.
 
 An [Agent Plugin](https://app.scalyr.com/help/scalyr-agent#plugins) is a component of the Scalyr Agent, enabling the collection of more data. The source code for each plugin is available on [Github](https://github.com/scalyr/scalyr-agent-2/tree/master/scalyr_agent/builtin_monitors).
 
@@ -129,7 +129,7 @@ You can import any information retrieved from a shell command. Commands execute 
 If you haven't already, install the [Scalyr Agent](https://app.scalyr.com/help/welcome) on the host that will execute the shell command.
 
 
-2\. Configure the Scalyr Agent to import the output of a shell command
+2\. Configure the Scalyr Agent
 
 Open the Agent configuration file, located at `/etc/scalyr-agent-2/agent.json`.
 
@@ -143,9 +143,9 @@ Find the `monitors: [ ... ]` section and add a `{...}` stanza with the `module` 
      }
     ]
 
-The `command` property is the shell command you wish to execute. The `id` property lets you identify the command, and shows in the UI as a value for the `instance` field. This is especially useful if you are running multiple instances of this plugin, to import output from multiple shell commands. To add multiple shell commands, add a separate `{...}` stanza for each.
+The `command` property is the shell command you wish to execute. The `id` property lets you identify the command, and shows in the UI as a value for the `instance` field. This is especially useful if you are running multiple instances of this plugin, to import output from multiple shell commands. Add a separate `{...}` stanza for each command.
 
-By default, only the first line of the command output is imported. Add and set `log_all_lines: true` if you wish to import the full output.
+By default, only the first line of the command output is imported. Add and set `log_all_lines: true` to import all lines.
 
 See [Configuration Options](#options) below for more properties you can add. You can set the number of characters to import, and you can apply a regular expression with a matching group, to extract data of interest from the output.
 

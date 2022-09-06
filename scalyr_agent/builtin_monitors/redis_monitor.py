@@ -50,7 +50,7 @@ define_config_option(
     __monitor__,
     "hosts",
     'Optional (defaults to `[{ "host": "localhost", "port": 6379, "password": none}]`). '
-    "An array of `{...}` objects. Each object sets `host`, "
+    "An array of host objects; each sets `host`, "
     "`port`, and `password` properties.",
     default={"host": "localhost", "port": 6379, "password": None},
 )
@@ -71,7 +71,7 @@ define_config_option(
     "Set this value based on your expected load; some lines will be dropped if "
     "more than this number of messages are logged to the SLOWLOG between sample intervals. "
     "Make sure the redis-server `slowlog-max-len` configuration option is set to at least "
-    "the same size. See line 1819 in this example [redis.conf](https://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=&ved=2ahUKEwiTiNXQoPj3AhXYkokEHYw8AhoQFnoECB0QAQ&url=https%3A%2F%2Fdownload.redis.io%2Fredis-stable%2Fredis.conf&usg=AOvVaw3_kFM1q_S7L9omTrS8uL23) file. Also set the "
+    "the same size. See line 1819 in this [redis.conf](https://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=&ved=2ahUKEwiTiNXQoPj3AhXYkokEHYw8AhoQFnoECB0QAQ&url=https%3A%2F%2Fdownload.redis.io%2Fredis-stable%2Fredis.conf&usg=AOvVaw3_kFM1q_S7L9omTrS8uL23) example file. Also set the "
     "`sample_interval` to match your expected traffic (see below).",
     default=500,
     convert_to=int,
@@ -83,7 +83,7 @@ define_config_option(
     __monitor__,
     "connection_timeout",
     "Optional (defaults to `5`). Number of seconds to wait when querying a Redis server "
-    "before timing out, and giving up.",
+    "before timing out and giving up.",
     default=5,
     convert_to=int,
     min_value=0,
