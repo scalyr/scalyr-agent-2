@@ -158,13 +158,62 @@ define_log_field(
 )
 define_log_field(
     __monitor__,
-    "Channel (Vista and later), Source (pre-Vista)",
-    "The event channel/source name, taken from the Windows field `Event.System.EventRecordID`/`event.SourceName`.",
+    "Channel",
+    "The event channel name, taken from the `Event.System.Channel` field. "
+    "Only for Vista and above; see `Source` for pre-Vista Windows versions.",
 )
 define_log_field(
     __monitor__,
-    "Channel (Vista and later), Source (pre-Vista)",
-    "The event channel/source name, taken from the Windows field `Event.System.EventRecordID`/`event.SourceName`.",
+    "EventRecordID",
+    "The event record number, taken from the `Event.System.EventRecordID` field. "
+    "Only for Vista and above; see `RecordNumber` for pre-Vista versions.",
+)
+define_log_field(
+    __monitor__,
+    "SystemTime",
+    "The time the event was generated, taken from the `Event.System.TimeCreated.SystemTime` "
+    "field. Only for Vista and above; see `RecordNumber` for pre-Vista versions.",
+)
+define_log_field(
+    __monitor__,
+    "EventId",
+    "The event id, taken from the `Event.System.EventID` field on Vista and above; "
+    "and from `event.EventID` for pre-Vista versions.",
+)
+define_log_field(
+    __monitor__,
+    "Source",
+    "The event source name, taken from the `event.SourceName` field. "
+    "Only for pre-Vista versions of Windows; see `Channel` for Vista and above.",
+)
+define_log_field(
+    __monitor__,
+    "RecordNumber",
+    "The event record number, taken from the `event.RecordNumber` field. "
+    "Only for pre-Vista versions of Windows; see `SystemTime` for Vista and above.",
+)
+define_log_field(
+    __monitor__,
+    "TimeGenerated",
+    "The time the event was generated. "
+    "Only for pre-Vista versions of Windows; see `SystemTime` for Vista and above.",
+)
+define_log_field(
+    __monitor__,
+    "Type",
+    "The event type. Only for pre-Vista versions of Windows.",
+)
+define_log_field(
+    __monitor__,
+    "Category",
+    "The event category, taken from the `event.EventCategory` Windows field. "
+    "Only for pre-Vista versions of Windows.",
+)
+define_log_field(
+    __monitor__,
+    "EventMsg",
+    "The contents of the event message from the Windows Event Log. "
+    "Only for pre-Vista versions of Windows.",
 )
 
 
