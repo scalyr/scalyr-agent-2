@@ -139,7 +139,7 @@ jobs:
         with:
           status: ${{ job.status }}
           steps: ${{ toJson(steps) }}
-          channel: '#cloud-tech'
+          channel: '#eng-dataset-cloud-tech'
 
   standalone-smoketests:
     name: Standalone Smoketests - Python ${{ matrix.python-version }} - ${{ matrix.variant }}
@@ -215,7 +215,7 @@ jobs:
         with:
           status: ${{ job.status }}
           steps: ${{ toJson(steps) }}
-          channel: '#cloud-tech'
+          channel: '#eng-dataset-cloud-tech'
 
   monitor-smoketests:
     name: Monitor Smoketests - Python ${{ matrix.python-version }}
@@ -284,7 +284,7 @@ jobs:
         with:
           status: ${{ job.status }}
           steps: ${{ toJson(steps) }}
-          channel: '#cloud-tech'
+          channel: '#eng-dataset-cloud-tech'
 
   publish-test-results:
     runs-on: ubuntu-latest

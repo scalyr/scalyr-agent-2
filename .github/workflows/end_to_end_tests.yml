@@ -250,7 +250,7 @@ jobs:
         with:
           status: ${{ job.status }}
           steps: ${{ toJson(steps) }}
-          channel: '#cloud-tech'
+          channel: '#eng-dataset-cloud-tech'
 
   k8s_open_metrics_monitor_tests:
     name: OpenMetrics Monitor - k8s ${{ matrix.k8s_version.version }}-${{ matrix.k8s_version.runtime}}
@@ -429,7 +429,7 @@ jobs:
         with:
           status: ${{ job.status }}
           steps: ${{ toJson(steps) }}
-          channel: '#cloud-tech'
+          channel: '#eng-dataset-cloud-tech'
 
   k8s-smoketest:
     runs-on: ubuntu-latest
@@ -485,7 +485,7 @@ jobs:
         with:
           status: ${{ job.status }}
           steps: ${{ toJson(steps) }}
-          channel: '#cloud-tech'
+          channel: '#eng-dataset-cloud-tech'
 
   docker-smoketest:
     name: Docker Smoketest - ${{ matrix.variant.log_mode }}
@@ -543,7 +543,7 @@ jobs:
         with:
           status: ${{ job.status }}
           steps: ${{ toJson(steps) }}
-          channel: '#cloud-tech'
+          channel: '#eng-dataset-cloud-tech'
 
   # Runs agent from it source and performs some basic sanity checks.
   agent-source-tests:
