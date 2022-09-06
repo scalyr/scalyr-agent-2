@@ -129,7 +129,9 @@ define_log_field(
     "url",
     "The request URL, for example `http://169.254.169.254/latest/meta-data/instance-type`.",
 )
-define_log_field(__monitor__, "status", "The HTTP response code, for example 200 or 404.")
+define_log_field(
+    __monitor__, "status", "The HTTP response code, for example 200 or 404."
+)
 define_log_field(__monitor__, "length", "The length of the HTTP response.")
 define_log_field(__monitor__, "value", "The body of the HTTP response.")
 
@@ -151,6 +153,7 @@ class NoRedirection(six.moves.urllib.request.HTTPErrorProcessor):
 
 # UrlMonitor implementation
 class UrlMonitor(ScalyrMonitor):
+    # fmt: off
     """
 # HTTP
 
@@ -216,6 +219,7 @@ Log into Scalyr. From Search view query [monitor = 'url_monitor'](/events?filter
 For help, contact Support.
 
     """
+    # fmt: on
 
     def _initialize(self):
         # Fetch and validate our configuration options.

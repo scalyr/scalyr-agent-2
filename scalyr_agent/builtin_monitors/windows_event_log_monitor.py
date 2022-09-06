@@ -167,6 +167,7 @@ define_log_field(
     "The event channel/source name, taken from the Windows field `Event.System.EventRecordID`/`event.SourceName`.",
 )
 
+
 class Api(object):
     def __init__(self, config, logger):
         self._checkpoints = {}

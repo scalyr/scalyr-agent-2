@@ -189,7 +189,7 @@ define_config_option(
     'Optional (defaults to `"default"`). Sets the TCP packet data request parser. Most '
     'users should leave this as is. The `"default"` setting supports framed and line-delimited '
     'syslog messages. When set to "batch", all lines are written in a single batch, at the end '
-    'of processing a packet. This offers better performance at the expense of increased buffer '
+    "of processing a packet. This offers better performance at the expense of increased buffer "
     'memory. When set to "raw", received data is written as-is: this plugin will not handle '
     "framed messages, and received lines are not always written as an atomic unit, but as part "
     "of multiple write calls. We recommend this setting when you wish to avoid expensive framed "
@@ -358,7 +358,6 @@ define_config_option(
     convert_to=bool,
     default=True,
 )
-
 
 
 # NOTE: On Windows on newer Python 3 versions, BlockingIOError is thrown instead of

@@ -122,6 +122,7 @@ define_config_option(
     "exceed the value of `lines_to_fetch`, otherwise some lines will be dropped.",
 )
 
+
 class RedisHost(object):
     """Class that holds various information about a specific redis connection"""
 

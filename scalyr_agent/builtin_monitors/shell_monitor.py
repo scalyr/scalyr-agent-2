@@ -46,7 +46,8 @@ define_config_option(
 define_config_option(
     __monitor__,
     "extract",
-    "Optional (defaults to ""). A regular expression, applied to the command output. Lets you extract "
+    'Optional (defaults to ""). '
+    "A regular expression, applied to the command output. Lets you extract "
     "the data of interest. Must include a matching group (i.e. a subexpression enclosed "
     "in parentheses). Only the content of the matching group is imported.",
     default="",

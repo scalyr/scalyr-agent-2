@@ -73,7 +73,9 @@ define_log_field(
     "The device that was queried to retrieve this value, for example `demo.snpmlabs.com`.",
 )
 define_log_field(
-    __monitor__, "oid", 'The OID for the retrieved value, for example `IF-MIB::ifDescr."1"`.'
+    __monitor__,
+    "oid",
+    'The OID for the retrieved value, for example `IF-MIB::ifDescr."1"`.',
 )
 define_log_field(__monitor__, "value", "The value reported by the device.")
 
