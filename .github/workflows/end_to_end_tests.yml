@@ -43,6 +43,38 @@ jobs:
           do_not_skip: "${{ steps.get_events_to_not_skip.outputs.events_to_not_skip }}"
           github_token: ${{ github.token }}
 
+  coverage:
+    runs-on: ubuntu-latest
+    if: success() || failure()
+    needs:
+      - pre_job
+      - k8s-smoketest
+      - docker-smoketest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        id: setup-python
+        with:
+          python-version: 3.8
+      - name: Install pycoverage
+        run: pip install coverage==4.5.4
+      - name: Download coverage reports
+        uses: actions/download-artifact@v3
+        with:
+          path: reports
+
+      - name: Prepare Coverage Data for codecov.io
+        run: |
+          coverage combine reports/**/.coverage
+          coverage xml -i -o coverage.xml
+
+      - name: Upload Coverage to Codecov.io
+        uses: codecov/codecov-action@81cd2dc8148241f03f5839d295e000b8f761e378 # pin@v3
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: true
 
   # Jobs which performs basic sanity checks for the Kubernetes Monitor and Kubernetes Events Monitor
   k8s_kubernetes_monitor_tests:
@@ -52,7 +84,7 @@ jobs:
 
     needs: pre_job
     # NOTE: We always want to run job on master branch
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' && (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
 
     strategy:
       fail-fast: false
@@ -141,14 +173,14 @@ jobs:
           daemonset_yaml_path: "tests/e2e/scalyr-agent-2-daemonset.yaml"
 
       - name: Verify data has been ingested
-        timeout-minutes: 5
+        timeout-minutes: 14
         env:
           # Needed for scalyr-tool
           scalyr_readlog_token: "${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }}"
           SCALYR_AGENT_POD_NAME: "${{ env.SCALYR_AGENT_POD_NAME }}"
           K8S_NODE_NAME: "${{ env.K8S_NODE_NAME }}"
         run: |
-          export RETRY_ATTEMPTS="10"
+          export RETRY_ATTEMPTS="14"
           export SLEEP_DELAY="10"
 
           # Verify agent is running
@@ -218,7 +250,7 @@ jobs:
         with:
           status: ${{ job.status }}
           steps: ${{ toJson(steps) }}
-          channel: '#cloud-tech'
+          channel: '#eng-dataset-cloud-tech'
 
   k8s_open_metrics_monitor_tests:
     name: OpenMetrics Monitor - k8s ${{ matrix.k8s_version.version }}-${{ matrix.k8s_version.runtime}}
@@ -227,7 +259,7 @@ jobs:
 
     needs: pre_job
     # NOTE: We always want to run job on master branch
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' && ( github.ref == 'refs/heads/master' || github.base_ref == 'master' ) }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || ( github.ref == 'refs/heads/master' || github.base_ref == 'master' ) }}
 
     strategy:
       fail-fast: false
@@ -328,7 +360,7 @@ jobs:
           K8S_NODE_NAME: "${{ env.K8S_NODE_NAME }}"
           K8S_CLUSTER_NAME: "${{ env.K8S_CLUSTER_NAME }}"
         run: |
-          export RETRY_ATTEMPTS="8"
+          export RETRY_ATTEMPTS="14"
           export SLEEP_DELAY="10"
 
           # Verify agent is running
@@ -397,12 +429,12 @@ jobs:
         with:
           status: ${{ job.status }}
           steps: ${{ toJson(steps) }}
-          channel: '#cloud-tech'
+          channel: '#eng-dataset-cloud-tech'
 
   k8s-smoketest:
     runs-on: ubuntu-latest
     needs: pre_job
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
@@ -420,7 +452,7 @@ jobs:
       - name: Setup minikube k8s cluster
         uses: ./.github/actions/setup-minikube-cluster/
         with:
-          k8s_version: v1.18.0
+          k8s_version: v1.22.0
           minikube_driver: ""
           container_runtime: "docker"
           github_token: "${{ secrets.GITHUB_TOKEN }}"
@@ -434,31 +466,13 @@ jobs:
         run: |
           source ./.circleci/smoketest_k8s.sh scalyr/scalyr-agent-ci-unittest:4 150 no_delete_existing_k8s_objs
 
-      - name: Prepare Coverage Data for codecov.io and Combine it and Upload it to S3
-        env:
-          COVERAGE_AWS_ACCESS_KEY_ID: ${{ secrets.COVERAGE_AWS_ACCESS_KEY_ID }}
-          COVERAGE_AWS_ACCESS_KEY_SECRET: ${{ secrets.COVERAGE_AWS_ACCESS_KEY_SECRET }}
-          CIRCLE_BRANCH: ${{ github.head_ref || github.ref_name}}
-          CIRCLE_SHA1: ${{ github.sha }}
-        run: |
-          ls -la .coverage* || true
-
-          # Ensure consistent paths for all the code coverage reports
-          sed -i "s#/usr/share/scalyr-agent-2/py/#${{ github.workspace }}#g" .coverage
-
-          # Prepare coverage for codecov.io
-          coverage xml --rcfile=.coveragerc_ci -i -o coverage.xml
-
-          # Combine it and upload it to S3
-          coverage combine --rcfile=.coveragerc_ci || true
-          export PYTHONPATH=.
-          ./scripts/circleci/upload-coverage-data-to-s3.py ".coverage"
-
-      - name: Upload Coverage to Codecov.io
-        uses: codecov/codecov-action@v3
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
         with:
-          files: ./coverage.xml
-          fail_ci_if_error: true
+          name: k8s-smoketest
+          path: |
+            .coverage
+        if: ${{ success() || failure() }}
 
       - name: Notify Slack on Failure
         # NOTE: github.ref is set to pr ref (and not branch name, e.g. refs/pull/28/merge) for pull
@@ -471,12 +485,12 @@ jobs:
         with:
           status: ${{ job.status }}
           steps: ${{ toJson(steps) }}
-          channel: '#cloud-tech'
+          channel: '#eng-dataset-cloud-tech'
 
   docker-smoketest:
     name: Docker Smoketest - ${{ matrix.variant.log_mode }}
     needs: pre_job
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -510,31 +524,13 @@ jobs:
         run: |
           source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 docker-${{ matrix.variant.log_mode }} ${{ matrix.variant.timeout }}
 
-      - name: Prepare Coverage Data for codecov.io and Combine it and Upload it to S3
-        env:
-          COVERAGE_AWS_ACCESS_KEY_ID: ${{ secrets.COVERAGE_AWS_ACCESS_KEY_ID }}
-          COVERAGE_AWS_ACCESS_KEY_SECRET: ${{ secrets.COVERAGE_AWS_ACCESS_KEY_SECRET }}
-          CIRCLE_BRANCH: ${{ github.head_ref || github.ref_name}}
-          CIRCLE_SHA1: ${{ github.sha }}
-        run: |
-          ls -la .coverage* || true
-
-          # Ensure consistent paths for all the code coverage reports
-          sed -i "s#/usr/share/scalyr-agent-2/py/#${{ github.workspace }}#g" .coverage
-
-          # Prepare coverage for codecov.io
-          coverage xml --rcfile=.coveragerc_ci -i -o coverage.xml
-
-          # Combine it and upload it to S3
-          coverage combine --rcfile=.coveragerc_ci || true
-          export PYTHONPATH=.
-          ./scripts/circleci/upload-coverage-data-to-s3.py ".coverage"
-
-      - name: Upload Coverage to Codecov.io
-        uses: codecov/codecov-action@v3
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
         with:
-          files: ./coverage.xml
-          fail_ci_if_error: true
+          name: docker-smoketest-${{ matrix.variant.log_mode }}
+          path: |
+            .coverage
+        if: ${{ success() || failure() }}
 
       - name: Notify Slack on Failure
         # NOTE: github.ref is set to pr ref (and not branch name, e.g. refs/pull/28/merge) for pull
@@ -547,13 +543,13 @@ jobs:
         with:
           status: ${{ job.status }}
           steps: ${{ toJson(steps) }}
-          channel: '#cloud-tech'
+          channel: '#eng-dataset-cloud-tech'
 
   # Runs agent from it source and performs some basic sanity checks.
   agent-source-tests:
     runs-on: ${{ matrix.os }}
     needs: pre_job
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
     container: ${{ matrix.container }}
     strategy:
       matrix:

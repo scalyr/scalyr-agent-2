@@ -37,7 +37,7 @@ from scalyr_agent.test_base import skipIf
 
 if six.PY3 and platform.system() != "Darwin":
     reload = importlib.reload
-    import orjson
+    import orjson  # pylint: disable=import-error
 
 JSON = 1
 ORJSON = 3

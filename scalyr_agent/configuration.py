@@ -428,17 +428,23 @@ class Configuration(object):
                     limit_key="instrumentation-interval-too-low",
                 )
 
-            # add in the profile logs if we have enabled profiling
-            if self.enable_profiling and self.__log_warnings:
-                self.__logger.info(
-                    "Profiling is enabled, will ingest CPU profiling (%s) and memory "
-                    "profiling (%s) data by default"
-                    % (self.profile_log_name, self.memory_profile_log_name),
-                    limit_once_per_x_secs=86400,
-                    limit_key="profiling-enabled-ingest",
-                )
+            enable_cpu_profiling = self.enable_profiling or self.enable_cpu_profiling
+            enable_memory_profiling = (
+                self.enable_profiling or self.enable_memory_profiling
+            )
 
-                # 1. CPU profiling
+            # add in the profile logs if we have enabled profiling
+            # 1. CPU profiling
+            if enable_cpu_profiling:
+                if self.__log_warnings:
+                    log_path = os.path.join(self.agent_log_path, self.profile_log_name)
+                    self.__logger.info(
+                        "CPU profiling is enabled, will ingest CPU profiling (%s) data."
+                        % (log_path),
+                        limit_once_per_x_secs=86400,
+                        limit_key="cpu-profiling-enabled-ingest",
+                    )
+
                 profile_config = JsonObject(
                     path=self.profile_log_name,
                     copy_from_start=True,
@@ -450,7 +456,23 @@ class Configuration(object):
                 )
                 self.__log_configs.append(profile_config)
 
-                # 2. Memory profiling
+            # 2. Memory profiling
+            if enable_memory_profiling:
+                if self.__log_warnings:
+                    log_path = os.path.join(
+                        self.agent_log_path, self.memory_profile_log_name
+                    )
+                    self.__logger.info(
+                        "Memory profiling is enabled, will ingest memory "
+                        "profiling (%s) data by default. Using %s memory profiler."
+                        % (
+                            log_path,
+                            self.__config["memory_profiler"],
+                        ),
+                        limit_once_per_x_secs=86400,
+                        limit_key="memory-profiling-enabled-ingest",
+                    )
+
                 profile_config = JsonObject(
                     path=self.memory_profile_log_name,
                     copy_from_start=True,
@@ -1121,7 +1143,52 @@ class Configuration(object):
 
     @property
     def enable_profiling(self):
+        """
+        Set to True to enable CPU and memory profiling.
+        """
         return self.__get_config().get_bool("enable_profiling")
+
+    @property
+    def enable_cpu_profiling(self):
+        """
+        Set to True to enable CPU profiling.
+        """
+        return self.__get_config().get_bool("enable_cpu_profiling")
+
+    @property
+    def enable_memory_profiling(self):
+        """
+        Set to True to enable memory profiling.
+        """
+        return self.__get_config().get_bool("enable_memory_profiling")
+
+    @property
+    def memory_profiler(self):
+        return self.__get_config().get_string("memory_profiler")
+
+    @property
+    def memory_profiler_max_items(self):
+        return self.__get_config().get_int("memory_profiler_max_items")
+
+    @property
+    # NOTE: Currently only applicable to tracemalloc profiler
+    # Number of traceback frames to capture for each reported line. More frames mean more context.
+    def memory_profiler_frames_count(self):
+        return self.__get_config().get_int("memory_profiler_frames_count")
+
+    @property
+    # NOTE: Currently only applicable to tracemalloc profiler
+    # Set to true to include additional context / traceback with each reported line.
+    def memory_profiler_include_traceback(self):
+        return self.__get_config().get_bool("memory_profiler_include_traceback")
+
+    @property
+    # NOTE: Currently only applicable to tracemalloc profiler
+    # A list of path globs which should be ignored by the tracemalloc memory profiler. Only
+    # applicable when memory profiler is set to tracemalloc.
+    # For example: memory_profiler_ignore_path_globs: ["**/scalyr_agent/configuration.py", "**/scalyr_agent/util.py", "**/scalyr_agent/json_lib/**"]
+    def memory_profiler_ignore_path_globs(self):
+        return self.__get_config().get_json_array("memory_profiler_ignore_path_globs")
 
     @property
     def max_profile_interval_minutes(self):
@@ -3053,6 +3120,65 @@ class Configuration(object):
             config,
             "enable_profiling",
             False,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_bool(
+            config,
+            "enable_cpu_profiling",
+            False,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_bool(
+            config,
+            "enable_memory_profiling",
+            False,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_string(
+            config,
+            "memory_profiler",
+            "pympler",
+            description,
+            apply_defaults,
+            valid_values=["pympler", "tracemalloc"],
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_int(
+            config,
+            "memory_profiler_max_items",
+            50,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        # Right now only applicable to tracemalloc
+        self.__verify_or_set_optional_int(
+            config,
+            "memory_profiler_frames_count",
+            10,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        # Right now only applicable to tracemalloc
+        self.__verify_or_set_optional_bool(
+            config,
+            "memory_profiler_include_traceback",
+            False,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_array_of_strings(
+            config,
+            "memory_profiler_ignore_path_globs",
+            [],
             description,
             apply_defaults,
             env_aware=True,

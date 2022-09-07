@@ -28,7 +28,9 @@ scalyr-agent-2-*/
 tests/package_tests/credentials.json
 tests/credentials.json
 !.github/actions/perform-deployment/dist
+!.github/actions/execute-runner/dist
 .github/actions/perform-deployment/node_modules
+.github/actions/execute-runner/node_modules
 /agent_build_output
 
 # Installer logs
@@ -38,7 +40,7 @@ pip-delete-this-directory.txt
 # Unit test / coverage reports
 htmlcov/
 .tox/
-.coverage
+.coverage*
 .cache
 nosetests.xml
 coverage.xml
