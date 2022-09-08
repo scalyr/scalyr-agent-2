@@ -44,7 +44,7 @@ import scalyr_agent.util as scalyr_util
 from scalyr_agent import ScalyrMonitor, define_config_option
 import scalyr_agent.scalyr_logging as scalyr_logging
 
-__author__ = "imron@scalyr.com"
+__author__ = "scalyr-cloudtech@scalyr.com"
 
 __monitor__ = __name__
 
@@ -697,7 +697,25 @@ class NewJsonApi(NewApi):
 
 def _convert_json_array_to_object(x):
     if isinstance(x, list):
-        return {str(i): _convert_json_array_to_object(x[i]) for i in range(len(x))}
+        # Special handling of @Name fields per customer request:
+        # Ie [{"@Name:":"n1", "a1":"v1", ...}, ...] becomes {"n1":{"a1":"v1", ...}, ...}
+        # Duplicate @Names are handled by appending the index number if possible.
+        # Otherwise the (stringified) index number becomes the field name.
+        rv = {}
+        for i in range(len(x)):
+            if isinstance(x[i], dict) and "@Name" in x[i]:
+                orig_name = name = x[i].pop("@Name")
+                if name in rv:
+                    name += str(i)
+                    # Fallback to the original behavior if this pathological case occurs
+                    if name in rv:
+                        x[i]["@Name"] = orig_name
+                        rv[str(i)] = _convert_json_array_to_object(x[i])
+                        continue
+                rv[name] = _convert_json_array_to_object(x[i])
+            else:
+                rv[str(i)] = _convert_json_array_to_object(x[i])
+        return rv
     elif isinstance(x, dict):
         return {k: _convert_json_array_to_object(v) for k, v in x.items()}
     else:
