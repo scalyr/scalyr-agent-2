@@ -3,7 +3,7 @@ Scalyr Agent 2 Changes By Release
 
 ## 2.1.35 "Xabboaturn" - September 8, 2022
 <!---
-Packaged by Joseph Makar <joseph.makar@sentinelone.com> on Sep 8, 2022 10:55 -0500
+Packaged by Joseph Makar <joseph.makar@sentinelone.com> on Sep 17, 2022 12:30 -0800
 --->
 
 Windows:
