@@ -945,8 +945,8 @@ def build_rpm_or_deb_package(is_rpm, variant, version):
         # "  --rpm-auto-add-directories "
         # "  --rpm-defattrfile 640"
         # "  --rpm-defattrdir 751"
+        " --verbose"
         "  -C root usr etc var"
-        ' --verbose'
         % (sudo_command_string, package_type, version, iteration_arg, description),
         exit_on_fail=True,
         command_name="fpm",
