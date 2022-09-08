@@ -7,7 +7,7 @@ Packaged by Joseph Makar <joseph.makar@sentinelone.com> on Sep 8, 2022 10:55 -05
 --->
 
 Windows:
-- More sophisticated handling of array-based (event field) names in ``windows_event_log`` monitor.
+* More sophisticated handling of array-based (event field) names in ``windows_event_log`` monitor.
 
 ## 2.1.34 "Tadongolia" - August 30, 2022
 <!---
