@@ -1,6 +1,11 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.35 "Xabboaturn" - September 8, 2022
+
+Windows:
+- More sophisticated handling of array-based (event field) names in ``windows_event_log`` monitor.
+
 ## 2.1.34 "Tadongolia" - August 30, 2022
 <!---
 Packaged by Dominic LoBue <dominicl@sentinelone.com> on Sep 17, 2022 12:29 -0800
