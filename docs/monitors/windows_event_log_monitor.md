@@ -87,3 +87,12 @@ and System sources:
 | `remote_password`            | Optional (defaults to ``None``). The password to use for authentication on the remote server.  This option is only valid on Windows Vista and above. | 
 | `remote_domain`              | Optional (defaults to ``None``). The domain to which the remote user account belongs.  This option is only valid on Windows Vista and above. | 
 | `json`                       | Optional (defaults to ``False``). Format events as json? Supports inclusion of all event fields. This option is only valid on Windows Vista and above. | 
+
+<a name="events"></a>
+## Event Reference
+
+In the UI, each event has the fields:
+
+| Field     | Description | 
+| ---       | --- | 
+| `monitor` | Always ``windows_event_log_monitor``. | 
