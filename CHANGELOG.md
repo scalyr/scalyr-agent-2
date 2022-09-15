@@ -1,6 +1,15 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.36 "Corrntos" - September 15, 2022
+<!---
+Packaged by Joseph Makar <joseph.makar@sentinelone.com> on Sep 17, 2022 12:31 -0800
+--->
+
+Windows:
+* The monitor field is set to ``windows_event_log_monitor`` in the ``windows_event_log`` monitor if the ``json`` config option is true.
+* Proper handling of forwarded windows events (ie handling of EvtOpenPublisherMetadata exceptions) in the ``windows_event_log`` monitor.
+
 ## 2.1.35 "Xabboaturn" - September 8, 2022
 <!---
 Packaged by Joseph Makar <joseph.makar@sentinelone.com> on Sep 17, 2022 12:30 -0800
