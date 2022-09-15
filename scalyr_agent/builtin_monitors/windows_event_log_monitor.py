@@ -660,9 +660,16 @@ class NewJsonApi(NewApi):
             event, win32evtlog.EvtRenderEventValues, Context=self._render_context
         )
 
-        metadata = win32evtlog.EvtOpenPublisherMetadata(
-            values[win32evtlog.EvtSystemProviderName][0]
-        )
+        # (Publisher) metadata is used to populate the RenderingInfo section,
+        # which is already populated for forwarded events and would throw an exception here.
+        # Ref: https://docs.microsoft.com/en-us/windows/win32/api/winevt/nf-winevt-evtformatmessage
+        metadata = None
+        try:
+            metadata = win32evtlog.EvtOpenPublisherMetadata(
+                values[win32evtlog.EvtSystemProviderName][0]
+            )
+        except Exception:
+            pass
 
         event_json = xmltodict.parse(
             win32evtlog.EvtFormatMessage(
