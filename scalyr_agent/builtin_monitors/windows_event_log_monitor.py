@@ -933,7 +933,7 @@ and System sources:
                 # Ensure the LogRecord has a message attribute.
                 # If the rate limit is disabled, formatting is not applied by RateLimitLogFilter.
                 # Ref: scalyr_logging.MetricLoggingHandler.__init__
-                if not hasattr(record, 'message'):
+                if not hasattr(record, "message"):
                     super(DummyFormatter, self).format(record)
                 return record.message[len("unused ") + 1 : -1].replace('\\"', '"')
 
