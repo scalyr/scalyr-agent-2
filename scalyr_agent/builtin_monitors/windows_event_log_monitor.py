@@ -928,8 +928,13 @@ and System sources:
         return result
 
     def open_metric_log(self):
-        class DummyFormatter:
+        class DummyFormatter(scalyr_logging.MetricLogFormatter):
             def format(self, record):
+                # Ensure the LogRecord has a message attribute.
+                # If the rate limit is disabled, formatting is not applied by RateLimitLogFilter.
+                # Ref: scalyr_logging.MetricLoggingHandler.__init__
+                if not hasattr(record, 'message'):
+                    super(DummyFormatter, self).format(record)
                 return record.message[len("unused ") + 1 : -1].replace('\\"', '"')
 
         rv = super(WindowEventLogMonitor, self).open_metric_log()
