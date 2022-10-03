@@ -44,7 +44,7 @@ import scalyr_agent.util as scalyr_util
 from scalyr_agent import ScalyrMonitor, define_config_option, define_log_field
 import scalyr_agent.scalyr_logging as scalyr_logging
 
-__author__ = "imron@scalyr.com"
+__author__ = "scalyr-cloudtech@scalyr.com"
 
 __monitor__ = __name__
 
@@ -149,6 +149,8 @@ define_config_option(
     default=False,
     convert_to=bool,
 )
+
+define_log_field(__monitor__, "monitor", "Always ``windows_event_log_monitor``.")
 
 
 define_log_field(
@@ -727,9 +729,16 @@ class NewJsonApi(NewApi):
             event, win32evtlog.EvtRenderEventValues, Context=self._render_context
         )
 
-        metadata = win32evtlog.EvtOpenPublisherMetadata(
-            values[win32evtlog.EvtSystemProviderName][0]
-        )
+        # (Publisher) metadata is used to populate the RenderingInfo section,
+        # which is already populated for forwarded events and would throw an exception here.
+        # Ref: https://docs.microsoft.com/en-us/windows/win32/api/winevt/nf-winevt-evtformatmessage
+        metadata = None
+        try:
+            metadata = win32evtlog.EvtOpenPublisherMetadata(
+                values[win32evtlog.EvtSystemProviderName][0]
+            )
+        except Exception:
+            pass
 
         event_json = xmltodict.parse(
             win32evtlog.EvtFormatMessage(
@@ -752,6 +761,7 @@ class NewJsonApi(NewApi):
             "SystemTime"
         ]
         event_json["name"] = self._logger.name
+        event_json["monitor"] = "windows_event_log_monitor"
         self._logger.emit_value("unused", scalyr_util.json_encode(event_json))
 
         self._bookmark_lock.acquire()
@@ -766,7 +776,25 @@ class NewJsonApi(NewApi):
 
 def _convert_json_array_to_object(x):
     if isinstance(x, list):
-        return {str(i): _convert_json_array_to_object(x[i]) for i in range(len(x))}
+        # Special handling of @Name fields per customer request:
+        # Ie [{"@Name:":"n1", "a1":"v1", ...}, ...] becomes {"n1":{"a1":"v1", ...}, ...}
+        # Duplicate @Names are handled by appending the index number if possible.
+        # Otherwise the (stringified) index number becomes the field name.
+        rv = {}
+        for i in range(len(x)):
+            if isinstance(x[i], dict) and "@Name" in x[i]:
+                orig_name = name = x[i].pop("@Name")
+                if name in rv:
+                    name += str(i)
+                    # Fallback to the original behavior if this pathological case occurs
+                    if name in rv:
+                        x[i]["@Name"] = orig_name
+                        rv[str(i)] = _convert_json_array_to_object(x[i])
+                        continue
+                rv[name] = _convert_json_array_to_object(x[i])
+            else:
+                rv[str(i)] = _convert_json_array_to_object(x[i])
+        return rv
     elif isinstance(x, dict):
         return {k: _convert_json_array_to_object(v) for k, v in x.items()}
     else:
