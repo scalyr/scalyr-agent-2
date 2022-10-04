@@ -1,6 +1,17 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.37 "TBD" - November 15, 2022
+<!---
+Packaged by Joseph Makar <joseph.makar@sentinelone.com> on Sep 17, 2022 12:31 -0800
+--->
+
+Docker Images:
+* Upgrade Linux Docker images to use Python 3.8.14.
+
+Windows:
+* Upgrade agent Windows binary to use Python 3.10.7.
+
 ## 2.1.36 "Corrntos" - September 15, 2022
 <!---
 Packaged by Joseph Makar <joseph.makar@sentinelone.com> on Sep 17, 2022 12:31 -0800
