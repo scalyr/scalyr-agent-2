@@ -31,8 +31,8 @@ from io import open
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 
-# By default we fail if any of the bundled cert expires in 2 years or sooner
-DEFAULT_EXPIRE_THRESHOLD_TIMEDELTA = datetime.timedelta(days=(12 * 30 * 2))
+# By default we fail if any of the bundled cert expires in 1 year or sooner
+DEFAULT_EXPIRE_THRESHOLD_TIMEDELTA = datetime.timedelta(days=(12 * 30 * 1))
 
 
 def fail_if_cert_expires_in_timedelta(cert_path, expire_in_threshold_timedelta):
