@@ -6,6 +6,9 @@ Scalyr Agent 2 Changes By Release
 Packaged by Joseph Makar <joseph.makar@sentinelone.com> on Sep 17, 2022 12:31 -0800
 --->
 
+Kubernetes:
+* Fix a bug / edge case in the Kubernetes caching PodProcessor code which could cause an agent to get stuck in an infinite loop when processing controllers which have a custom Kind which is not supported by the agent defined. Contributed by #xdvpser #998 #999.
+
 Docker Images:
 * Upgrade Linux Docker images to use Python 3.8.14.
 
