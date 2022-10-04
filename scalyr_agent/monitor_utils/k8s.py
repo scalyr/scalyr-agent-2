@@ -888,6 +888,13 @@ class PodProcessor(_K8sProcessor):
                     "controller %s has no parent kind" % controller.name,
                 )
                 break
+                
+            if controller.parent_kind not in _OBJECT_ENDPOINTS:
+                global_log.log(
+                    scalyr_logging.DEBUG_LEVEL_1,
+                    "parent of controller %s is not standard k8s object" % controller.name,
+                )
+                break
 
             # get the parent controller
             parent_controller = self._controllers.lookup(
