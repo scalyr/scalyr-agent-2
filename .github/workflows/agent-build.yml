@@ -27,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image-type: [ "docker-json", "docker-syslog", "docker-api", "k8s", "k8s-restart-agent-on-monitor-death"]
+        image-type: [ "docker-json", "docker-syslog", "docker-api", "k8s" ]
         image-distro-name: [ "debian", "alpine" ]
         python-version: [ "3.8.13" ]
 
