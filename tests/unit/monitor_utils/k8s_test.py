@@ -25,6 +25,7 @@ from scalyr_agent.monitor_utils.k8s import DockerMetricFetcher
 from scalyr_agent.monitor_utils.k8s import (
     _K8sCache,
     _K8sProcessor,
+    PodProcessor,
     KubernetesApi,
     K8sApiNotFoundException,
     K8sApiTemporaryError,
@@ -989,6 +990,155 @@ class TestK8sNamespaceFilter(ScalyrTestCase):
 
         self.assertTrue(blacklist_filter_a != blacklist_filter_b)
         self.assertFalse(blacklist_filter_a != blacklist_filter_c)
+
+
+class PodProcessorTestCase(ScalyrTestCase):
+    @patch("scalyr_agent.monitor_utils.k8s.global_log")
+    def test_get_controller_from_owners_edge_cases_are_handled_correctly(
+        self, mock_global_log
+    ):
+        mock_controllers = mock.Mock()
+
+        mock_k8s = None
+        mock_obj = {
+            "metadata": {
+                "ownerReferences": [
+                    # Valid kind, should be included
+                    {
+                        "name": "name1",
+                        "kind": "CronJob",
+                        "controller": "controller1",
+                    },
+                    # No name, should be ignored
+                    {
+                        "name": "name2",
+                        "kind": "DaemonSet",
+                        "controller": "controller2",
+                    },
+                    # No kind, should be ignored
+                    {
+                        "name": "name3",
+                        "kind": "DaemonSet",
+                        "controller": "controller3",
+                    },
+                    # Invalid kind, should be ignored
+                    {
+                        "name": "name4",
+                        "kind": "invalid",
+                        "controller": "controller4",
+                    },
+                ]
+            }
+        }
+
+        # 1. Valid controller
+        def mock_lookup_1(*args, **kwargs):
+            if mock_lookup_1.counter == 0:
+                # Valid controller
+                result = mock.Mock(
+                    id="1", parent_name="parent1", parent_kind="DaemonSet"
+                )
+            elif mock_lookup_1.counter == 1:
+                return None
+
+            mock_lookup_1.counter += 1
+            return result
+
+        mock_lookup_1.counter = 0
+
+        self.assertEqual(mock_global_log.log.call_count, 0)
+
+        mock_controllers.lookup = mock_lookup_1
+        processor = PodProcessor(controllers=mock_controllers)
+        result = processor.process_object(k8s=mock_k8s, obj=mock_obj)
+
+        self.assertEqual(result.controller.id, "1")
+        self.assertEqual(result.controller.parent_name, "parent1")
+        self.assertEqual(result.controller.parent_kind, "DaemonSet")
+        self.assertEqual(mock_global_log.log.call_count, 2)
+
+        # 2. Invalid controller, no parent_name, should be ignored
+        mock_global_log.reset_mock()
+
+        def mock_lookup_2(*args, **kwargs):
+            if mock_lookup_2.counter == 0:
+                # Valid controller
+                result = mock.Mock(id="2", parent_name=None, parent_kind="CronJob")
+            elif mock_lookup_2.counter == 1:
+                return None
+
+            mock_lookup_2.counter += 1
+            return result
+
+        mock_lookup_2.counter = 0
+
+        self.assertEqual(mock_global_log.log.call_count, 0)
+
+        mock_controllers.lookup = mock_lookup_2
+        processor = PodProcessor(controllers=mock_controllers)
+        result = processor.process_object(k8s=mock_k8s, obj=mock_obj)
+        self.assertEqual(result.controller.id, "2")
+        self.assertEqual(result.controller.parent_name, None)
+        self.assertEqual(result.controller.parent_kind, "CronJob")
+        self.assertEqual(mock_global_log.log.call_count, 2 + 1)
+        self.assertTrue(
+            "has no parent name, ignoring"
+            in mock_global_log.log.call_args_list[0][0][1]
+        )
+
+        # 3. Invalid controller, no parent_kind, should be ignored
+        mock_global_log.reset_mock()
+
+        def mock_lookup_3(*args, **kwargs):
+            if mock_lookup_3.counter == 0:
+                # Valid controller
+                result = mock.Mock(id="3", parent_name="parent3", parent_kind=None)
+            elif mock_lookup_3.counter == 1:
+                return None
+
+            mock_lookup_3.counter += 1
+            return result
+
+        mock_lookup_3.counter = 0
+
+        mock_controllers.lookup = mock_lookup_3
+        processor = PodProcessor(controllers=mock_controllers)
+        result = processor.process_object(k8s=mock_k8s, obj=mock_obj)
+        self.assertEqual(result.controller.id, "3")
+        self.assertEqual(result.controller.parent_name, "parent3")
+        self.assertEqual(result.controller.parent_kind, None)
+        self.assertEqual(mock_global_log.log.call_count, 2 + 1)
+        self.assertTrue(
+            "has no parent kind, ignoring"
+            in mock_global_log.log.call_args_list[0][0][1]
+        )
+
+        # 4. Invalid controller, invalid parent_kind, should be ignored
+        mock_global_log.reset_mock()
+
+        def mock_lookup_4(*args, **kwargs):
+            if mock_lookup_4.counter == 0:
+                # Valid controller
+                result = mock.Mock(id="4", parent_name="parent4", parent_kind="Invalid")
+            elif mock_lookup_4.counter == 1:
+                return None
+
+            mock_lookup_4.counter += 1
+            return result
+
+        mock_lookup_4.counter = 0
+
+        mock_controllers.lookup = mock_lookup_4
+        processor = PodProcessor(controllers=mock_controllers)
+        result = processor.process_object(k8s=mock_k8s, obj=mock_obj)
+        self.assertEqual(result.controller.id, "4")
+        self.assertEqual(result.controller.parent_name, "parent4")
+        self.assertEqual(result.controller.parent_kind, "Invalid")
+        self.assertEqual(mock_global_log.log.call_count, 2 + 1)
+        self.assertTrue(
+            "is not standard k8s object (got=Invalid), ignoring"
+            in mock_global_log.log.call_args_list[0][0][1]
+        )
 
 
 class DockerClientFaker(object):
