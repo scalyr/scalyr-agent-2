@@ -1,6 +1,14 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.37 "TBD" - November 15, 2022
+<!---
+Packaged by Joseph Makar <joseph.makar@sentinelone.com> on Sep 17, 2022 12:31 -0800
+--->
+
+Kubernetes:
+* Fix a bug / edge case in the Kubernetes caching PodProcessor code which could cause an agent to get stuck in an infinite loop when processing controllers which have a custom Kind which is not supported by the agent defined. Contributed by #xdvpser #998 #999.
+
 ## 2.1.36 "Corrntos" - September 15, 2022
 <!---
 Packaged by Joseph Makar <joseph.makar@sentinelone.com> on Sep 17, 2022 12:31 -0800
