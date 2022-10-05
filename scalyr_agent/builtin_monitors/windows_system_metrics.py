@@ -247,7 +247,7 @@ _SYSTEM_CPU_METRICS = [
     METRIC(  # ------------------  User CPU ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.cpu",
-            description="The amount of time in seconds the CPU has spent executing instructions in user space.",
+            description="Seconds of user space CPU execution. The value is cumulative since boot.",
             category="CPU",
             unit="secs",
             cumulative=True,
@@ -258,7 +258,7 @@ _SYSTEM_CPU_METRICS = [
     METRIC(  # ------------------  System CPU ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.cpu",
-            description="The amount of time in seconds the CPU has spent executing instructions in kernel space.",
+            description="Seconds of kernel space CPU execution. The value is cumulative since boot.",
             category="CPU",
             unit="secs",
             cumulative=True,
@@ -269,7 +269,7 @@ _SYSTEM_CPU_METRICS = [
     METRIC(  # ------------------  Idle CPU ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.cpu",
-            description="The amount of time in seconds the CPU has been idle.",
+            description="Seconds of idle CPU. The value is cumulative since boot.",
             category="CPU",
             unit="secs",
             cumulative=True,
@@ -301,7 +301,7 @@ _UPTIME_METRICS = [
     METRIC(  # ------------------  System Boot Time   ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.uptime",
-            description="Seconds since the system boot time.",
+            description="Seconds since system boot.",
             category="Uptime",
             unit="secs",
             cumulative=True,
@@ -320,7 +320,7 @@ _VIRTUAL_MEMORY_METRICS = [
     METRIC(  # ------------------    Total Swap Memory    ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.memory.total",
-            description="The number of bytes of swap space available.",
+            description="Total bytes of swap memory.",
             category="Memory",
             unit="bytes",
             # cumulative      = {cumulative},
@@ -331,7 +331,7 @@ _VIRTUAL_MEMORY_METRICS = [
     METRIC(  # ------------------    Used Virtual Memory    ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.memory.used",
-            description="The number of bytes of swap currently in use.",
+            description="Bytes of used swap memory.",
             category="Memory",
             unit="bytes",
             # cumulative      = {cumulative},
@@ -342,7 +342,7 @@ _VIRTUAL_MEMORY_METRICS = [
     METRIC(  # ------------------    Free Virtual Memory    ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.memory.free",
-            description="The number of bytes of swap currently free.",
+            description="Bytes of free swap memory.",
             category="Memory",
             unit="bytes",
             # cumulative      = {cumulative},
@@ -361,7 +361,7 @@ _PHYSICAL_MEMORY_METRICS = [
     METRIC(  # ------------------    Total Physical Memory    ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.memory.total",
-            description="The number of bytes of RAM.",
+            description="Total bytes of RAM.",
             category="Memory",
             unit="bytes",
             # cumulative      = {cumulative},
@@ -372,7 +372,7 @@ _PHYSICAL_MEMORY_METRICS = [
     METRIC(  # ------------------    Used Physical Memory    ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.memory.used",
-            description="The number of bytes of RAM currently in use.",
+            description="Bytes of used RAM.",
             category="Memory",
             unit="bytes",
             # cumulative      = {cumulative},
@@ -383,7 +383,7 @@ _PHYSICAL_MEMORY_METRICS = [
     METRIC(  # ------------------    Free Physical Memory    ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.memory.free",
-            description="The number of bytes of RAM that are not in use.",
+            description="Bytes of free RAM.",
             category="Memory",
             unit="bytes",
             # cumulative      = {cumulative},
@@ -394,8 +394,8 @@ _PHYSICAL_MEMORY_METRICS = [
     METRIC(  # ------------------    Free Physical Memory    ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.memory.available",
-            description="The number of bytes of RAM that are available for allocation.  This includes memory "
-            "currently in use for caches but can be freed for other purposes.",
+            description="Bytes of available RAM. This includes memory used for "
+            "caches that can be freed for other purposes.",
             category="Memory",
             unit="bytes",
             # cumulative      = {cumulative},
@@ -417,7 +417,7 @@ _NETWORK_IO_METRICS = [
     METRIC(  # ------------------   Bytes Sent  ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.network.bytes",
-            description="The number of bytes transmitted by the network interfaces.",
+            description="Bytes transmitted by the network interfaces. The value is cumulative since boot.",
             category="Network",
             unit="bytes",
             cumulative=True,
@@ -428,7 +428,7 @@ _NETWORK_IO_METRICS = [
     METRIC(  # ------------------   Bytes Recv  ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.network.bytes",
-            description="The number of bytes received by the network interfaces.",
+            description="Bytes received by the network interfaces. The value is cumulative since boot.",
             category="Network",
             unit="bytes",
             cumulative=True,
@@ -439,7 +439,7 @@ _NETWORK_IO_METRICS = [
     METRIC(  # ------------------   Packets Sent  ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.network.packets",
-            description="The number of packets transmitted by the network intefaces.",
+            description="Number of packets transmitted by the network interfaces. The value is cumulative since boot.",
             category="Network",
             unit="packets",
             cumulative=True,
@@ -450,7 +450,7 @@ _NETWORK_IO_METRICS = [
     METRIC(  # ------------------   Packets Recv  ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.network.packets",
-            description="The number of packets received by the network interfaces.",
+            description="Number of packets received by the network interfaces. The value is cumulative since boot.",
             category="Network",
             unit="packets",
             cumulative=True,
@@ -472,7 +472,7 @@ _DISK_IO_METRICS = [
     METRIC(  # ------------------   Disk Bytes Read    ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.disk.io.bytes",
-            description="The number of bytes read from disk.",
+            description="Bytes read from disk. The value is cumulative since boot.",
             category="Disk",
             unit="bytes",
             cumulative=True,
@@ -483,7 +483,7 @@ _DISK_IO_METRICS = [
     METRIC(  # ------------------  Disk Bytes Written  ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.disk.io.bytes",
-            description="The number of bytes written to disk.",
+            description="Bytes written to disk. The value is cumulative since boot. ",
             category="Disk",
             unit="bytes",
             cumulative=True,
@@ -494,7 +494,7 @@ _DISK_IO_METRICS = [
     METRIC(  # ------------------   Disk Read Count    ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.disk.io.ops",
-            description="The number of disk read operations issued since boot time.",
+            description="Number of disk read operations. The value is cumulative since boot.",
             category="Disk",
             unit="count",
             cumulative=True,
@@ -505,7 +505,7 @@ _DISK_IO_METRICS = [
     METRIC(  # ------------------   Disk Write Count    ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.disk.io.ops",
-            description="The number of disk write operations issued since boot time.",
+            description="Number of disk write operations. The value is cumulative since boot.",
             category="Disk",
             unit="count",
             cumulative=True,
@@ -523,7 +523,7 @@ _DISK_USAGE_METRICS = [
     METRIC(
         METRIC_CONFIG(
             metric_name="winsys.disk.usage.percent",
-            description="Disk usage percentage for each disk partition.",
+            description="Percentage of disk used, by partition.",
             category="Disk",
             unit="percent",
             cumulative=False,
@@ -534,7 +534,7 @@ _DISK_USAGE_METRICS = [
     METRIC(
         METRIC_CONFIG(
             metric_name="winsys.disk.usage.used",
-            description="The number of bytes used for each disk partition",
+            description="Bytes of disk used, by partition.",
             category="Disk",
             unit="byte",
             cumulative=False,
@@ -545,7 +545,7 @@ _DISK_USAGE_METRICS = [
     METRIC(
         METRIC_CONFIG(
             metric_name="winsys.disk.usage.total",
-            description="The maximum number of bytes that can be used on each disk partition.",
+            description="Maximum usable bytes of disk, by partition.",
             category="Disk",
             unit="byte",
             cumulative=False,
@@ -556,7 +556,7 @@ _DISK_USAGE_METRICS = [
     METRIC(
         METRIC_CONFIG(
             metric_name="winsys.disk.usage.free",
-            description="The number of free bytes on each disk partition.",
+            description="Bytes of disk free, by partition.",
             category="Disk",
             unit="byte",
             cumulative=False,
@@ -589,13 +589,34 @@ define_log_field(__monitor__, "value", "The metric value.")
 
 class SystemMonitor(ScalyrMonitor):
     # fmt: off
-    """
-    A Scalyr agent monitor that records system metrics for Windows platforms.
+    r"""
+# Windows System Metrics
 
-    This agent monitor plugin records CPU consumption, memory usage, and other metrics for the server on which
-    the agent is running.
+Import CPU consumption, memory usage, and other metrics for a Windows server.
 
-    There is no required configuration for this monitor and is generally automatically run by the agent.
+An [Agent Plugin](https://app.scalyr.com/help/scalyr-agent#plugins) is a component of the Scalyr Agent, enabling the collection of more data. The source code for each plugin is available on [Github](https://github.com/scalyr/scalyr-agent-2/tree/master/scalyr_agent/builtin_monitors).
+
+You can disable collection of these metrics by setting `implicit_metric_monitor: false` at the top level of the Agent [configuration file](/help/scalyr-agent#plugins).
+
+
+## Installation
+
+
+1\. Install the Scalyr Agent
+
+If you haven't already, install the [Scalyr Agent](https://app.scalyr.com/help/welcome) on the Windows server.
+
+This plugin is automatically configured. On some Windows installations, you must run [diskperf -y](https://docs.microsoft.com/en-us/windows-server/administration/windows-commands/diskperf) as an Administrator to enable disk io metrics.
+
+
+2\. Confirm
+
+You can check the [Agent Status](https://app.scalyr.com/help/scalyr-agent#agentStatus), which includes information about all running monitors.
+
+Log into Scalyr and click Dashboards > system. You will see an overview of Windows system metrics, across all Windows servers running this plugin. The dashboard only shows some of the data collected. Go to Search view and query [monitor = 'windows_system_metrics'](/events?filter=monitor+%3D+%27windows_system_metrics%27) to view all data.
+
+For help, contact Support.
+
     """
     # fmt: on
 

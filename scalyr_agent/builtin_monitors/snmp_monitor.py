@@ -26,184 +26,183 @@ __monitor__ = __name__
 define_config_option(
     __monitor__,
     "module",
-    "Always ``scalyr_agent.builtin_monitors.snmp_monitor``",
+    "Always `scalyr_agent.builtin_monitors.snmp_monitor`",
     convert_to=six.text_type,
     required_option=True,
 )
-
+define_config_option(
+    __monitor__,
+    "mib_path",
+    "Optional (defaults to `none`). An absolute path to ASN1 MIB files",
+    default=None,
+    convert_to=six.text_type,
+)
+define_config_option(
+    __monitor__,
+    "oid_groups",
+    'A `{...}` JSON object, mapping a "group" (key name) to a `[...]` list of MIBs and OIDs. '
+    "Lets you import device values from multiple devices. For example, `oid_groups: "
+    '{ "group1" : [ "IF-MIB::ifInOctets", "1.3.6.1.2.1.2.2.1.16.1" ] }`.',
+    default=None,
+)
+define_config_option(
+    __monitor__,
+    "poll_targets",
+    "See Steps **3** and **4**. An array of `{...}` target objects, each with a `targets` and "
+    "`oids` property. `targets` is an array of objects. Each object sets the "
+    "`host` and `port` for the device. `port` defaults to `161` if not set. `oids` is a list "
+    'of "groups" set in Step **2**. For example, `poll_targets: [ { "targets": [ { "host": '
+    '"demo.snmplabs.com" }, { "host": "demo.snmplabs.com", "port": 1161 } ], "oids" : '
+    '[ "group1", "group2" ] } ]`. You can also add the `user`, `version`, `timeout`, '
+    "and `retries` properties.",
+    default=None,
+)
 define_config_option(
     __monitor__,
     "error_repeat_interval",
-    "Optional (defaults to 300). The number of seconds to wait before repeating an error message.",
+    "Optional (defaults to 300). Seconds to wait before repeating an error message.",
     default=300,
     convert_to=int,
 )
 
-define_config_option(
-    __monitor__,
-    "mib_path",
-    "Optional (defaults to None).  An absolute path to a location on disk that contains ASN1 MIB files",
-    default=None,
-    convert_to=six.text_type,
-)
 
-define_config_option(
-    __monitor__,
-    "oid_groups",
-    'A JSON object that maps custom names to a list of OIDs/variables defined as strings such "group1" : ["IF-MIB::ifDescr",  "1.3.6.1.2.1.2.2.1.16.1"].',
-    default=None,
-)
-
-define_config_option(
-    __monitor__,
-    "poll_targets",
-    "A JSON array contain a list of target devices to poll.  Each element of the array is a JSON object that contains"
-    'a list of target devices, and a list of "oid_groups" to query.  Each "target device" in the list is a JSON object containing'
-    'variables that define the target (host, port, authentication details) and each "oid_group" is a string key from the'
-    'previously defined "oid_groups" configuration option.',
-    default=None,
-)
-
-define_log_field(__monitor__, "monitor", "Always ``snmp_monitor``.")
+define_log_field(__monitor__, "monitor", "Always `snmp_monitor`.")
 define_log_field(
     __monitor__,
     "poll_target",
-    "The device that was queried to retrieve this value, e.g. ``demo.snpmlabs.com``",
+    "The device that was queried to retrieve this value, for example `demo.snpmlabs.com`.",
 )
 define_log_field(
-    __monitor__, "oid", 'The OID for the retrieved value, e.g. ``IF-MIB::ifDescr."1"``'
+    __monitor__,
+    "oid",
+    'The OID for the retrieved value, for example `IF-MIB::ifDescr."1"`.',
 )
 define_log_field(__monitor__, "value", "The value reported by the device.")
 
 
 class SNMPMonitor(ScalyrMonitor):  # pylint: disable=monitor-not-included-for-win32
     # fmt: off
-    """
-# SNMP Monitor
-The SNMP Monitor polls SNMP-enabled devices on the network to collect values specified in the configuration
-file.
+    r"""
+# SNMP
 
-You can configure the monitor to collect values from one or more devices.  Each of these devices can be
-configured to retrieve a different set of values, if desired.
+Import values from one or more SNMP-enabled devices.
 
-Values can be retrieved using either OIDs or by variable names if you have installed an appropriate
-MIBs file.
+An [Agent Plugin](https://app.scalyr.com/help/scalyr-agent#plugins) is a component of the Scalyr Agent, enabling the collection of more data. The source code for each plugin is available on [Github](https://github.com/scalyr/scalyr-agent-2/tree/master/scalyr_agent/builtin_monitors).
 
-By default, no MIBs files are provided with the Scalyr Agent.  Users are expected to provide any MIBs they
-are interested in.  There is documentation below describing how to configure the this monitor to use any installed
-MIBs files.
+You can use Object Identifiers (OIDs) or Management Information Base (MIB) variable names to get device values. You must provide the MIB files.
 
-A sample/test configuration is provided below, followed by an explanation of the critical fields.
 
-{
-    module: "scalyr_agent.builtin_monitors.snmp_monitor",
-    mib_path: "/usr/share/mibs/",
-    oid_groups: {
+## Installation
+
+1\. Install the Scalyr Agent
+
+The [Scalyr Agent](https://app.scalyr.com/help/welcome) must be installed on a host to import device values. We recommend you install the Agent on each server you want to monitor. Your data will automatically be tagged for the server it came from, and the Agent can also collect system metrics and log files.
+
+
+2\. Set OID objects and MIB variables, and assign them to groups
+
+Open the Scalyr Agent configuration file, located at `/etc/scalyr-agent-2/agent.json`.
+
+Find the `monitors: [ ... ]` section and add a `{...}` stanza with the `module` property set for SNMP. An example configuration:
+
+    {
+      module: "scalyr_agent.builtin_monitors.snmp_monitor",
+      mib_path: "/usr/share/mibs/",
+      oid_groups: {
         "group1" : [ "IF-MIB::ifInOctets", "1.3.6.1.2.1.2.2.1.16.1" ],
         "group2" : [ "IF-MIB::ifDescr" ]
+      }
     }
 
-    poll_targets: [
-        {
-            "targets": [ { "host": "demo.snmplabs.com" }, { "host": "demo.snmplabs.com", "port": 1161 } ],
-            "oids" : [ "group1", "group2" ]
-        },
-        {
-            "targets": [
-                {
-                    "host": "demo.snmplabs.com",
-                    "port": 3161,
-                },
-            ],
-            "oids" : [ "group2" ]
-        }
-    ]
+For MIB variables, add and set the `mib_path`, and `oid_groups` properties. For OIDs, add and set the `oid_groups` property.
 
-}
+`mib_path` sets the path to the MIB files. In the above example, `/usr/share/mibs` has MIB files describing IF-MIB, and its related MIBs.
 
-Field descriptions:
+`oid_groups` maps a list of OIDs and MIB variables to a "group" (key name). This lets you import a set of values from multiple devices in the next step. In the above example, "group1" imports the `IF-MIB::ifInOctets` value, and the `1.3.6.1.2.1.2.2.1.16.1` value. The `IF-MIB::ifDescr` value is imported by "group2".
 
-mib_path - the full path on disk for any MIB files.  In this example, it is assumed that /usr/share/mibs will
-            contain MIB files describing IF-MIB and its related MIBS.
 
-oid_groups - a JSON object mapping a name to a list of OIDs/variables, e.g.
-    "oid_groups" : {
+3\. Set target devices
+
+Add a `poll_targets: [...]` array to map "groups" to target devices
+
+    {
+      module: "scalyr_agent.builtin_monitors.snmp_monitor",
+      mib_path: "/usr/share/mibs/",
+      oid_groups: {
         "group1" : [ "IF-MIB::ifInOctets", "1.3.6.1.2.1.2.2.1.16.1" ],
         "group2" : [ "IF-MIB::ifDescr" ]
+      }
+
+      poll_targets: [
+        {
+          "targets": [ { "host": "demo.snmplabs.com" }, { "host": "demo.snmplabs.com", "port": 1161 } ],
+          "oids" : [ "group1", "group2" ]
+        },
+        {
+          "targets": [
+             {
+               "host": "demo.snmplabs.com",
+               "port": 3161,
+             },
+          ],
+          "oids" : [ "group2" ]
+        }
+      ]
     }
 
-    Each list can contain a mix of OIDs or MIB variable names.  This grouping allows users
-    to specify common groups of values that can be queried across multiple hosts (see below
-    more detail)
+Each `{...}` target object, has a `targets` and `oids` property. `targets` is an array of target `{...}` objects. Each sets the `host` and `port` for the device. If not set, `port` defaults to `161`.
 
-poll_targets - a JSON array containing a list of target devices to poll.  Each poll_target
-in the array is a JSON object with a list of target devices (host, port, authentication) as
-well as a list of OID groups to query. e.g.
+The `oids` property is a list of "groups" (key names) from Step 2. Device values for each "group" will be imported from each target. In the above example, two targets are set. The first imports "group1" and "group2" device values from `demo.snmplabs.com`, on the default port of `161`, and `demo.snmplabs.com`, on port `1161`. The second imports "group2" values from `demo.snmplabs.com`, on port `3161`.
 
-    "poll_targets": [
-        //first set of targets
-        {
-            //a list of target devices to poll
-            "targets": [ { "host": "demo.snmplabs.com" }, { "host": "demo.snmplabs.com", "port": 1161 } ],
 
-            //oid groups to query for the above targets
-            "oids" : [ "group1", "group2" ]
-        },
-        //second set of targets
-        {
-            //a list of target devices to poll
-            "targets": [
-                {
-                    "host": "demo.snmplabs.com",
-                    "port": 3161,
-                },
-            ],
-            //oid groups to query for the above targets
-            "oids" : [ "group2" ]
+4\. Set user authentication, and other properties for target devices
+
+Each `targets` object can have the properties:
+
+    {
+        "host": "mydevice.example.com", // Domain or IP address of the device to query.
+        "port": 161,                    // The port to connect to. Defaults to 161.
+        "version": "SNMPv2",            // Version of the SNMP protocol.  Valid values are SNMPv1,
+                                        // SNMPv2, and SNMPv3. Defaults to SNMPv2. If the
+                                        // 'user' field is set, the default is SNMPv3.
+        "timeout": 1,                   // Connection timeout in seconds. Defaults to 1.
+        "retries": 3,                   // Number of times to retry the connection. Defaults to 3.
+        "user" : {                      // User object for authentication, if required.
+                                        // See below for more information. If 'user'
+                                        // is set, "version" must be SNMPv3.
         }
-    ]
+    }
 
-    With the above example, the SNMP module will query 3 devices on the network.  demo.snmplabs.com on the
-    default port of 161, demo.snmplabs.com on port 1161, and demo.snmplabs.com with the port 3161.  The two
-    devices from the first set of targets will be queried for OIDs in 'oid_groups' "group1" and "group2",
-    whereas the devices specified in the second set of targets will only be queried for OIDs in "group2".
+If authentication is required, add and set the `"user": {...}` property:
 
-    In addition to the 'host' and 'port', each target can have the following fields defined:
+    "user" : {
+        "username": "myuser",    // Username for authentication. Defaults to ''
+        "auth_key": "authkey",   // Key/password for authentication. Defaults to ''
+        "auth_protocol": "None", // Hash protocol for the authentication key.
+                                 // Valid values are 'None', 'MD5' and 'SHA'.  Defaults
+                                 // to 'None' if auth_key is empty, or 'MD5' if auth_key
+                                 // is set.
+        "priv_key": "privkey",   // Private key to use if the auth_key is encrypted.
+                                 // Defaults to ''.
+        "priv_protocol": "None"  // The encryption protocol to use, valid values are:
+                                 // 'None', 'DES', '3DES', 'AES128', 'AES192', and 'AES256'.
+                                 // Defaults to 'None' if 'priv_key' is empty, otherwise defaults
+                                 // to 'DES'. The python module PyCrypto must
+                                 // be installed for encryption, and is not
+                                 // included with the Scalyr Agent.
+    }
 
-        {
-            "host": "mydevice.example.com", //domain or IP address of device to query
-            "port": 161, //port to connect to, defaults to 161
-            "version": "SNMPv2", //version string to use a specific version of the SNMP
-                                    //protocol.  Valid values are SNMPv1, SNMPv2, SNMPv3, with
-                                    //SNMPv2 as the default, unless the 'user' field is specified
-                                    //and then SNMPv3 is the default.
-            "timeout": 1, //the connection timeout in seconds, defaults to 1
-            "retries": 3, //the number of times to retry the connection, defaults to 3
-            "user" : {
-                //user authentication details - see below for more information.
-                //Note, if 'user' is specified, version must be SNMPv3
-            }
-        }
 
-    If the 'user' field is specified, it is a JSON object with the following fields:
+5\. Save and confirm
 
-        "user" : {
-            "username": "myuser", //the username to authenticate as, defaults to ''
-            "auth_key": "authkey", //the authentication key/password, defaults to ''
-            "auth_protocol": "None", //the hash protocol for the authentication key.
-                                        //Valid values are 'None', 'MD5' and 'SHA'.  Defaults
-                                        //to 'None' if auth_key is empty, or 'MD5' if auth_key
-                                        //is specified.
-            "priv_key": "privkey", //the private key to use if the auth_key needs to be encrypted,
-                                    //defaults to ''.
-            "priv_protocol": "None" //The encryption protocol to use, valid values are:
-                                    // 'None', 'DES', '3DES', 'AES128', 'AES192', 'AES256'
-                                    //Defaults to 'None' if 'priv_key' is empty, otherwise defaults
-                                    //to 'DES'.  Note: In order to use encryption, the python
-                                    //crypto module PyCrypto needs to be installed.  This is not
-                                    //included with the scalyr-agent as it uses native code.
+Save the `agent.json` file. The Agent will detect changes within 30 seconds. Wait a few minutes for the Agent to send device values.
 
-        }
+You can check the [Agent Status](https://app.scalyr.com/help/scalyr-agent#agentStatus), which includes information about all running monitors.
+
+Log into Scalyr. From Search view query [monitor = 'snmp_monitor'](/events?filter=monitor+%3D+%27snmp_monitor%27). This will show all data collected by this plugin, across all servers. See the [Event Reference](#events) below for a description of all fields in the UI generated by this plugin.
+
+For help, contact Support.
+
     """
     # fmt: on
 

@@ -5,19 +5,33 @@
 
 <!-- Auto generated content below. DO NOT edit manually, but run tox -egenerate-monitor-docs command instead -->
 
-# Syslog Monitor
+# Syslog
 
-The Syslog monitor allows the Scalyr Agent to act as a syslog server, proxying logs from any application or device
-that supports syslog. It can recieve log messages via the syslog TCP or syslog UDP protocols.
+Import logs from an application or device that supports syslog.
 
-@class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
-simply add it to the ``monitors`` section of the Scalyr Agent configuration file (``/etc/scalyr/agent.json``).
-For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
+An [Agent Plugin](https://app.scalyr.com/help/scalyr-agent#plugins) is a component of the Scalyr Agent, enabling the collection of more data. The source code for each plugin is available on [Github](https://github.com/scalyr/scalyr-agent-2/tree/master/scalyr_agent/builtin_monitors).
 
-## Sample Configuration
+TCP and UDP protocols are supported. We recommend TCP for reliability and performance, whenever possible.
 
-This sample will configure the agent to accept syslog messages on TCP port 601 and UDP port 514, from localhost
-only:
+**For Docker**: We recommend the `json` logging driver. This plugin imports Docker logs configured for the `syslog` driver. Containers on localhost must run the Scalyr Agent and this plugin. Set the `mode` [configuration option](#options) to `docker`.
+
+
+## Installation
+
+1\. Install the Scalyr Agent
+
+If you haven't already, install the [Scalyr Agent](https://app.scalyr.com/help/welcome). We recommend installing the Agent on each server you want to monitor. Your data will automatically be tagged for the server it came from. The Agent can also collect system metrics and log files.
+
+You can install the Agent on a single server and configure this plugin to accept messages from all hosts.
+
+If you are on Linux, running Python 3, this [memory leak](https://bugs.python.org/issue37193) was fixed in versions [3.8.9](https://docs.python.org/3.8/whatsnew/changelog.html), [3.9.3 final](https://docs.python.org/3.9/whatsnew/changelog.html), and [3.10.0 alpha 4](https://docs.python.org/3/whatsnew/changelog.html).
+
+
+2\. Configure the Scalyr Agent
+
+Open the Scalyr Agent configuration file at `/etc/scalyr-agent-2/agent.json`.
+
+Find the `monitors: [ ... ]` section, and add a `{...}` stanza with the `module` property set for syslog.
 
     monitors: [
       {
@@ -27,83 +41,106 @@ only:
       }
     ]
 
-You can specify any number of protocol/port combinations. Note that on Linux, to use port numbers 1024 or lower,
-the agent must be running as root.
+The `protocols` property is a string of `protocol:port` combinations, separated by commas. In the above example, the Agent accepts syslog messages on TCP port 601, and UDP port 514. Note that on Linux, the Scalyr Agent must run as root to use port numbers 1024 or lower.
 
-You may wish to accept syslog connections from other devices on the network, such as a firewall or router which
-exports logs via syslog. Set ``accept_remote_connections`` to true to allow this.
+To accept syslog connections from devices other than localhost, for example a firewall or router on the network, add and set  `accept_remote_connections: true`. The Agent will accept connections from any host.
 
-Additional options are documented in the Configuration Reference section, below.
+If you are using this plugin to upload dissimilar log formats (ex. firewall, system services, and application logs), we recommend using multiple instances (denoted in the example below by the {...} stanzas). This lets you associate a separate parser and log file for each log type.
 
-## Log files and parsers
+    monitors: [
+        {
+          module: "scalyr_agent.builtin_monitors.syslog_monitor",
+          protocols: "tcp:601, udp:514",
+          accept_remote_connections: true,
+          message_log: "firewall.log",
+          parser: "firewall"
+        },
+        {
+          module: "scalyr_agent.builtin_monitors.syslog_monitor",
+          protocols: "tcp:602, udp:515",
+          accept_remote_connections: true,
+          message_log: "system.log", //send ntpdate, chrond, and dhcpd logs here
+          parser: "system"
+        },
+        {
+          module: "scalyr_agent.builtin_monitors.syslog_monitor",
+          protocols: "tcp:603, udp:516",
+          accept_remote_connections: true,
+          message_log: "sonicwall.log", //send SonicWall logs here
+          parser: "sonicwall"
+        }
+    ]
 
-By default, all syslog messages are written to a single log file, named ``agentSyslog.log``. You can use the
-``message_log`` option to specify a different file name (see Configuration Reference).
+The `message_log` property sets the file name to store syslog messages. It defaults to `agent_syslog.log`. The file is placed in the default Scalyr log directory, unless it is an absolute path.
 
-If you'd like to send messages from different devices to different log files, you can include multiple syslog_monitor
-stanzas in your configuration file. Specify a different ``message_log`` for each monitor, and have each listen on a
-different port number. Then configure each device to send to the appropriate port.
+The `parser` property defaults to "agentSyslog". As a best practice, we recommend creating one parser per distinct log type, as this improves maintainability and scalability. More information on configuring parsers can be found [here](https://app.scalyr.com/parsers).
 
-syslog_monitor logs use a parser named ``agentSyslog``. To set up parsing for your syslog messages, go to the
-[Parser Setup Page](/parsers?parser=agentSyslog) and click {{menuRef:Leave it to Us}} or
-{{menuRef:Build Parser By Hand}}. If you are using multiple syslog_monitor stanzas, you can specify a different
-parser for each one, using the ``parser`` option.
+See [Configuration Options](#options) below for more properties you can add.
 
-## Sending messages via syslog
+If you expect a throughput in excess of 2.5 MB/s (216 GB per day), contact Support. We can recommend an optimal configuration.
 
-To send messages to the Scalyr Agent using the syslog protocol, you must configure your application or network
-device. The documentation for your application or device should include instructions. We'll be happy to help out;
-please drop us a line at [support@scalyr.com](mailto:support@scalyr.com).
 
-### Rsyslogd
+3\. Configure your application or network device
 
-To send messages from another Linux host, you may wish to use the popular ``rsyslogd`` utility. rsyslogd has a
-powerful configuration language, and can be used to forward all logs or only a selected set of logs.
+You must configure each device to send logs to the correct port. Consult the documentation for your application, or device.
 
-Here is a simple example. Suppose you have configured Scalyr's Syslog Monitor to listen on TCP port 601, and you
-wish to use rsyslogd on the local host to upload system log messages of type ``authpriv``. You would add the following
-lines to your rsyslogd configuration, which is typically in ``/etc/rsyslogd.conf``:
+To send logs from a different Linux host, you may wish to use the popular `rsyslogd` utility, which has a
+powerful configuration language. You can forward some or all logs. For example, suppose this plugin listens on TCP port 601, and you wish to use `rsyslogd` on the local host to import `authpriv` system logs. Add these lines to your `rsyslogd` configuration, typically found at `/etc/rsyslogd.conf`:
 
-    # Send all authpriv messasges to Scalyr.
+    # Send all authpriv messasges.
     authpriv.*                                              @@localhost:601
 
-Make sure that this line comes before any other filters that could match the authpriv messages. The ``@@`` prefix
+Make sure you place this line before any other filters that match the authpriv messages. The `@@` prefix
 specifies TCP.
 
-## Viewing Data
+In Ubuntu, you must edit the file in `/etc/rsyslog.d/50-default.conf` to include the following line:
 
-Messages uploaded by the Syslog Monitor will appear as an independent log file on the host where the agent is
-running. You can find this log file in the [Overview](/logStart) page. By default, the file is named "agentSyslog.log".
+<pre><code>*.warn                         @&lt;ip of agent&gt;:514</code></pre>
+
+Where, `<ip of agent>` is replaced with the IP address of the host running the Scalyr Agent. This will forward
+all messages of `warning` severity level or higher to the Agent. You must execute
+`sudo service rsyslog restart` for the changes to take affect.
+
+
+4\. Save and confirm
+
+Save the `agent.json` file. The Scalyr Agent will detect changes within 30 seconds. Wait a few minutes for the Agent to send data.
+
+You can check the [Agent Status](https://app.scalyr.com/help/scalyr-agent#agentStatus), which includes information about all running monitors.
+
+Log in to Scalyr and go to the [Logs](https://app.scalyr.com/logStart) overview page. The log file, which defaults to "agent_syslog.log", should show for each server running this plugin.
+
+From Search view, query [monitor = 'syslog_monitor'](https://app.scalyr.com/events?filter=monitor+%3D+%27syslog_monitor%27). This will show all data collected by this plugin, across all servers.
 
 <a name="options"></a>
 ## Configuration Options
 
 | Property                             | Description | 
 | ---                                  | --- | 
-| `module`                             | Always ``scalyr_agent.builtin_monitors.syslog_monitor`` | 
-| `protocols`                          | Optional (defaults to ``tcp:601``). Lists the protocols and ports on which the agent will accept messages. You can include one or more entries, separated by commas. Each entry must be of the form ``tcp:NNN`` or ``udp:NNN``. Port numbers are optional, defaulting to 601 for TCP and 514 for UDP | 
-| `accept_remote_connections`          | Optional (defaults to false). If true, the plugin will accept network connections from any host; otherwise, it will only accept connections from localhost. | 
-| `message_log`                        | Optional (defaults to ``agent_syslog.log``). Specifies the file name under which syslog messages are stored. The file will be placed in the default Scalyr log directory, unless it is an absolute path | 
-| `parser`                             | Optional (defaults to ``agentSyslog``). Defines the parser name associated with the log file | 
-| `tcp_buffer_size`                    | Optional (defaults to 8K).  The maximum buffer size for a single TCP syslog message.  Note: RFC 5425 (syslog over TCP/TLS) says syslog receivers MUST be able to support messages at least 2048 bytes long, and recommends they SHOULD support messages up to 8192 bytes long. | 
-| `message_size_can_exceed_tcp_buffer` | Optional (defaults to False).  True to support syslog messages which are larger than the configured tcp buffer size. If not provided, we support messages of tcp_buffer_size bytes long. When this value is True, we will use tcp_buffer_size option as the amount of bytes we try to read from the socket in a single recv() call and a single syslog message will be able to span multiple TCP packets / reads from the socket. | 
-| `max_log_size`                       | Optional (defaults to None). How large the log file will grow before it is rotated. If None, then the default value will be taken from the monitor level or the global level log_rotation_max_bytes config option.  Set to zero for infinite size. Note that rotation is not visible in Scalyr; it is only relevant for managing disk space on the host running the agent. However, a very small limit could cause logs to be dropped if there is a temporary network outage and the log overflows before it can be sent to Scalyr | 
-| `max_log_rotations`                  | Optional (defaults to None). The maximum number of log rotations before older log files are deleted. If None, then the value is taken from the monitor level or the global level log_rotation_backup_count option. Set to zero for infinite rotations. | 
-| `log_flush_delay`                    | Optional (defaults to 1.0). The time to wait in seconds between flushing the log file containing the syslog messages. | 
-| `mode`                               | Optional (defaults to "syslog"). If set to "docker", the plugin will enable extra functionality to properly receive log lines sent via the `docker_monitor`.  In particular, the plugin will check for container ids in the tags of the incoming lines and create log files based on their container names. | 
-| `docker_regex`                       | Regular expression for parsing out docker logs from a syslog message when the tag sent to syslog only has the container id.  If a message matches this regex then everything *after* the full matching expression will be logged to a file called docker-<container-name>.log | 
-| `docker_regex_full`                  | Regular expression for parsing out docker logs from a syslog message when the tag sent to syslog included both the container name and id.  If a message matches this regex then everything *after* the full matching expression will be logged to a file called docker-<container-name>.log | 
-| `docker_expire_log`                  | Optional (defaults to 300).  The number of seconds of inactivity from a specific container before the log file is removed.  The log will be created again if a new message comes in from the container | 
-| `docker_accept_ips`                  | Optional.  A list of ip addresses to accept connections from if being run in a docker container. Defaults to a list with the ip address of the default docker bridge gateway. If accept_remote_connections is true, this option does nothing. | 
-| `docker_api_socket`                  | Optional (defaults to /var/scalyr/docker.sock). Defines the unix socket used to communicate with the docker API. This is only used when `mode` is set to `docker` to look up container names by their ids.  WARNING, you must also set the `api_socket` configuration option in the docker monitor to this same value.Note:  You need to map the host's /run/docker.sock to the same value as specified here, using the -v parameter, e.g.	docker run -v /run/docker.sock:/var/scalyr/docker.sock ... | 
-| `docker_api_version`                 | Optional (defaults to 'auto'). The version of the Docker API to use when communicating to docker.  WARNING, you must also set the `docker_api_version` configuration option in the docker monitor to this same value. | 
-| `docker_logfile_template`            | Optional (defaults to 'containers/${CNAME}.log'). The template used to create the log file paths for save docker logs sent by other containers via syslog.  The variables $CNAME and $CID will be substituted with the name and id of the container that is emitting the logs.  If the path is not absolute, then it is assumed to be relative to the main Scalyr Agent log directory. | 
-| `docker_cid_cache_lifetime_secs`     | Optional (defaults to 300). Controls the docker id to container name cache expiration.  After this number of seconds of inactivity, the cache entry will be evicted. | 
-| `docker_cid_clean_time_secs`         | Optional (defaults to 5.0). The number seconds to wait between cleaning the docker id to container name cache. | 
-| `docker_use_daemon_to_resolve`       | Optional (defaults to True). If True, will use the Docker daemon (via the docker_api_socket to resolve container ids to container names.  If you set this to False, you must be sure to add the --log-opt tag="/{{.Name}}/{{.ID}}" to your running containers to pass the container name in the log messages. | 
-| `docker_check_for_unused_logs_mins`  | Optional (defaults to 60). The number of minutes to wait between checking to see if there are any log files matchings the docker_logfile_template that haven't been written to for a while and can be deleted | 
-| `docker_delete_unused_logs_hours`    | Optional (defaults to 24). The number of hours to wait before deleting any log files matchings the docker_logfile_template | 
-| `docker_check_rotated_timestamps`    | Optional (defaults to True). If True, will check timestamps of all file rotations to see if they should be individually deleted based on the the log deletion configuration options. If False, only the file modification time of the main log file is checked, and the rotated files will only be deleted when the main log file is deleted. | 
-| `tcp_request_parser`                 | Optional (defaults to default). Which TCP packet data request parser to use. Most users should leave this as is. | 
-| `tcp_incomplete_frame_timeout`       | How long we wait (in seconds) for a complete frame / syslog message when running in TCP mode with batch request parser before giving up and flushing what has accumulated in the buffer. | 
-| `tcp_message_delimiter`              | Which character sequence to use for a message delimiter / suffix (defaults to \ n). Some implementations such as Python syslog handler one utilize null character (\ 000) which allows messages to contain new lines without using framing. If that is the case for you, set this option to . Keep in mind that this value needs to be escaped when specified in the config option which means you need to use two backslashes instead of one. | 
+| `module`                             | Always `scalyr_agent.builtin_monitors.syslog_monitor` | 
+| `protocols`                          | Optional (defaults to `"tcp:601, udp:514"`). A string of `protocol:port`s, separated by commas. Sets the ports on which the Scalyr Agent will accept messages. We recommend TCP for reliability and performance, whenever possible. | 
+| `accept_remote_connections`          | Optional (defaults to `false`). If `true`, this plugin accepts network connections from any host. If `false`, only connections from localhost are accepted. | 
+| `message_log`                        | Optional (defaults to `agent_syslog.log`). File name to store syslog messages. The file is put in the default Scalyr log directory, unless it is an absolute path. This is especially useful when running multiple instances of this plugin, to send dissimilar log types to different files. Add and set a separate `{...}` stanza for each instance. | 
+| `parser`                             | Optional (defaults to `agentSyslog`). Parser name for the log file. We recommend using a single parser for each distinct log type, as this improves maintainability and scalability. More information on configuring parsers can be found [here](https://app.scalyr.com/parsers). | 
+| `tcp_buffer_size`                    | Optional (defaults to `8192`). Maximum buffer size for a single TCP syslog message. Per [RFC 5425](https://datatracker.ietf.org/doc/html/rfc5425#section-4.3.1) (syslog over TCP/TLS), syslog receivers MUST be able to support messages at least 2048 bytes long, and SHOULD support messages up to 8192 bytes long. | 
+| `message_size_can_exceed_tcp_buffer` | Optional (defaults to `false`). If `true`, syslog messages larger than the configured `tcp_buffer_size` are supported. We use `tcp_buffer_size` as the bytes we try to read from the socket in a single recv() call. A single message can span multiple TCP packets, or reads from the socket. | 
+| `max_log_size`                       | Optional (defaults to `none`). Maximum size of the log file, before rotation. If `none`, the default value is set from the global `log_rotation_max_bytes` [Agent configuration option](https://app.scalyr.com/help/scalyr-agent-env-aware), which defaults to `20*1024*1024`. Set to `0` for infinite size. Rotation does not show in Scalyr; this property is only relevant for managing disk space on the host running the Agent. A very small limit could cause dropped logs if there is a temporary network outage, and the log overflows before it can be sent. | 
+| `max_log_rotations`                  | Optional (defaults to `none`). Maximum number of log rotations, before older log files are deleted. If `none`, the value is set from the global level `log_rotation_backup_count` [Agent configuration option](https://app.scalyr.com/help/scalyr-agent-env-aware), which defaults to `2`. Set to `0` for infinite rotations. | 
+| `log_flush_delay`                    | Optional (defaults to `1.0`). Time in seconds to wait between flushing the log file containing the syslog messages. | 
+| `tcp_request_parser`                 | Optional (defaults to `"default"`). Sets the TCP packet data request parser. Most users should leave this as is. The `"default"` setting supports framed and line-delimited syslog messages. When set to "batch", all lines are written in a single batch, at the end of processing a packet. This offers better performance at the expense of increased buffer memory. When set to "raw", received data is written as-is: this plugin will not handle framed messages, and received lines are not always written as an atomic unit, but as part of multiple write calls. We recommend this setting when you wish to avoid expensive framed message parsing, and only want to write received data as-is. | 
+| `tcp_incomplete_frame_timeout`       | How long to wait (in seconds) for a complete frame / syslog message, when running in TCP mode with batch request parser, before giving up and flushing what has accumulated in the buffer. | 
+| `tcp_message_delimiter`              | Which character sequence to use for a message delimiter or suffix. Defaults to `\ n`. Some implementations, such as the Python syslog handler, use the null character `\ 000`; messages can have new lines without the use of framing. | 
+| `mode`                               | Optional (defaults to `syslog`). If set to `docker`, this plugin imports log lines sent from the `docker_monitor`. In particular, the plugin will check for container ids in the tags of incoming lines, and create log files based on their container names. | 
+| `docker_regex`                       | Regular expression to parse docker logs from a syslog message, when the tag sent to syslog has the container id. Defaults to `"^.*([a-z0-9]{12})\[\d+\]: ?"`. If a message matches this regex, then everything *after* the full matching expression is logged to a file named `docker-<container-name>.log`. | 
+| `docker_regex_full`                  | Regular expression for parsing docker logs from a syslog message, when the tag sent to syslog has the container name and id. Defaults to `"^.*([^/]+)/([^[]+)\[\d+\]: ?"`. If a message matches this regex, then everything *after* the full matching expression is logged to a file named `docker-<container-name>.log`. | 
+| `docker_expire_log`                  | Optional (defaults to `300`). The number of seconds of inactivity from a specific container before the log file is removed. The log will be created again if a new message is received from the container. | 
+| `docker_accept_ips`                  | Optional. A list of ip addresses to accept connections from, if run in a docker container. Defaults to a list with the ip address of the default docker bridge gateway. If `accept_remote_connections` is `true`, this option does nothing. | 
+| `docker_api_socket`                  | Optional (defaults to `/var/scalyr/docker.sock`). Sets the Unix socket to communicate with the docker API. Only relevant when `mode` is set to `docker`, to look up container names by their ids. You must set the `api_socket` configuration option in the docker monitor to the same value. You must also map the host's `/run/docker.sock` to the same value as specified here, with the -v parameter, for example `docker run -v /run/docker.sock:/var/scalyr/docker.sock ...`. | 
+| `docker_api_version`                 | Optional (defaults to `auto`). Version of the Docker API to use when communicating. WARNING: you must set the `docker_api_version` configuration option in the docker monitor to the same value. | 
+| `docker_logfile_template`            | Optional (defaults to `containers/${CNAME}.log`). Template used to create log file paths to save docker logs sent by other containers with syslog. The variables $CNAME and $CID will be substituted with the name and id of the container that is emitting the logs. If the path is not absolute, then it is assumed to be relative to the main Scalyr Agent log directory. | 
+| `docker_cid_cache_lifetime_secs`     | Optional (defaults to `300`). Controls the docker id to container name cache expiration. After this number of seconds of inactivity, the cache entry is evicted. | 
+| `docker_cid_clean_time_secs`         | Optional (defaults to `5.0`). Number of seconds to wait between cleaning the docker id to container name cache. Fractional values are supported. | 
+| `docker_use_daemon_to_resolve`       | Optional (defaults to `true`). When `true`, the Docker daemon resolves container ids to container names, with the `docker_api_socket`.  When `false`, you must add the `--log-opt tag="/{{.Name}}/{{.ID}}"` to your running containers, to include the container name in log messages. | 
+| `docker_check_for_unused_logs_mins`  | Optional (defaults to `60`). Number of minutes to wait between checks for log files matching the `docker_logfile_template` that haven't been written to for a while, and can be deleted. | 
+| `docker_delete_unused_logs_hours`    | Optional (defaults to `24`). Number of hours to wait before deleting log files matching the `docker_logfile_template`. | 
+| `docker_check_rotated_timestamps`    | Optional (defaults to `true`). When `true` the timestamps of all file rotations are checked for deletion, based on the log deletion configuration options. When `false`, only the file modification time of the main log file is checked, and rotated files are deleted when the main log file is deleted. | 
