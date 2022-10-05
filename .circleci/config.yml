@@ -500,7 +500,7 @@ jobs:
     parameters:
       python-version:
         description: Version of the Python interpreter to use.
-        default: 3.10.4
+        default: 3.10.7
         type: string
     steps:
       - checkout
