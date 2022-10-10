@@ -2074,7 +2074,7 @@ class ContainerEnumerator(object):
 
 class DockerEnumerator(ContainerEnumerator):
     """
-    Container Enumerator that retrieves the list of containers by querying the docker remote API over the docker socket by usin
+    Container Enumerator that retrieves the list of containers by querying the docker remote API over the docker socket by using
     a docker.Client
     """
 
@@ -2750,15 +2750,31 @@ class ContainerChecker(object):
                 self._container_runtime == "docker" and not self.__always_use_cri
             ):
                 docker_py_version = getattr(docker, "__version__", "unknown")
+                docker_client_kwargs = {}
+
+                if self._global_config.k8s_docker_client_timeout:
+                    docker_client_kwargs[
+                        "timeout"
+                    ] = self._global_config.k8s_docker_client_timeout
+
+                if self._global_config.k8s_docker_client_max_pool_size:
+                    docker_client_kwargs[
+                        "max_pool_size"
+                    ] = self._global_config.k8s_docker_client_max_pool_size
+
                 global_log.info(
-                    "kubernetes_monitor is using docker for listing containers (docker_py_version=%s)"
-                    % (docker_py_version)
+                    "kubernetes_monitor is using docker for listing containers (docker_py_version=%s, client_kwargs=%s)"
+                    % (docker_py_version, str(docker_client_kwargs))
                 )
+
                 self._validate_socket_file()
+
                 self.__client = DockerClient(
                     base_url=("unix:/%s" % self.__socket_file),
                     version=self.__docker_api_version,
+                    **docker_client_kwargs
                 )
+
                 self._container_enumerator = DockerEnumerator(
                     self.__client,
                     self.__agent_pod,

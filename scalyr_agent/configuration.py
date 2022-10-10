@@ -1137,6 +1137,24 @@ class Configuration(object):
         return self.__get_config().get_int("k8s_ratelimit_max_concurrency")
 
     @property
+    def k8s_docker_client_timeout(self):
+        """
+        Timeout when connecting to Docker API via socket when using Docker container listing mode.
+        If not set (None), it defaults to the docker-py library default (60s in October 2022 -
+        https://github.com/docker/docker-py/blob/bc0a5fbacd7617fd338d121adca61600fc70d221/docker/constants.py#L6).
+        """
+        return self.__get_config().get_int("k8s_docker_client_timeout")
+
+    @property
+    def k8s_docker_client_max_pool_size(self):
+        """
+        Docker client maximum connection pol size. If not set (None), it defaults to the docker-py
+        library default (10 in October 2022 -
+        https://github.com/docker/docker-py/blob/bc0a5fbacd7617fd338d121adca61600fc70d221/docker/constants.py#L39).
+        """
+        return self.__get_config().get_int("k8s_docker_client_timeout")
+
+    @property
     def enforce_monotonic_timestamps(self):
         # UNDOCUMENTED_CONFIG
         return self.__get_config().get_bool("enforce_monotonic_timestamps")
@@ -3091,6 +3109,22 @@ class Configuration(object):
             config,
             "k8s_ratelimit_max_concurrency",
             1,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_int(
+            config,
+            "k8s_docker_client_timeout",
+            None,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_int(
+            config,
+            "k8s_docker_client_max_pool_size",
+            None,
             description,
             apply_defaults,
             env_aware=True,
