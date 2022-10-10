@@ -628,6 +628,9 @@ class ScalyrClientSession(object):
         bytes_received = 0
 
         try:
+            start_ts = 0
+            end_ts = 0
+
             try:
                 if self.__disable_send_requests:
                     response = '{ "status":"success" }'
@@ -686,10 +689,11 @@ class ScalyrClientSession(object):
                 # contains non utf-8 characters
                 pass
 
+            duration_ms = int((end_ts - start_ts) * 1000)
             log.log(
                 scalyr_logging.DEBUG_LEVEL_5,
-                'Response was received with body "%s"',
-                response,
+                'Response was received with body "%s" (duration_ms=%s)',
+                response, duration_ms,
             )
 
             if status_code == 429:
