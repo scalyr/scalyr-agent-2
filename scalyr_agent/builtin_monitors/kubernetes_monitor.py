@@ -2749,8 +2749,10 @@ class ContainerChecker(object):
             if self.__always_use_docker or (
                 self._container_runtime == "docker" and not self.__always_use_cri
             ):
+                docker_py_version = getattr(docker, "__version__", "unknown")
                 global_log.info(
-                    "kubernetes_monitor is using docker for listing containers"
+                    "kubernetes_monitor is using docker for listing containers (docker_py_version=%s)"
+                    % (docker_py_version)
                 )
                 self._validate_socket_file()
                 self.__client = DockerClient(

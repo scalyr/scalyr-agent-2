@@ -733,6 +733,8 @@ class Configuration(object):
             "max_log_offset_size",
             "max_existing_log_offset_size",
             "json_library",
+            "docker_py_version",
+            "requests_version",
             "use_requests_lib",
             "use_multiprocess_workers",
             "default_sessions_per_worker",
@@ -771,6 +773,20 @@ class Configuration(object):
             if option == "json_library" and value == "auto":
                 json_lib = scalyr_util.get_json_lib()
                 value = "%s (%s)" % (value, json_lib)
+            elif option == "docker_py_version":
+                try:
+                    import docker
+                except Exception:
+                    value = "none"
+                else:
+                    value = getattr(docker, "__version__", None)
+            elif option == "requests_version":
+                try:
+                    import requests
+                except Exception:
+                    value = "none"
+                else:
+                    value = getattr(requests, "__version__", None)
 
             if print_value:
                 # if this is the first option we are printing, output a header
