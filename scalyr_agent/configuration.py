@@ -1143,7 +1143,7 @@ class Configuration(object):
         If not set (None), it defaults to the docker-py library default (60s in October 2022 -
         https://github.com/docker/docker-py/blob/bc0a5fbacd7617fd338d121adca61600fc70d221/docker/constants.py#L6).
         """
-        return self.__get_config().get_int("k8s_docker_client_timeout")
+        return self.__get_config().get_int("k8s_docker_client_timeout", none_if_missing=True)
 
     @property
     def k8s_docker_client_max_pool_size(self):
@@ -1152,7 +1152,7 @@ class Configuration(object):
         library default (10 in October 2022 -
         https://github.com/docker/docker-py/blob/bc0a5fbacd7617fd338d121adca61600fc70d221/docker/constants.py#L39).
         """
-        return self.__get_config().get_int("k8s_docker_client_timeout")
+        return self.__get_config().get_int("k8s_docker_client_timeout", none_if_missing=True)
 
     @property
     def enforce_monotonic_timestamps(self):
