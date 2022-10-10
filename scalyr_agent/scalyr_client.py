@@ -633,35 +633,47 @@ class ScalyrClientSession(object):
                     response = '{ "status":"success" }'
                     status_code = 200
                 else:
+                    start_ts = time.time()
                     status_code = self.__connection.status_code()
                     response = self.__connection.response()
+                    end_ts = time.time()
 
                 bytes_received = len(response)
             except six.moves.http_client.HTTPException as httpError:
+                end_ts = time.time()
+                duration_ms = int((end_ts - start_ts) * 1000)
+
                 log.warning(
-                    "Failed to receive response due to HTTPException '%s'. Closing connection, will re-attempt"
-                    % (httpError.__class__.__name__),
+                    "Failed to receive response due to HTTPException '%s' (address=%s, duration_ms=%s). Closing connection, will re-attempt"
+                    % (httpError.__class__.__name__, self.__full_address, duration_ms),
                     error_code="requestFailed",
                 )
                 return "requestFailed", len(body_str), response
 
             except Exception as error:
+                end_ts = time.time()
+                duration_ms = int((end_ts - start_ts) * 1000)
+
                 # TODO: Do not just catch Exception.  Do narrower scope.
                 if (
                     hasattr(error, "errno")
                     and error.errno is not None  # pylint: disable=no-member
                 ):
                     log.warning(
-                        'Failed to receive response to "%s" due to errno=%d.  Exception was %s.  Closing '
+                        'Failed to receive response to "%s" due to errno=%d (address=%s, duration_ms=%s).  Exception was %s.  Closing '
                         "connection, will re-attempt",
                         self.__full_address,
                         error.errno,  # pylint: disable=no-member
+                        self.__full_address,
+                        duration_ms,
                         six.text_type(error),
                         error_code="client/requestFailed",
                     )
                 else:
                     log.warning(
-                        "Failed to receive response due to exception.  Closing connection, will re-attempt",
+                        "Failed to receive response due to exception (address=%s, duration_ms=%s).  Closing connection, will re-attempt",
+                        self.__full_address,
+                        duration_ms,
                         exc_info=True,
                         error_code="requestFailed",
                     )
