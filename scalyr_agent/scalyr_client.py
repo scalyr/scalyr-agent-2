@@ -693,7 +693,8 @@ class ScalyrClientSession(object):
             log.log(
                 scalyr_logging.DEBUG_LEVEL_5,
                 'Response was received with body "%s" (duration_ms=%s)',
-                response, duration_ms,
+                response,
+                duration_ms,
             )
 
             if status_code == 429:
