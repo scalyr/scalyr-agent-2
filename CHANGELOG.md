@@ -8,12 +8,17 @@ Packaged by Joseph Makar <joseph.makar@sentinelone.com> on Sep 17, 2022 12:31 -0
 
 Kubernetes:
 * Fix a bug / edge case in the Kubernetes caching PodProcessor code which could cause an agent to get stuck in an infinite loop when processing controllers which have a custom Kind which is not supported by the agent defined. Contributed by #xdvpser #998 #999.
+* Allows user to configure Docker client library connection timeout and maximum connection pool size when using Docker container enumerator via new `k8s_docker_client_timeout` and `k8s_docker_client_max_pool_size` config option.
 
 Docker Images:
 * Upgrade Linux Docker images to use Python 3.8.14.
 
 Windows:
 * Upgrade agent Windows binary to use Python 3.10.7.
+
+Other:
+* Log how long it took (in milliseconds) to read data from socket when we encounter HTTP errors (e.g. connection aborted, connection reset, etc.).
+* Log which version of docker-py and requests Python library is being used so it's easier to spot if bundled / vendored or system version is used.
 
 ## 2.1.36 "Corrntos" - September 15, 2022
 <!---

@@ -733,6 +733,8 @@ class Configuration(object):
             "max_log_offset_size",
             "max_existing_log_offset_size",
             "json_library",
+            "docker_py_version",
+            "requests_version",
             "use_requests_lib",
             "use_multiprocess_workers",
             "default_sessions_per_worker",
@@ -771,6 +773,20 @@ class Configuration(object):
             if option == "json_library" and value == "auto":
                 json_lib = scalyr_util.get_json_lib()
                 value = "%s (%s)" % (value, json_lib)
+            elif option == "docker_py_version":
+                try:
+                    import docker
+                except Exception:
+                    value = "none"
+                else:
+                    value = getattr(docker, "__version__", None)
+            elif option == "requests_version":
+                try:
+                    import requests
+                except Exception:
+                    value = "none"
+                else:
+                    value = getattr(requests, "__version__", None)
 
             if print_value:
                 # if this is the first option we are printing, output a header
@@ -1119,6 +1135,28 @@ class Configuration(object):
     def k8s_ratelimit_max_concurrency(self):
         # UNDOCUMENTED_CONFIG
         return self.__get_config().get_int("k8s_ratelimit_max_concurrency")
+
+    @property
+    def k8s_docker_client_timeout(self):
+        """
+        Timeout when connecting to Docker API via socket when using Docker container listing mode.
+        If not set (None), it defaults to the docker-py library default (60s in October 2022 -
+        https://github.com/docker/docker-py/blob/bc0a5fbacd7617fd338d121adca61600fc70d221/docker/constants.py#L6).
+        """
+        return self.__get_config().get_int(
+            "k8s_docker_client_timeout", none_if_missing=True
+        )
+
+    @property
+    def k8s_docker_client_max_pool_size(self):
+        """
+        Docker client maximum connection pol size. If not set (None), it defaults to the docker-py
+        library default (10 in October 2022 -
+        https://github.com/docker/docker-py/blob/bc0a5fbacd7617fd338d121adca61600fc70d221/docker/constants.py#L39).
+        """
+        return self.__get_config().get_int(
+            "k8s_docker_client_timeout", none_if_missing=True
+        )
 
     @property
     def enforce_monotonic_timestamps(self):
@@ -3075,6 +3113,22 @@ class Configuration(object):
             config,
             "k8s_ratelimit_max_concurrency",
             1,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_int(
+            config,
+            "k8s_docker_client_timeout",
+            None,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_int(
+            config,
+            "k8s_docker_client_max_pool_size",
+            None,
             description,
             apply_defaults,
             env_aware=True,
