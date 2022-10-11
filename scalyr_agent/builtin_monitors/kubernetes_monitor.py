@@ -4440,6 +4440,7 @@ cluster.
             "SCALYR_K8S_KUBELET_CA_CERT",
             "SCALYR_REPORT_K8S_METRICS",
             "SCALYR_REPORT_CONTAINER_METRICS",
+            "SCALYR_K8S_EVENTS_DISABLE",
         ]
         for envar in envars_to_log:
             self._logger.info(
