@@ -12,6 +12,7 @@ Kubernetes:
 
 Docker Images:
 * Upgrade Linux Docker images to use Python 3.8.14.
+* Upgrade docker-py dependency to v6.0.0.
 
 Windows:
 * Upgrade agent Windows binary to use Python 3.10.7.
