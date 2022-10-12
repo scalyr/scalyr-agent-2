@@ -3,15 +3,13 @@
 
 # Used for performance optimized versions of rfc3339_to_* functions
 # NOTE: Not supported on windows
-# Includes bug fix for Python >= 3.9 (doesn't work under 3.9)
-# https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=972029
-udatetime==0.0.16; python_version < '3.9' and platform_system != 'Windows'
+udatetime==0.0.17; platform_system != 'Windows'
 
 # Two dependencies below are used for CPU and memory profiling which is opt-in and disabled by
 # default. We include it in the Docker image to make  troubleshooting (profiling) easier for the
 # end user (no need to rebuild Docker image - user can simply enable the corresponding agent config
 # option)
-yappi==1.3.5; python_version >= '3.7'
+yappi==1.3.6; python_version >= '3.7'
 pympler==1.0.1; python_version >= '3.7'
 # used by Python 2.7 tests
 pympler==0.8; python_version < '3.7'
