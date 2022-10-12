@@ -1,7 +1,7 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.37 "TBD" - October 13, 2022
+## 2.1.37 "Penvolea" - October 13, 2022
 <!---
 Packaged by Joseph Makar <joseph.makar@sentinelone.com> on Oct 13, 2022 12:31 -0800
 --->
