@@ -1,9 +1,9 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.37 "TBD" - November 15, 2022
+## 2.1.37 "TBD" - October 13, 2022
 <!---
-Packaged by Joseph Makar <joseph.makar@sentinelone.com> on Sep 17, 2022 12:31 -0800
+Packaged by Joseph Makar <joseph.makar@sentinelone.com> on Oct 13, 2022 12:31 -0800
 --->
 
 Kubernetes:
@@ -13,6 +13,7 @@ Kubernetes:
 Docker Images:
 * Upgrade Linux Docker images to use Python 3.8.14.
 * Upgrade docker-py dependency to v6.0.0.
+* Upgrade orjson and yappi dependency to the latest stable version (3.8.0 and 1.3.6).
 
 Windows:
 * Upgrade agent Windows binary to use Python 3.10.7.
