@@ -15,8 +15,10 @@
 from __future__ import absolute_import
 
 import mock
+import os
 import pytest
 import sys
+import tempfile
 
 if sys.platform == "Windows":
     import scalyr_agent.builtin_monitors.windows_event_log_monitor
@@ -24,7 +26,9 @@ if sys.platform == "Windows":
         WindowEventLogMonitor,
     )
 
-from scalyr_agent.test_base import ScalyrTestCase
+import scalyr_agent.scalyr_logging as scalyr_logging
+
+from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase, ScalyrTestCase
 from scalyr_agent.test_base import skipIf
 
 
@@ -223,3 +227,38 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
             ),
             [{"a": "a", "Text": "t"}],
         )
+
+
+@pytest.mark.windows_platform
+class WindowsEventLogMonitorTest2(BaseScalyrLogCaptureTestCase):
+    @skipIf(sys.platform not in ["Windows", "win32"], "Skipping tests under non-Windows platform")
+    def test_newjsonapi_with_no_rate_limit(self):
+        config = {
+            "module": "windows_event_log_monitor",
+            "sources": "Application, Security, System",
+            "event_types": "All",
+            "json": True,
+            "monitor_log_write_rate": -1,
+            "monitor_log_max_write_burst": -1,
+        }
+
+        metric_file_fd, metric_file_path = tempfile.mkstemp(config["module"] + ".log")
+
+        # NOTE: We close the fd here because we open it again below. This way file deletion at
+        # the end works correctly on Windows.
+        os.close(metric_file_fd)
+
+        logger = scalyr_logging.getLogger(config["module"])
+        scalyr_agent.builtin_monitors.windows_event_log_monitor.windll = mock.Mock()
+        monitor = WindowEventLogMonitor(config, logger)
+        monitor.log_config["path"] = metric_file_path
+
+        # Normally called when the monitor is started (via MonitorsManager.__start_monitor)
+        monitor.open_metric_log()
+
+        logger.emit_value("unused", "{\"foo\":\"bar\"}")
+
+        self.assertEquals(monitor.reported_lines(), 1)
+        self.assertLogFileContainsLineRegex(file_path=metric_file_path, expression="foo")
+
+        logger.closeMetricLog()
