@@ -231,7 +231,10 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
 
 @pytest.mark.windows_platform
 class WindowsEventLogMonitorTest2(BaseScalyrLogCaptureTestCase):
-    @skipIf(sys.platform not in ["Windows", "win32"], "Skipping tests under non-Windows platform")
+    @skipIf(
+        sys.platform not in ["Windows", "win32"],
+        "Skipping tests under non-Windows platform",
+    )
     def test_newjsonapi_with_no_rate_limit(self):
         config = {
             "module": "windows_event_log_monitor",
@@ -256,9 +259,11 @@ class WindowsEventLogMonitorTest2(BaseScalyrLogCaptureTestCase):
         # Normally called when the monitor is started (via MonitorsManager.__start_monitor)
         monitor.open_metric_log()
 
-        logger.emit_value("unused", "{\"foo\":\"bar\"}")
+        logger.emit_value("unused", '{"foo":"bar"}')
 
         self.assertEquals(monitor.reported_lines(), 1)
-        self.assertLogFileContainsLineRegex(file_path=metric_file_path, expression="foo")
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path, expression="foo"
+        )
 
         logger.closeMetricLog()
