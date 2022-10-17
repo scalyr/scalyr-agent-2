@@ -510,13 +510,31 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
         @param k8s: a KubernetesApi object for querying the k8s api
         @query_fields - optional query string appended to the node endpoint to allow for filtering
         """
+        # Hard guard-rails to prevent the agent from consuming large amounts of memory.
+        if query_fields:
+            query_fields += '&limit=1000'
+        else:
+            query_fields = '?limit=1000'
+
         response = k8s.query_api_with_retries(
             "/api/v1/nodes%s" % query_fields,
             retry_error_context="nodes%s" % query_fields,
             retry_error_limit_key="k8se_check_nodes_for_leader",
         )
-        nodes = response.get("items", [])
+        if "continue" in response.get("metadata", {}):
+            # This is a hard guard-rail that stops only the
+            # KubernetesEventsMonitor should we run into a situation where
+            # 1000+ nodes are considered for leader election.
+            # TODO: Add in URL for how to use labels to rectify this once we have the documentation written up.
+            global_log.error(
+                "The Kubernetes Events monitor leader election is finding more than 1000 possible "
+                "candidates. This will impact performance of both the agent, and the cluster itself. "
+                "Contact support@scalyr.com for more information."
+            )
+            self.__disable_monitor = True
+            self.stop(False)
 
+        nodes = response.get("items", [])
         if len(nodes) > 100:
             # TODO: Add in URL for how to use labels to rectify this once we have the documentation written up.
             global_log.warning(
