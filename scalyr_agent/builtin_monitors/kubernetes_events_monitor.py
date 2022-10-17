@@ -179,7 +179,7 @@ define_config_option(
     "configured using this option and the node with this label set and that has the oldest"
     "creation time will be the event monitor leader.",
     convert_to=six.text_type,
-    default='agent.config.scalyr.com/events_leader_candidate=true',
+    default="agent.config.scalyr.com/events_leader_candidate=true",
     env_name="SCALYR_K8S_LEADER_CANDIDATE_LABEL",
 )
 
@@ -566,9 +566,7 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
             # alive
             if self._check_labels:
                 query = "?labelSelector=%s" % (
-                    six.moves.urllib.parse.quote(
-                        self._leader_candidate_label
-                    )
+                    six.moves.urllib.parse.quote(self._leader_candidate_label)
                 )
                 new_leader = self._check_nodes_for_leader(k8s, query)
 
