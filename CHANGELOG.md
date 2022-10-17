@@ -1,9 +1,9 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.37 "Penvolea" - October 13, 2022
+## 2.1.37 "Penvolea" - October 17, 2022
 <!---
-Packaged by Joseph Makar <joseph.makar@sentinelone.com> on Oct 13, 2022 12:31 -0800
+Packaged by Joseph Makar <joseph.makar@sentinelone.com> on Oct 17, 2022 12:31 -0800
 --->
 
 Kubernetes:
@@ -17,6 +17,7 @@ Docker Images:
 
 Windows:
 * Upgrade agent Windows binary to use Python 3.10.7.
+* Fix a bug where under some scenarios log record would not contain "message" attribute.
 
 Other:
 * Log how long it took (in milliseconds) to read data from socket when we encounter HTTP errors (e.g. connection aborted, connection reset, etc.).
