@@ -512,9 +512,9 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
         """
         # Hard guard-rails to prevent the agent from consuming large amounts of memory.
         if query_fields:
-            query_fields += '&limit=1000'
+            query_fields += "&limit=1000"
         else:
-            query_fields = '?limit=1000'
+            query_fields = "?limit=1000"
 
         response = k8s.query_api_with_retries(
             "/api/v1/nodes%s" % query_fields,
