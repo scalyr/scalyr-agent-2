@@ -149,7 +149,7 @@ jobs:
     # NOTE: We always want to run job on master branch
     if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
 
-    timeout-minutes: 10
+    timeout-minutes: 15
     defaults:
       run:
         shell: bash
