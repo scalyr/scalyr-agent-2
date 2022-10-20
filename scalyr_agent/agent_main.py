@@ -2148,8 +2148,6 @@ class ScalyrAgent(object):
         :rtype: ``str``
         """
 
-
-        time.sleep(100)
         # First determine the format user request. If no file with the requested format, we assume
         # text format is used (this way it's backward compatible and works correctly on upgraded)
         status_format = "text"
