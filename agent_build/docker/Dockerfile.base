@@ -26,6 +26,7 @@ MAINTAINER Scalyr Inc <support@scalyr.com>
 RUN apk update && apk add --virtual build-dependencies \
     binutils \
     build-base \
+    linux-headers \
     gcc \
     g++ \
     make \
