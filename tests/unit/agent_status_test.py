@@ -185,6 +185,7 @@ class TestReportStatus(ScalyrTestCase):
         self.status.version = "2.0.0.beta.7"
         self.status.revision = "git revision"
         self.status.python_version = "3.6.8"
+        self.status.avg_status_report_duration = 2
 
         config_status = ConfigStatus()
         self.status.config_status = config_status
@@ -388,7 +389,7 @@ class TestReportStatus(ScalyrTestCase):
 
         self.status.copying_manager_status.calculate_status()
 
-        report_status(output, self.status, self.time, avg_status_generation_time=2)
+        report_status(output, self.status, self.time)
 
         expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
 
@@ -482,7 +483,7 @@ Failed monitors:
         self.status.config_status.last_error = "Bad stuff"
 
         output = io.StringIO()
-        report_status(output, self.status, self.time, avg_status_generation_time=2)
+        report_status(output, self.status, self.time)
 
         expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
 
@@ -573,7 +574,7 @@ Failed monitors:
         self.status.copying_manager_status.calculate_status()
 
         output = io.StringIO()
-        report_status(output, self.status, self.time, avg_status_generation_time=2)
+        report_status(output, self.status, self.time)
 
         expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
 
@@ -674,7 +675,7 @@ Failed monitors:
 
         self.make_default()
         self.status.copying_manager_status.calculate_status()
-        report_status(output, self.status, self.time, avg_status_generation_time=2)
+        report_status(output, self.status, self.time)
 
         expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
 
@@ -769,7 +770,7 @@ Failed monitors:
         self.status.copying_manager_status.calculate_status()
 
         output = io.StringIO()
-        report_status(output, self.status, self.time, avg_status_generation_time=2)
+        report_status(output, self.status, self.time)
         expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
 
 Current time:            Fri Sep  5 23:14:13 2014 UTC
@@ -887,7 +888,7 @@ Failed monitors:
         self.status.copying_manager_status.calculate_status()
 
         output = io.StringIO()
-        report_status(output, self.status, self.time, avg_status_generation_time=2)
+        report_status(output, self.status, self.time)
         expected_output = "Health check:                              Good\n"
         self.assertTrue(expected_output in output.getvalue())
 
@@ -900,7 +901,7 @@ Failed monitors:
 
         self.status.copying_manager_status.calculate_status()
         output = io.StringIO()
-        report_status(output, self.status, self.time, avg_status_generation_time=2)
+        report_status(output, self.status, self.time)
         expected_output = (
             "Health check:                              Copying thread is failed\n"
         )
@@ -917,7 +918,7 @@ Failed monitors:
 
         self.status.copying_manager_status.calculate_status()
         output = io.StringIO()
-        report_status(output, self.status, self.time, avg_status_generation_time=2)
+        report_status(output, self.status, self.time)
         expected_output = "Health check:                              Copying thread is failed, Worker 1 has failed\n"
         self.assertTrue(expected_output in output.getvalue())
 
@@ -926,7 +927,7 @@ Failed monitors:
 
         self.status.copying_manager_status.calculate_status()
 
-        report_status(output, self.status, self.time, avg_status_generation_time=2)
+        report_status(output, self.status, self.time)
 
         expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
 
@@ -1060,7 +1061,7 @@ Failed monitors:
 
         self.status.copying_manager_status.calculate_status()
 
-        report_status(output, self.status, self.time, avg_status_generation_time=2)
+        report_status(output, self.status, self.time)
 
         expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
 
@@ -1172,7 +1173,7 @@ Failed monitors:
 
         self.status.copying_manager_status.calculate_status()
 
-        report_status(output, self.status, self.time, avg_status_generation_time=2)
+        report_status(output, self.status, self.time)
 
         expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
 
@@ -1297,7 +1298,7 @@ Failed monitors:
 
         self.status.copying_manager_status.calculate_status()
 
-        report_status(output, self.status, self.time, avg_status_generation_time=2)
+        report_status(output, self.status, self.time)
 
         expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
 

@@ -61,6 +61,10 @@ if False:
 # 1. https://github.com/scalyr/scalyr-agent-2/pull/700#issuecomment-761676613
 # 2. https://bugs.python.org/issue7980
 import _strptime  # NOQA
+try:
+    import psutil
+except ImportError:
+    psutil = None
 
 try:
     from __scalyr__ import SCALYR_VERSION
@@ -244,7 +248,10 @@ class ScalyrAgent(object):
         self.__last_verify_config = None
 
         # Collection of generation time intervals for recent status reports.
-        self.__agent_status_generation_times = collections.deque(maxlen=100)
+        self.__agent_status_report_durations = collections.deque(maxlen=100)
+        # Average duration of the status report preparation, based on collection
+        # of all recent status report durations.
+        self.__agent_avg_status_report_duration = None
 
         self.__no_fork = False
         self.__last_total_bytes_skipped = 0
@@ -693,6 +700,40 @@ class ScalyrAgent(object):
             log.info("Received signal to shutdown, attempt to shutdown cleanly.")
             self.__run_state.stop()
 
+    def _get_system_and_agent_stats(self):  # type: () -> Dict
+        """
+        Return current machine's and agent process' stats.
+        :return: Dict with stats.
+        """
+        if psutil is None:
+            raise Exception("No psutil module.")
+
+        pidfile = os.path.join(self.__config.agent_log_path, "agent.pid")
+
+        if not os.path.exists(pidfile):
+            raise Exception("Pid file does not exist.")
+
+        with open(pidfile, "r") as fp:
+            pidfile_content = fp.read().strip()
+
+        process = psutil.Process(
+            pid=int(pidfile_content)
+        )
+
+        return {
+            "cpu_percent": psutil.cpu_percent(),
+            "cpu_count": psutil.cpu_count(),
+            "getloadavg": psutil.getloadavg(),
+            "virtual_memory_percent": psutil.virtual_memory().percent,
+            "agent_process":
+                {
+                    "PID": process.pid,
+                    "cpu_percent": process.cpu_percent(),
+                    "memory_rss": process.memory_info().rss
+
+                }
+        }
+
     def __detailed_status(
         self,
         data_directory,
@@ -821,9 +862,15 @@ class ScalyrAgent(object):
                     agent_log = os.path.join(
                         self.__default_paths.agent_log_path, AGENT_LOG_FILENAME
                     )
+
+                try:
+                    system_and_agent_stats = str(self._get_system_and_agent_stats())
+                except Exception as err:
+                    system_and_agent_stats = "not available, reason: %s" % str(err)
+
                 print(
                     "Failed to get status within 5 seconds.  Giving up.  The agent process is "
-                    "possibly stuck.  See %s for more details." % agent_log,
+                    "possibly stuck.  See %s for more details.\n\n    Usage info: %s" % (agent_log, system_and_agent_stats),
                     file=sys.stderr,
                 )
                 return 1
@@ -1761,6 +1808,13 @@ class ScalyrAgent(object):
         if self.__monitors_manager is not None:
             result.monitor_manager_status = self.__monitors_manager.generate_status()
 
+        # Calculate average status report duration.
+        if self.__agent_status_report_durations:
+            result.avg_status_report_duration = round(
+                sum(self.__agent_status_report_durations) / len(self.__agent_status_report_durations),
+                4
+            )
+
         # Include GC stats (if enabled)
         if self.__config.enable_gc_stats:
             gc_stats = GCStatus()
@@ -1806,6 +1860,12 @@ class ScalyrAgent(object):
                 stats.skipped_preexisting_bytes,
                 stats.total_bytes_pending,
             )
+        )
+
+        log.debug(
+            'agent_status_debug avg_status_report_duration="%s"'
+            % (stats.avg_status_report_duration,)
+
         )
 
     def __log_bandwidth_stats(self, overall_stats):
@@ -2118,26 +2178,16 @@ class ScalyrAgent(object):
 
             agent_status = self.__generate_status()
 
-            # Calculate average status report time.
-            if self.__agent_status_generation_times:
-                avg_status_report_time = round(
-                    sum(self.__agent_status_generation_times) / len(self.__agent_status_generation_times),
-                    4
-                )
-            else:
-                avg_status_report_time = None
-
             if not status_format or status_format == "text":
                 report_status(
                     tmp_file,
                     agent_status,
-                    time.time(),
-                    avg_status_generation_time=avg_status_report_time
+                    time.time()
                 )
             elif status_format == "json":
                 status_data = agent_status.to_dict()
                 status_data["overall_stats"] = self.__overall_stats.to_dict()
-                status_data["avg_status_report_time"] = avg_status_report_time
+                status_data["avg_status_report_duration"] = agent_status.avg_status_report_duration
                 tmp_file.write(scalyr_util.json_encode(status_data))
 
             tmp_file.close()
@@ -2147,7 +2197,7 @@ class ScalyrAgent(object):
 
             # Calculate time that is spent for the whole status report.
             end_ts = time.time()
-            self.__agent_status_generation_times.append(end_ts - start_ts)
+            self.__agent_status_report_durations.append(end_ts - start_ts)
 
         except (OSError, IOError) as e:
             # Temporary workaround to make race conditions less likely.
