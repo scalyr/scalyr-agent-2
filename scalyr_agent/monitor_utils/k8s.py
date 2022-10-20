@@ -1821,10 +1821,6 @@ class KubernetesApi(object):
         self._query_options_max_retries = query_options_max_retries
         self._rate_limiter = rate_limiter
 
-        traceback.print_stack()
-        global_log.info(
-            traceback.format_list(traceback.extract_stack())
-        )
         global_log.info(
             "Kubernetes API host = %s, url = %s, ca_file = %s, verify_https = %s",
             self._http_host,
