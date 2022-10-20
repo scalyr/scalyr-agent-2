@@ -388,7 +388,7 @@ class TestReportStatus(ScalyrTestCase):
 
         self.status.copying_manager_status.calculate_status()
 
-        report_status(output, self.status, self.time)
+        report_status(output, self.status, self.time, status_generation_time=1, avg_status_generation_time=2)
 
         expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
 
@@ -403,6 +403,8 @@ Agent log:               /var/logs/scalyr-agent/agent.log
 ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
+Status generated in:     1 sec.
+Average status time:     2 sec.
 
 View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
@@ -481,7 +483,7 @@ Failed monitors:
         self.status.config_status.last_error = "Bad stuff"
 
         output = io.StringIO()
-        report_status(output, self.status, self.time)
+        report_status(output, self.status, self.time, status_generation_time=1, avg_status_generation_time=2)
 
         expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
 
@@ -496,6 +498,8 @@ Agent log:               /var/logs/scalyr-agent/agent.log
 ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
+Status generated in:     1 sec.
+Average status time:     2 sec.
 
 View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
@@ -571,7 +575,7 @@ Failed monitors:
         self.status.copying_manager_status.calculate_status()
 
         output = io.StringIO()
-        report_status(output, self.status, self.time)
+        report_status(output, self.status, self.time, status_generation_time=1, avg_status_generation_time=2)
 
         expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
 
@@ -586,6 +590,8 @@ Agent log:               /var/logs/scalyr-agent/agent.log
 ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
+Status generated in:     1 sec.
+Average status time:     2 sec.
 
 View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
@@ -671,7 +677,7 @@ Failed monitors:
 
         self.make_default()
         self.status.copying_manager_status.calculate_status()
-        report_status(output, self.status, self.time)
+        report_status(output, self.status, self.time, status_generation_time=1, avg_status_generation_time=2)
 
         expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
 
@@ -686,6 +692,8 @@ Agent log:               /var/logs/scalyr-agent/agent.log
 ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
+Status generated in:     1 sec.
+Average status time:     2 sec.
 
 View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
@@ -765,7 +773,7 @@ Failed monitors:
         self.status.copying_manager_status.calculate_status()
 
         output = io.StringIO()
-        report_status(output, self.status, self.time)
+        report_status(output, self.status, self.time, status_generation_time=1, avg_status_generation_time=2)
         expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
 
 Current time:            Fri Sep  5 23:14:13 2014 UTC
@@ -779,6 +787,8 @@ Agent log:               /var/logs/scalyr-agent/agent.log
 ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
+Status generated in:     1 sec.
+Average status time:     2 sec.
 
 View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
@@ -882,7 +892,7 @@ Failed monitors:
         self.status.copying_manager_status.calculate_status()
 
         output = io.StringIO()
-        report_status(output, self.status, self.time)
+        report_status(output, self.status, self.time, status_generation_time=1, avg_status_generation_time=2)
         expected_output = "Health check:                              Good\n"
         self.assertTrue(expected_output in output.getvalue())
 
@@ -895,7 +905,7 @@ Failed monitors:
 
         self.status.copying_manager_status.calculate_status()
         output = io.StringIO()
-        report_status(output, self.status, self.time)
+        report_status(output, self.status, self.time, status_generation_time=1, avg_status_generation_time=2)
         expected_output = (
             "Health check:                              Copying thread is failed\n"
         )
@@ -912,7 +922,7 @@ Failed monitors:
 
         self.status.copying_manager_status.calculate_status()
         output = io.StringIO()
-        report_status(output, self.status, self.time)
+        report_status(output, self.status, self.time, status_generation_time=1, avg_status_generation_time=2)
         expected_output = "Health check:                              Copying thread is failed, Worker 1 has failed\n"
         self.assertTrue(expected_output in output.getvalue())
 
@@ -921,7 +931,7 @@ Failed monitors:
 
         self.status.copying_manager_status.calculate_status()
 
-        report_status(output, self.status, self.time)
+        report_status(output, self.status, self.time, status_generation_time=1, avg_status_generation_time=2)
 
         expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
 
@@ -936,6 +946,8 @@ Agent log:               /var/logs/scalyr-agent/agent.log
 ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
+Status generated in:     1 sec.
+Average status time:     2 sec.
 
 View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
@@ -1054,7 +1066,7 @@ Failed monitors:
 
         self.status.copying_manager_status.calculate_status()
 
-        report_status(output, self.status, self.time)
+        report_status(output, self.status, self.time, status_generation_time=1, avg_status_generation_time=2)
 
         expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
 
@@ -1070,6 +1082,8 @@ Agent log:               /var/logs/scalyr-agent/agent.log
 ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
+Status generated in:     1 sec.
+Average status time:     2 sec.
 
 View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
@@ -1165,7 +1179,7 @@ Failed monitors:
 
         self.status.copying_manager_status.calculate_status()
 
-        report_status(output, self.status, self.time)
+        report_status(output, self.status, self.time, status_generation_time=1, avg_status_generation_time=2)
 
         expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
 
@@ -1181,6 +1195,8 @@ Agent log:               /var/logs/scalyr-agent/agent.log
 ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
+Status generated in:     1 sec.
+Average status time:     2 sec.
 
 View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
@@ -1289,7 +1305,7 @@ Failed monitors:
 
         self.status.copying_manager_status.calculate_status()
 
-        report_status(output, self.status, self.time)
+        report_status(output, self.status, self.time, status_generation_time=1, avg_status_generation_time=2)
 
         expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
 
@@ -1304,6 +1320,8 @@ Agent log:               /var/logs/scalyr-agent/agent.log
 ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
+Status generated in:     1 sec.
+Average status time:     2 sec.
 
 View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 

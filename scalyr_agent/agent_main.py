@@ -37,6 +37,7 @@ from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
+import collections
 import platform
 import traceback
 import errno
@@ -241,6 +242,9 @@ class ScalyrAgent(object):
         self.__debug_server = None
         # Used below for a small cache for a slight optimization.
         self.__last_verify_config = None
+
+        # Collection of generation time intervals for recent status reports.
+        self.__agent_status_generation_times = collections.deque(maxlen=100)
 
         self.__no_fork = False
         self.__last_total_bytes_skipped = 0
@@ -2081,6 +2085,7 @@ class ScalyrAgent(object):
         # First determine the format user request. If no file with the requested format, we assume
         # text format is used (this way it's backward compatible and works correctly on upgraded)
         status_format = "text"
+        start_ts = time.time()
 
         status_format_file = os.path.join(
             self.__config.agent_data_path, STATUS_FORMAT_FILE
@@ -2113,11 +2118,26 @@ class ScalyrAgent(object):
 
             agent_status = self.__generate_status()
 
+            # Before outputting the report, calculate time that is spent for its generation
+            # and calculate average time.
+            end_ts = time.time()
+            status_generation_time = end_ts - start_ts
+            self.__agent_status_generation_times.append(status_generation_time)
+            avg_status_generation_time = sum(self.__agent_status_generation_times) / len(self.__agent_status_generation_times)
+
             if not status_format or status_format == "text":
-                report_status(tmp_file, agent_status, time.time())
+                report_status(
+                    tmp_file,
+                    agent_status,
+                    time.time(),
+                    status_generation_time=status_generation_time,
+                    avg_status_generation_time=avg_status_generation_time
+                )
             elif status_format == "json":
                 status_data = agent_status.to_dict()
                 status_data["overall_stats"] = self.__overall_stats.to_dict()
+                status_data["status_generation_time"] = status_generation_time
+                status_data["avg_status_generation_time"] = avg_status_generation_time
                 tmp_file.write(scalyr_util.json_encode(status_data))
 
             tmp_file.close()
