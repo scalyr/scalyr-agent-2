@@ -604,16 +604,14 @@ def report_status(
         output,
         status,
         current_time,
-        status_generation_time,
-        avg_status_generation_time,
+        avg_status_generation_time = None,
 ):
     """
 
     :param output: File object to output.
     :param status: Agent status instance.
     :param current_time: Time of the status report.
-    :param status_generation_time: Time spent on status generation.
-    :param avg_status_generation_time: Average time spent on generation.
+    :param avg_status_generation_time: Average time spent on generation, if not None.
     """
     print(
         "Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help",
@@ -654,8 +652,8 @@ def report_status(
     print("ServerHost:              %s" % status.server_host, file=output)
     print("Compression algorithm:   %s" % status.compression_type, file=output)
     print("Compression level:       %s" % status.compression_level, file=output)
-    print("Status generated in:     %s sec." % status_generation_time, file=output)
-    print("Average status time:     %s sec." % avg_status_generation_time, file=output)
+    if avg_status_generation_time:
+        print("Average status time:     %s sec." % avg_status_generation_time, file=output)
     print("", file=output)
     server = scalyr_util.get_web_url_from_upload_url(status.scalyr_server)
     # We default to https://agent.scalyr.com for the Scalyr server, but to see the status on the web,

@@ -2118,35 +2118,37 @@ class ScalyrAgent(object):
 
             agent_status = self.__generate_status()
 
-            # Before outputting the report, calculate time that is spent for its generation
-            # and calculate average time.
-            end_ts = time.time()
-            status_generation_time = round(end_ts - start_ts, 4)
-            self.__agent_status_generation_times.append(status_generation_time)
-            avg_status_generation_time = round(
-                sum(self.__agent_status_generation_times) / len(self.__agent_status_generation_times),
-                4
-            )
+            # Calculate average status report time.
+            if self.__agent_status_generation_times:
+                avg_status_report_time = round(
+                    sum(self.__agent_status_generation_times) / len(self.__agent_status_generation_times),
+                    4
+                )
+            else:
+                avg_status_report_time = None
 
             if not status_format or status_format == "text":
                 report_status(
                     tmp_file,
                     agent_status,
                     time.time(),
-                    status_generation_time=status_generation_time,
-                    avg_status_generation_time=avg_status_generation_time
+                    avg_status_generation_time=avg_status_report_time
                 )
             elif status_format == "json":
                 status_data = agent_status.to_dict()
                 status_data["overall_stats"] = self.__overall_stats.to_dict()
-                status_data["status_generation_time"] = status_generation_time
-                status_data["avg_status_generation_time"] = avg_status_generation_time
+                status_data["avg_status_report_time"] = avg_status_report_time
                 tmp_file.write(scalyr_util.json_encode(status_data))
 
             tmp_file.close()
             tmp_file = None
 
             os.rename(tmp_file_path, final_file_path)
+
+            # Calculate time that is spent for the whole status report.
+            end_ts = time.time()
+            self.__agent_status_generation_times.append(end_ts - start_ts)
+
         except (OSError, IOError) as e:
             # Temporary workaround to make race conditions less likely.
             # If agent status or health check is requested multiple times or concurrently around the
