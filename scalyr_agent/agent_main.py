@@ -700,13 +700,13 @@ class ScalyrAgent(object):
             log.info("Received signal to shutdown, attempt to shutdown cleanly.")
             self.__run_state.stop()
 
-    def _get_system_and_agent_stats(self):  # type: () -> Dict
+    def _get_system_and_agent_stats(self):  # type: () -> Optional[Dict]
         """
         Return current machine's and agent process' stats.
         :return: Dict with stats.
         """
         if psutil is None:
-            raise Exception("No psutil module.")
+            return None
 
         pidfile = os.path.join(self.__config.agent_log_path, "agent.pid")
 
@@ -868,9 +868,14 @@ class ScalyrAgent(object):
                 except Exception as err:
                     system_and_agent_stats = "not available, reason: %s" % str(err)
 
+                if system_and_agent_stats:
+                    usage_info = " Usage info: %s" % system_and_agent_stats
+                else:
+                    usage_info = ""
+
                 print(
                     "Failed to get status within 5 seconds.  Giving up.  The agent process is "
-                    "possibly stuck.  See %s for more details.\n\n    Usage info: %s" % (agent_log, system_and_agent_stats),
+                    "possibly stuck.  See %s for more details.%s" % (agent_log, usage_info),
                     file=sys.stderr,
                 )
                 return 1
@@ -2142,6 +2147,9 @@ class ScalyrAgent(object):
         :return: File path status data has been written to.
         :rtype: ``str``
         """
+
+
+        time.sleep(100)
         # First determine the format user request. If no file with the requested format, we assume
         # text format is used (this way it's backward compatible and works correctly on upgraded)
         status_format = "text"
