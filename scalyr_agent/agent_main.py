@@ -2121,9 +2121,12 @@ class ScalyrAgent(object):
             # Before outputting the report, calculate time that is spent for its generation
             # and calculate average time.
             end_ts = time.time()
-            status_generation_time = end_ts - start_ts
+            status_generation_time = round(end_ts - start_ts, 4)
             self.__agent_status_generation_times.append(status_generation_time)
-            avg_status_generation_time = sum(self.__agent_status_generation_times) / len(self.__agent_status_generation_times)
+            avg_status_generation_time = round(
+                sum(self.__agent_status_generation_times) / len(self.__agent_status_generation_times),
+                4
+            )
 
             if not status_format or status_format == "text":
                 report_status(
