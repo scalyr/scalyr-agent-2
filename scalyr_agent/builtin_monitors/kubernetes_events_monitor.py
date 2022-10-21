@@ -228,7 +228,7 @@ By default, the leader election algorithm selects the Scalyr Agent Pod running o
 
 ### Node Labels
 
-The first approach is to add the label `agent.config.scalyr.com/events_leader_candidate=true` to any node that you wish to be eligible to become the events collector.  This can be done with the following command:
+The first approach is to add the label `agent.config.scalyr.com/events_leader_candidate=true` (or the value specified in `leader_candidate_label`) to any node that you wish to be eligible to become the events collector.  This can be done with the following command:
 
 `kubectl label node <nodename> agent.config.scalyr.com/events_leader_candidate=true`
 

@@ -18,7 +18,7 @@ By default, the leader election algorithm selects the Scalyr Agent Pod running o
 
 ### Node Labels
 
-The first approach is to add the label `agent.config.scalyr.com/events_leader_candidate=true` to any node that you wish to be eligible to become the events collector.  This can be done with the following command:
+The first approach is to add the label `agent.config.scalyr.com/events_leader_candidate=true` (or the value specified in `leader_candidate_label`) to any node that you wish to be eligible to become the events collector.  This can be done with the following command:
 
 `kubectl label node <nodename> agent.config.scalyr.com/events_leader_candidate=true`
 
@@ -100,15 +100,16 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
 <a name="options"></a>
 ## Configuration Options
 
-| Property                | Description | 
-| ---                     | --- | 
-| `module`                | Always ``scalyr_agent.builtin_monitors.kubernetes_events_monitor`` | 
-| `max_log_size`          | Optional (defaults to None). How large the log file will grow before it is rotated. If None, then the default value will be taken from the monitor level or the global level log_rotation_max_bytes config option.  Set to zero for infinite size. Note that rotation is not visible in Scalyr; it is only relevant for managing disk space on the host running the agent. However, a very small limit could cause logs to be dropped if there is a temporary network outage and the log overflows before it can be sent to Scalyr | 
-| `max_log_rotations`     | Optional (defaults to None). The maximum number of log rotations before older log files are deleted. If None, then the value is taken from the monitor level or the global level log_rotation_backup_count option. Set to zero for infinite rotations. | 
-| `log_flush_delay`       | Optional (defaults to 1.0). The time to wait in seconds between flushing the log file containing the kubernetes event messages. | 
-| `message_log`           | Optional (defaults to ``kubernetes_events.log``). Specifies the file name under which event messages are stored. The file will be placed in the default Scalyr log directory, unless it is an absolute path | 
-| `event_object_filter`   | Optional (defaults to ['CronJob', 'DaemonSet', 'Deployment', 'Job', 'Node', 'Pod', 'ReplicaSet', 'ReplicationController', 'StatefulSet', 'Endpoint']). A list of event object types to filter on. Only events whose ``involvedObject`` ``kind`` is on this list will be included.  To not perform filtering and to send all event kinds, set the environment variable ``SCALYR_K8S_EVENT_OBJECT_FILTER=null``. | 
-| `leader_check_interval` | Optional (defaults to 60). The number of seconds to wait between checks to see if we are still the leader. | 
-| `leader_node`           | Optional (defaults to None). Force the `leader` to be the scalyr-agent that runs on this node. | 
-| `check_labels`          | Optional (defaults to False). If true, then the monitor will check for any nodes with the label `agent.config.scalyr.com/events_leader_candidate=true` and the node with this label set and that has the oldestcreation time will be the event monitor leader. | 
-| `ignore_master`         | Optional (defaults to True). If true, then the monitor will ignore any nodes with the label `node-role.kubernetes.io/master` when determining which node is the event monitor leader. | 
+| Property                 | Description | 
+| ---                      | --- | 
+| `module`                 | Always ``scalyr_agent.builtin_monitors.kubernetes_events_monitor`` | 
+| `max_log_size`           | Optional (defaults to None). How large the log file will grow before it is rotated. If None, then the default value will be taken from the monitor level or the global level log_rotation_max_bytes config option.  Set to zero for infinite size. Note that rotation is not visible in Scalyr; it is only relevant for managing disk space on the host running the agent. However, a very small limit could cause logs to be dropped if there is a temporary network outage and the log overflows before it can be sent to Scalyr | 
+| `max_log_rotations`      | Optional (defaults to None). The maximum number of log rotations before older log files are deleted. If None, then the value is taken from the monitor level or the global level log_rotation_backup_count option. Set to zero for infinite rotations. | 
+| `log_flush_delay`        | Optional (defaults to 1.0). The time to wait in seconds between flushing the log file containing the kubernetes event messages. | 
+| `message_log`            | Optional (defaults to ``kubernetes_events.log``). Specifies the file name under which event messages are stored. The file will be placed in the default Scalyr log directory, unless it is an absolute path | 
+| `event_object_filter`    | Optional (defaults to ['CronJob', 'DaemonSet', 'Deployment', 'Job', 'Node', 'Pod', 'ReplicaSet', 'ReplicationController', 'StatefulSet', 'Endpoint']). A list of event object types to filter on. Only events whose ``involvedObject`` ``kind`` is on this list will be included.  To not perform filtering and to send all event kinds, set the environment variable ``SCALYR_K8S_EVENT_OBJECT_FILTER=null``. | 
+| `leader_check_interval`  | Optional (defaults to 60). The number of seconds to wait between checks to see if we are still the leader. | 
+| `leader_node`            | Optional (defaults to None). Force the `leader` to be the scalyr-agent that runs on this node. | 
+| `check_labels`           | Optional (defaults to False). If true, then the monitor will check for any nodes with the label `agent.config.scalyr.com/events_leader_candidate=true` and the node with this label set and that has the oldestcreation time will be the event monitor leader. | 
+| `leader_candidate_label` | Optional (defaults to `agent.config.scalyr.com/events_leader_candidate=true`). If `check_labels` is true, then the monitor will check for any nodes with the label configured using this option and the node with this label set and that has the oldestcreation time will be the event monitor leader. | 
+| `ignore_master`          | Optional (defaults to True). If true, then the monitor will ignore any nodes with the label `node-role.kubernetes.io/master` when determining which node is the event monitor leader. | 
