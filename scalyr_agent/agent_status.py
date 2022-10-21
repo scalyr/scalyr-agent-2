@@ -218,6 +218,9 @@ class OverallStats(AgentStatus):
         self.avg_bytes_copied_rate = 0
         self.rate_limited_time_since_last_status = 0
 
+        # average time in seconds spent on agent's status report.
+        self.avg_status_report_duration = None
+
     def __add__(self, other):
         """Adds all of the 'total_' fields of this instance and other together and returns a new OverallStats containing
         the result.

@@ -731,7 +731,7 @@ class ScalyrAgent(object):
                     "cpu_percent": process.cpu_percent(),
                     "memory_rss": process.memory_info().rss
 
-                }
+                },
         }
 
     def __detailed_status(
@@ -1813,12 +1813,7 @@ class ScalyrAgent(object):
         if self.__monitors_manager is not None:
             result.monitor_manager_status = self.__monitors_manager.generate_status()
 
-        # Calculate average status report duration.
-        if self.__agent_status_report_durations:
-            result.avg_status_report_duration = round(
-                sum(self.__agent_status_report_durations) / len(self.__agent_status_report_durations),
-                4
-            )
+        result.avg_status_report_duration = self.__agent_avg_status_report_duration
 
         # Include GC stats (if enabled)
         if self.__config.enable_gc_stats:
@@ -1870,7 +1865,6 @@ class ScalyrAgent(object):
         log.debug(
             'agent_status_debug avg_status_report_duration="%s"'
             % (stats.avg_status_report_duration,)
-
         )
 
     def __log_bandwidth_stats(self, overall_stats):
@@ -2204,6 +2198,12 @@ class ScalyrAgent(object):
             # Calculate time that is spent for the whole status report.
             end_ts = time.time()
             self.__agent_status_report_durations.append(end_ts - start_ts)
+            # Calculate average status report duration.
+            if self.__agent_status_report_durations:
+                self.__avg_status_report_duration = round(
+                    sum(self.__agent_status_report_durations) / len(self.__agent_status_report_durations),
+                    4
+                )
 
         except (OSError, IOError) as e:
             # Temporary workaround to make race conditions less likely.
