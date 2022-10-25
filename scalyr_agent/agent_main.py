@@ -38,7 +38,9 @@ from __future__ import absolute_import
 __author__ = "czerwin@scalyr.com"
 
 import collections
+import json
 import platform
+import subprocess
 import traceback
 import errno
 import gc
@@ -322,6 +324,7 @@ class ScalyrAgent(object):
         health_check = command_options.health_check
         status_format = command_options.status_format
         extra_config_dir = command_options.extra_config_dir
+        debug = command_options.debug
         self.__no_fork = command_options.no_fork
         no_check_remote = False
 
@@ -412,6 +415,7 @@ class ScalyrAgent(object):
                     agent_data_path,
                     status_format=status_format,
                     health_check=health_check,
+                    debug=debug
                 )
             elif command == "restart":
                 return self.__restart(quiet, no_check_remote)
@@ -705,34 +709,79 @@ class ScalyrAgent(object):
         Return current machine's and agent process' stats.
         :return: Dict with stats.
         """
-        if psutil is None:
-            return None
 
-        pidfile = os.path.join(self.__config.agent_log_path, "agent.pid")
+        # Get information about agent process.
+        def get_agent_process_stats():
+            agent_process_stats = {}
+            if psutil is None:
+                return {"error": "No psutil"}
 
-        if not os.path.exists(pidfile):
-            raise Exception("Pid file does not exist.")
+            pidfile = os.path.join(self.__config.agent_log_path, "agent.pid")
 
-        with open(pidfile, "r") as fp:
-            pidfile_content = fp.read().strip()
+            if not os.path.exists(pidfile):
+                return {"error": "No PID file."}
 
-        process = psutil.Process(
-            pid=int(pidfile_content)
-        )
+            try:
+                with open(pidfile, "r") as fp:
+                    pidfile_content = fp.read().strip()
+            except OSError as e:
+                return {"error": "Error during PID file read. Error: {}".format(e)}
 
-        return {
-            "cpu_percent": psutil.cpu_percent(),
-            "cpu_count": psutil.cpu_count(),
-            "getloadavg": psutil.getloadavg(),
-            "virtual_memory_percent": psutil.virtual_memory().percent,
-            "agent_process":
-                {
-                    "PID": process.pid,
-                    "cpu_percent": process.cpu_percent(),
-                    "memory_rss": process.memory_info().rss
+            try:
+                psutil_process = psutil.Process(
+                    pid=int(pidfile_content)
+                )
+            except psutil.Error as e:
+                return {"error": "Can't create psutil process. Error: {}".format(e)}
 
-                },
-        }
+            try:
+                agent_process_stats["cpu_percent"] = psutil_process.pid
+                agent_process_stats["cpu_percent"] = psutil_process.cpu_percent()
+                agent_process_stats["cpu_percent"] = psutil_process.memory_info().rss
+            except Exception as e:
+                agent_process_stats["error"] = str(e)
+
+            return agent_process_stats
+
+        # Get information about machine's current state.
+        def get_machine_stats():
+            machine_stats = {}
+            try:
+                machine_stats["cpu_percent"] = psutil.cpu_percent()
+                machine_stats["cpu_count"] = psutil.cpu_count()
+                machine_stats["getloadavg"] = psutil.getloadavg()
+                machine_stats["virtual_memory_percent"] = psutil.virtual_memory().percent
+            except Exception as e:
+                machine_stats["error"] = str(e)
+
+            return machine_stats
+
+        # Get list of related processes'
+        def find_agent_processed():
+            agent_processes = []
+            try:
+                ps_output = subprocess.check_output(
+                    [
+                        "ps",
+                        "aux",
+                    ]
+                ).decode()
+            except Exception as e:
+                return {"error": "Can't get list of processes. Error: {}".format(e)}
+
+            for line in ps_output.splitlines():
+                if "scalyr-agent" in line or "python" in line or "agent_main" in line:
+                    agent_processes.append(line)
+
+            return agent_processes
+
+        result = {}
+
+        result.update(get_machine_stats())
+        result["agent_process"] = get_agent_process_stats()
+        result["processes"] = find_agent_processed()
+
+        return result
 
     def __detailed_status(
         self,
@@ -740,6 +789,7 @@ class ScalyrAgent(object):
         status_format="text",
         health_check=False,
         zero_status_file=True,
+        debug=False
     ):
         """Execute the status -v or -H command.
 
@@ -753,6 +803,7 @@ class ScalyrAgent(object):
                              a new status file This is primary meant to be used in testing where we can
                              set it to False which means we can avoid a lot of nasty mocking if
                              open() and related functiond.
+        :param debug: Print additional information if True.
 
         @return:  An exit status code for the status command indicating success or failure.
         @rtype: int
@@ -760,6 +811,24 @@ class ScalyrAgent(object):
         # Health check ignores format but uses `json` under the hood
         if health_check:
             status_format = "json"
+
+        # List of all debug stats that are captured during status report.
+        debug_stats = []
+
+        def print_debug_stats():
+            print(
+                "Debug stats: {}".format(json.dumps(
+                    debug_stats,
+                    sort_keys=True,
+                    indent=4
+                )),
+                file=sys.stderr
+            )
+
+        # Capture debug stats at the beginning.
+        if debug:
+            stats = self._get_system_and_agent_stats()
+            debug_stats.append(stats)
 
         if status_format not in VALID_STATUS_FORMATS:
             print(
@@ -839,8 +908,15 @@ class ScalyrAgent(object):
         # We wait for five seconds at most to get the status.
         deadline = time.time() + 5
 
+        last_debug_stat_time = 0
         # Now loop until we see it show up.
         while True:
+            # Capture debug stats every second while waiting.
+            if debug and (last_debug_stat_time + 1 < time.time()):
+                stats = self._get_system_and_agent_stats()
+                debug_stats.append(stats)
+                last_debug_stat_time = time.time()
+
             try:
                 if os.path.isfile(status_file) and os.path.getsize(status_file) > 0:
                     break
@@ -863,21 +939,18 @@ class ScalyrAgent(object):
                         self.__default_paths.agent_log_path, AGENT_LOG_FILENAME
                     )
 
-                try:
-                    system_and_agent_stats = str(self._get_system_and_agent_stats())
-                except Exception as err:
-                    system_and_agent_stats = "not available, reason: %s" % str(err)
-
-                if system_and_agent_stats:
-                    usage_info = " Usage info: %s" % system_and_agent_stats
-                else:
-                    usage_info = ""
+                # Capture debug stats on timeout.
+                if debug:
+                    debug_stats.append(self._get_system_and_agent_stats())
 
                 print(
                     "Failed to get status within 5 seconds.  Giving up.  The agent process is "
-                    "possibly stuck.  See %s for more details.%s" % (agent_log, usage_info),
+                    "possibly stuck.  See %s for more details." % agent_log,
                     file=sys.stderr,
                 )
+
+                if debug:
+                    print_debug_stats()
                 return 1
 
             time.sleep(0.03)
@@ -2356,6 +2429,13 @@ if __name__ == "__main__":
         dest="health_check",
         default=False,
         help="For status command, prints health check status. Return code will be 0 for a passing check, and 2 for failing",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        dest="debug",
+        default=False,
+        help="Prints additional debug output. For now works only with --health-check option."
     )
     parser.add_argument(
         "--format",
