@@ -63,6 +63,7 @@ if False:
 # 1. https://github.com/scalyr/scalyr-agent-2/pull/700#issuecomment-761676613
 # 2. https://bugs.python.org/issue7980
 import _strptime  # NOQA
+
 try:
     import psutil
 except ImportError:
@@ -416,7 +417,7 @@ class ScalyrAgent(object):
                     agent_data_path,
                     status_format=status_format,
                     health_check=health_check,
-                    debug=debug
+                    debug=debug,
                 )
             elif command == "restart":
                 return self.__restart(quiet, no_check_remote)
@@ -729,9 +730,7 @@ class ScalyrAgent(object):
                 return {"error": "Error during PID file read. Error: {}".format(e)}
 
             try:
-                psutil_process = psutil.Process(
-                    pid=int(pidfile_content)
-                )
+                psutil_process = psutil.Process(pid=int(pidfile_content))
             except psutil.Error as e:
                 return {"error": "Can't create psutil process. Error: {}".format(e)}
 
@@ -751,7 +750,9 @@ class ScalyrAgent(object):
                 machine_stats["cpu_percent"] = psutil.cpu_percent()
                 machine_stats["cpu_count"] = psutil.cpu_count()
                 machine_stats["getloadavg"] = psutil.getloadavg()
-                machine_stats["virtual_memory_percent"] = psutil.virtual_memory().percent
+                machine_stats[
+                    "virtual_memory_percent"
+                ] = psutil.virtual_memory().percent
             except Exception as e:
                 machine_stats["error"] = str(e)
 
@@ -791,7 +792,7 @@ class ScalyrAgent(object):
         status_format="text",
         health_check=False,
         zero_status_file=True,
-        debug=False
+        debug=False,
     ):
         """Execute the status -v or -H command.
 
@@ -819,12 +820,10 @@ class ScalyrAgent(object):
 
         def print_debug_stats():
             print(
-                "Debug stats: {}".format(json.dumps(
-                    debug_stats,
-                    sort_keys=True,
-                    indent=4
-                )),
-                file=sys.stderr
+                "Debug stats: {}".format(
+                    json.dumps(debug_stats, sort_keys=True, indent=4)
+                ),
+                file=sys.stderr,
             )
 
         # Capture debug stats at the beginning.
@@ -2254,15 +2253,13 @@ class ScalyrAgent(object):
             agent_status = self.__generate_status()
 
             if not status_format or status_format == "text":
-                report_status(
-                    tmp_file,
-                    agent_status,
-                    time.time()
-                )
+                report_status(tmp_file, agent_status, time.time())
             elif status_format == "json":
                 status_data = agent_status.to_dict()
                 status_data["overall_stats"] = self.__overall_stats.to_dict()
-                status_data["avg_status_report_duration"] = agent_status.avg_status_report_duration
+                status_data[
+                    "avg_status_report_duration"
+                ] = agent_status.avg_status_report_duration
                 tmp_file.write(scalyr_util.json_encode(status_data))
 
             tmp_file.close()
@@ -2276,8 +2273,9 @@ class ScalyrAgent(object):
             # Calculate average status report duration.
             if self.__agent_status_report_durations:
                 self.__agent_avg_status_report_duration = round(
-                    sum(self.__agent_status_report_durations) / len(self.__agent_status_report_durations),
-                    4
+                    sum(self.__agent_status_report_durations)
+                    / len(self.__agent_status_report_durations),
+                    4,
                 )
 
         except (OSError, IOError) as e:
@@ -2437,7 +2435,7 @@ if __name__ == "__main__":
         action="store_true",
         dest="debug",
         default=False,
-        help="Prints additional debug output. For now works only with --health-check option."
+        help="Prints additional debug output. For now works only with --health-check option.",
     )
     parser.add_argument(
         "--format",
