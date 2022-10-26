@@ -779,7 +779,8 @@ class ScalyrAgent(object):
 
         result.update(get_machine_stats())
         result["agent_process"] = get_agent_process_stats()
-        result["processes"] = find_agent_processed()
+        if not platform.system().lower().startswith("windows"):
+            result["processes"] = find_agent_processed()
 
         return result
 
