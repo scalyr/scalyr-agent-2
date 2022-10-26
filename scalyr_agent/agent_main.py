@@ -2274,7 +2274,7 @@ class ScalyrAgent(object):
             self.__agent_status_report_durations.append(end_ts - start_ts)
             # Calculate average status report duration.
             if self.__agent_status_report_durations:
-                self.__avg_status_report_duration = round(
+                self.__agent_avg_status_report_duration = round(
                     sum(self.__agent_status_report_durations) / len(self.__agent_status_report_durations),
                     4
                 )
