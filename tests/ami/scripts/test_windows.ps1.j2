@@ -141,6 +141,9 @@ Log-Message ""
 @() | ScalyrShell.cmd status;
 
 if (!$?) {
+    $log_output=type "C:\Program Files (x86)\Scalyr\log\agent.log"
+    echo "Agent log:"
+    echo $log_output
     throw "Status command via cmdlet failed"
 }
 
