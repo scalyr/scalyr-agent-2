@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - release
+      - py311_benchmarks
   schedule:
     - cron: '0 4 * * *'
 
@@ -36,6 +37,7 @@ jobs:
         python-version:
           - "2.7.17"
           - "3.5.9"
+          - "3.11.0"
 
     steps:
       - name: Checkout Repository
@@ -55,7 +57,7 @@ jobs:
           TOX_GH_ACTIONS_VERSION: 2.9.1
         run: |
           python -m pip install --upgrade pip
-          pip install "tox==$TOX_VERSION" "tox-gh-actions==$TOX_GH_ACTIONS_VERSION" "cffi==1.12.3" "udatetime==0.0.16" "requests"
+          pip install "tox==$TOX_VERSION" "tox-gh-actions==$TOX_GH_ACTIONS_VERSION" "cffi==1.15.1" "udatetime==0.0.17" "requests"
           # Needed for snappy library
           sudo apt-get update
           sudo apt-get install -y libsnappy-dev
@@ -64,7 +66,7 @@ jobs:
         run: tox -e micro-benchmarks
 
       - name: Process and submit results to CodeSpeed
-        if: (github.ref == 'refs/heads/master' || github.head_ref == 'master')
+        if: (github.ref == 'refs/heads/master' || github.head_ref == 'master' || github.head_ref == 'py311_benchmarks' || github.ref == 'refs/heads/py311_benchmarks')
         env:
           PYTHONPATH: .
           CODESPEED_URL: "https://scalyr-agent-codespeed.herokuapp.com/"
@@ -119,6 +121,19 @@ jobs:
       codespeed_executable: "Python 3.5.9 - idle conf 1"
       agent_config: "benchmarks/configs/agent_no_monitored_logs.json"
       agent_server_host: "ci-codespeed-benchmarks-py35-idle-conf-1"
+      capture_line_counts: true
+
+  benchmarks-idle-agent-py-311:
+    needs: pre_job
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
+    uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
+    secrets: inherit
+    with:
+      job_name: benchmarks-idle-agent-py-311
+      python-version: 3.11.0
+      codespeed_executable: "Python 3.11.0 - idle conf 1"
+      agent_config: "benchmarks/configs/agent_no_monitored_logs.json"
+      agent_server_host: "ci-codespeed-benchmarks-py311-idle-conf-1"
       capture_line_counts: true
 
   benchmarks-idle-agent-no-monitors-py-27:
@@ -213,6 +228,22 @@ jobs:
       agent_server_host: "ci-codespeed-benchmarks-py35-loaded-conf-2"
       capture_line_counts: true
 
+  benchmarks-loaded-agent-single-growing-log-file-20mb-py-311:
+    needs: pre_job
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
+    uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
+    secrets: inherit
+    with:
+      job_name: benchmarks-loaded-agent-single-growing-log-file-20mb-py-311
+      python-version: 3.11.0
+      codespeed_executable: "Python 3.11.0 - loaded conf 2"
+      agent_config: "benchmarks/configs/agent_single_growing_log_file_with_shell_and_url_monitor.json"
+      run_time: 140
+      agent_pre_run_command: "touch /tmp/random.log"
+      agent_post_run_command: "benchmarks/scripts/write-random-lines.sh /tmp/random.log 2M 10 100 1"
+      agent_server_host: "ci-codespeed-benchmarks-py311-loaded-conf-2"
+      capture_line_counts: true
+
   benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
@@ -278,6 +309,22 @@ jobs:
       agent_config: "benchmarks/configs/agent_single_50mb_genlog_500k_line_file.json"
       agent_pre_run_command: "wget --directory-prefix=/tmp https://github.com/scalyr/codespeed-agent-fixtures/raw/master/fixtures/logs/scalyr_genlog_500k_line_50_mb.log"
       agent_server_host: "ci-codespeed-benchmarks-py35-loaded-conf-5"
+      run_time: 140
+      capture_agent_status_metrics: true
+      capture_line_counts: true
+
+  benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-311:
+    needs: pre_job
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
+    uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
+    secrets: inherit
+    with:
+      job_name: benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-35
+      python-version: 3.11.0
+      codespeed_executable: "Python 3.11.0 - loaded conf 5"
+      agent_config: "benchmarks/configs/agent_single_50mb_genlog_500k_line_file.json"
+      agent_pre_run_command: "wget --directory-prefix=/tmp https://github.com/scalyr/codespeed-agent-fixtures/raw/master/fixtures/logs/scalyr_genlog_500k_line_50_mb.log"
+      agent_server_host: "ci-codespeed-benchmarks-py311-loaded-conf-5"
       run_time: 140
       capture_agent_status_metrics: true
       capture_line_counts: true
