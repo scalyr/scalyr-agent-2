@@ -1,6 +1,14 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.38 "TBD" - November 17, 2022
+<!---
+Packaged by Joseph Makar <joseph.makar@sentinelone.com> on Oct 17, 2022 12:31 -0800
+--->
+
+Kubernetes:
+* Add ``securityContext.allowPrivilegeEscalation: false`` annotation to the Scalyr Agent DaemonSet container specification.
+
 ## 2.1.37 "Penvolea" - October 17, 2022
 <!---
 Packaged by Joseph Makar <joseph.makar@sentinelone.com> on Oct 17, 2022 12:31 -0800
