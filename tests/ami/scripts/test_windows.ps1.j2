@@ -142,6 +142,7 @@ Log-Message ""
 
 if (!$?) {
     $log_output=type "C:\Program Files (x86)\Scalyr\log\agent.log";
+
     $log_output = Get-Content "C:\Program Files (x86)\Scalyr\log\agent.log" -Raw
     throw "Status command via cmdlet failed. Agent log: $log_output";
 }
