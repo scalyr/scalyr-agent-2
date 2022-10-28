@@ -477,7 +477,8 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
                     replicaset = owner["name"]
                     break
             if not replicaset:
-                raise K8sApiException("unable to determine pod's replicaset")
+                import json
+                raise K8sApiException("unable to determine pod's replicaset" + json.dumps(response))
 
             response = k8s.query_api_with_retries(
                 "/apis/apps/v1/namespaces/%s/replicasets/%s/scale"
