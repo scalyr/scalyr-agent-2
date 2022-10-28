@@ -480,15 +480,19 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
                 raise K8sApiException("unable to determine pod's replicaset")
 
             response = k8s.query_api_with_retries(
-                "/apis/apps/v1/namespaces/%s/replicasets/%s/scale" % (k8s.namespace, replicaset),
-                retry_error_context="%s/replicasets/%s/scale" % (k8s.namespace, replicaset),
+                "/apis/apps/v1/namespaces/%s/replicasets/%s/scale"
+                % (k8s.namespace, replicaset),
+                retry_error_context="%s/replicasets/%s/scale"
+                % (k8s.namespace, replicaset),
                 retry_error_limit_key="k8se_get_own_replicaset",
             )
             self._replicaset_selector = response.get("status", {}).get("selector")
             if not self._replicaset_selector:
                 raise K8sApiException("unable to determine replicaset selector")
 
-        params = "?labelSelector=" + six.moves.urllib.parse.quote(selector or self._replicaset_selector)
+        params = "?labelSelector=" + six.moves.urllib.parse.quote(
+            selector or self._replicaset_selector
+        )
         response = k8s.query_api_with_retries(
             "/api/v1/namespaces/%s/pods%s" % (k8s.namespace, params),
             retry_error_context="%s/pods%s" % (k8s.namespace, params),
@@ -527,7 +531,9 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
             # first check to see if the leader pod is specified via a label
             # this is in case the label has been moved to a different pod and the old pod is still alive
             if self._check_labels:
-                new_leader = self._check_pods_for_leader(k8s, "agent.config.scalyr.com/events_leader_candidate=true")
+                new_leader = self._check_pods_for_leader(
+                    k8s, "agent.config.scalyr.com/events_leader_candidate=true"
+                )
 
             if new_leader is not None:
                 global_log.log(scalyr_logging.DEBUG_LEVEL_1, "Leader set from label")
