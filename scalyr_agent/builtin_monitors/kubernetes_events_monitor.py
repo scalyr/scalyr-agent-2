@@ -194,7 +194,7 @@ This monitor powers the [Kubernetes Events dashboard](https://www.scalyr.com/das
 
 The Scalyr Agent uses a simple leader election algorithm to decide which Scalyr Agent should retrieve the cluster's Events and upload them to Scalyr. This is necessary because the Events pertain to the entire cluster. Duplicate information would be uploaded if each Scalyr Agent Pod retrieved the cluster's Events and uploaded them.
 
-By default, the leader election algorithm selects the Scalyr Agent running on the oldest Pod. To determine which is the oldest pod, each Scalyr Agent Pod will retrieve the Pod list of the associated ReplicaSet at start up, and then query the API Server once every `leader_check_interval` seconds (defaults to 60 seconds) to ensure the leader is still alive. For large deployment/replicaset, performing these checks can place noticeable load on the K8s API server. Beyond using a limited ReplicaSet in the Deployment (or a separate DaemonSet for the monitor), there is another way to address this issue.
+By default, the leader election algorithm selects the Scalyr Agent running on the oldest Pod. To determine which is the oldest pod, each Scalyr Agent Pod will retrieve the Pod list of the associated ReplicaSet at start up, and then query the API Server once every `leader_check_interval` seconds (defaults to 60 seconds) to ensure the leader is still alive. For large deployment/replicaset or cluster/daemonset, performing these checks can place noticeable load on the K8s API server. Beyond using a limited ReplicaSet in the Deployment (or a separate DaemonSet for the monitor), there is another way to address this issue.
 
 ### Pod Labels
 
@@ -282,7 +282,7 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
         self._check_labels = self._config.get("check_labels")
 
         self._current_leader = None
-        self._replicaset_selector = None
+        self._owner_selector = None
 
         self.__flush_delay = self._config.get("log_flush_delay")
         try:
@@ -458,41 +458,59 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
 
     def _check_pods_for_leader(self, k8s, selector=None):
         """
-        Checks all pods in the namespace to see which one has the oldest creationTime
+        Checks all pods in the owner (replicaset/daemonset) to see which one has the oldest creationTime
         @param k8s: a KubernetesApi object for querying the k8s api
         @selector - optional pod selector to allow for filtering
         """
 
-        # Determine the current pod's replicaset for the selector to the (other) replicaset pods.
-        # Done in two stages: retrieve the current pod for the replicaset name, then the replicaset selector proper.
-        if not selector and not self._replicaset_selector:
-            replicaset = None
+        # Determine the current pod's owner for the selector to the other owned pods.
+        # Done in two stages: retrieve the current pod for the owner type and name, then the selector proper.
+        if not selector and not self._owner_selector:
+            owner_name, owner_type = None, None
             response = k8s.query_api_with_retries(
                 "/api/v1/namespaces/%s/pods/%s" % (k8s.namespace, self._pod_name),
                 retry_error_context="%s/pods/%s" % (k8s.namespace, self._pod_name),
                 retry_error_limit_key="k8se_get_own_pod",
             )
             for owner in response.get("metadata", {}).get("ownerReferences", []):
-                if owner.get("kind") == "ReplicaSet" and "name" in owner:
-                    replicaset = owner["name"]
+                if owner.get("kind") in ["DaemonSet", "ReplicaSet"] and "name" in owner:
+                    owner_type, owner_name = owner["kind"], owner["name"]
                     break
-            if not replicaset:
-                import json
-                raise K8sApiException("unable to determine pod's replicaset" + json.dumps(response))
+            if not owner_name:
+                raise K8sApiException("unable to determine pod's owner")
 
-            response = k8s.query_api_with_retries(
-                "/apis/apps/v1/namespaces/%s/replicasets/%s/scale"
-                % (k8s.namespace, replicaset),
-                retry_error_context="%s/replicasets/%s/scale"
-                % (k8s.namespace, replicaset),
-                retry_error_limit_key="k8se_get_own_replicaset",
-            )
-            self._replicaset_selector = response.get("status", {}).get("selector")
-            if not self._replicaset_selector:
+            if owner_type == "DaemonSet":
+                response = k8s.query_api_with_retries(
+                    "/apis/apps/v1/namespaces/%s/daemonsets/%s"
+                    % (k8s.namespace, owner_name),
+                    retry_error_context="%s/daemonsets/%s"
+                    % (k8s.namespace, owner_name),
+                    retry_error_limit_key="k8se_get_own_daemonset",
+                )
+                selector = ""
+                for k, v in (
+                    response.get("spec", {}).get("selector", {}).get("matchLabels", {})
+                ):
+                    if selector != "":
+                        selector += ","
+                    selector += k + "=" + v
+                self._owner_selector = selector
+
+            elif owner_type == "ReplicaSet":
+                response = k8s.query_api_with_retries(
+                    "/apis/apps/v1/namespaces/%s/replicasets/%s/scale"
+                    % (k8s.namespace, owner_name),
+                    retry_error_context="%s/replicasets/%s/scale"
+                    % (k8s.namespace, owner_name),
+                    retry_error_limit_key="k8se_get_own_replicaset",
+                )
+                self._owner_selector = response.get("status", {}).get("selector")
+
+            if not self._owner_selector:
                 raise K8sApiException("unable to determine replicaset selector")
 
         params = "?labelSelector=" + six.moves.urllib.parse.quote(
-            selector or self._replicaset_selector
+            selector or self._owner_selector
         )
         response = k8s.query_api_with_retries(
             "/api/v1/namespaces/%s/pods%s" % (k8s.namespace, params),
@@ -523,7 +541,7 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
 
         Check to see if the leader is specified using a pod label.
         If not, then if there is not a current leader pod, or if the current leader pod no longer exists
-        then query all pods in the replicaset for the leader
+        then query all pods in the owner (replicaset/daemonset) for the leader
         @param k8s: a KubernetesApi object for querying the k8s api
         """
 
@@ -550,7 +568,7 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
                     )
                     new_leader = self._current_leader
                 else:
-                    # previous leader is not alive so check all pods in the replicaset for the leader
+                    # previous leader is not alive so check all pods in the owner for the leader
                     global_log.log(
                         scalyr_logging.DEBUG_LEVEL_1, "Checking for a new leader"
                     )
