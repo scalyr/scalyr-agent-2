@@ -490,7 +490,7 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
                 selector = ""
                 for k, v in (
                     response.get("spec", {}).get("selector", {}).get("matchLabels", {})
-                ):
+                ).items():
                     if selector != "":
                         selector += ","
                     selector += k + "=" + v
@@ -550,7 +550,6 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
             # first check to see if the leader pod is specified via a label
             # this is in case the label has been moved to a different pod and the old pod is still alive
             if self._check_labels:
-                global_log.info("jmakar: before _check_pods_for_leader with label")
                 new_leader = self._check_pods_for_leader(
                     k8s, "agent.config.scalyr.com/events_leader_candidate=true"
                 )
@@ -573,7 +572,6 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
                     global_log.log(
                         scalyr_logging.DEBUG_LEVEL_1, "Checking for a new leader"
                     )
-                    global_log.info("jmakar: before _check_pods_for_leader w/o label")
                     new_leader = self._check_pods_for_leader(k8s)
 
             # update the global leader (leader can be None)
@@ -610,7 +608,6 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
 
         leader = None
         try:
-            global_log.info("jmakar: before _get_current_leader")
             leader = self._get_current_leader(k8s)
         except Exception as e:
             global_log.log(
