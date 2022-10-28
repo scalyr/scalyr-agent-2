@@ -117,9 +117,7 @@ class TestConfigurationK8s(TestConfigurationBase):
                 TEST_INT,
                 int,
             ),
-            "leader_node": ("SCALYR_K8S_LEADER_NODE", TEST_STRING, six.text_type),
             "check_labels": ("SCALYR_K8S_CHECK_LABELS", True, bool),
-            "ignore_master": ("SCALYR_K8S_IGNORE_MASTER", False, bool),
         }
 
         # Fake the environment variables

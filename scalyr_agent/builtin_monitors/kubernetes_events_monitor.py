@@ -683,7 +683,6 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
             )
 
             self._pod_name = k8s_api_main.get_pod_name()
-            node_name = k8s_api_main.get_node_name(self._pod_name)
             cluster_name = k8s_api_main.get_cluster_name()
 
             last_event = None
