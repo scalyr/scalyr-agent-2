@@ -52,6 +52,8 @@ spec:
         image: scalyr/scalyr-k8s-agent:2.1.37
         imagePullPolicy: Always
         name: scalyr-agent
+        securityContext:
+          allowPrivilegeEscalation: false
         resources:
           limits:
             memory: 500Mi
@@ -74,7 +76,6 @@ spec:
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler
-      securityContext: {}
       serviceAccount: scalyr-service-account
       serviceAccountName: scalyr-service-account
       terminationGracePeriodSeconds: 30
