@@ -118,6 +118,11 @@ class TestConfigurationK8s(TestConfigurationBase):
                 int,
             ),
             "check_labels": ("SCALYR_K8S_CHECK_LABELS", True, bool),
+            "leader_candidate_label": (
+                "SCALYR_K8S_LEADER_CANDIDATE_LABEL",
+                "agent.config.scalyr.com/events_leader_candidate=true",
+                six.text_type,
+            ),
         }
 
         # Fake the environment variables

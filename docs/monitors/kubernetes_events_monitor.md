@@ -18,7 +18,7 @@ By default, the leader election algorithm selects the Scalyr Agent running on th
 
 ### Pod Labels
 
-The approach is to add the label `agent.config.scalyr.com/events_leader_candidate=true` to a subset of pods that you wish to be eligible to become the events collector.  This can be done with the following command:
+The approach is to add the label `agent.config.scalyr.com/events_leader_candidate=true` (or the value specified in `leader_candidate_label`) to a subset of pods that you wish to be eligible to become the events collector.  This can be done with the following command:
 
 `kubectl label pod <podname> agent.config.scalyr.com/events_leader_candidate=true`
 
@@ -89,4 +89,5 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
 | `message_log`           | Optional (defaults to ``kubernetes_events.log``). Specifies the file name under which event messages are stored. The file will be placed in the default Scalyr log directory, unless it is an absolute path | 
 | `event_object_filter`   | Optional (defaults to ['CronJob', 'DaemonSet', 'Deployment', 'Job', 'Node', 'Pod', 'ReplicaSet', 'ReplicationController', 'StatefulSet', 'Endpoint']). A list of event object types to filter on. Only events whose ``involvedObject`` ``kind`` is on this list will be included.  To not perform filtering and to send all event kinds, set the environment variable ``SCALYR_K8S_EVENT_OBJECT_FILTER=null``. | 
 | `leader_check_interval` | Optional (defaults to 60). The number of seconds to wait between checks to see if we are still the leader. | 
-| `check_labels`          | Optional (defaults to False). If true, then the monitor will check for any pods with the label `agent.config.scalyr.com/events_leader_candidate=true` and the pod with this label set and that has the oldestcreation time will be the event monitor leader. | 
+| `check_labels`           | Optional (defaults to False). If true, then the monitor will check for any nodes with the label `agent.config.scalyr.com/events_leader_candidate=true` and the node with this label set and that has the oldestcreation time will be the event monitor leader. | 
+| `leader_candidate_label` | Optional (defaults to `agent.config.scalyr.com/events_leader_candidate=true`). If `check_labels` is true, then the monitor will check for any nodes with the label configured using this option and the node with this label set and that has the oldestcreation time will be the event monitor leader. | 

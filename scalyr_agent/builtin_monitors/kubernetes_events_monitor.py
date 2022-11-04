@@ -163,6 +163,17 @@ define_config_option(
     env_name="SCALYR_K8S_CHECK_LABELS",
 )
 
+define_config_option(
+    __monitor__,
+    "leader_candidate_label",
+    "Optional (defaults to `agent.config.scalyr.com/events_leader_candidate=true`). "
+    "If `check_labels` is true, then the monitor will check for any nodes with the label "
+    "configured using this option and the node with this label set and that has the oldest"
+    "creation time will be the event monitor leader.",
+    convert_to=six.text_type,
+    default="agent.config.scalyr.com/events_leader_candidate=true",
+    env_name="SCALYR_K8S_LEADER_CANDIDATE_LABEL",
+)
 
 class EventLogFormatter(BaseFormatter):
     """Formatter used for the logs produced by the event monitor."""
@@ -198,7 +209,7 @@ By default, the leader election algorithm selects the Scalyr Agent running on th
 
 ### Pod Labels
 
-The approach is to add the label `agent.config.scalyr.com/events_leader_candidate=true` to a subset of pods that you wish to be eligible to become the events collector.  This can be done with the following command:
+The approach is to add the label `agent.config.scalyr.com/events_leader_candidate=true` (or the value specified in `leader_candidate_label`) to a subset of pods that you wish to be eligible to become the events collector.  This can be done with the following command:
 
 `kubectl label pod <podname> agent.config.scalyr.com/events_leader_candidate=true`
 
@@ -280,6 +291,7 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
 
         self._leader_check_interval = self._config.get("leader_check_interval")
         self._check_labels = self._config.get("check_labels")
+        self._leader_candidate_label = self._config.get("leader_candidate_label")
 
         self._current_leader = None
         self._owner_selector = None
@@ -551,7 +563,7 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
             # this is in case the label has been moved to a different pod and the old pod is still alive
             if self._check_labels:
                 new_leader = self._check_pods_for_leader(
-                    k8s, "agent.config.scalyr.com/events_leader_candidate=true"
+                    k8s, self._leader_candidate_label
                 )
 
             if new_leader is not None:
