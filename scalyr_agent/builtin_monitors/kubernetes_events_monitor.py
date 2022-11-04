@@ -175,6 +175,7 @@ define_config_option(
     env_name="SCALYR_K8S_LEADER_CANDIDATE_LABEL",
 )
 
+
 class EventLogFormatter(BaseFormatter):
     """Formatter used for the logs produced by the event monitor."""
 
