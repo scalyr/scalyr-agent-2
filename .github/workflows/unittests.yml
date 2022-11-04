@@ -303,6 +303,6 @@ jobs:
         with:
           path: reports
       - name: Publish Test Results
-        uses: EnricoMi/publish-unit-test-result-action@713caf1dd6f1c273144546ed2d79ca24a01f4623 # pin@v2
+        uses: EnricoMi/publish-unit-test-result-action@46ab8d49369d898e381a607119161771bc65c2a6 # pin@v2
         with:
           junit_files: "reports/**/junit*.xml"
