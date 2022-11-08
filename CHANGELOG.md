@@ -10,7 +10,7 @@ Kubernetes:
 * Fix bug that caused logging of the Kubernetes cache stats to agent status. 
 
 Other
-* Add to agent's status its generation and average generation time. 
+* Added support for ``--debug`` flag to the scalyr-agent-2 status command. When this flag is used, agent prints additional debug related information with the status output. NOTE: Right now it's only supported with the healthcheck option (``--health_check``, ``-H``).
 
 ## 2.1.37 "Penvolea" - October 17, 2022
 <!---
