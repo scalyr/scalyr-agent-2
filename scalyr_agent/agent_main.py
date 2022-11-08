@@ -139,6 +139,7 @@ import scalyr_agent.monitors_manager
 
 STATUS_FILE = "last_status"
 STATUS_FORMAT_FILE = "status_format"
+TEMP_STATUS_FILES_DIR_NAME = "dataset_agent_statuses"
 
 VALID_STATUS_FORMATS = ["text", "json"]
 
@@ -782,15 +783,25 @@ class ScalyrAgent(object):
             return agent_processes
 
         # Get status file stats and content.
-        def get_status_file_info():
+        def get_status_files_info():
             result = {}
             try:
                 ls_output = subprocess.check_output(
                     ["ls", "-la", data_directory]
                 ).decode()
-                result["stats"] = ls_output.splitlines()
+                result["data_root_file_stats"] = ls_output.splitlines()
             except Exception as e:
-                result["stats"] = six.text_type(e)
+                result["data_root_file_stats"] = six.text_type(e)
+
+            try:
+                ls_output = subprocess.check_output(
+                    ["ls", "-la", os.path.join(tempfile.gettempdir(), TEMP_STATUS_FILES_DIR_NAME)]
+                ).decode()
+                result["temp_status_files_stats"] = ls_output.splitlines()
+            except Exception as e:
+                result["temp_status_files_stats"] = six.text_type(e)
+
+
 
             try:
                 with open(status_file_path, "rb") as fp:
@@ -807,7 +818,7 @@ class ScalyrAgent(object):
         result["agent_process"] = get_agent_process_stats()
         if not platform.system().lower().startswith("windows"):
             result["processes"] = find_agent_processes()
-            result["status_file_info"] = get_status_file_info()
+            result["status_file_info"] = get_status_files_info()
 
         return result
 
@@ -2278,17 +2289,24 @@ class ScalyrAgent(object):
 
             # Before writing status file, search and delete status files from the previous status reports, which
             # may be left undeleted because of unexpected errors. Since the `mkstemp` function creates uniquely
-            # named file, the number of such undeleted files may eventually grow and pollute the directory.
+            # named file, the number of such undeleted files may eventually grow.
+
+            # Create (if needed) directory in the system's default tmp folder.
+            agent_status_temp_files_dir = os.path.join(
+                tempfile.gettempdir(), TEMP_STATUS_FILES_DIR_NAME
+            )
+            os.makedirs(agent_status_temp_files_dir, exist_ok=True)
+
             fount_tmp_files = list(
                 glob.glob(
-                    os.path.join(self.__config.agent_data_path, "last_status_*.tmp")
+                    os.path.join(agent_status_temp_files_dir, "last_status_*.tmp")
                 )
             )
             current_time = time.time()
 
-            # Iterate through all found temp files and remove files which are older than 60 sec.
+            # Iterate through all found temp files and remove files which are older than 10 minutes.
             for found_path in fount_tmp_files:
-                if os.path.getmtime(found_path) + 60 < current_time:
+                if os.path.getmtime(found_path) + 600 < current_time:
                     os.unlink(found_path)
 
             # We do a little dance to write the status.  We write it to a temporary file first, and then
@@ -2297,7 +2315,7 @@ class ScalyrAgent(object):
             tmp_file_fd, tmp_file_path = tempfile.mkstemp(
                 prefix="last_status_",
                 suffix=".tmp",
-                dir=self.__config.agent_data_path,
+                dir=agent_status_temp_files_dir,
                 text=True,
             )
             final_file_path = os.path.join(self.__config.agent_data_path, "last_status")
