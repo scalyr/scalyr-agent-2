@@ -38,9 +38,11 @@ from __future__ import absolute_import
 __author__ = "czerwin@scalyr.com"
 
 import collections
+import datetime
 import json
 import platform
 import subprocess
+import tempfile
 import traceback
 import errno
 import gc
@@ -706,7 +708,11 @@ class ScalyrAgent(object):
             log.info("Received signal to shutdown, attempt to shutdown cleanly.")
             self.__run_state.stop()
 
-    def _get_system_and_agent_stats(self, status_file_path):  # type: (six.text_type) -> Optional[Dict]
+    def _get_system_and_agent_stats(
+            self,
+            data_directory,
+            status_file_path
+    ):  # type: (six.text_type, six.text_type) -> Optional[Dict]
         """
         Return current machine's and agent process' stats.
         :return: Dict with stats.
@@ -735,9 +741,10 @@ class ScalyrAgent(object):
                 return {"error": "Can't create psutil process. Error: {}".format(e)}
 
             try:
-                agent_process_stats["cpu_percent"] = psutil_process.pid
-                agent_process_stats["cpu_percent"] = psutil_process.cpu_percent()
-                agent_process_stats["cpu_percent"] = psutil_process.memory_info().rss
+                with psutil_process.oneshot():
+                    agent_process_stats["pid"] = psutil_process.pid
+                    agent_process_stats["cpu_percent"] = psutil_process.cpu_percent()
+                    agent_process_stats["memory_rss"] = psutil_process.memory_info().rss
             except Exception as e:
                 agent_process_stats["error"] = str(e)
 
@@ -781,7 +788,8 @@ class ScalyrAgent(object):
         def get_status_file_info():
             result = {}
             try:
-                result["stats"] = subprocess.check_output(["ls", "-la", status_file_path]).decode(errors="ignore")
+                ls_output = subprocess.check_output(["ls", "-la", data_directory]).decode()
+                result["stats"] = ls_output.splitlines()
             except Exception as e:
                 result["stats"] = six.text_type(e)
 
@@ -796,8 +804,8 @@ class ScalyrAgent(object):
 
 
         result = {}
-
         result.update(get_machine_stats())
+        result["timestamp"] = datetime.datetime.now().microsecond * 1000
         result["agent_process"] = get_agent_process_stats()
         if not platform.system().lower().startswith("windows"):
             result["processes"] = find_agent_processes()
@@ -850,7 +858,10 @@ class ScalyrAgent(object):
 
         # Capture debug stats at the beginning.
         if debug:
-            stats = self._get_system_and_agent_stats(status_file_path=status_file)
+            stats = self._get_system_and_agent_stats(
+                data_directory=data_directory,
+                status_file_path=status_file
+            )
             debug_stats.append(stats)
 
         if status_format not in VALID_STATUS_FORMATS:
@@ -933,7 +944,10 @@ class ScalyrAgent(object):
         while True:
             # Capture debug stats every second while waiting.
             if debug and (last_debug_stat_time + 1 < time.time()):
-                stats = self._get_system_and_agent_stats(status_file_path=status_file)
+                stats = self._get_system_and_agent_stats(
+                    data_directory=data_directory,
+                    status_file_path=status_file
+                )
                 debug_stats.append(stats)
                 last_debug_stat_time = time.time()
 
@@ -961,7 +975,12 @@ class ScalyrAgent(object):
 
                 # Capture debug stats on timeout.
                 if debug:
-                    debug_stats.append(self._get_system_and_agent_stats(status_file_path=status_file))
+                    debug_stats.append(
+                        self._get_system_and_agent_stats(
+                            data_directory=data_directory,
+                            status_file_path=status_file
+                        )
+                    )
 
                 print(
                     "Failed to get status within 5 seconds.  Giving up.  The agent process is "
@@ -2256,18 +2275,33 @@ class ScalyrAgent(object):
             status_format = "text"
 
         tmp_file = None
+
         try:
+
+            # Before writing status file, search and delete status files from the previous status reports, which
+            # may be left undeleted because of unexpected errors. Since the `mkstemp` function creates uniquely
+            # named file, the number of such undeleted files may eventually grow and pollute the directory.
+            fount_tmp_files = list(glob.glob(
+                os.path.join(self.__config.agent_data_path, "last_status_*.tmp")
+            ))
+            current_time = time.time()
+
+            # Iterate through all found temp files and remove files which are older than 60 sec.
+            for found_path in fount_tmp_files:
+                if os.path.getmtime(found_path) + 60 < current_time:
+                    os.unlink(found_path)
+
             # We do a little dance to write the status.  We write it to a temporary file first, and then
             # move it into the real location after the write has finished.  This way, the process watching
             # the file we are writing does not accidentally read it when it is only partially written.
-            tmp_file_path = os.path.join(
-                self.__config.agent_data_path, "last_status.tmp"
+            tmp_file_fd, tmp_file_path = tempfile.mkstemp(
+                prefix="last_status_", suffix=".tmp", dir=self.__config.agent_data_path, text=True
             )
             final_file_path = os.path.join(self.__config.agent_data_path, "last_status")
 
             if os.path.isfile(final_file_path):
                 os.remove(final_file_path)
-            tmp_file = open(tmp_file_path, "w")
+            tmp_file = os.fdopen(tmp_file_fd, "w")
 
             agent_status = self.__generate_status()
 
