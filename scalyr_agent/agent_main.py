@@ -706,7 +706,7 @@ class ScalyrAgent(object):
             log.info("Received signal to shutdown, attempt to shutdown cleanly.")
             self.__run_state.stop()
 
-    def _get_system_and_agent_stats(self):  # type: () -> Optional[Dict]
+    def _get_system_and_agent_stats(self, status_file_path):  # type: (six.text_type) -> Optional[Dict]
         """
         Return current machine's and agent process' stats.
         :return: Dict with stats.
@@ -759,7 +759,7 @@ class ScalyrAgent(object):
             return machine_stats
 
         # Get list of related processes'
-        def find_agent_processed():
+        def find_agent_processes():
             agent_processes = []
             try:
                 ps_output = subprocess.check_output(
@@ -777,12 +777,31 @@ class ScalyrAgent(object):
 
             return agent_processes
 
+        # Get status file stats and content.
+        def get_status_file_info():
+            result = {}
+            try:
+                result["stats"] = subprocess.check_output(["ls", "-la", status_file_path]).decode(errors="ignore")
+            except Exception as e:
+                result["stats"] = six.text_type(e)
+
+            try:
+                with open(status_file_path, "rb") as fp:
+                    content = fp.read()
+                result["content"] = content.decode(errors="ignore")
+            except Exception as e:
+                result["content"] = six.text_type(e)
+
+            return result
+
+
         result = {}
 
         result.update(get_machine_stats())
         result["agent_process"] = get_agent_process_stats()
         if not platform.system().lower().startswith("windows"):
-            result["processes"] = find_agent_processed()
+            result["processes"] = find_agent_processes()
+            result["status_file_info"] = get_status_file_info()
 
         return result
 
@@ -818,6 +837,9 @@ class ScalyrAgent(object):
         # List of all debug stats that are captured during status report.
         debug_stats = []
 
+        status_file = os.path.join(data_directory, STATUS_FILE)
+        status_format_file = os.path.join(data_directory, STATUS_FORMAT_FILE)
+
         def print_debug_stats():
             print(
                 "Debug stats: {}".format(
@@ -828,7 +850,7 @@ class ScalyrAgent(object):
 
         # Capture debug stats at the beginning.
         if debug:
-            stats = self._get_system_and_agent_stats()
+            stats = self._get_system_and_agent_stats(status_file_path=status_file)
             debug_stats.append(stats)
 
         if status_format not in VALID_STATUS_FORMATS:
@@ -865,9 +887,6 @@ class ScalyrAgent(object):
                 file=sys.stderr,
             )
             return 1
-
-        status_file = os.path.join(data_directory, STATUS_FILE)
-        status_format_file = os.path.join(data_directory, STATUS_FORMAT_FILE)
 
         # This users needs to zero out the current status file (if it exists), so they need write access to it.
         # When we do create the status file, we give everyone read/write access, so it should not be an issue.
@@ -914,7 +933,7 @@ class ScalyrAgent(object):
         while True:
             # Capture debug stats every second while waiting.
             if debug and (last_debug_stat_time + 1 < time.time()):
-                stats = self._get_system_and_agent_stats()
+                stats = self._get_system_and_agent_stats(status_file_path=status_file)
                 debug_stats.append(stats)
                 last_debug_stat_time = time.time()
 
@@ -942,7 +961,7 @@ class ScalyrAgent(object):
 
                 # Capture debug stats on timeout.
                 if debug:
-                    debug_stats.append(self._get_system_and_agent_stats())
+                    debug_stats.append(self._get_system_and_agent_stats(status_file_path=status_file))
 
                 print(
                     "Failed to get status within 5 seconds.  Giving up.  The agent process is "
