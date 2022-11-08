@@ -795,13 +795,15 @@ class ScalyrAgent(object):
 
             try:
                 ls_output = subprocess.check_output(
-                    ["ls", "-la", os.path.join(tempfile.gettempdir(), TEMP_STATUS_FILES_DIR_NAME)]
+                    [
+                        "ls",
+                        "-la",
+                        os.path.join(tempfile.gettempdir(), TEMP_STATUS_FILES_DIR_NAME),
+                    ]
                 ).decode()
                 result["temp_status_files_stats"] = ls_output.splitlines()
             except Exception as e:
                 result["temp_status_files_stats"] = six.text_type(e)
-
-
 
             try:
                 with open(status_file_path, "rb") as fp:
