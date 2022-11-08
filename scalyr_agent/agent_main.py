@@ -328,7 +328,6 @@ class ScalyrAgent(object):
         health_check = command_options.health_check
         status_format = command_options.status_format
         extra_config_dir = command_options.extra_config_dir
-        debug = command_options.debug
         self.__no_fork = command_options.no_fork
         no_check_remote = False
 
@@ -417,9 +416,9 @@ class ScalyrAgent(object):
                     )
                 return self.__detailed_status(
                     agent_data_path,
+                    command_options=command_options,
                     status_format=status_format,
                     health_check=health_check,
-                    debug=debug,
                 )
             elif command == "restart":
                 return self.__restart(quiet, no_check_remote)
@@ -709,9 +708,7 @@ class ScalyrAgent(object):
             self.__run_state.stop()
 
     def _get_system_and_agent_stats(
-            self,
-            data_directory,
-            status_file_path
+        self, data_directory, status_file_path
     ):  # type: (six.text_type, six.text_type) -> Optional[Dict]
         """
         Return current machine's and agent process' stats.
@@ -788,7 +785,9 @@ class ScalyrAgent(object):
         def get_status_file_info():
             result = {}
             try:
-                ls_output = subprocess.check_output(["ls", "-la", data_directory]).decode()
+                ls_output = subprocess.check_output(
+                    ["ls", "-la", data_directory]
+                ).decode()
                 result["stats"] = ls_output.splitlines()
             except Exception as e:
                 result["stats"] = six.text_type(e)
@@ -801,7 +800,6 @@ class ScalyrAgent(object):
                 result["content"] = six.text_type(e)
 
             return result
-
 
         result = {}
         result.update(get_machine_stats())
@@ -816,10 +814,10 @@ class ScalyrAgent(object):
     def __detailed_status(
         self,
         data_directory,
+        command_options,
         status_format="text",
         health_check=False,
         zero_status_file=True,
-        debug=False,
     ):
         """Execute the status -v or -H command.
 
@@ -857,10 +855,9 @@ class ScalyrAgent(object):
             )
 
         # Capture debug stats at the beginning.
-        if debug:
+        if command_options.debug:
             stats = self._get_system_and_agent_stats(
-                data_directory=data_directory,
-                status_file_path=status_file
+                data_directory=data_directory, status_file_path=status_file
             )
             debug_stats.append(stats)
 
@@ -943,10 +940,12 @@ class ScalyrAgent(object):
         # Now loop until we see it show up.
         while True:
             # Capture debug stats every second while waiting.
-            if debug and (last_debug_stat_time + 1 < time.time()):
+            if command_options.debug and (
+                last_debug_stat_time + command_options.stats_capture_interval
+                < time.time()
+            ):
                 stats = self._get_system_and_agent_stats(
-                    data_directory=data_directory,
-                    status_file_path=status_file
+                    data_directory=data_directory, status_file_path=status_file
                 )
                 debug_stats.append(stats)
                 last_debug_stat_time = time.time()
@@ -974,11 +973,10 @@ class ScalyrAgent(object):
                     )
 
                 # Capture debug stats on timeout.
-                if debug:
+                if command_options.debug:
                     debug_stats.append(
                         self._get_system_and_agent_stats(
-                            data_directory=data_directory,
-                            status_file_path=status_file
+                            data_directory=data_directory, status_file_path=status_file
                         )
                     )
 
@@ -988,7 +986,7 @@ class ScalyrAgent(object):
                     file=sys.stderr,
                 )
 
-                if debug:
+                if command_options.debug:
                     print_debug_stats()
                 return 1
 
@@ -2281,9 +2279,11 @@ class ScalyrAgent(object):
             # Before writing status file, search and delete status files from the previous status reports, which
             # may be left undeleted because of unexpected errors. Since the `mkstemp` function creates uniquely
             # named file, the number of such undeleted files may eventually grow and pollute the directory.
-            fount_tmp_files = list(glob.glob(
-                os.path.join(self.__config.agent_data_path, "last_status_*.tmp")
-            ))
+            fount_tmp_files = list(
+                glob.glob(
+                    os.path.join(self.__config.agent_data_path, "last_status_*.tmp")
+                )
+            )
             current_time = time.time()
 
             # Iterate through all found temp files and remove files which are older than 60 sec.
@@ -2295,7 +2295,10 @@ class ScalyrAgent(object):
             # move it into the real location after the write has finished.  This way, the process watching
             # the file we are writing does not accidentally read it when it is only partially written.
             tmp_file_fd, tmp_file_path = tempfile.mkstemp(
-                prefix="last_status_", suffix=".tmp", dir=self.__config.agent_data_path, text=True
+                prefix="last_status_",
+                suffix=".tmp",
+                dir=self.__config.agent_data_path,
+                text=True,
             )
             final_file_path = os.path.join(self.__config.agent_data_path, "last_status")
 
@@ -2490,6 +2493,15 @@ if __name__ == "__main__":
         default=False,
         help="Prints additional debug output. For now works only with --health-check option.",
     )
+
+    parser.add_argument(
+        "--stats-capture-interval",
+        dest="stats_capture_interval",
+        type=float,
+        default=1,
+        help="Set interval before debug stats in the agent status are gathered. Only works with --debug option.",
+    )
+
     parser.add_argument(
         "--format",
         dest="status_format",
