@@ -139,7 +139,6 @@ import scalyr_agent.monitors_manager
 
 STATUS_FILE = "last_status"
 STATUS_FORMAT_FILE = "status_format"
-TEMP_STATUS_FILES_DIR_NAME = "dataset_agent_statuses"
 
 VALID_STATUS_FORMATS = ["text", "json"]
 
@@ -858,14 +857,6 @@ class ScalyrAgent(object):
         status_file = os.path.join(data_directory, STATUS_FILE)
         status_format_file = os.path.join(data_directory, STATUS_FORMAT_FILE)
 
-        def print_debug_stats():
-            print(
-                "Debug stats: {}".format(
-                    json.dumps(debug_stats, sort_keys=True, indent=4)
-                ),
-                file=sys.stderr,
-            )
-
         # Capture debug stats at the beginning.
         if command_options.debug:
             stats = self._get_system_and_agent_stats(
@@ -992,14 +983,18 @@ class ScalyrAgent(object):
                         )
                     )
 
+                if command_options.debug:
+                    debug_stats_str = "Debug stats: {}".format(
+                        json.dumps(debug_stats, sort_keys=True, indent=4)
+                    ),
+                else:
+                    debug_stats_str = ""
+
                 print(
                     "Failed to get status within 5 seconds.  Giving up.  The agent process is "
-                    "possibly stuck.  See %s for more details." % agent_log,
+                    "possibly stuck.  See %s for more details.%s" % (agent_log, debug_stats_str),
                     file=sys.stderr,
                 )
-
-                if command_options.debug:
-                    print_debug_stats()
                 return 1
 
             time.sleep(0.03)
