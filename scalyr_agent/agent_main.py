@@ -986,13 +986,13 @@ class ScalyrAgent(object):
                 if command_options.debug:
                     debug_stats_str = "Debug stats: {}".format(
                         json.dumps(debug_stats, sort_keys=True, indent=4)
-                    ),
+                    )
                 else:
                     debug_stats_str = ""
 
                 print(
                     "Failed to get status within 5 seconds.  Giving up.  The agent process is "
-                    "possibly stuck.  See %s for more details.%s" % (agent_log, debug_stats_str),
+                    "possibly stuck.  See %s for more details.\n%s" % (agent_log, debug_stats_str),
                     file=sys.stderr,
                 )
                 return 1
