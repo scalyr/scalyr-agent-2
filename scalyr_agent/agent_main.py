@@ -794,18 +794,6 @@ class ScalyrAgent(object):
                 result["data_root_file_stats"] = six.text_type(e)
 
             try:
-                ls_output = subprocess.check_output(
-                    [
-                        "ls",
-                        "-la",
-                        os.path.join(tempfile.gettempdir(), TEMP_STATUS_FILES_DIR_NAME),
-                    ]
-                ).decode()
-                result["temp_status_files_stats"] = ls_output.splitlines()
-            except Exception as e:
-                result["temp_status_files_stats"] = six.text_type(e)
-
-            try:
                 with open(status_file_path, "rb") as fp:
                     content = fp.read()
                 result["content"] = content.decode(errors="ignore")
