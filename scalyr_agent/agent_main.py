@@ -844,7 +844,6 @@ class ScalyrAgent(object):
                              a new status file This is primary meant to be used in testing where we can
                              set it to False which means we can avoid a lot of nasty mocking if
                              open() and related functiond.
-        :param debug: Print additional information if True.
 
         @return:  An exit status code for the status command indicating success or failure.
         @rtype: int
@@ -2286,45 +2285,18 @@ class ScalyrAgent(object):
             status_format = "text"
 
         tmp_file = None
-
         try:
-
-            # Before writing status file, search and delete status files from the previous status reports, which
-            # may be left undeleted because of unexpected errors. Since the `mkstemp` function creates uniquely
-            # named file, the number of such undeleted files may eventually grow.
-
-            # Create (if needed) directory in the system's default tmp folder.
-            agent_status_temp_files_dir = os.path.join(
-                tempfile.gettempdir(), TEMP_STATUS_FILES_DIR_NAME
-            )
-            os.makedirs(agent_status_temp_files_dir, exist_ok=True)
-
-            fount_tmp_files = list(
-                glob.glob(
-                    os.path.join(agent_status_temp_files_dir, "last_status_*.tmp")
-                )
-            )
-            current_time = time.time()
-
-            # Iterate through all found temp files and remove files which are older than 10 minutes.
-            for found_path in fount_tmp_files:
-                if os.path.getmtime(found_path) + 600 < current_time:
-                    os.unlink(found_path)
-
             # We do a little dance to write the status.  We write it to a temporary file first, and then
             # move it into the real location after the write has finished.  This way, the process watching
             # the file we are writing does not accidentally read it when it is only partially written.
-            tmp_file_fd, tmp_file_path = tempfile.mkstemp(
-                prefix="last_status_",
-                suffix=".tmp",
-                dir=agent_status_temp_files_dir,
-                text=True,
+            tmp_file_path = os.path.join(
+                self.__config.agent_data_path, "last_status.tmp"
             )
             final_file_path = os.path.join(self.__config.agent_data_path, "last_status")
 
             if os.path.isfile(final_file_path):
                 os.remove(final_file_path)
-            tmp_file = os.fdopen(tmp_file_fd, "w")
+            tmp_file = open(tmp_file_path, "w")
 
             agent_status = self.__generate_status()
 
