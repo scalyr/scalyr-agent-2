@@ -981,7 +981,8 @@ class ScalyrAgent(object):
 
                 print(
                     "Failed to get status within 5 seconds.  Giving up.  The agent process is "
-                    "possibly stuck.  See %s for more details.\n%s" % (agent_log, debug_stats_str),
+                    "possibly stuck.  See %s for more details.\n%s"
+                    % (agent_log, debug_stats_str),
                     file=sys.stderr,
                 )
                 return 1
