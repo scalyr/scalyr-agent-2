@@ -1,4 +1,4 @@
-# Copyright 2018 Scalyr Inc.
+# Copyright 2018-2022 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ------------------------------------------------------------------------
-# author:  Imron Alston <imron@scalyr.com>
+# author: scalyr-cloudtech@scalyr.com
+
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
-__author__ = "imron@scalyr.com"
+__author__ = "scalyr-cloudtech@scalyr.com"
 
 from scalyr_agent import compat
 
@@ -153,18 +154,9 @@ define_config_option(
 
 define_config_option(
     __monitor__,
-    "leader_node",
-    "Optional (defaults to None). Force the `leader` to be the scalyr-agent that runs on this node.",
-    convert_to=six.text_type,
-    default=None,
-    env_name="SCALYR_K8S_LEADER_NODE",
-)
-
-define_config_option(
-    __monitor__,
     "check_labels",
-    "Optional (defaults to False). If true, then the monitor will check for any nodes with the label "
-    "`agent.config.scalyr.com/events_leader_candidate=true` and the node with this label set and that has the oldest"
+    "Optional (defaults to False). If true, then the monitor will check for any pods with the label "
+    "`agent.config.scalyr.com/events_leader_candidate=true` and the pod with this label set and that has the oldest"
     "creation time will be the event monitor leader.",
     convert_to=bool,
     default=False,
@@ -173,12 +165,14 @@ define_config_option(
 
 define_config_option(
     __monitor__,
-    "ignore_master",
-    "Optional (defaults to True). If true, then the monitor will ignore any nodes with the label "
-    "`node-role.kubernetes.io/master` when determining which node is the event monitor leader.",
-    convert_to=bool,
-    default=True,
-    env_name="SCALYR_K8S_IGNORE_MASTER",
+    "leader_candidate_label",
+    "Optional (defaults to `agent.config.scalyr.com/events_leader_candidate=true`). "
+    "If `check_labels` is true, then the monitor will check for any nodes with the label "
+    "configured using this option and the node with this label set and that has the oldest"
+    "creation time will be the event monitor leader.",
+    convert_to=six.text_type,
+    default="agent.config.scalyr.com/events_leader_candidate=true",
+    env_name="SCALYR_K8S_LEADER_CANDIDATE_LABEL",
 )
 
 
@@ -210,17 +204,17 @@ This monitor powers the [Kubernetes Events dashboard](https://www.scalyr.com/das
 
 ## Event Collection Leader
 
-The Scalyr Agent uses a simple leader election algorithm to decide which Scalyr Agent should retrieve the cluster's Events and upload them to Scalyr. This is necessary because the Events pertain to the entire cluster (and not necessarily just one Node). Duplicate information would be uploaded if each Scalyr Agent Pod retrieved the cluster's Events and uploaded them.
+The Scalyr Agent uses a simple leader election algorithm to decide which Scalyr Agent should retrieve the cluster's Events and upload them to Scalyr. This is necessary because the Events pertain to the entire cluster. Duplicate information would be uploaded if each Scalyr Agent Pod retrieved the cluster's Events and uploaded them.
 
-By default, the leader election algorithm selects the Scalyr Agent Pod running on the oldest Node, excluding the Node running the master. To determine which is the oldest node, each Scalyr Agent Pod will retrieve the entire cluster Node list at start up, and then query the API Server once every `leader_check_interval` seconds (defaults to 60 seconds) to ensure the leader is still alive. For large clusters, performing these checks can place noticeable load on the K8s API server. There are two ways to address this issue, with different impacts on load and flexibility.
+By default, the leader election algorithm selects the Scalyr Agent running on the oldest Pod. To determine which is the oldest pod, each Scalyr Agent Pod will retrieve the Pod list of the associated ReplicaSet at start up, and then query the API Server once every `leader_check_interval` seconds (defaults to 60 seconds) to ensure the leader is still alive. For large deployment/replicaset or cluster/daemonset, performing these checks can place noticeable load on the K8s API server. Beyond using a limited ReplicaSet in the Deployment (or a separate DaemonSet for the monitor), there is another way to address this issue.
 
-### Node Labels
+### Pod Labels
 
-The first approach is to add the label `agent.config.scalyr.com/events_leader_candidate=true` to any node that you wish to be eligible to become the events collector.  This can be done with the following command:
+The approach is to add the label `agent.config.scalyr.com/events_leader_candidate=true` (or the value specified in `leader_candidate_label`) to a subset of pods that you wish to be eligible to become the events collector.  This can be done with the following command:
 
-`kubectl label node <nodename> agent.config.scalyr.com/events_leader_candidate=true`
+`kubectl label pod <podname> agent.config.scalyr.com/events_leader_candidate=true`
 
-Where `<nodename>` is the name of the node in question.  You can set this label on multiple nodes, and the agent will use the oldest of them as the event collector leader.  If the leader node is shutdown, it will fallback to the next oldest node and so on.
+Where `<podname>` is the name of the pod in question.  You can set this label on multiple pods, and the agent will use the oldest of them as the event collector leader.  If the leader pod is shutdown, it will fallback to the next oldest pod and so on.
 
 Once the labels have been set, you also need to configure the agent to query these labels.  This is done via the `check_labels` configuration option in the Kubernetes Events monitor config (which is off by default):
 
@@ -236,29 +230,9 @@ monitors: [
 ...
 ```
 
-If `check_labels` is true then instead of querying the API server for all nodes on the cluster, the Scalyr agents will only query the API server for nodes with this label set.  In order to reduce load on the API server, it is recommended to only set this label on a small number of nodes.
+If `check_labels` is true then instead of querying the API server for all nodes on the cluster, the Scalyr agents will only query the API server for pods with this label set.  In order to reduce load on the API server, it is recommended to only set this label on a small number of pods.
 
-This approach reduces the load placed on the API server and also provides a convenient fallback mechanism for when an exister event collector leader node is shutdown.
-
-### Hardcoded Event Collector
-
-The second approach is to manually assign a leader node in the agent config.  This is done via the `leader_node` option of the Kubernetes Events monitor:
-
-```
-...
-monitors: [
-    {
-    "module": "scalyr_agent.builtin_monitors.kubernetes_events_monitor",
-    ...
-    "leader_node": "<name of leader node>"
-    }
-]
-...
-```
-
-When the leader node is explicitly set like this, no API queries are made to the K8s API server and only the node with that name will be used to query K8s events.  The downside to this approach is that it is less flexible, especially in the event of the node shutting down unexpectedly.
-
-The leader election algorithm relies on a few assumptions to work correctly and could, for large clusters, impact performance. If necessary, the events monitor can also be disabled.
+This approach reduces the load placed on the API server and also provides a convenient fallback mechanism for when the existing event collector leader pod is shutdown.
 
 ## Disabling the Kubernetes Events Monitor
 
@@ -306,7 +280,7 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
         self.__log_watcher = None
         self.__module = None
 
-        self._node_name = None
+        self._pod_name = None
 
         # configure the logger and path
         self.__message_log = self._config.get("message_log")
@@ -317,11 +291,11 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
         }
 
         self._leader_check_interval = self._config.get("leader_check_interval")
-        self._leader_node = self._config.get("leader_node")
         self._check_labels = self._config.get("check_labels")
-        self._ignore_master = self._config.get("ignore_master")
+        self._leader_candidate_label = self._config.get("leader_candidate_label")
 
-        self._current_leader = self._leader_node
+        self._current_leader = None
+        self._owner_selector = None
 
         self.__flush_delay = self._config.get("log_flush_delay")
         try:
@@ -441,55 +415,48 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
     def set_log_watcher(self, log_watcher):
         self.__log_watcher = log_watcher
 
-    def _check_if_alive(self, k8s, node):
+    def _check_if_alive(self, k8s, pod):
         """
-        Checks to see if the node specified by `node` is alive
+        Checks to see if the pod specified by `pod` is alive
         """
-        if node is None:
+        if pod is None:
             return False
 
         try:
             # this call will throw an exception on failure
             k8s.query_api_with_retries(
-                "/api/v1/nodes/%s" % node,
-                retry_error_context=node,
+                "/api/v1/namespaces/%s/pods/%s" % (k8s.namespace, pod),
+                retry_error_context="%s/pods/%s" % (k8s.namespace, pod),
                 retry_error_limit_key="k8se_check_if_alive",
             )
         except Exception:
             global_log.log(
-                scalyr_logging.DEBUG_LEVEL_1, "_check_if_alive False for node %s" % node
+                scalyr_logging.DEBUG_LEVEL_1, "_check_if_alive False for pod %s" % pod
             )
             return False
 
-        # if we are here, then the above node exists so return True
+        # if we are here, then the above pod exists so return True
         return True
 
-    def _get_oldest_node(self, nodes, ignore_master):
+    def _get_oldest_pod(self, pods):
         """
-        Takes a list of nodes returned from querying the k8s api, and returns the name
-        of the node with the oldest creationTimestamp or None if nodes is empty or doesn't
-        contain Node objects.
-
-        if `ignore_master` is true, then any nodes with the label `node-role.kubernetes.io/master` are ignored.
+        Takes a list of pods returned from querying the k8s api, and returns the name
+        of the pod with the oldest creationTimestamp or None if pods is empty or doesn't
+        contain Pod objects.
         """
 
         oldest_time = datetime.datetime.utcnow()
         oldest = None
 
-        # loop over all nodes and find the one with the oldest create time
-        for node in nodes:
-            metadata = node.get("metadata", {})
+        # loop over all pods and find the one with the oldest create time
+        for pod in pods:
+            metadata = pod.get("metadata", {})
             create_time = metadata.get("creationTimestamp", None)
             if create_time is None:
                 continue
 
             name = metadata.get("name", None)
             if name is None:
-                continue
-
-            # skip the master node if necessary
-            labels = metadata.get("labels", {})
-            if ignore_master and "node-role.kubernetes.io/master" in labels:
                 continue
 
             # convert to datetime
@@ -502,22 +469,70 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
 
         return oldest
 
-    def _check_nodes_for_leader(self, k8s, query_fields=""):
+    def _check_pods_for_leader(self, k8s, selector=None):
         """
-        Checks all nodes on the cluster to see which one has the oldest creationTime
-        If `self._ignore_master` is True then any node with the label `node-role.kubernetes.io/master`
-        is ignored.
+        Checks all pods in the owner (replicaset/daemonset) to see which one has the oldest creationTime
         @param k8s: a KubernetesApi object for querying the k8s api
-        @query_fields - optional query string appended to the node endpoint to allow for filtering
+        @selector - optional pod selector to allow for filtering
         """
-        response = k8s.query_api_with_retries(
-            "/api/v1/nodes%s" % query_fields,
-            retry_error_context="nodes%s" % query_fields,
-            retry_error_limit_key="k8se_check_nodes_for_leader",
-        )
-        nodes = response.get("items", [])
 
-        if len(nodes) > 100:
+        # Determine the current pod's owner for the selector to the other owned pods.
+        # Done in two stages: retrieve the current pod for the owner type and name, then the selector proper.
+        if not selector and not self._owner_selector:
+            owner_name, owner_type = None, None
+            response = k8s.query_api_with_retries(
+                "/api/v1/namespaces/%s/pods/%s" % (k8s.namespace, self._pod_name),
+                retry_error_context="%s/pods/%s" % (k8s.namespace, self._pod_name),
+                retry_error_limit_key="k8se_get_own_pod",
+            )
+            for owner in response.get("metadata", {}).get("ownerReferences", []):
+                if owner.get("kind") in ["DaemonSet", "ReplicaSet"] and "name" in owner:
+                    owner_type, owner_name = owner["kind"], owner["name"]
+                    break
+            if not owner_name:
+                raise K8sApiException("unable to determine pod's owner")
+
+            if owner_type == "DaemonSet":
+                response = k8s.query_api_with_retries(
+                    "/apis/apps/v1/namespaces/%s/daemonsets/%s"
+                    % (k8s.namespace, owner_name),
+                    retry_error_context="%s/daemonsets/%s"
+                    % (k8s.namespace, owner_name),
+                    retry_error_limit_key="k8se_get_own_daemonset",
+                )
+                selector = ""
+                for k, v in (
+                    response.get("spec", {}).get("selector", {}).get("matchLabels", {})
+                ).items():
+                    if selector != "":
+                        selector += ","
+                    selector += k + "=" + v
+                self._owner_selector = selector
+
+            elif owner_type == "ReplicaSet":
+                response = k8s.query_api_with_retries(
+                    "/apis/apps/v1/namespaces/%s/replicasets/%s/scale"
+                    % (k8s.namespace, owner_name),
+                    retry_error_context="%s/replicasets/%s/scale"
+                    % (k8s.namespace, owner_name),
+                    retry_error_limit_key="k8se_get_own_replicaset",
+                )
+                self._owner_selector = response.get("status", {}).get("selector")
+
+            if not self._owner_selector:
+                raise K8sApiException("unable to determine replicaset selector")
+
+        params = "?labelSelector=" + six.moves.urllib.parse.quote(
+            selector or self._owner_selector
+        )
+        response = k8s.query_api_with_retries(
+            "/api/v1/namespaces/%s/pods%s" % (k8s.namespace, params),
+            retry_error_context="%s/pods%s" % (k8s.namespace, params),
+            retry_error_limit_key="k8se_check_pods_for_leader",
+        )
+        pods = response.get("items", [])
+
+        if len(pods) > 100:
             # TODO: Add in URL for how to use labels to rectify this once we have the documentation written up.
             global_log.warning(
                 "Warning, Kubernetes Events monitor leader election is finding more than 100 possible "
@@ -526,43 +541,36 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
                 limit_once_per_x_secs=300,
                 limit_key="k8s-too-many-event-leaders",
             )
-        # sort the list by node name to ensure consistent processing order
-        # if two nodes have exactly the same creation time
-        nodes.sort(key=lambda n: n.get("metadata", {}).get("name", ""))
+        # sort the list by pod name to ensure consistent processing order
+        # if two pod have exactly the same creation time
+        pods.sort(key=lambda n: n.get("metadata", {}).get("name", ""))
 
-        # the leader is the longest running node
-        return self._get_oldest_node(nodes, self._ignore_master)
+        # the leader is the longest running pod
+        return self._get_oldest_pod(pods)
 
     def _get_current_leader(self, k8s):
         """
-        Queries the kubernetes api to see which node is the current leader node.
+        Queries the kubernetes api to see which pod is the current leader pod.
 
-        If there is currently a leader node, then only that node is polled to see if it still
-        exists.
-
-        Check to see if the leader is specified as a node label.
-        If not, then if there is not a current leader node, or if the current leader node no longer exists
-        then query all nodes for the leader
+        Check to see if the leader is specified using a pod label.
+        If not, then if there is not a current leader pod, or if the current leader pod no longer exists
+        then query all pods in the owner (replicaset/daemonset) for the leader
         @param k8s: a KubernetesApi object for querying the k8s api
         """
 
         try:
             new_leader = None
-            # first check to see if the leader node is specified as a label
-            # we do this first in case the label has been moved to a different node but the old node is still
-            # alive
+            # first check to see if the leader pod is specified via a label
+            # this is in case the label has been moved to a different pod and the old pod is still alive
             if self._check_labels:
-                query = "?labelSelector=%s" % (
-                    six.moves.urllib.parse.quote(
-                        "agent.config.scalyr.com/events_leader_candidate=true"
-                    )
+                new_leader = self._check_pods_for_leader(
+                    k8s, self._leader_candidate_label
                 )
-                new_leader = self._check_nodes_for_leader(k8s, query)
 
-            # if no labelled leader was found, then check to see if the previous leader is still alive
             if new_leader is not None:
                 global_log.log(scalyr_logging.DEBUG_LEVEL_1, "Leader set from label")
             else:
+                # if no labelled leader was found, then check to see if the previous leader is still alive
                 if self._current_leader is not None and self._check_if_alive(
                     k8s, self._current_leader
                 ):
@@ -573,11 +581,11 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
                     )
                     new_leader = self._current_leader
                 else:
-                    # previous leader is not alive so check all nodes for the leader
+                    # previous leader is not alive so check all pods in the owner for the leader
                     global_log.log(
                         scalyr_logging.DEBUG_LEVEL_1, "Checking for a new leader"
                     )
-                    new_leader = self._check_nodes_for_leader(k8s)
+                    new_leader = self._check_pods_for_leader(k8s)
 
             # update the global leader (leader can be None)
             self._current_leader = new_leader
@@ -586,7 +594,7 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
             global_log.warning(
                 "Could not determine K8s event leader due to authorization error.  The "
                 "Scalyr Service Account does not have permission to retrieve the list of "
-                "available nodes.  Please recreate the role with the latest definition which can be found "
+                "available pods.  Please recreate the role with the latest definition which can be found "
                 "at https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/k8s/scalyr-service-account.yaml "
                 "K8s event collection will be disabled until this is resolved.  See the K8s install "
                 "directions for instructions on how to create the role "
@@ -608,25 +616,19 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
         """
         Detects if this agent is the `leader` for events in a cluster.  In order to prevent duplicates, only `leader` agents will log events.
         """
-        if self._node_name is None:
+        if self._pod_name is None:
             return False
 
-        # see if we have a fixed leader node specified
-        leader = self._leader_node
-
+        leader = None
         try:
-            # if not then query the k8s api for the leader
-            if leader is None:
-                leader = self._get_current_leader(k8s)
-
-            # check if this node is the current leader node
+            leader = self._get_current_leader(k8s)
         except Exception as e:
             global_log.log(
                 scalyr_logging.DEBUG_LEVEL_0,
                 "Unexpected error checking for leader: %s" % (six.text_type(e)),
             )
 
-        return leader is not None and self._node_name == leader
+        return leader is not None and self._pod_name == leader
 
     def _is_resource_expired(self, response):
         """
@@ -693,8 +695,7 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
                 rate_limiter=k8s_api_events.default_query_options.rate_limiter,
             )
 
-            pod_name = k8s_api_main.get_pod_name()
-            self._node_name = k8s_api_main.get_node_name(pod_name)
+            self._pod_name = k8s_api_main.get_pod_name()
             cluster_name = k8s_api_main.get_cluster_name()
 
             last_event = None

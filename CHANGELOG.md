@@ -1,17 +1,17 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.38 "TBD" - October 17, 2022
+## 2.1.38 "TBD" - November 17, 2022
 <!---
-Packaged by Joseph Makar <arthurk@sentinelone.com> on Oct 17, 2022 12:31 -0800
+Packaged by Joseph Makar <joseph.makar@sentinelone.com> on Oct 17, 2022 12:31 -0800
 --->
 
 Kubernetes:
+* Add ``securityContext.allowPrivilegeEscalation: false`` annotation to the Scalyr Agent DaemonSet container specification.
 * Fix bug that caused logging of the Kubernetes cache stats to agent status. 
 
 Other
 * Added support for ``--debug`` flag to the scalyr-agent-2 status command. When this flag is used, agent prints additional debug related information with the status output. NOTE: Right now it's only supported with the healthcheck option (``--health_check``, ``-H``).
-
 ## 2.1.37 "Penvolea" - October 17, 2022
 <!---
 Packaged by Joseph Makar <joseph.makar@sentinelone.com> on Oct 17, 2022 12:31 -0800

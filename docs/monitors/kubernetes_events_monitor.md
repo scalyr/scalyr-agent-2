@@ -12,17 +12,17 @@ This monitor powers the [Kubernetes Events dashboard](https://www.scalyr.com/das
 
 ## Event Collection Leader
 
-The Scalyr Agent uses a simple leader election algorithm to decide which Scalyr Agent should retrieve the cluster's Events and upload them to Scalyr. This is necessary because the Events pertain to the entire cluster (and not necessarily just one Node). Duplicate information would be uploaded if each Scalyr Agent Pod retrieved the cluster's Events and uploaded them.
+The Scalyr Agent uses a simple leader election algorithm to decide which Scalyr Agent should retrieve the cluster's Events and upload them to Scalyr. This is necessary because the Events pertain to the entire cluster. Duplicate information would be uploaded if each Scalyr Agent Pod retrieved the cluster's Events and uploaded them.
 
-By default, the leader election algorithm selects the Scalyr Agent Pod running on the oldest Node, excluding the Node running the master. To determine which is the oldest node, each Scalyr Agent Pod will retrieve the entire cluster Node list at start up, and then query the API Server once every `leader_check_interval` seconds (defaults to 60 seconds) to ensure the leader is still alive. For large clusters, performing these checks can place noticeable load on the K8s API server. There are two ways to address this issue, with different impacts on load and flexibility.
+By default, the leader election algorithm selects the Scalyr Agent running on the oldest Pod. To determine which is the oldest pod, each Scalyr Agent Pod will retrieve the Pod list of the associated ReplicaSet at start up, and then query the API Server once every `leader_check_interval` seconds (defaults to 60 seconds) to ensure the leader is still alive. For large deployment/replicaset or cluster/daemonset, performing these checks can place noticeable load on the K8s API server. Beyond using a limited ReplicaSet in the Deployment (or a separate DaemonSet for the monitor), there is another way to address this issue.
 
-### Node Labels
+### Pod Labels
 
-The first approach is to add the label `agent.config.scalyr.com/events_leader_candidate=true` to any node that you wish to be eligible to become the events collector.  This can be done with the following command:
+The approach is to add the label `agent.config.scalyr.com/events_leader_candidate=true` (or the value specified in `leader_candidate_label`) to a subset of pods that you wish to be eligible to become the events collector.  This can be done with the following command:
 
-`kubectl label node <nodename> agent.config.scalyr.com/events_leader_candidate=true`
+`kubectl label pod <podname> agent.config.scalyr.com/events_leader_candidate=true`
 
-Where `<nodename>` is the name of the node in question.  You can set this label on multiple nodes, and the agent will use the oldest of them as the event collector leader.  If the leader node is shutdown, it will fallback to the next oldest node and so on.
+Where `<podname>` is the name of the pod in question.  You can set this label on multiple pods, and the agent will use the oldest of them as the event collector leader.  If the leader pod is shutdown, it will fallback to the next oldest pod and so on.
 
 Once the labels have been set, you also need to configure the agent to query these labels.  This is done via the `check_labels` configuration option in the Kubernetes Events monitor config (which is off by default):
 
@@ -38,29 +38,9 @@ monitors: [
 ...
 ```
 
-If `check_labels` is true then instead of querying the API server for all nodes on the cluster, the Scalyr agents will only query the API server for nodes with this label set.  In order to reduce load on the API server, it is recommended to only set this label on a small number of nodes.
+If `check_labels` is true then instead of querying the API server for all nodes on the cluster, the Scalyr agents will only query the API server for pods with this label set.  In order to reduce load on the API server, it is recommended to only set this label on a small number of pods.
 
-This approach reduces the load placed on the API server and also provides a convenient fallback mechanism for when an exister event collector leader node is shutdown.
-
-### Hardcoded Event Collector
-
-The second approach is to manually assign a leader node in the agent config.  This is done via the `leader_node` option of the Kubernetes Events monitor:
-
-```
-...
-monitors: [
-    {
-    "module": "scalyr_agent.builtin_monitors.kubernetes_events_monitor",
-    ...
-    "leader_node": "<name of leader node>"
-    }
-]
-...
-```
-
-When the leader node is explicitly set like this, no API queries are made to the K8s API server and only the node with that name will be used to query K8s events.  The downside to this approach is that it is less flexible, especially in the event of the node shutting down unexpectedly.
-
-The leader election algorithm relies on a few assumptions to work correctly and could, for large clusters, impact performance. If necessary, the events monitor can also be disabled.
+This approach reduces the load placed on the API server and also provides a convenient fallback mechanism for when the existing event collector leader pod is shutdown.
 
 ## Disabling the Kubernetes Events Monitor
 
@@ -100,15 +80,14 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
 <a name="options"></a>
 ## Configuration Options
 
-| Property                | Description | 
-| ---                     | --- | 
-| `module`                | Always ``scalyr_agent.builtin_monitors.kubernetes_events_monitor`` | 
-| `max_log_size`          | Optional (defaults to None). How large the log file will grow before it is rotated. If None, then the default value will be taken from the monitor level or the global level log_rotation_max_bytes config option.  Set to zero for infinite size. Note that rotation is not visible in Scalyr; it is only relevant for managing disk space on the host running the agent. However, a very small limit could cause logs to be dropped if there is a temporary network outage and the log overflows before it can be sent to Scalyr | 
-| `max_log_rotations`     | Optional (defaults to None). The maximum number of log rotations before older log files are deleted. If None, then the value is taken from the monitor level or the global level log_rotation_backup_count option. Set to zero for infinite rotations. | 
-| `log_flush_delay`       | Optional (defaults to 1.0). The time to wait in seconds between flushing the log file containing the kubernetes event messages. | 
-| `message_log`           | Optional (defaults to ``kubernetes_events.log``). Specifies the file name under which event messages are stored. The file will be placed in the default Scalyr log directory, unless it is an absolute path | 
-| `event_object_filter`   | Optional (defaults to ['CronJob', 'DaemonSet', 'Deployment', 'Job', 'Node', 'Pod', 'ReplicaSet', 'ReplicationController', 'StatefulSet', 'Endpoint']). A list of event object types to filter on. Only events whose ``involvedObject`` ``kind`` is on this list will be included.  To not perform filtering and to send all event kinds, set the environment variable ``SCALYR_K8S_EVENT_OBJECT_FILTER=null``. | 
-| `leader_check_interval` | Optional (defaults to 60). The number of seconds to wait between checks to see if we are still the leader. | 
-| `leader_node`           | Optional (defaults to None). Force the `leader` to be the scalyr-agent that runs on this node. | 
-| `check_labels`          | Optional (defaults to False). If true, then the monitor will check for any nodes with the label `agent.config.scalyr.com/events_leader_candidate=true` and the node with this label set and that has the oldestcreation time will be the event monitor leader. | 
-| `ignore_master`         | Optional (defaults to True). If true, then the monitor will ignore any nodes with the label `node-role.kubernetes.io/master` when determining which node is the event monitor leader. | 
+| Property                 | Description | 
+| ---                      | --- | 
+| `module`                 | Always ``scalyr_agent.builtin_monitors.kubernetes_events_monitor`` | 
+| `max_log_size`           | Optional (defaults to None). How large the log file will grow before it is rotated. If None, then the default value will be taken from the monitor level or the global level log_rotation_max_bytes config option.  Set to zero for infinite size. Note that rotation is not visible in Scalyr; it is only relevant for managing disk space on the host running the agent. However, a very small limit could cause logs to be dropped if there is a temporary network outage and the log overflows before it can be sent to Scalyr | 
+| `max_log_rotations`      | Optional (defaults to None). The maximum number of log rotations before older log files are deleted. If None, then the value is taken from the monitor level or the global level log_rotation_backup_count option. Set to zero for infinite rotations. | 
+| `log_flush_delay`        | Optional (defaults to 1.0). The time to wait in seconds between flushing the log file containing the kubernetes event messages. | 
+| `message_log`            | Optional (defaults to ``kubernetes_events.log``). Specifies the file name under which event messages are stored. The file will be placed in the default Scalyr log directory, unless it is an absolute path | 
+| `event_object_filter`    | Optional (defaults to ['CronJob', 'DaemonSet', 'Deployment', 'Job', 'Node', 'Pod', 'ReplicaSet', 'ReplicationController', 'StatefulSet', 'Endpoint']). A list of event object types to filter on. Only events whose ``involvedObject`` ``kind`` is on this list will be included.  To not perform filtering and to send all event kinds, set the environment variable ``SCALYR_K8S_EVENT_OBJECT_FILTER=null``. | 
+| `leader_check_interval`  | Optional (defaults to 60). The number of seconds to wait between checks to see if we are still the leader. | 
+| `check_labels`           | Optional (defaults to False). If true, then the monitor will check for any pods with the label `agent.config.scalyr.com/events_leader_candidate=true` and the pod with this label set and that has the oldestcreation time will be the event monitor leader. | 
+| `leader_candidate_label` | Optional (defaults to `agent.config.scalyr.com/events_leader_candidate=true`). If `check_labels` is true, then the monitor will check for any nodes with the label configured using this option and the node with this label set and that has the oldestcreation time will be the event monitor leader. | 
