@@ -1586,8 +1586,13 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
         content = self._read_status_file(status_file)
         self.assertFalse(content.startswith("{") and content.endswith("}"))
 
+        command_options = mock.Mock()
+        command_options.debug = False
+        command_options.stats_capture_interval = 1
+
         return_code = self.agent._ScalyrAgent__detailed_status(
             self.data_path,
+            command_options=command_options,
             status_format="text",
             health_check=False,
             zero_status_file=False,
@@ -1603,6 +1608,7 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
 
         return_code = self.agent._ScalyrAgent__detailed_status(
             self.data_path,
+            command_options=command_options,
             status_format="text",
             health_check=True,
             zero_status_file=False,
@@ -1620,6 +1626,7 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
 
         return_code = self.agent._ScalyrAgent__detailed_status(
             self.data_path,
+            command_options=command_options,
             status_format="text",
             health_check=False,
             zero_status_file=False,
@@ -1635,6 +1642,7 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
 
         return_code = self.agent._ScalyrAgent__detailed_status(
             self.data_path,
+            command_options=command_options,
             status_format="text",
             health_check=True,
             zero_status_file=False,
@@ -1652,6 +1660,7 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
 
         return_code = self.agent._ScalyrAgent__detailed_status(
             self.data_path,
+            command_options=command_options,
             status_format="json",
             health_check=False,
             zero_status_file=False,
@@ -1669,6 +1678,7 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
 
         return_code = self.agent._ScalyrAgent__detailed_status(
             self.data_path,
+            command_options=command_options,
             status_format="json",
             health_check=True,
             zero_status_file=False,
@@ -1686,6 +1696,7 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
 
         return_code = self.agent._ScalyrAgent__detailed_status(
             self.data_path,
+            command_options=command_options,
             status_format="text",
             health_check=False,
             zero_status_file=False,
@@ -1703,6 +1714,7 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
 
         return_code = self.agent._ScalyrAgent__detailed_status(
             self.data_path,
+            command_options=command_options,
             status_format="text",
             health_check=True,
             zero_status_file=False,
@@ -1720,6 +1732,7 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
 
         return_code = self.agent._ScalyrAgent__detailed_status(
             self.data_path,
+            command_options=command_options,
             status_format="json",
             health_check=False,
             zero_status_file=False,
@@ -1737,6 +1750,7 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
 
         return_code = self.agent._ScalyrAgent__detailed_status(
             self.data_path,
+            command_options=command_options,
             status_format="json",
             health_check=True,
             zero_status_file=False,

@@ -299,6 +299,7 @@ class ScalyrAgent(object):
         my_options.no_check_remote = False
         my_options.extra_config_dir = None
         my_options.debug = False
+        my_options.stats_capture_interval = 1
 
         if perform_config_check:
             command = "inner_run_with_checks"
