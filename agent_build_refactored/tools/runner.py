@@ -47,6 +47,10 @@ def remove_directory_in_docker(path: pl.Path):
     The workaround for that to delegate that deletion to a docker container as well.
     """
 
+    if IN_DOCKER:
+        shutil.rmtree(path)
+        return
+
     # In order to be able to remove the whole directory, we mount parent directory.
     with DockerContainer(
         name="agent_build_step_trash_remover",
@@ -107,6 +111,7 @@ class RunnerStep:
         base: Union["EnvironmentRunnerStep", DockerImageSpec] = None,
         required_steps: Dict[str, "ArtifactRunnerStep"] = None,
         environment_variables: Dict[str, str] = None,
+        user: str = "root",
         github_actions_settings: "GitHubActionsSettings" = None,
     ):
         """
@@ -118,9 +123,11 @@ class RunnerStep:
             step will run.
         :param required_steps: List of other steps that has to be executed in order to run this step.
         :param environment_variables: Dist with environment variables to pass to step's script.
+        :param user: Name of the user under which name run the step's script.
         :param github_actions_settings: Additional setting on how step has to be executed on GitHub Actions CI/CD
         """
         self.name = name
+        self.user = user
         script_path = pl.Path(script_path)
         if script_path.is_absolute():
             script_path = script_path.relative_to(SOURCE_ROOT)
@@ -267,13 +274,21 @@ class RunnerStep:
         result = {}
 
         for step_env_var_name, step in self.required_steps.items():
-            step_out_dir = step.get_output_directory(work_dir=work_dir)
-            if self.runs_in_docker:
-                step_out_dir = step_out_dir.name
-                step_dir = pl.Path("/tmp/required_steps") / step_out_dir
-            else:
-                step_dir = step_out_dir
+            result[step_env_var_name] = step.get_output_directory(work_dir=work_dir)
 
+        return result
+
+    def _get_required_steps_docker_output_directories(
+        self, work_dir: pl.Path
+    ) -> Dict[str, pl.Path]:
+        """
+        Return path of the docker outputs of all steps which are required by this step.
+        """
+        result = {}
+
+        for step_env_var_name, step in self.required_steps.items():
+            step_out_dir = step.get_output_directory(work_dir=work_dir)
+            step_dir = pl.Path("/tmp/required_steps") / step_out_dir.name
             result[step_env_var_name] = step_dir
 
         return result
@@ -282,9 +297,15 @@ class RunnerStep:
         """Gather and return all environment variables that has to be passed to step's script."""
         result_env_variables = UniqueDict()
 
-        req_steps_env_variables = self._get_required_steps_output_directories(
-            work_dir=work_dir
-        )
+        if self.runs_in_docker:
+            req_steps_env_variables = self._get_required_steps_docker_output_directories(
+                work_dir=work_dir
+            )
+        else:
+            req_steps_env_variables = self._get_required_steps_output_directories(
+                work_dir=work_dir
+            )
+
         # Set path of the required steps as env. variables.
         for step_env_var_name, step_output_path in req_steps_env_variables.items():
             result_env_variables[step_env_var_name] = str(step_output_path)
@@ -319,8 +340,19 @@ class RunnerStep:
 
         # Calculate the sha256 for each file's content, filename.
         for file_path in self._tracked_files:
+            # Include file's path...
             sha256.update(str(file_path.relative_to(SOURCE_ROOT)).encode())
+            # ... content ...
             sha256.update(file_path.read_bytes())
+            # ... and permissions.
+            sha256.update(str(file_path.stat().st_mode).encode())
+
+        # Also add user into the checksum.
+        sha256.update(self.user.encode())
+
+        if self.runs_in_docker:
+            sha256.update(self.initial_docker_image.name.encode())
+            sha256.update(self.initial_docker_image.platform.to_dashed_str.encode())
 
         return sha256.hexdigest()
 
@@ -424,9 +456,13 @@ class RunnerStep:
         required_steps_directories = self._get_required_steps_output_directories(
             work_dir=work_dir
         )
+        required_steps_docker_directories = self._get_required_steps_docker_output_directories(
+            work_dir=work_dir
+        )
         mount_options = []
         for step_env_var_name, step_output_path in required_steps_directories.items():
-            mount_options.extend(["-v", f"{output_directory}:{step_output_path}"])
+            step_docker_output_path = required_steps_docker_directories[step_env_var_name]
+            mount_options.extend(["-v", f"{step_output_path}:{step_docker_output_path}"])
 
         # Mount isolated source root, output path and cache to be able to use them later.
         mount_options.extend(
@@ -444,6 +480,12 @@ class RunnerStep:
         for env_var_name, env_var_val in env_variables_to_pass.items():
             env_options.extend(["-e", f"{env_var_name}={env_var_val}"])
 
+        # Also add current step's checksum.
+        env_options.extend([
+            "-e",
+            f"CHECKSUM={self.checksum}"
+        ])
+
         check_call_with_log(
             [
                 "docker",
@@ -453,6 +495,8 @@ class RunnerStep:
                 self._step_container_name,
                 "--workdir",
                 str(final_isolated_source_root),
+                "--user",
+                self.user,
                 *mount_options,
                 *env_options,
                 self._base_docker_image.name,
@@ -470,6 +514,7 @@ class RunnerStep:
         isolated_source_root = self.get_isolated_root(work_dir)
 
         output_directory.parent.mkdir(parents=True, exist_ok=True)
+        cache_directory.parent.mkdir(parents=True, exist_ok=True)
         skipped = self._restore_cache(
             output_directory=output_directory, cache_directory=cache_directory
         )
@@ -511,19 +556,18 @@ class RunnerStep:
         except Exception:
             files = [str(g) for g in self._tracked_files]
             logging.exception(
-                f"'{type(self).__name__}' has failed. "
+                f"'{self.name}' has failed. "
                 "HINT: Make sure that you have specified all files. "
                 f"For now, tracked files are: {files}."
             )
             raise
-        finally:
-            self.cleanup()
 
         self._save_to_cache(
             is_skipped=skipped,
             output_directory=output_directory,
             cache_directory=cache_directory,
         )
+        self.cleanup()
 
     def cleanup(self):
         if self._step_container_name:
@@ -554,7 +598,7 @@ class ArtifactRunnerStep(RunnerStep):
         self, is_skipped: bool, output_directory: pl.Path, cache_directory: pl.Path
     ):
         if not is_skipped:
-            shutil.copytree(output_directory, cache_directory, dirs_exist_ok=True)
+            shutil.copytree(output_directory, cache_directory, dirs_exist_ok=True, symlinks=True)
 
 
 class EnvironmentRunnerStep(RunnerStep):
@@ -617,6 +661,10 @@ class EnvironmentRunnerStep(RunnerStep):
         self.result_image.save_docker_image(output_path=cached_image_path)
 
 
+@dataclasses.dataclass
+class RunnerMappedPath:
+    path: Union[pl.Path, str]
+
 class Runner:
     """
     Abstraction which combines several RunnerStep instances in order to execute them and to use their results
@@ -640,7 +688,7 @@ class Runner:
 
     def __init__(
         self,
-        work_dir: pl.Path,
+        work_dir: pl.Path = None,
         required_steps: List[RunnerStep] = None,
     ):
         """
@@ -653,9 +701,9 @@ class Runner:
         self.required_steps = required_steps or type(self).REQUIRED_STEPS[:]
         self.required_runners = {}
 
-        self.work_dir = work_dir
+        self.work_dir = pl.Path(work_dir or SOURCE_ROOT / "agent_build_output")
         output_name = type(self).get_fully_qualified_name().replace(".", "_")
-        self.output_path = work_dir / "runner_outputs" / output_name
+        self.output_path = self.work_dir / "runner_outputs" / output_name
 
         self._input_values = {}
 
@@ -692,7 +740,11 @@ class Runner:
         if cls._FULLY_QUALIFIED_NAME:
             return cls._FULLY_QUALIFIED_NAME
 
-        return f"{cls.__module__}.{cls.__qualname__}"
+        module_path = pl.Path(sys.modules[cls.__module__].__file__)
+        module_rel_path = module_path.relative_to(SOURCE_ROOT)
+
+        module_fqdn = str(module_rel_path).strip(".py").replace(os.sep, ".")
+        return f"{module_fqdn}.{cls.__qualname__}"
 
     @classmethod
     def assign_fully_qualified_name(
@@ -733,7 +785,71 @@ class Runner:
 
         setattr(module, final_class_name, cls)
 
-    def run(self):
+    @property
+    def base_docker_image(self) -> Optional[DockerImageSpec]:
+        if isinstance(self.base_environment, DockerImageSpec):
+            return self.base_environment
+
+        # If base environment is EnvironmentStep, then use its result docker image as base environment.
+        if self.base_environment.runs_in_docker:
+            return self.base_environment.result_image
+
+        return None
+
+    @property
+    def runs_in_docker(self) -> bool:
+        return self.base_docker_image is not None and not IN_DOCKER
+
+    def run_in_docker(self, command_args: List = None):
+
+        command_args = command_args or []
+
+        final_command_args = []
+
+        mount_args = []
+
+        for arg in command_args:
+            if not isinstance(arg, RunnerMappedPath):
+                final_command_args.append(str(arg))
+                continue
+
+
+            path = pl.Path(arg.path)
+
+            if path.is_absolute():
+                path = path.relative_to("/")
+
+            in_docker_path = pl.Path("/tmp/mounts") / path
+
+            mount_args.extend([
+                "-v",
+                f"{arg.path}:{in_docker_path}"
+            ])
+            final_command_args.append(str(in_docker_path))
+
+        env_args = [
+            "-e",
+            "AGENT_BUILD_IN_DOCKER=1"
+        ]
+
+        check_call_with_log([
+            "docker",
+            "run",
+            "-i",
+            *mount_args,
+            "-v",
+            f"{SOURCE_ROOT}:/tmp/source",
+            *env_args,
+            "--platform",
+            str(self.base_docker_image.platform),
+            self.base_docker_image.name,
+            "python3",
+            "/tmp/source/agent_build_refactored/scripts/runner_helper.py",
+            type(self).get_fully_qualified_name(),
+            *final_command_args
+        ])
+
+    def run_required(self):
         """
         Function where Runner performs its main actions.
         """
@@ -743,16 +859,16 @@ class Runner:
             remove_directory_in_docker(self.output_path)
         self.output_path.mkdir(parents=True)
 
-        # Determine if Runner has to run in docker.
-        docker_image = None
-        if self.base_environment:
-            # If base environment is EnvironmentStep, then use its result docker image as base environment.
-            if isinstance(self.base_environment, EnvironmentRunnerStep):
-                if self.base_environment.runs_in_docker:
-                    docker_image = self.base_environment.result_image
-            else:
-                # It has to be a DockerImageSpec, so execute the runner inside the environment specified in image spec.
-                docker_image = self.base_environment
+        # # Determine if Runner has to run in docker.
+        # docker_image = None
+        # if self.base_environment:
+        #     # If base environment is EnvironmentStep, then use its result docker image as base environment.
+        #     if isinstance(self.base_environment, EnvironmentRunnerStep):
+        #         if self.base_environment.runs_in_docker:
+        #             docker_image = self.base_environment.result_image
+        #     else:
+        #         # It has to be a DockerImageSpec, so execute the runner inside the environment specified in image spec.
+        #         docker_image = self.base_environment
 
         # Run all steps and runners we depend on, skip this if we already in docker to avoid infinite loop.
         if not IN_DOCKER:
@@ -765,6 +881,8 @@ class Runner:
             if self.required_runners:
                 for runner in self.required_runners:
                     runner.run(work_dir=self.work_dir)
+
+        return
 
         # If runner does not run in docker just run it directly.
         if not docker_image:
@@ -892,3 +1010,15 @@ class Runner:
             for step in steps:
                 step.run(work_dir=work_dir)
             exit(0)
+
+
+
+def cleanup():
+    if IN_DOCKER:
+        return
+    check_call_with_log([
+        "docker", "system", "prune", "-f", "--volumes"
+    ])
+    check_call_with_log([
+        "docker", "system", "prune", "-f"
+    ])

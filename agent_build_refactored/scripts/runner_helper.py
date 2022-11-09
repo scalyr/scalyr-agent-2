@@ -27,20 +27,24 @@ import importlib
 SOURCE_ROOT = pl.Path(__file__).parent.parent.parent
 # This file can be executed as script. Add source root to the PYTHONPATH in order to be able to import
 # local packages. All such imports also have to be done after that.
+print(__file__)
+print(SOURCE_ROOT)
 sys.path.append(str(SOURCE_ROOT))
 
-from agent_build_refactored.tools.runner import Runner
+from agent_build_refactored.tools.runner import Runner, cleanup
 
 
 if __name__ == "__main__":
     from agent_build_refactored.tools import init_logging
 
     init_logging()
+    cleanup()
 
     base_parser = argparse.ArgumentParser()
     base_parser.add_argument("builder_class_fqdn")
     base_args, other_args = base_parser.parse_known_args()
-
+    print("GGGGGGG")
+    print(base_args.builder_class_fqdn)
     module_name, class_name = base_args.builder_class_fqdn.rsplit(".", 1)
 
     module = importlib.import_module(module_name)

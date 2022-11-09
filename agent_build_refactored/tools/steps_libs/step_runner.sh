@@ -133,6 +133,7 @@ if [ "${SCRIPT_TYPE}" = "shell" ]; then
     # shellcheck disable=SC1090
   . "${STEP_SCRIPT_PATH}"
 else
+  export PYTHONPATH="${SOURCE_ROOT}:${PYTHONPATH}"
   ${STEP_SCRIPT_PATH}
 fi
 
