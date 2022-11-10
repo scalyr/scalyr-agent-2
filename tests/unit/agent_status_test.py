@@ -1587,7 +1587,7 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
         self.assertFalse(content.startswith("{") and content.endswith("}"))
 
         command_options = mock.Mock()
-        command_options.debug = False
+        setattr(command_options, "debug", False)
         command_options.stats_capture_interval = 1
 
         return_code = self.agent._ScalyrAgent__detailed_status(
