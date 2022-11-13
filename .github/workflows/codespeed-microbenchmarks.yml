@@ -1,4 +1,4 @@
-name: Codespeed Benchmarks
+name: Codespeed Micro Benchmarks
 
 on:
   push:
