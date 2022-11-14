@@ -9,6 +9,15 @@ incompatible changes have been made in that release.
 For a list of all the changes in a particular release, please refer to the changelog file -
 https://github.com/scalyr/scalyr-agent-2/blob/master/CHANGELOG.md.
 
+## 2.1.38 "TBD" - TBD
+
+* This release changes the Kubernetes monitor leader election algorithm to use the pods in the owning ReplicaSet or
+  DaemonSet, formerly it used every node in the cluster.
+
+  As a result two of the associated options have changed:
+  - `leader_node` has been removed
+  - `check_labels` now checks pod labels (formerly node labels)
+
 ## 2.1.21 "Ultramarine" - Jun 1, 2021
 
 * This is the last release that still supports Python 2.6. This version of the agent will emit a
