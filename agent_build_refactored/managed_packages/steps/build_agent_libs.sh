@@ -37,7 +37,6 @@ export PKG_CONFIG_PATH="/usr/local/lib64/pkgconfig:${PKG_CONFIG_PATH}"
 curl --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 rustup toolchain install "${RUST_VERSION}"
 rustup default "${RUST_VERSION}"
-
 cargo install cargo-update -v
 
 REQUIREMENTS_FILES_PATH="${SOURCE_ROOT}/agent_build/requirement-files"
@@ -92,7 +91,9 @@ AGENT_LIBS_ROOT="${STEP_OUTPUT_PATH}/agent_libs"
 # Also fix structure of the result filesystem, since pip also does not fully respect sub-directories and some files
 # are located outside of them.
 mkdir -p "${AGENT_LIBS_ROOT}/usr/lib"
-mv "${AGENT_LIBS_BUILD_ROOT}/usr/lib" "${AGENT_LIBS_ROOT}/usr/lib/${SUBDIR_NAME}"
+mv "${AGENT_LIBS_BUILD_ROOT}/usr/lib/${SUBDIR_NAME}" "${AGENT_LIBS_ROOT}/usr/lib"
+cp -a "${AGENT_LIBS_BUILD_ROOT}/usr/lib/python${PYTHON_SHORT_VERSION}"  "${AGENT_LIBS_ROOT}/usr/lib/${SUBDIR_NAME}"
+rm -r "${AGENT_LIBS_BUILD_ROOT}/usr/lib/python${PYTHON_SHORT_VERSION}"
 
 mkdir -p "${AGENT_LIBS_ROOT}/usr/libexec"
 mv "${AGENT_LIBS_BUILD_ROOT}/usr/bin" "${AGENT_LIBS_ROOT}/usr/libexec/${SUBDIR_NAME}"

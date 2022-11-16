@@ -74,7 +74,7 @@ class PythonPackageBuilder(Runner):
         """
         Deconstructs package version string and return tuple with version's iteration and checksum parts.
         """
-        iteration, checksum = version.split("_")
+        iteration, checksum = version.split("-")
         return int(iteration), checksum
 
     def build_python_package(
@@ -164,7 +164,6 @@ class PythonPackageBuilder(Runner):
             self,
             packages_dir_path: pl.Path
     ):
-        self.run_required()
 
         if self.runs_in_docker:
             self.run_in_docker(
@@ -214,6 +213,8 @@ class PythonPackageBuilder(Runner):
         if failed:
             logging.error("Please update version files and try again.")
             exit(1)
+
+        logging.info("All package version files are up to date.")
 
     def update_version_files(self):
         iteration, python_package_checksum = self._get_package_version_parts(PYTHON_PACKAGE_VERSION)

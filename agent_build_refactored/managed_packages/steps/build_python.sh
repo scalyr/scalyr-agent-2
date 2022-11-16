@@ -155,7 +155,7 @@ cp -a "${SOURCE_ROOT}/agent_build_refactored/managed_packages/files/scalyr-agent
 # Remove some of the files to reduce package size
 PYTHON_LIBS_PATH="${FINAL_PACKAGE_ROOT}/${LIB_DIR}/${SUBDIR_NAME}/python${PYTHON_SHORT_VERSION}"
 
-find ${PYTHON_LIBS_PATH} -name "__pycache__" -type d -exec rm -r {} \;
+find ${PYTHON_LIBS_PATH} -name "__pycache__" -type d -prune -exec rm -r {} \;
 rm -r ${PYTHON_LIBS_PATH}/test
 rm -r ${PYTHON_LIBS_PATH}/config-${PYTHON_SHORT_VERSION}-x86_64-linux-gnu
 rm -r ${PYTHON_LIBS_PATH}/lib2to3
