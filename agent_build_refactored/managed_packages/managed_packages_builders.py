@@ -22,7 +22,7 @@ import tarfile
 import argparse
 import os
 import pathlib as pl
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict
 
 from agent_build_refactored.tools.runner import Runner, RunnerStep, ArtifactRunnerStep
 from agent_build_refactored.tools.constants import SOURCE_ROOT, EMBEDDED_PYTHON_VERSION
@@ -52,6 +52,8 @@ class PythonPackageBuilder(Runner):
     DOWNLOAD_PYTHON_PACKAGE: ArtifactRunnerStep
     BUILD_AGENT_LIBS_STEP: ArtifactRunnerStep
     DOWNLOAD_AGENT_LIBS_PACKAGE: ArtifactRunnerStep
+
+    BUILD_STEPS: Dict[str, ArtifactRunnerStep]
 
     @classmethod
     def get_all_required_steps(cls) -> List[RunnerStep]:
@@ -353,10 +355,12 @@ class PythonPackageBuilder(Runner):
 
         failed = False
 
-        current_version = PACKAGES_VERSIONS["python"][self.PACKAGE_TYPE][self.PACKAGE_ARCHITECTURE]
-        _, python_package_checksum = self._get_package_version_parts(current_version)
+        build_step = self.BUILD_STEPS[package]
 
-        if self.BUILD_PYTHON_STEP.checksum != python_package_checksum:
+        current_version = PACKAGES_VERSIONS[package][self.PACKAGE_TYPE][self.PACKAGE_ARCHITECTURE]
+        _, current_package_checksum = self._get_package_version_parts(current_version)
+
+        if build_step.checksum != current_package_checksum:
             logging.error(
                 f"Current version of the {package} {self.PACKAGE_TYPE} {self.PACKAGE_ARCHITECTURE} package does not match "
                 f"version in the {PACKAGES_VERSIONS_PATH} file"
@@ -370,13 +374,16 @@ class PythonPackageBuilder(Runner):
         logging.info("All package version files are up to date.")
 
     def update_package_version_file(self, package: str):
-        iteration, python_package_checksum = self._get_package_version_parts(
+        iteration, current_package_checksum = self._get_package_version_parts(
             version=self.get_package_version(package=package)
         )
-        if self.BUILD_PYTHON_STEP.checksum != python_package_checksum:
+
+        build_step = self.BUILD_STEPS[package]
+
+        if build_step.checksum != current_package_checksum:
             new_package_versions = PACKAGES_VERSIONS.copy()
 
-            new_version = f"{iteration + 1}-{self.BUILD_PYTHON_STEP.checksum}"
+            new_version = f"{iteration + 1}-{build_step.checksum}"
             new_package_versions[package][self.PACKAGE_TYPE][self.PACKAGE_ARCHITECTURE] = new_version
 
             PACKAGES_VERSIONS_PATH.write_text(
@@ -452,6 +459,11 @@ class DebPythonPackageBuilderX64(PythonPackageBuilder):
     BUILD_AGENT_LIBS_STEP = BUILD_AGENT_LIBS_GLIBC_X86_64
     DOWNLOAD_AGENT_LIBS_PACKAGE = DOWNLOAD_AGENT_LIBS_PACKAGE_FROM_PACKAGECLOUD
 
+    BUILD_STEPS = {
+        "python": BUILD_PYTHON_GLIBC_X86_64,
+        "agent_libs": BUILD_AGENT_LIBS_GLIBC_X86_64
+    }
+
 
 MANAGED_PACKAGE_BUILDERS = {
     "deb-x64": DebPythonPackageBuilderX64
@@ -466,12 +478,18 @@ class AllPackagesVersionTracker(Runner):
             builder.check_package_version_file_up_to_date(
                 package="python"
             )
+            builder.check_package_version_file_up_to_date(
+                package="agent_libs"
+            )
 
     def update_version_files(self):
         for builder_cls in MANAGED_PACKAGE_BUILDERS.values():
             builder = builder_cls(work_dir=self.work_dir)
             builder.update_package_version_file(
                 package="python"
+            )
+            builder.update_package_version_file(
+                package="agent_libs"
             )
 
     @classmethod
