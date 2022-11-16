@@ -19,7 +19,6 @@ SOURCE_ROOT = pl.Path(__file__).parent.parent.parent.absolute()
 AGENT_BUILD_PATH = SOURCE_ROOT / "agent_build"
 
 EMBEDDED_PYTHON_VERSION = "3.11.0"
-EMBEDDED_PYTHON_SHORT_VERSION = ".".join(EMBEDDED_PYTHON_VERSION.split(".")[:2])
 
 
 @dataclasses.dataclass(frozen=True)

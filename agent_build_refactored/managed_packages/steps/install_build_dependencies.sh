@@ -1,6 +1,53 @@
+# Copyright 2014-2022 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This script is meant to be executed by the instance of the 'agent_build_refactored.tools.runner.RunnerStep' class.
+# Every RunnerStep provides common environment variables to its script:
+#   SOURCE_ROOT: Path to the projects root.
+#   STEP_OUTPUT_PATH: Path to the step's output directory.
+#
+# This script build from source all libraries that are required to build Python. Since we build Python and its
+# requirements in a legacy OS (such as Centos 6) to achieve binary compatibility, we also have to build many essential
+# build tools because tools from legacy OS's ate too old.
+#
+# It expects next environment variables:
+#
+#   ZX_VERSION: version of XZ Utils to build. Python requirement. ALso required by some make and configure scripts.
+#   PERL_VERSION: version of Perl to build. Required by some make and configure scripts.
+#   TEXTINFO_VERSION: version of texinfo to build. Required by some make and configure scripts.
+#   M4_VERSION: version of M4 to build. Required by some make and configure scripts.
+#   AUTOCONF_VERSION: version of autoconf to build. Required by some make and configure scripts.
+#   LIBTOOL_VERSION: version of libtool to build. Required by some make and configure scripts.
+#   HELP2MAN_VERSION: version of help2man to build. Required by some make and configure scripts.
+#   AUTOMAKE_VERSION: version of automake to build. Required by some make and configure scripts.
+#   LZMA_VERSION: version of lzma to build. Python requirement.
+#   ZLIB_VERSION: version of zlib to build. Python requirement. Provides zlib module.
+#   BZIP_VERSION: version of bzip to build. Python requirement. Provides bz2 module.
+#   UTIL_LINUX_VERSION: version of lzma to build. Python requirement. Provides uuid module.
+#   NCURSES_VERSION: version of ncurses to build. Python requirement. Provides curses module.
+#   LIBEDIT_VERSION: version of libedit to build. Python requirement. Provides non-GPL alternative for readline module.
+#   GDBM_VERSION: version of gdbm to build. Python requirement. Provides dbm module.
+#   LIBFFI_VERSION: version of libffi to build. Python requirement. Provides ctypes module and essential for C bindings.
+#   OPENSSL_VERSION: version of OpenSSL to build. Python requirement. Provides ssl module.
+
+
+
 set -e
 
 source ~/.bashrc
+
+# NOTE: The order of installation is important.
 
 
 mkdir /tmp/build-xz
@@ -19,7 +66,6 @@ pushd /tmp/build-perl
 curl -L http://www.cpan.org/src/5.0/perl-${PERL_VERSION}.tar.gz > perl.tar.gz
 tar -xvf perl.tar.gz
 pushd "perl-${PERL_VERSION}"
-#./Configure -des -Dprefix="/usr/local"
 ./Configure -des
 make -j "$(nproc)"
 make install
@@ -100,9 +146,9 @@ popd
 
 mkdir /tmp/build-lzma
 pushd /tmp/build-lzma
-curl -L "https://tukaani.org/lzma/lzma-${LIBLZMA_VERSION}.tar.gz" > lzma.tar.gz
+curl -L "https://tukaani.org/lzma/lzma-${LZMA_VERSION}.tar.gz" > lzma.tar.gz
 tar -xvf "lzma.tar.gz"
-pushd "lzma-${LIBLZMA_VERSION}"
+pushd "lzma-${LZMA_VERSION}"
 ./configure --prefix=/usr/local
 make -j "$(nproc)"
 make install
@@ -206,10 +252,10 @@ popd
 
 mkdir /tmp/build-openssl
 pushd /tmp/build-openssl
-openssl_version_underscored="${OPENSSL_VERSION//./_}"
-curl -L "https://github.com/openssl/openssl/archive/refs/tags/OpenSSL_${openssl_version_underscored}.tar.gz" > openssl.tar.gz
+OPENSSL_VERSION_UNDERSCORED="${OPENSSL_VERSION//./_}"
+curl -L "https://github.com/openssl/openssl/archive/refs/tags/OpenSSL_${OPENSSL_VERSION_UNDERSCORED}.tar.gz" > openssl.tar.gz
 tar -xvf "openssl.tar.gz"
-pushd "openssl-OpenSSL_${openssl_version_underscored}"
+pushd "openssl-OpenSSL_${OPENSSL_VERSION_UNDERSCORED}"
 ./Configure linux-x86_64 shared
 make -j "$(nproc)"
 make install_sw
@@ -217,12 +263,3 @@ popd
 
 
 rm -r /tmp/build*
-
-
-cd ~
-curl --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-rustup toolchain install "${RUST_VERSION}"
-rustup default "${RUST_VERSION}"
-
-export PKG_CONFIG_PATH="/usr/local/lib64/pkgconfig:${PKG_CONFIG_PATH}"
-cargo install cargo-update -v

@@ -562,6 +562,12 @@ class RunnerStep:
             )
             raise
 
+        # Check if step result caching has to be skipped.
+        skip_caching_file_path = output_directory / "skip_caching"
+        if skip_caching_file_path.is_file():
+            skipped = True
+            remove_directory_in_docker(cache_directory)
+
         self._save_to_cache(
             is_skipped=skipped,
             output_directory=output_directory,
@@ -588,8 +594,8 @@ class ArtifactRunnerStep(RunnerStep):
         self._remove_output_directory(output_directory=output_directory)
 
         if cache_directory.exists():
-
-            output_directory.symlink_to(cache_directory)
+            symlink_rel_path = pl.Path("../step_cache") / output_directory.name
+            output_directory.symlink_to(symlink_rel_path)
             return True
 
         return False
@@ -787,12 +793,13 @@ class Runner:
 
     @property
     def base_docker_image(self) -> Optional[DockerImageSpec]:
-        if isinstance(self.base_environment, DockerImageSpec):
-            return self.base_environment
+        if self.base_environment:
+            if isinstance(self.base_environment, DockerImageSpec):
+                return self.base_environment
 
-        # If base environment is EnvironmentStep, then use its result docker image as base environment.
-        if self.base_environment.runs_in_docker:
-            return self.base_environment.result_image
+            # If base environment is EnvironmentStep, then use its result docker image as base environment.
+            if self.base_environment.runs_in_docker:
+                return self.base_environment.result_image
 
         return None
 
@@ -800,7 +807,11 @@ class Runner:
     def runs_in_docker(self) -> bool:
         return self.base_docker_image is not None and not IN_DOCKER
 
-    def run_in_docker(self, command_args: List = None):
+    def run_in_docker(
+            self,
+            command_args: List = None,
+            python_executable: str = "python3"
+    ):
 
         command_args = command_args or []
 
@@ -843,7 +854,7 @@ class Runner:
             "--platform",
             str(self.base_docker_image.platform),
             self.base_docker_image.name,
-            "python3",
+            python_executable,
             "/tmp/source/agent_build_refactored/scripts/runner_helper.py",
             type(self).get_fully_qualified_name(),
             *final_command_args

@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 # Copyright 2014-2022 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,8 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-PYTHON_SUBDIR_NAME="scalyr-agent-2-dependencies"
+#
+# This module provides some helper functions that can be used inside RunnerStep scripts.
+#
+import os
+import pathlib as pl
 
-export LD_LIBRARY_PATH="/usr/lib/${PYTHON_SUBDIR_NAME}"
-export PYTHONPATH="/usr/lib/${PYTHON_SUBDIR_NAME}/python3.10:/usr/lib/${PYTHON_SUBDIR_NAME}/python3.10/lib-dynload:/usr/lib/${PYTHON_SUBDIR_NAME}/python3.10/site-packages"
-exec /usr/libexec/scalyr-agent-2-dependencies/python3 "$@"
+
+def skip_caching_and_exit():
+    """
+    This function immediately finishes RunnerStep's script and also writes special 'skip_caching' file,
+    which signals that step result must not be cached.
+    """
+    skip_caching_file_path = pl.Path(os.environ["STEP_OUTPUT_PATH"]) / "skip_caching"
+    skip_caching_file_path.touch()
+    exit(0)
