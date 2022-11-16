@@ -42,6 +42,8 @@ PYTHON_PACKAGE_NAME = "scalyr-agent-python3"
 PYTHON_PACKAGE_SSL_VERSION = "1.1.1k"
 EMBEDDED_PYTHON_SHORT_VERSION = ".".join(EMBEDDED_PYTHON_VERSION.split(".")[:2])
 
+AGENT_LIBS_PACKAGE_NAME = "agent_libs"
+
 INSTALL_GCC_7_GLIBC_X86_64 = EnvironmentRunnerStep(
         name="install_gcc_7",
         script_path="agent_build_refactored/managed_packages/steps/install_gcc_7.sh",
@@ -212,6 +214,16 @@ DOWNLOAD_PYTHON_PACKAGE_FROM_PACKAGECLOUD = create_download_from_packageloud_ste
     name="download_python_package_from_packagecloud",
     package_name=PYTHON_PACKAGE_NAME,
     package_version=PACKAGES_VERSIONS["python"]["deb"]["amd64"],
+    package_type="deb",
+    package_architecture="amd64",
+    user_name="ArthurSentinelone",
+    repo_name="DataSetAgent"
+)
+
+DOWNLOAD_AGENT_LIBS_PACKAGE_FROM_PACKAGECLOUD = create_download_from_packageloud_step(
+    name="download_agent_libs_package_from_packagecloud",
+    package_name=AGENT_LIBS_PACKAGE_NAME,
+    package_version=PACKAGES_VERSIONS["agent_libs"]["deb"]["amd64"],
     package_type="deb",
     package_architecture="amd64",
     user_name="ArthurSentinelone",

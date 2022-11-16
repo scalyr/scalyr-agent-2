@@ -30,6 +30,7 @@ from typing import Union, Optional, List, Dict, Type
 from agent_build_refactored.tools.constants import SOURCE_ROOT, DockerPlatformInfo
 from agent_build_refactored.tools import (
     check_call_with_log,
+    check_output_with_log_debug,
     DockerContainer,
     UniqueDict,
     check_output_with_log,
@@ -1027,9 +1028,9 @@ class Runner:
 def cleanup():
     if IN_DOCKER:
         return
-    check_call_with_log([
+    check_output_with_log_debug([
         "docker", "system", "prune", "-f", "--volumes"
     ])
-    check_call_with_log([
+    check_output_with_log_debug([
         "docker", "system", "prune", "-f"
     ])
