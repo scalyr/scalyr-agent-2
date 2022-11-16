@@ -371,7 +371,7 @@ class PythonPackageBuilder(Runner):
 
     def update_package_version_file(self, package: str):
         iteration, python_package_checksum = self._get_package_version_parts(
-            version=self.get_python_package_version()
+            version=self.get_package_version(package=package)
         )
         if self.BUILD_PYTHON_STEP.checksum != python_package_checksum:
             new_package_versions = PACKAGES_VERSIONS.copy()

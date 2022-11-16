@@ -1,10 +1,10 @@
 {
-    "python": {
+    "agent_libs": {
         "deb": {
             "amd64": "0-0"
         }
-    }
-        "agent_libs": {
+    },
+    "python": {
         "deb": {
             "amd64": "0-0"
         }
