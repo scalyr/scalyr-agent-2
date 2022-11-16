@@ -20,29 +20,16 @@ from agent_build_refactored.tools.constants import DockerPlatform, EMBEDDED_PYTH
 
 PACKAGES_VERSIONS_PATH = pl.Path(__file__).parent / "PACKAGES_VERSIONS"
 
-
-@dataclasses.dataclass
-class PackageVersions:
-    PYTHON_DEB_X86_64: str
-
-    @staticmethod
-    def read_from_file():
-        data = json.loads(
-            PACKAGES_VERSIONS_PATH.read_text()
-        )
-        return PackageVersions(
-            PYTHON_DEB_X86_64=data["_deb_X86_64"]
-        )
-
-
 PACKAGES_VERSIONS = json.loads(PACKAGES_VERSIONS_PATH.read_text())
 
 AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME = "scalyr-agent-2-dependencies"
 PYTHON_PACKAGE_NAME = "scalyr-agent-python3"
+AGENT_LIBS_PACKAGE_NAME = "scalyr-agent-libs"
+
+
 PYTHON_PACKAGE_SSL_VERSION = "1.1.1k"
 EMBEDDED_PYTHON_SHORT_VERSION = ".".join(EMBEDDED_PYTHON_VERSION.split(".")[:2])
 
-AGENT_LIBS_PACKAGE_NAME = "agent_libs"
 
 INSTALL_GCC_7_GLIBC_X86_64 = EnvironmentRunnerStep(
         name="install_gcc_7",
@@ -140,6 +127,7 @@ def create_build_agent_libs_step(
         },
         environment_variables={
             "PYTHON_SHORT_VERSION": EMBEDDED_PYTHON_SHORT_VERSION,
+            "RUST_VERSION": "1.63.0",
             "SUBDIR_NAME": AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME
         },
         github_actions_settings=GitHubActionsSettings(
@@ -182,13 +170,12 @@ PREPARE_TOOLSET_GLIBC_X86_64 = EnvironmentRunnerStep(
 def create_download_from_packageloud_step(
         name: str,
         package_name: str,
-        package_version: str,
         package_type: str,
         package_architecture: str,
         user_name: str,
         repo_name: str
 ):
-
+    package_version = PACKAGES_VERSIONS[package_name][package_type][package_architecture]
     package_filename = f"{package_name}_{package_version}_{package_architecture}.{package_type}"
     return ArtifactRunnerStep(
         name=name,
@@ -213,7 +200,6 @@ def create_download_from_packageloud_step(
 DOWNLOAD_PYTHON_PACKAGE_FROM_PACKAGECLOUD = create_download_from_packageloud_step(
     name="download_python_package_from_packagecloud",
     package_name=PYTHON_PACKAGE_NAME,
-    package_version=PACKAGES_VERSIONS["python"]["deb"]["amd64"],
     package_type="deb",
     package_architecture="amd64",
     user_name="ArthurSentinelone",
@@ -223,7 +209,6 @@ DOWNLOAD_PYTHON_PACKAGE_FROM_PACKAGECLOUD = create_download_from_packageloud_ste
 DOWNLOAD_AGENT_LIBS_PACKAGE_FROM_PACKAGECLOUD = create_download_from_packageloud_step(
     name="download_agent_libs_package_from_packagecloud",
     package_name=AGENT_LIBS_PACKAGE_NAME,
-    package_version=PACKAGES_VERSIONS["agent_libs"]["deb"]["amd64"],
     package_type="deb",
     package_architecture="amd64",
     user_name="ArthurSentinelone",

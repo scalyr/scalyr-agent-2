@@ -871,17 +871,6 @@ class Runner:
             remove_directory_in_docker(self.output_path)
         self.output_path.mkdir(parents=True)
 
-        # # Determine if Runner has to run in docker.
-        # docker_image = None
-        # if self.base_environment:
-        #     # If base environment is EnvironmentStep, then use its result docker image as base environment.
-        #     if isinstance(self.base_environment, EnvironmentRunnerStep):
-        #         if self.base_environment.runs_in_docker:
-        #             docker_image = self.base_environment.result_image
-        #     else:
-        #         # It has to be a DockerImageSpec, so execute the runner inside the environment specified in image spec.
-        #         docker_image = self.base_environment
-
         # Run all steps and runners we depend on, skip this if we already in docker to avoid infinite loop.
         if not IN_DOCKER:
             if self.base_environment:
@@ -893,69 +882,6 @@ class Runner:
             if self.required_runners:
                 for runner in self.required_runners:
                     runner.run(work_dir=self.work_dir)
-
-        return
-
-        # If runner does not run in docker just run it directly.
-        if not docker_image:
-            self._run()
-            return
-
-        # This runner runs in docker. Make docker container run special script which has to run
-        # the same runner. The runner has to be found by its FQDN.
-        command_args = [
-            "python3",
-            "/scalyr-agent-2/agent_build_refactored/scripts/runner_helper.py",
-            self.get_fully_qualified_name(),
-        ]
-
-        # To run exactly the same runner inside the docker, we have to pass exactly the same arguments.
-        # We can do this because we already saved constructor arguments of this particular instance in
-        # its 'self.input_values' attribute.
-        # We go through constructor's signature, get appropriate constructor argument values and create
-        # command line arguments.
-        signature = inspect.signature(self.__init__)
-
-        additional_mounts = []
-        for name, param in signature.parameters.items():
-            value = self.input_values[name]
-
-            if value is None:
-                continue
-
-            if isinstance(value, (str, pl.Path)):
-                path = pl.Path(value)
-                # if value represents path, them also mount this path to a container.
-                if path.exists() and not str(path).startswith(str(SOURCE_ROOT)):
-                    docker_path = pl.Path("/tmp/other_mounts/") / path.relative_to("/")
-                    additional_mounts.extend(["-v", f"{path}:{docker_path}"])
-                    value = docker_path
-
-            command_args.extend([f"--{name}".replace("_", "-"), str(value)])
-
-        env_options = [
-            "-e",
-            "AGENT_BUILD_IN_DOCKER=1",
-        ]
-
-        if IN_CICD:
-            env_options.extend(["-e", "IN_CICD=1"])
-
-        # Finally execute runner with generated command line arguments in container.
-        check_call_with_log(
-            [
-                "docker",
-                "run",
-                "-i",
-                "--rm",
-                "-v",
-                f"{SOURCE_ROOT}:/scalyr-agent-2",
-                *additional_mounts,
-                *env_options,
-                docker_image.name,
-                *command_args,
-            ]
-        )
 
     def _run(self):
         """
@@ -1022,7 +948,6 @@ class Runner:
             for step in steps:
                 step.run(work_dir=work_dir)
             exit(0)
-
 
 
 def cleanup():

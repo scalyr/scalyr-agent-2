@@ -34,9 +34,7 @@ cp -a "${BUILD_PYTHON}/python/." /
 cd ~
 export PATH="/usr/local/bin:/root/.cargo/bin:${PATH}"
 export PKG_CONFIG_PATH="/usr/local/lib64/pkgconfig:${PKG_CONFIG_PATH}"
-curl --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-rustup toolchain install "${RUST_VERSION}"
-rustup default "${RUST_VERSION}"
+curl --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain "${RUST_VERSION}"
 cargo install cargo-update -v
 
 REQUIREMENTS_FILES_PATH="${SOURCE_ROOT}/agent_build/requirement-files"

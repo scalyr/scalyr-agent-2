@@ -48,22 +48,17 @@ from agent_build_refactored.managed_packages.dependency_packages import (
 class PythonPackageBuilder(Runner):
     PACKAGE_TYPE: str
     PACKAGE_ARCHITECTURE: str
-    BUILD_PYTHON_STEP: ArtifactRunnerStep
-    DOWNLOAD_PYTHON_PACKAGE: ArtifactRunnerStep
-    BUILD_AGENT_LIBS_STEP: ArtifactRunnerStep
-    DOWNLOAD_AGENT_LIBS_PACKAGE: ArtifactRunnerStep
 
     BUILD_STEPS: Dict[str, ArtifactRunnerStep]
+    DOWNLOAD_STEPS: Dict[str, ArtifactRunnerStep]
 
     @classmethod
     def get_all_required_steps(cls) -> List[RunnerStep]:
         steps = super(PythonPackageBuilder, cls).get_all_required_steps()
 
         steps.extend([
-            cls.BUILD_PYTHON_STEP,
-            cls.DOWNLOAD_PYTHON_PACKAGE,
-            cls.BUILD_AGENT_LIBS_STEP,
-            cls.DOWNLOAD_AGENT_LIBS_PACKAGE
+            *cls.BUILD_STEPS.values(),
+            *cls.DOWNLOAD_STEPS.values()
         ])
         return steps
 
@@ -100,15 +95,17 @@ class PythonPackageBuilder(Runner):
                       "'scalyr-agent-2 package'"
 
         iteration, _ = self._get_package_version_parts(
-            version=self.get_package_version(package="python")
+            version=self.get_package_version(package=PYTHON_PACKAGE_NAME)
         )
 
         if increment_iteration:
             iteration += 1
 
-        package_version = f"{iteration}-{self.BUILD_PYTHON_STEP.checksum}"
+        build_step = self.BUILD_STEPS[PYTHON_PACKAGE_NAME]
 
-        package_root = self.BUILD_PYTHON_STEP.get_output_directory(work_dir=self.work_dir) / "python"
+        package_version = f"{iteration}-{build_step.checksum}"
+
+        package_root = build_step.get_output_directory(work_dir=self.work_dir) / "python"
 
         check_call_with_log(
             [
@@ -152,15 +149,17 @@ class PythonPackageBuilder(Runner):
                       "from the 'scalyr-agent-2 package'"
 
         iteration, _ = self._get_package_version_parts(
-            version=self.get_package_version("agent_libs")
+            version=self.get_package_version(AGENT_LIBS_PACKAGE_NAME)
         )
 
         if increment_iteration:
             iteration += 1
 
-        package_version = f"{iteration}-{self.BUILD_AGENT_LIBS_STEP.checksum}"
+        build_step = self.BUILD_STEPS[AGENT_LIBS_PACKAGE_NAME]
 
-        package_root = self.BUILD_AGENT_LIBS_STEP.get_output_directory(work_dir=self.work_dir) / "agent_libs"
+        package_version = f"{iteration}-{build_step.checksum}"
+
+        package_root = build_step.get_output_directory(work_dir=self.work_dir) / "agent_libs"
 
         check_call_with_log(
             [
@@ -202,16 +201,9 @@ class PythonPackageBuilder(Runner):
         return current_version_checksum != build_step_checksum
 
     def _look_for_existing_package(self, package: str) -> Optional[pl.Path]:
-        if package == "python":
-            package_name = PYTHON_PACKAGE_NAME
-            build_step = self.BUILD_PYTHON_STEP
-            download_step = self.DOWNLOAD_PYTHON_PACKAGE
-        elif package == "agent_libs":
-            package_name = AGENT_LIBS_PACKAGE_NAME
-            build_step = self.BUILD_AGENT_LIBS_STEP
-            download_step = self.DOWNLOAD_AGENT_LIBS_PACKAGE
-        else:
-            raise ValueError(f"Invalid package type {package}")
+
+        build_step = self.BUILD_STEPS[package]
+        download_step = self.DOWNLOAD_STEPS[package]
 
         if self._is_package_changed(
                 package=package, build_step_checksum=build_step.checksum
@@ -224,7 +216,7 @@ class PythonPackageBuilder(Runner):
         output = download_step.get_output_directory(work_dir=self.work_dir)
         current_version = self.get_package_version(package)
         found = list(output.glob(
-            f"{package_name}_{current_version}_{self.PACKAGE_ARCHITECTURE}.{self.PACKAGE_TYPE}"
+            f"{package}_{current_version}_{self.PACKAGE_ARCHITECTURE}.{self.PACKAGE_TYPE}"
         ))
         if len(found) > 1:
             raise Exception(f"Number of downloaded {package} packages can be 1 or 0, got {len(found)}")
@@ -232,7 +224,12 @@ class PythonPackageBuilder(Runner):
         if len(found) == 0:
             return None
 
-        return found[0]
+        package_path = found[0]
+        shutil.copy(
+            package_path,
+            self.packages_output_path,
+        )
+        return package_path
 
     def build_packages(self):
 
@@ -241,7 +238,6 @@ class PythonPackageBuilder(Runner):
         if self.runs_in_docker:
             self.run_in_docker(
                 command_args=["build"]
-                # python_executable=f"/usr/libexec/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/scalyr-agent-2-python3"
             )
             return
 
@@ -250,12 +246,13 @@ class PythonPackageBuilder(Runner):
         packages_to_publish = []
 
         python_package_file_path = self._look_for_existing_package(
-            package="python"
+            package=PYTHON_PACKAGE_NAME
         )
 
         if python_package_file_path is None:
+            python_build_step = self.BUILD_STEPS[PYTHON_PACKAGE_NAME]
             increment_iteration = self._is_package_changed(
-                package="python", build_step_checksum=self.BUILD_PYTHON_STEP.checksum
+                package=PYTHON_PACKAGE_NAME, build_step_checksum=python_build_step.checksum
             )
             python_package_file_path = self.build_python_package(
                 increment_iteration=increment_iteration
@@ -263,20 +260,16 @@ class PythonPackageBuilder(Runner):
             packages_to_publish.append(python_package_file_path.name)
             logging.info(f"Package {python_package_file_path.name} is built.")
 
-        shutil.copy(
-            python_package_file_path,
-            self.packages_output_path
-        )
-
         # Build or reuse agent_libs package.
 
         agent_libs_package_file_path = self._look_for_existing_package(
-            package="agent_libs"
+            package=AGENT_LIBS_PACKAGE_NAME
         )
 
         if agent_libs_package_file_path is None:
+            agent_libs_build_step = self.BUILD_STEPS[AGENT_LIBS_PACKAGE_NAME]
             increment_iteration = self._is_package_changed(
-                package="agent_libs", build_step_checksum=self.BUILD_AGENT_LIBS_STEP.checksum
+                package=AGENT_LIBS_PACKAGE_NAME, build_step_checksum=agent_libs_build_step.checksum
             )
 
             python_package_version = self._parse_version_from_package_file_name(
@@ -289,11 +282,6 @@ class PythonPackageBuilder(Runner):
             packages_to_publish.append(agent_libs_package_file_path.name)
             logging.info(f"Package {agent_libs_package_file_path.name} is built.")
 
-        shutil.copy(
-            agent_libs_package_file_path,
-            self.packages_output_path
-        )
-
         packages_to_publish_file_path = self.packages_output_path / "packages_to_publish.json"
 
         packages_to_publish_file_path.write_text(
@@ -302,7 +290,6 @@ class PythonPackageBuilder(Runner):
                 indent=4
             )
         )
-
 
     def publish_packages_to_packagecloud(
             self,
@@ -353,8 +340,6 @@ class PythonPackageBuilder(Runner):
 
     def check_package_version_file_up_to_date(self, package: str):
 
-        failed = False
-
         build_step = self.BUILD_STEPS[package]
 
         current_version = PACKAGES_VERSIONS[package][self.PACKAGE_TYPE][self.PACKAGE_ARCHITECTURE]
@@ -365,13 +350,7 @@ class PythonPackageBuilder(Runner):
                 f"Current version of the {package} {self.PACKAGE_TYPE} {self.PACKAGE_ARCHITECTURE} package does not match "
                 f"version in the {PACKAGES_VERSIONS_PATH} file"
             )
-            failed = True
-
-        if failed:
-            logging.error("Please update version file and try again.")
             exit(1)
-
-        logging.info("All package version files are up to date.")
 
     def update_package_version_file(self, package: str):
         iteration, current_package_checksum = self._get_package_version_parts(
@@ -460,8 +439,12 @@ class DebPythonPackageBuilderX64(PythonPackageBuilder):
     DOWNLOAD_AGENT_LIBS_PACKAGE = DOWNLOAD_AGENT_LIBS_PACKAGE_FROM_PACKAGECLOUD
 
     BUILD_STEPS = {
-        "python": BUILD_PYTHON_GLIBC_X86_64,
-        "agent_libs": BUILD_AGENT_LIBS_GLIBC_X86_64
+        PYTHON_PACKAGE_NAME: BUILD_PYTHON_GLIBC_X86_64,
+        AGENT_LIBS_PACKAGE_NAME: BUILD_AGENT_LIBS_GLIBC_X86_64
+    }
+    DOWNLOAD_STEPS = {
+        PYTHON_PACKAGE_NAME: DOWNLOAD_PYTHON_PACKAGE_FROM_PACKAGECLOUD,
+        AGENT_LIBS_PACKAGE_NAME: DOWNLOAD_AGENT_LIBS_PACKAGE_FROM_PACKAGECLOUD
     }
 
 
@@ -476,20 +459,22 @@ class AllPackagesVersionTracker(Runner):
         for builder_cls in MANAGED_PACKAGE_BUILDERS.values():
             builder = builder_cls(work_dir=self.work_dir)
             builder.check_package_version_file_up_to_date(
-                package="python"
+                package=PYTHON_PACKAGE_NAME
             )
             builder.check_package_version_file_up_to_date(
-                package="agent_libs"
+                package=AGENT_LIBS_PACKAGE_NAME
             )
+
+        logging.info("All package version files are up to date.")
 
     def update_version_files(self):
         for builder_cls in MANAGED_PACKAGE_BUILDERS.values():
             builder = builder_cls(work_dir=self.work_dir)
             builder.update_package_version_file(
-                package="python"
+                package=PYTHON_PACKAGE_NAME
             )
             builder.update_package_version_file(
-                package="agent_libs"
+                package=AGENT_LIBS_PACKAGE_NAME
             )
 
     @classmethod
