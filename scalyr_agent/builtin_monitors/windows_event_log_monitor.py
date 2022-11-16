@@ -802,7 +802,7 @@ class NewJsonApi(NewApi):
             self._bookmark_lock.release()
 
     def _param_placeholder_value(self, channel, provider, param):
-        if not re.match("^%%\d+$", param):
+        if not re.match("^%%[0-9]+$", param):
             return param
 
         if channel == "Security":
@@ -864,21 +864,21 @@ class NewJsonApi(NewApi):
         except:
             return rv
 
-        if isinstance(event_data, str) and re.match("^%%\d+$", event_data):
+        if isinstance(event_data, str) and re.match("^%%[0-9]+$", event_data):
             rv["Event"]["EventData"]["Data"] = self._param_placeholder_value(
                 channel, provider, event_data
             )
 
         elif isinstance(event_data, dict):
             for key, val in event_data.items():
-                if isinstance(val, str) and re.match("^%%\d+$", val):
+                if isinstance(val, str) and re.match("^%%[0-9]+$", val):
                     rv["Event"]["EventData"]["Data"][
                         key
                     ] = self._param_placeholder_value(channel, provider, val)
                 elif (
                     isinstance(val, dict)
                     and "Text" in val
-                    and re.match("^%%\d+$", val["Text"])
+                    and re.match("^%%[0-9]+$", val["Text"])
                 ):
                     rv["Event"]["EventData"]["Data"][key][
                         "Text"
