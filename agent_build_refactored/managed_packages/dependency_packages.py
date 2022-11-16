@@ -165,7 +165,9 @@ def create_download_from_packageloud_step(
         package_name: str,
         package_version: str,
         package_type: str,
-        package_architecture: str
+        package_architecture: str,
+        user_name: str,
+        repo_name: str
 ):
 
     package_filename = f"{package_name}_{package_version}_{package_architecture}.{package_type}"
@@ -177,7 +179,9 @@ def create_download_from_packageloud_step(
         ],
         base=PREPARE_TOOLSET_GLIBC_X86_64,
         environment_variables={
-            "PACKAGE_FILENAME": package_filename
+            "PACKAGE_FILENAME": package_filename,
+            "USER_NAME": user_name,
+            "REPO_NAME": repo_name
         },
         github_actions_settings=GitHubActionsSettings(
             cacheable=True
@@ -190,5 +194,7 @@ DOWNLOAD_PYTHON_PACKAGE_FROM_PACKAGECLOUD = create_download_from_packageloud_ste
     package_name=PYTHON_PACKAGE_NAME,
     package_version=PYTHON_PACKAGE_VERSION,
     package_type="deb",
-    package_architecture="amd64"
+    package_architecture="amd64",
+    user_name="ArthurSentinelone",
+    repo_name="DataSetAgent"
 )

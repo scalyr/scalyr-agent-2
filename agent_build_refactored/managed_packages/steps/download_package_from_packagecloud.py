@@ -24,14 +24,57 @@
 #   PACKAGE_FILENAME: File name of the package.
 
 import os
+import subprocess
+import requests
+import pathlib as pl
+import shutil
+from requests.auth import HTTPBasicAuth
 
 from agent_build_refactored.tools.steps_libs.step_tools import skip_caching_and_exit
 
 
 def main():
     package_file_name = os.environ["PACKAGE_FILENAME"]
+    user_name = os.environ["USER_NAME"]
+    repo_name = os.environ["REPO_NAME"]
+    token = "50552e5ef4df6c425e24d1213564910f1990c5fd25f2c4f4"
+    auth = HTTPBasicAuth(token, "")
 
-    skip_caching_and_exit()
+    with requests.Session() as s:
+        headers = {'Authorization': token}
+
+        resp = s.get(
+            url=f"https://packagecloud.io/api/v1/repos/{user_name}/{repo_name}/search.json",
+            params={
+                "q": package_file_name
+            },
+            auth=auth
+        )
+    try:
+        resp.raise_for_status()
+    except requests.HTTPError:
+        if resp.status_code == "404":
+            skip_caching_and_exit()
+        else:
+            raise
+
+    packages = resp.json()
+
+    print(len(packages))
+
+    download_url = packages[0]["download_url"]
+
+    package_path = pl.Path(os.environ["STEP_OUTPUT_PATH"]) / package_file_name
+
+    with requests.Session() as s:
+        resp = s.get(
+            url=download_url,
+            auth=auth,
+            stream=True
+        )
+        resp.raise_for_status()
+        with package_path.open("wb") as f:
+            shutil.copyfileobj(resp.raw, f)
 
 
 if __name__ == '__main__':

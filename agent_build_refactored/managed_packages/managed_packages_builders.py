@@ -87,7 +87,7 @@ class PythonPackageBuilder(Runner):
 
         package_version = f"{iteration + 1}-{self.BUILD_PYTHON_STEP.checksum}"
 
-        package_root = self.BUILD_PYTHON_STEP.get_output_directory(work_dir=self.work_dir) / "python",
+        package_root = self.BUILD_PYTHON_STEP.get_output_directory(work_dir=self.work_dir) / "python"
 
         self.packages_output_path.mkdir(parents=True)
 
@@ -209,6 +209,7 @@ class PythonPackageBuilder(Runner):
                 "Current Python package version does not match version in the "
                 "PYTHON_PACKAGE_VERSION file"
             )
+            failed = True
 
         if failed:
             logging.error("Please update version files and try again.")
