@@ -736,11 +736,13 @@ class NewJsonApi(NewApi):
             win32evtlog.EvtRenderContextSystem
         )
 
-        self._placeholder_render = config.get('placeholder_render')
+        self._placeholder_render = config.get("placeholder_render")
         if self._placeholder_render:
             self._dll_cache = Cache(size=10)
             self._param_cache = Cache(size=1000)
-            self._langid = win32api.MAKELANGID(win32con.LANG_NEUTRAL, win32con.SUBLANG_NEUTRAL)
+            self._langid = win32api.MAKELANGID(
+                win32con.LANG_NEUTRAL, win32con.SUBLANG_NEUTRAL
+            )
 
     def log_event(self, event):
         values = win32evtlog.EvtRender(
@@ -800,17 +802,17 @@ class NewJsonApi(NewApi):
             self._bookmark_lock.release()
 
     def _param_placeholder_value(self, channel, provider, param):
-        if not re.match('^%%\d+$', param):
+        if not re.match("^%%\d+$", param):
             return param
 
-        if channel == 'Security':
-            provider = 'Security'
+        if channel == "Security":
+            provider = "Security"
 
-        param_key = '%s-%s-%s' % (channel, provider, param)
+        param_key = "%s-%s-%s" % (channel, provider, param)
         if param_key in self._param_cache:
             return self._param_cache[param_key]
 
-        dll_key = '%s-%s' % (channel, provider)
+        dll_key = "%s-%s" % (channel, provider)
         if dll_key in self._dll_cache:
             if not isinstance(self._dll_cache[dll_key], _DLL):
                 return param
@@ -844,33 +846,43 @@ class NewJsonApi(NewApi):
                 self._dll_cache[dll_key].handle,
                 int(param[2:]),
                 self._langid,
-                None
+                None,
             )
             self._param_cache[param_key] = value.strip()
         except:
             self._param_cache[param_key] = param
 
         return self._param_cache[param_key]
-    
+
     def _replace_param_placeholders(self, event):
         rv = copy.deepcopy(event)
 
         try:
-            event_data = event['Event']['EventData']['Data']
-            channel = event['Event']['System']['Channel']
-            provider = event['Event']['System']['Provider']['Name']
+            event_data = event["Event"]["EventData"]["Data"]
+            channel = event["Event"]["System"]["Channel"]
+            provider = event["Event"]["System"]["Provider"]["Name"]
         except:
             return rv
 
-        if isinstance(event_data, str) and re.match('^%%\d+$', event_data):
-            rv['Event']['EventData']['Data'] = self._param_placeholder_value(channel, provider, event_data)
-            
+        if isinstance(event_data, str) and re.match("^%%\d+$", event_data):
+            rv["Event"]["EventData"]["Data"] = self._param_placeholder_value(
+                channel, provider, event_data
+            )
+
         elif isinstance(event_data, dict):
             for key, val in event_data.items():
-                if isinstance(val, str) and re.match('^%%\d+$', val):
-                    rv['Event']['EventData']['Data'][key] = self._param_placeholder_value(channel, provider, val)
-                elif isinstance(val, dict) and 'Text' in val and re.match('^%%\d+$', val['Text']):
-                    rv['Event']['EventData']['Data'][key]['Text'] = self._param_placeholder_value(channel, provider, val['Text'])
+                if isinstance(val, str) and re.match("^%%\d+$", val):
+                    rv["Event"]["EventData"]["Data"][
+                        key
+                    ] = self._param_placeholder_value(channel, provider, val)
+                elif (
+                    isinstance(val, dict)
+                    and "Text" in val
+                    and re.match("^%%\d+$", val["Text"])
+                ):
+                    rv["Event"]["EventData"]["Data"][key][
+                        "Text"
+                    ] = self._param_placeholder_value(channel, provider, val["Text"])
 
         return rv
 
@@ -927,17 +939,24 @@ def _strip_xmltodict_prefixes(x):
 class _DLL:
     @staticmethod
     def dllpath(channel, provider):
-        keyname = 'SYSTEM\\CurrentControlSet\\Services\\EventLog\\%s\\%s' % (channel, provider)
+        keyname = "SYSTEM\\CurrentControlSet\\Services\\EventLog\\%s\\%s" % (
+            channel,
+            provider,
+        )
         keyhandle = win32api.RegOpenKey(win32con.HKEY_LOCAL_MACHINE, keyname)
         try:
-            return win32api.ExpandEnvironmentStrings(win32api.RegQueryValueEx(keyhandle, 'ParameterMessageFile')[0])
+            return win32api.ExpandEnvironmentStrings(
+                win32api.RegQueryValueEx(keyhandle, "ParameterMessageFile")[0]
+            )
         finally:
             win32api.RegCloseKey(keyhandle)
 
     def __init__(self, channel, provider):
         try:
             self.path = self.dllpath(channel, provider)
-            self.handle = win32api.LoadLibraryEx(self.path, 0, win32con.LOAD_LIBRARY_AS_DATAFILE)
+            self.handle = win32api.LoadLibraryEx(
+                self.path, 0, win32con.LOAD_LIBRARY_AS_DATAFILE
+            )
         except Exception as e:
             self.handle = None
             raise e
