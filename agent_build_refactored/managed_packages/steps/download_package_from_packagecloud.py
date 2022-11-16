@@ -22,7 +22,7 @@
 #
 # It expects next environment variables:
 #   PACKAGE_FILENAME: File name of the package.
-
+import logging
 import os
 import subprocess
 import requests
@@ -31,9 +31,13 @@ import shutil
 from requests.auth import HTTPBasicAuth
 
 from agent_build_refactored.tools.steps_libs.step_tools import skip_caching_and_exit
+from agent_build_refactored.tools.steps_libs.build_logging import init_logging
 
+logger = logging.getLogger(__name__)
 
 def main():
+    init_logging()
+
     package_file_name = os.environ["PACKAGE_FILENAME"]
     user_name = os.environ["USER_NAME"]
     repo_name = os.environ["REPO_NAME"]
@@ -50,17 +54,13 @@ def main():
             },
             auth=auth
         )
-    try:
-        resp.raise_for_status()
-    except requests.HTTPError:
-        if resp.status_code == "404":
-            skip_caching_and_exit()
-        else:
-            raise
 
+    resp.raise_for_status()
     packages = resp.json()
 
-    print(len(packages))
+    if len(packages) == 0:
+        logger.info(f"Package {package_file_name} is not in the Packagecloud repository.")
+        skip_caching_and_exit()
 
     download_url = packages[0]["download_url"]
 

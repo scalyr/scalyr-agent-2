@@ -11,14 +11,31 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import dataclasses
+import json
 import  pathlib as pl
 
 from agent_build_refactored.tools.runner import EnvironmentRunnerStep, GitHubActionsSettings, DockerImageSpec, ArtifactRunnerStep
 from agent_build_refactored.tools.constants import DockerPlatform, EMBEDDED_PYTHON_VERSION
 
-PYTHON_PACKAGE_VERSION_PATH = pl.Path(__file__).parent / "PYTHON_PACKAGE_VERSION"
-PYTHON_PACKAGE_VERSION = PYTHON_PACKAGE_VERSION_PATH.read_text().strip()
+PACKAGES_VERSIONS_PATH = pl.Path(__file__).parent / "PACKAGES_VERSIONS"
+
+
+@dataclasses.dataclass
+class PackageVersions:
+    PYTHON_DEB_X86_64: str
+
+    @staticmethod
+    def read_from_file():
+        data = json.loads(
+            PACKAGES_VERSIONS_PATH.read_text()
+        )
+        return PackageVersions(
+            PYTHON_DEB_X86_64=data["_deb_X86_64"]
+        )
+
+
+PACKAGES_VERSIONS = json.loads(PACKAGES_VERSIONS_PATH.read_text())
 
 AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME = "scalyr-agent-2-dependencies"
 PYTHON_PACKAGE_NAME = "scalyr-agent-python3"
@@ -175,7 +192,9 @@ def create_download_from_packageloud_step(
         name=name,
         script_path="agent_build_refactored/managed_packages/steps/download_package_from_packagecloud.py",
         tracked_files_globs=[
-            "agent_build_refactored/tools/steps_libs/step_tools.py"
+            "agent_build_refactored/tools/steps_libs/constants.py",
+            "agent_build_refactored/tools/steps_libs/step_tools.py",
+            "agent_build_refactored/tools/steps_libs/build_logging.py"
         ],
         base=PREPARE_TOOLSET_GLIBC_X86_64,
         environment_variables={
@@ -192,7 +211,7 @@ def create_download_from_packageloud_step(
 DOWNLOAD_PYTHON_PACKAGE_FROM_PACKAGECLOUD = create_download_from_packageloud_step(
     name="download_python_package_from_packagecloud",
     package_name=PYTHON_PACKAGE_NAME,
-    package_version=PYTHON_PACKAGE_VERSION,
+    package_version=PACKAGES_VERSIONS["python"]["deb"]["amd64"],
     package_type="deb",
     package_architecture="amd64",
     user_name="ArthurSentinelone",
