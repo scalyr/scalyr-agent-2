@@ -736,7 +736,9 @@ class Runner:
         for runner_clas in cls.REQUIRED_RUNNERS_CLASSES:
             result.extend(runner_clas.get_all_cacheable_steps())
 
-        return result
+        # Filter all identical steps
+        result_dict = {step.id: step for step in result}
+        return list(result_dict.values())
 
     @classmethod
     def get_fully_qualified_name(cls) -> str:
