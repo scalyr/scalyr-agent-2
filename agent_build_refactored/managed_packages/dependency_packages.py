@@ -13,10 +13,11 @@
 # limitations under the License.
 import dataclasses
 import json
+import os
 import  pathlib as pl
 
 from agent_build_refactored.tools.runner import EnvironmentRunnerStep, GitHubActionsSettings, DockerImageSpec, ArtifactRunnerStep
-from agent_build_refactored.tools.constants import DockerPlatform, EMBEDDED_PYTHON_VERSION
+from agent_build_refactored.tools.constants import DockerPlatform, EMBEDDED_PYTHON_VERSION, IN_CICD
 
 PACKAGES_VERSIONS_PATH = pl.Path(__file__).parent / "PACKAGES_VERSIONS"
 
@@ -29,6 +30,12 @@ AGENT_LIBS_PACKAGE_NAME = "scalyr-agent-libs"
 
 PYTHON_PACKAGE_SSL_VERSION = "1.1.1k"
 EMBEDDED_PYTHON_SHORT_VERSION = ".".join(EMBEDDED_PYTHON_VERSION.split(".")[:2])
+
+
+PACKAGE_CLOUD_TOKEN = os.environ.get("PACKAGE_CLOUD_TOKEN")
+
+if IN_CICD and not PACKAGE_CLOUD_TOKEN:
+    raise ValueError(f"The 'PACKAGE_CLOUD_TOKEN' environment variable has to be specified in CI/CD.")
 
 
 INSTALL_GCC_7_GLIBC_X86_64 = EnvironmentRunnerStep(
@@ -189,7 +196,8 @@ def create_download_from_packageloud_step(
         environment_variables={
             "PACKAGE_FILENAME": package_filename,
             "USER_NAME": user_name,
-            "REPO_NAME": repo_name
+            "REPO_NAME": repo_name,
+            "TOKEN": PACKAGE_CLOUD_TOKEN or ""
         },
         github_actions_settings=GitHubActionsSettings(
             cacheable=True

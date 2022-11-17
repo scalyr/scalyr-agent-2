@@ -190,7 +190,8 @@ jobs:
       #   "python-version": Version of python to set up on this runner. (NOTE: version of python used in images may differ, and it specified in the source code.)
       #   "os": Runner OS.
       matrix: ${{ fromJSON(needs.pre_job.outputs.managed_packages_build_matrix_json) }}
-
+    env:
+      PACKAGE_CLOUD_TOKEN: ${{ secrets.PACKAGE_CLOUD_TOKEN }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -213,16 +214,5 @@ jobs:
 
       - name: Build managed package with builder '${{ matrix.name }}'
         run: |
-          
-          mkdir -p /home/runner/work/scalyr-agent-2/scalyr-agent-2/ggg
-          
-          ls -l /home/runner/work/scalyr-agent-2/scalyr-agent-2 
-          
-          docker run -i -v /home/runner/work/scalyr-agent-2/scalyr-agent-2/ggg:/ggg centos:6 /bin/echo "hello"
-          
-          ls -l /home/runner/work/scalyr-agent-2/scalyr-agent-2 
-          
-          touch  /home/runner/work/scalyr-agent-2/scalyr-agent-2/ggg/ttt.txt
-          
-          #python3 build_package_new_refactored.py ${{ matrix.name }} build
+            python3 build_package_new_refactored.py ${{ matrix.name }} build
 

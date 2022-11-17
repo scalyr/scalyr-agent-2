@@ -35,18 +35,21 @@ from agent_build_refactored.tools.steps_libs.build_logging import init_logging
 
 logger = logging.getLogger(__name__)
 
+
 def main():
     init_logging()
 
     package_file_name = os.environ["PACKAGE_FILENAME"]
     user_name = os.environ["USER_NAME"]
     repo_name = os.environ["REPO_NAME"]
-    token = "50552e5ef4df6c425e24d1213564910f1990c5fd25f2c4f4"
+    token = os.environ["TOKEN"]
+
+    if not token:
+        skip_caching_and_exit()
+
     auth = HTTPBasicAuth(token, "")
 
     with requests.Session() as s:
-        headers = {'Authorization': token}
-
         resp = s.get(
             url=f"https://packagecloud.io/api/v1/repos/{user_name}/{repo_name}/search.json",
             params={
