@@ -840,7 +840,7 @@ class Runner:
 
             mount_args.extend([
                 "-v",
-                f"{arg.path}:{in_docker_path}:Z"
+                f"{arg.path}:{in_docker_path}:z"
             ])
             final_command_args.append(str(in_docker_path))
 
@@ -855,7 +855,7 @@ class Runner:
             "-i",
             *mount_args,
             "-v",
-            f"{SOURCE_ROOT}:/tmp/source:Z",
+            f"{SOURCE_ROOT}:/tmp/source:z",
             *env_args,
             "--platform",
             str(self.base_docker_image.platform),
