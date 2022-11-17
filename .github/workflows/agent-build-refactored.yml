@@ -183,10 +183,11 @@ jobs:
 #      #   "python-version": Version of python to set up on this runner. (NOTE: version of python used in images may differ, and it specified in the source code.)
 #      #   "os": Runner OS.
 #      matrix: ${{ fromJSON(needs.pre_job.outputs.agent_image_build_matrix_json) }}
+    runs-on: ${{ matrix.packages.os }}
     strategy:
       matrix:
         packages:
-          - { "package_type": "deb", "architecture": "amd64", "master_run_only": "false" }
+          - { "package_type": "deb", "architecture": "amd64", "os": "ubuntu-22.04", "master_run_only": "false" }
 
     steps:
       - name: Checkout repository
