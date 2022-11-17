@@ -660,6 +660,7 @@ class EnvironmentRunnerStep(RunnerStep):
         check_call_with_log(
             ["docker", "commit", self._step_container_name, self.result_image.name]
         )
+        print("IN_DOCKER?", IN_DOCKER)
         cache_directory.mkdir(parents=True, exist_ok=True)
         cached_image_path = cache_directory / self.result_image.name
         logging.info(
