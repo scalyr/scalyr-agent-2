@@ -216,11 +216,11 @@ jobs:
           
           mkdir -p /home/runner/work/scalyr-agent-2/scalyr-agent-2/ggg
           
-          ls -l /home/runner/work/scalyr-agent-2/scalyr-agent-2/ggg 
+          ls -l /home/runner/work/scalyr-agent-2/scalyr-agent-2 
           
           docker run -i -v /home/runner/work/scalyr-agent-2/scalyr-agent-2/ggg:/ggg centos:6 /bin/echo "hello"
           
-          ls -l /home/runner/work/scalyr-agent-2/scalyr-agent-2/ggg 
+          ls -l /home/runner/work/scalyr-agent-2/scalyr-agent-2 
           
-          python3 build_package_new_refactored.py ${{ matrix.name }} build
+          #python3 build_package_new_refactored.py ${{ matrix.name }} build
 
