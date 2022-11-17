@@ -34,10 +34,10 @@ EMBEDDED_PYTHON_SHORT_VERSION = ".".join(EMBEDDED_PYTHON_VERSION.split(".")[:2])
 INSTALL_GCC_7_GLIBC_X86_64 = EnvironmentRunnerStep(
         name="install_gcc_7",
         script_path="agent_build_refactored/managed_packages/steps/install_gcc_7.sh",
-        base=DockerImageSpec(
-            name="centos:6",
-            platform=DockerPlatform.AMD64.value
-        ),
+        # base=DockerImageSpec(
+        #     name="centos:6",
+        #     platform=DockerPlatform.AMD64.value
+        # ),
         github_actions_settings=GitHubActionsSettings(
             cacheable=True
         )
