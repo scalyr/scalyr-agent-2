@@ -205,13 +205,22 @@ jobs:
         with:
           driver-opts: network=host
 
-      - name: Prepare everything that is needed by image builder '${{ matrix.name }}'
-        uses: ./.github/actions/execute-runner
-        with:
-          runner-fqdn: ${{ matrix.builder-fqdn }}
+#      - name: Prepare everything that is needed by image builder '${{ matrix.name }}'
+#        uses: ./.github/actions/execute-runner
+#        with:
+#          runner-fqdn: ${{ matrix.builder-fqdn }}
 
 
       - name: Build managed package with builder '${{ matrix.name }}'
         run: |
+          
+          mkdir -p /home/runner/work/scalyr-agent-2/scalyr-agent-2/ggg
+          
+          ls -l /home/runner/work/scalyr-agent-2/scalyr-agent-2/ggg 
+          
+          docker run -it -v /home/runner/work/scalyr-agent-2/scalyr-agent-2/ggg:/ggg centos:6 /usr/bin/echo "hello"
+          
+          ls -l /home/runner/work/scalyr-agent-2/scalyr-agent-2/ggg 
+          
           python3 build_package_new_refactored.py ${{ matrix.name }} build
 
