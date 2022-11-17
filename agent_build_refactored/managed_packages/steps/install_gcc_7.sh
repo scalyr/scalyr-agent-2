@@ -24,6 +24,8 @@
 
 set -e
 
+exit 0
+
 # Update main sources from vault.
 cat <<EOT > /etc/yum.repos.d/CentOS-Base.repo
 [C6.10-base]
