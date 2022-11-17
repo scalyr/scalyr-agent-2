@@ -76,7 +76,7 @@ jobs:
       - name: Verify that the PACKAGECLOUD_PACKAGES file is up to date.
         # if: steps.init-matrices.outputs.is_master_run == "true"
         run: |
-          python3 build_package_new_refactored.py \
+          python3 agent_build_refactored/scripts/runner_helper.py \
             agent_build_refactored.managed_packages.managed_packages_builders.AllPackagesVersionTracker \
             check_repo_package_file_is_up_to_date  
 
