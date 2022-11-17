@@ -671,6 +671,8 @@ class EnvironmentRunnerStep(RunnerStep):
         )
         print("IN_DOCKER?", IN_DOCKER)
         cache_directory.mkdir(parents=True, exist_ok=True)
+
+        os.system(f"ls -l {cache_directory.parent.parent}")
         os.system(f"ls -l {cache_directory.parent}")
         tt = cache_directory / "ttt.txt"
         tt.touch()
