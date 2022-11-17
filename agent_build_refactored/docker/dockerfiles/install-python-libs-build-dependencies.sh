@@ -23,6 +23,7 @@ elif [ "$DISTRO_NAME" = "alpine" ]; then
    apk add --virtual build-dependencies \
     binutils \
     build-base \
+    linux-headers \
     gcc \
     g++ \
     make \

@@ -14,8 +14,10 @@ requests_mock==1.9.3
 # transitive dependency of pytest-benchmark, pinned since pytest-benchmark
 # doesn't pin it and new version drops support for Python 3
 # NOTE: For snyk false positive, see https://github.com/scalyr/scalyr-agent-2/pull/791#issuecomment-981771502
-pygal==2.4.0
-pytest-benchmark==3.2.3
+pygal==2.4.0; python_version == '2.7'
+pygal==3.0.0; python_version > '2.7'
+pytest-benchmark==3.2.3; python_version < '3.11'
+pytest-benchmark==4.0.0; python_version == '3.11'
 pytest-xdist==1.31.0
 coverage==4.5.4
 codecov==2.1.9

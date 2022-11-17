@@ -120,6 +120,8 @@ class AgentStatus(BaseAgentStatus):
         self.monitor_manager_status = None
         # version of the running python interpreter.
         self.python_version = None
+        # average time in seconds spent on agent's status report.
+        self.avg_status_report_duration = None
 
 
 class GCStatus(BaseAgentStatus):
@@ -215,6 +217,9 @@ class OverallStats(AgentStatus):
         self.avg_bytes_produced_rate = 0
         self.avg_bytes_copied_rate = 0
         self.rate_limited_time_since_last_status = 0
+
+        # average time in seconds spent on agent's status report.
+        self.avg_status_report_duration = None
 
     def __add__(self, other):
         """Adds all of the 'total_' fields of this instance and other together and returns a new OverallStats containing
@@ -601,6 +606,12 @@ class MonitorStatus(BaseAgentStatus):
 
 
 def report_status(output, status, current_time):
+    """
+
+    :param output: File object to output.
+    :param status: Agent status instance.
+    :param current_time: Time of the status report.
+    """
     print(
         "Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help",
         file=output,
@@ -640,6 +651,11 @@ def report_status(output, status, current_time):
     print("ServerHost:              %s" % status.server_host, file=output)
     print("Compression algorithm:   %s" % status.compression_type, file=output)
     print("Compression level:       %s" % status.compression_level, file=output)
+    if status.avg_status_report_duration:
+        print(
+            "Average status time:     %s sec." % status.avg_status_report_duration,
+            file=output,
+        )
     print("", file=output)
     server = scalyr_util.get_web_url_from_upload_url(status.scalyr_server)
     # We default to https://agent.scalyr.com for the Scalyr server, but to see the status on the web,
