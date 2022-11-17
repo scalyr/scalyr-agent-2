@@ -24,6 +24,9 @@ import os
 import pathlib as pl
 from typing import List, Tuple, Optional, Dict
 
+import requests
+from requests.auth import HTTPBasicAuth
+
 from agent_build_refactored.tools.runner import Runner, RunnerStep, ArtifactRunnerStep
 from agent_build_refactored.tools.constants import SOURCE_ROOT, EMBEDDED_PYTHON_VERSION
 from agent_build_refactored.tools import check_call_with_log
@@ -43,6 +46,8 @@ from agent_build_refactored.managed_packages.dependency_packages import (
     AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME,
     EMBEDDED_PYTHON_SHORT_VERSION
 )
+
+logger = logging.getLogger(__name__)
 
 
 class PythonPackageBuilder(Runner):
@@ -374,6 +379,52 @@ class PythonPackageBuilder(Runner):
             )
             logging.info(f"The {PACKAGES_VERSIONS_PATH} file is updated.")
 
+    def download_package_from_packagecloud(
+            self,
+            package_name: str,
+            token: str,
+            user_name: str,
+            repo_name: str,
+            output_path: pl.Path
+
+    ) -> Optional[pl.Path]:
+
+        package_version = PACKAGES_VERSIONS[package_name][self.PACKAGE_TYPE][self.PACKAGE_ARCHITECTURE]
+        package_filename = f"{package_name}_{package_version}_{self.PACKAGE_ARCHITECTURE}.{self.PACKAGE_TYPE}"
+
+        auth = HTTPBasicAuth(token, "")
+
+        with requests.Session() as s:
+            resp = s.get(
+                url=f"https://packagecloud.io/api/v1/repos/{user_name}/{repo_name}/search.json",
+                params={
+                    "q": package_filename
+                },
+                auth=auth
+            )
+
+        resp.raise_for_status()
+        packages = resp.json()
+
+        if len(packages) == 0:
+            logger.info(f"Package {package_filename} is not in the Packagecloud repository.")
+            return None
+
+        download_url = packages[0]["download_url"]
+
+        output_path.mkdir(parents=True, exist_ok=True)
+        package_path = output_path / package_filename
+
+        with requests.Session() as s:
+            resp = s.get(
+                url=download_url,
+                auth=auth,
+                stream=True
+            )
+            resp.raise_for_status()
+            with package_path.open("wb") as f:
+                shutil.copyfileobj(resp.raw, f)
+
 
     @classmethod
     def add_command_line_arguments(cls, parser: argparse.ArgumentParser):
@@ -399,6 +450,39 @@ class PythonPackageBuilder(Runner):
             dest="packages_dir",
             required=True,
             help="Path to a directory with packages to publish."
+        )
+
+        download_python_package_parser = subparsers.add_parser(
+            "download_package_from_packagecloud"
+        )
+
+        download_python_package_parser.add_argument(
+            "--package-name",
+            dest="package_name",
+            required=True,
+            choices=[PYTHON_PACKAGE_NAME, AGENT_LIBS_PACKAGE_NAME]
+        )
+
+        download_python_package_parser.add_argument(
+            "--token",
+            required=True
+        )
+
+        download_python_package_parser.add_argument(
+            "--user-name",
+            dest="user_name",
+            required=True
+        )
+
+        download_python_package_parser.add_argument(
+            "--repo-name",
+            dest="repo_name",
+            required=True
+        )
+
+        download_python_package_parser.add_argument(
+            "--output",
+            required=True
         )
 
     @classmethod
@@ -427,6 +511,17 @@ class PythonPackageBuilder(Runner):
             builder.publish_packages_to_packagecloud(
                 packages_dir_path=pl.Path(args.packages_dir)
             )
+        elif args.command == "download_package_from_packagecloud":
+            package_path = builder.download_package_from_packagecloud(
+                package_name=PYTHON_PACKAGE_NAME,
+                token=args.token,
+                user_name=args.user_name,
+                repo_name=args.repo_name,
+                output_path=pl.Path(args.output)
+            )
+            if package_path:
+                print(package_path)
+                exit(0)
         else:
             logging.error(f"Unknown command {args.command}.")
             exit(1)

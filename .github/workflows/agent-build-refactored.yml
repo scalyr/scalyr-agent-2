@@ -190,8 +190,6 @@ jobs:
       #   "python-version": Version of python to set up on this runner. (NOTE: version of python used in images may differ, and it specified in the source code.)
       #   "os": Runner OS.
       matrix: ${{ fromJSON(needs.pre_job.outputs.managed_packages_build_matrix_json) }}
-    env:
-      PACKAGE_CLOUD_TOKEN: ${{ secrets.PACKAGE_CLOUD_TOKEN }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -205,6 +203,34 @@ jobs:
         uses: docker/setup-buildx-action@8c0edbc76e98fa90f69d9a2c020dcb50019dc325 # v2.0.0
         with:
           driver-opts: network=host
+
+
+      - name: Look for packages in Packagecloud for '${{ matrix.name }}'
+        id: look-for-packages
+        run: |
+          PYTHON_PACKAGE_PATH=$(
+            python3 build_package_new_refactored.py ${{ matrix.name }} \
+              download_package_from_packagecloud \
+              --package-name scalyr-agent-python3 \
+              --user-name ArthurSentinelone \
+              --repo-name DataSetAgent \
+              --output /tmp/packagecloud \
+              --token ${{ secrets.PACKAGE_CLOUD_TOKEN }}
+          )
+          
+          echo "python-package-path=${PYTHON_PACKAGE_PATH}" >> $GITHUB_OUTPUT
+          
+          
+          
+      - name: Cache Python package.
+        if: steps.look-for-packages.outputs.python-package-path
+        id: cache-python-package
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.look-for-packages.outputs.python-package-path }}
+          key: python-package-${{ matrix.name }}
+
+      
 
       - name: Prepare everything that is needed by image builder '${{ matrix.name }}'
         uses: ./.github/actions/execute-runner
