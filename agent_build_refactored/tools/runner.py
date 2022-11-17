@@ -495,6 +495,9 @@ class RunnerStep:
             f"CHECKSUM={self.checksum}"
         ])
 
+        print("BEFORE!!!!!")
+        os.system(f"ls -l {cache_directory.parent}")
+
         check_call_with_log(
             [
                 "docker",
@@ -512,6 +515,9 @@ class RunnerStep:
                 *command_args,
             ]
         )
+
+        print("AFTER!!!!!")
+        os.system(f"ls -l {cache_directory.parent}")
 
     def run(self, work_dir: pl.Path):
         """
