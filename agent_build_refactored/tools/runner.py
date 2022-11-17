@@ -813,6 +813,7 @@ class Runner:
     def runs_in_docker(self) -> bool:
         return self.base_docker_image is not None and not IN_DOCKER
 
+
     def run_in_docker(
             self,
             command_args: List = None,
@@ -849,6 +850,36 @@ class Runner:
             "AGENT_BUILD_IN_DOCKER=1"
         ]
 
+        if os.getlogin() != "root":
+
+            intermediate_user_container = f"{self.base_docker_image.name}_intermediate_user_container"
+
+            check_call_with_log([
+                "docker",
+                "run",
+                "-i",
+                "--platform",
+                str(self.base_docker_image.platform),
+                "--name",
+                intermediate_user_container,
+                self.base_docker_image.name,
+                "adduser",
+                "--disabled-password",
+                #"--gecos",
+                "-u",
+                str(os.getuid()),
+                os.getlogin()
+
+            ])
+
+            check_call_with_log([
+                "docker", "commit", intermediate_user_container, intermediate_user_container
+            ])
+
+            base_image_name = intermediate_user_container
+        else:
+            base_image_name = self.base_docker_image.name
+
         check_call_with_log([
             "docker",
             "run",
@@ -859,7 +890,10 @@ class Runner:
             *env_args,
             "--platform",
             str(self.base_docker_image.platform),
-            self.base_docker_image.name,
+            "--user",
+            os.getlogin(),
+            #self.base_docker_image.name,
+            base_image_name,
             python_executable,
             "/tmp/source/agent_build_refactored/scripts/runner_helper.py",
             type(self).get_fully_qualified_name(),
