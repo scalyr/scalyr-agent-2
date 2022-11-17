@@ -832,7 +832,6 @@ class Runner:
                 final_command_args.append(str(arg))
                 continue
 
-
             path = pl.Path(arg.path)
 
             if path.is_absolute():

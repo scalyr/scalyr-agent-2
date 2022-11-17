@@ -25,7 +25,7 @@ import pathlib as pl
 from typing import List, Tuple, Optional, Dict
 
 
-from agent_build_refactored.tools.runner import Runner, RunnerStep, ArtifactRunnerStep
+from agent_build_refactored.tools.runner import Runner, RunnerStep, ArtifactRunnerStep, RunnerMappedPath
 from agent_build_refactored.tools.constants import SOURCE_ROOT, EMBEDDED_PYTHON_VERSION
 from agent_build_refactored.tools import check_call_with_log
 from agent_build_refactored.prepare_agent_filesystem import build_linux_lfs_agent_files
@@ -308,7 +308,17 @@ class PythonPackageBuilder(Runner):
 
         if self.runs_in_docker:
             self.run_in_docker(
-                command_args=["publish"]
+                command_args=[
+                    "publish",
+                    "--packages-dir",
+                    RunnerMappedPath(packages_dir_path),
+                    "--token",
+                    token,
+                    "--repo_name",
+                    repo_name,
+                    "--user_name",
+                    user_name
+                ]
             )
             return
         packages_to_publish_path = packages_dir_path / "packages_to_publish.json"
