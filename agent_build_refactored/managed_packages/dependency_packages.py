@@ -15,6 +15,7 @@ import dataclasses
 import json
 import os
 import  pathlib as pl
+import subprocess
 
 from agent_build_refactored.tools.runner import EnvironmentRunnerStep, GitHubActionsSettings, DockerImageSpec, ArtifactRunnerStep
 from agent_build_refactored.tools.constants import DockerPlatform, EMBEDDED_PYTHON_VERSION, IN_CICD
@@ -142,6 +143,7 @@ BUILD_AGENT_LIBS_GLIBC_X86_64 = create_build_agent_libs_step(
     build_python_step=BUILD_PYTHON_GLIBC_X86_64
 )
 
+_user_name = subprocess.check_output("whoami").decode().strip()
 
 PREPARE_TOOLSET_GLIBC_X86_64 = EnvironmentRunnerStep(
     name="prepare_toolset",
@@ -160,7 +162,12 @@ PREPARE_TOOLSET_GLIBC_X86_64 = EnvironmentRunnerStep(
     environment_variables={
         "SUBDIR_NAME": AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME,
         "FPM_VERSION": "1.14.2",
-        "PACKAGECLOUD_VERSION": "0.3.11"
+        "PACKAGECLOUD_VERSION": "0.3.11",
+        "USER_NAME": _user_name,
+        "USER_ID": str(os.getuid()),
+        "USER_GID": str(os.getgid()),
+
+
     },
     github_actions_settings=GitHubActionsSettings(
         cacheable=True

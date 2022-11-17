@@ -30,6 +30,9 @@
 
 set -e
 
+groupadd -f -g ${USER_GID} mygroup
+useradd -m -g "${USER_GID}" -u ${USER_ID} -p root ${USER_NAME}
+
 source ~/.bashrc
 cp -a "${BUILD_PYTHON}/python/." /
 cp -a "${BUILD_AGENT_LIBS}/dev_libs/." /
@@ -42,4 +45,6 @@ gem install fpm:${FPM_VERSION} package_cloud:${PACKAGECLOUD_VERSION}
 
 
 apt clean
+
+
 

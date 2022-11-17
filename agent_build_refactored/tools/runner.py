@@ -851,43 +851,6 @@ class Runner:
             "AGENT_BUILD_IN_DOCKER=1"
         ]
 
-        user_name = subprocess.check_output("whoami").decode().strip()
-
-        if user_name != "root":
-
-            intermediate_user_container = f"{self.base_docker_image.name}_intermediate_user_container"
-
-            check_call_with_log([
-                "docker",
-                "run",
-                "-i",
-                "--platform",
-                str(self.base_docker_image.platform),
-                "--name",
-                intermediate_user_container,
-                self.base_docker_image.name,
-                "useradd",
-                "-m",
-                "-g",
-                str(os.getgid()),
-                "-u",
-                str(os.getuid()),
-                "-p",
-                "pass",
-                user_name
-
-
-
-            ])
-
-            check_call_with_log([
-                "docker", "commit", intermediate_user_container, intermediate_user_container
-            ])
-
-            base_image_name = intermediate_user_container
-        else:
-            base_image_name = self.base_docker_image.name
-
         check_call_with_log([
             "docker",
             "run",
@@ -900,8 +863,7 @@ class Runner:
             str(self.base_docker_image.platform),
             "--user",
             f"{os.getuid()}:{os.getgid()}",
-            #self.base_docker_image.name,
-            base_image_name,
+            self.base_docker_image.name,
             python_executable,
             "/tmp/source/agent_build_refactored/scripts/runner_helper.py",
             type(self).get_fully_qualified_name(),
