@@ -855,7 +855,7 @@ class Runner:
             "-i",
             *mount_args,
             "-v",
-            f"{SOURCE_ROOT}:/tmp/source",
+            f"{SOURCE_ROOT}:/tmp/source:Z",
             *env_args,
             "--platform",
             str(self.base_docker_image.platform),
