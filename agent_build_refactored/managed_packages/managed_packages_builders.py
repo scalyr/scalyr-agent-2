@@ -369,8 +369,14 @@ class PythonPackageBuilder(Runner):
 
         if build_step.checksum != repo_package_checksum:
             logging.error(
-                f"Current version of the {package_name} {self.PACKAGE_TYPE} {self.PACKAGE_ARCHITECTURE} package does not match "
-                f"version in the {PACKAGECLOUD_PACKAGES_VERSIONS_PATH} file"
+                f"Current version of the {package_name} {self.PACKAGE_TYPE} {self.PACKAGE_ARCHITECTURE} package does "
+                f"not match version in the {PACKAGECLOUD_PACKAGES_VERSIONS_PATH} file"
+            )
+            logging.error(
+                "Please update this file by running the "
+                "'agent_build_refactored/scripts/runner_helper.py "
+                "agent_build_refactored.managed_packages.managed_packages_builders.AllPackagesVersionTracker "
+                "update-version-files"
             )
             exit(1)
 
@@ -647,5 +653,5 @@ class AllPackagesVersionTracker(Runner):
         if args.command == "check_repo_package_file_is_up_to_date":
             builder.check_repo_package_file_is_up_to_date()
 
-        elif args.command == "update_repo_packages_file-files":
+        elif args.command == "update_repo_packages_file":
             builder.update_repo_packages_file()
