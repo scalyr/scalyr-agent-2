@@ -674,6 +674,7 @@ class EnvironmentRunnerStep(RunnerStep):
 class RunnerMappedPath:
     path: Union[pl.Path, str]
 
+
 class Runner:
     """
     Abstraction which combines several RunnerStep instances in order to execute them and to use their results
@@ -839,7 +840,7 @@ class Runner:
 
             mount_args.extend([
                 "-v",
-                f"{arg.path}:{in_docker_path}"
+                f"{arg.path}:{in_docker_path}:Z"
             ])
             final_command_args.append(str(in_docker_path))
 
