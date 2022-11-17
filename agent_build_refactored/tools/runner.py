@@ -77,6 +77,7 @@ class DockerImageSpec:
         """
 
         p = output_path.parent
+        os.system(f"ls -l {str(output_path.parent.parent)}")
         p.chmod(int('777', 8))
         os.system(f"ls -l {str(output_path.parent.parent)}")
         check_call_with_log(["docker", "save", self.name, "--output", str(output_path)])
