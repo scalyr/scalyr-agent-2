@@ -24,11 +24,11 @@ jobs:
     runs-on: ubuntu-20.04
     outputs:
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
+      is_master_run: ${{ steps.init-matrices.outputs.is_master_run }}
       # The following outputs will be used by the other jobs below as their strategy matrices.
       pre_build_steps_matrix_json: ${{ steps.init-matrices.outputs.pre_build_steps_matrix_json }}
       agent_image_build_matrix_json: ${{ steps.init-matrices.outputs.agent_image_build_matrix_json }}
       managed_packages_build_matrix_json: ${{ steps.init-matrices.outputs.managed_packages_build_matrix_json }}
-      is_master_run: ${{ steps.init-matrices.outputs.is_master_run }}
 
 
 
@@ -232,5 +232,5 @@ jobs:
               --user-name ArthurSentinelone \
               --repo-name DataSetAgent \
               --token ${{ secrets.PACKAGE_CLOUD_TOKEN }} \
-              --reuse-existing-repo-packages ${{ needs.pre_job.outputs.is_master_run == "true" }}
+              --reuse-existing-repo-packages ${{ needs.pre_job.outputs.is_master_run == true }}
 
