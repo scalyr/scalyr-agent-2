@@ -204,6 +204,11 @@ jobs:
         with:
           driver-opts: network=host
 
+      - name: Prepare dependencies.
+        uses: ./.github/actions/execute-runner
+        with:
+          runner-fqdn: "agent_build_refactored.__init__.BuildTestEnvironment"
+
 
       - name: Look for packages in Packagecloud for '${{ matrix.name }}'
         id: look-for-packages
