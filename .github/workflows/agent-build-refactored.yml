@@ -222,5 +222,7 @@ jobs:
           
           ls -l /home/runner/work/scalyr-agent-2/scalyr-agent-2 
           
+          touch  /home/runner/work/scalyr-agent-2/scalyr-agent-2/ggg/ttt.txt
+          
           #python3 build_package_new_refactored.py ${{ matrix.name }} build
 
