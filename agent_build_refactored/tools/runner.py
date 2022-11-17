@@ -75,7 +75,7 @@ class DockerImageSpec:
         Serialize docker image into file by using 'docker save' command.
         :param output_path: Result output file.
         """
-        os.system(f"ls -l {output_path}")
+        os.system(f"ls -l {str(output_path.parent)}")
         check_call_with_log(["docker", "save", self.name, "--output", str(output_path)])
 
 
