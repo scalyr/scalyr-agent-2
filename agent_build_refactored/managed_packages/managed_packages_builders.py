@@ -58,7 +58,7 @@ class PythonPackageBuilder(Runner):
 
         steps.extend([
             *cls.BUILD_STEPS.values(),
-            *cls.DOWNLOAD_STEPS.values()
+            #*cls.DOWNLOAD_STEPS.values()
         ])
         return steps
 
