@@ -77,6 +77,7 @@ class DockerImageSpec:
         """
 
         p = output_path.parent
+        os.system("pwd")
         os.system(f"ls -l {str(output_path.parent.parent)}")
         p.chmod(int('777', 8))
         os.system(f"ls -l {str(output_path.parent.parent)}")
