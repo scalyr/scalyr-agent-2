@@ -244,7 +244,7 @@ jobs:
 
 
   publish-managed-packages:
-    name: Build managed package ${{ matrix.name }}
+    name: Publish managed package ${{ matrix.name }}
     if: needs.pre_job.outputs.is_master_run == true
     needs:
       - pre_job
@@ -267,11 +267,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-    - name: Download built packages.
-      uses: actions/download-artifact@v3
-      with:
-        name: ${{ matrix.name }}-packages
-        path: /tmp/packages
+      - name: Download built packages.
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{ matrix.name }}-packages
+          path: /tmp/packages
 
       - name: Publish '${{ matrix.name }}' packages
         run: |
