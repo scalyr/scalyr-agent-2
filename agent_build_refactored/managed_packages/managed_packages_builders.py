@@ -51,7 +51,6 @@ class PythonPackageBuilder(Runner):
     PACKAGE_ARCHITECTURE: str
 
     BUILD_STEPS: Dict[str, ArtifactRunnerStep]
-    DOWNLOAD_STEPS: Dict[str, ArtifactRunnerStep]
 
     @classmethod
     def get_all_required_steps(cls) -> List[RunnerStep]:
@@ -59,7 +58,6 @@ class PythonPackageBuilder(Runner):
 
         steps.extend([
             *cls.BUILD_STEPS.values(),
-            #*cls.DOWNLOAD_STEPS.values()
         ])
         return steps
 
@@ -85,6 +83,13 @@ class PythonPackageBuilder(Runner):
         _, version, _ = filename.split("_")
         return version
 
+    def get_repo_package_filename(
+        self,
+        package_name: str
+    ) -> str:
+
+        return PACKAGECLOUD_PACKAGES[package_name][self.PACKAGE_TYPE][self.PACKAGE_ARCHITECTURE]
+
 
     def build_python_package(
             self,
@@ -93,7 +98,7 @@ class PythonPackageBuilder(Runner):
         description = "Dependency package which provides Python interpreter which is used by the agent from the " \
                       "'scalyr-agent-2 package'"
 
-        repo_package_filename = self.get_packagecloud_package_filename(PYTHON_PACKAGE_NAME)
+        repo_package_filename = self.get_repo_package_filename(PYTHON_PACKAGE_NAME)
         repo_package_version = self._parse_version_from_package_file_name(repo_package_filename)
 
         build_step = self.BUILD_STEPS[PYTHON_PACKAGE_NAME]
@@ -150,7 +155,7 @@ class PythonPackageBuilder(Runner):
         description = "Dependency package which provides Python requirement libraries which are used by the agent " \
                       "from the 'scalyr-agent-2 package'"
 
-        repo_package_filename = self.get_packagecloud_package_filename(AGENT_LIBS_PACKAGE_NAME)
+        repo_package_filename = self.get_repo_package_filename(AGENT_LIBS_PACKAGE_NAME)
         repo_package_version = self._parse_version_from_package_file_name(repo_package_filename)
 
         build_step = self.BUILD_STEPS[AGENT_LIBS_PACKAGE_NAME]
@@ -201,41 +206,6 @@ class PythonPackageBuilder(Runner):
         assert len(found) == 1, f"Number of result agent_libs packages has to be 1, got {len(found)}"
 
         return found[0]
-
-    # def _is_package_changed(self, package_name: str, build_step_checksum: str):
-    #     current_version = self.get_package_version(package_name)
-    #     _, current_version_checksum = self._parse_package_version_parts(current_version)
-    #     return current_version_checksum != build_step_checksum
-
-    def _look_for_existing_package(self, package: str) -> Optional[pl.Path]:
-
-        build_step = self.BUILD_STEPS[package]
-
-        if self._is_package_changed(
-                package_name=package, build_step_checksum=build_step.checksum
-        ):
-            return None
-
-        # If checksum of the build step is the same as the checksum from the PACKAGES_VERSIONS file,
-        # then the package files haven't been changed, and it may be already published, so we try
-        # to find that published package.
-        output = download_step.get_output_directory(work_dir=self.work_dir)
-        current_version = self.get_package_version(package)
-        found = list(output.glob(
-            f"{package}_{current_version}_{self.PACKAGE_ARCHITECTURE}.{self.PACKAGE_TYPE}"
-        ))
-        if len(found) > 1:
-            raise Exception(f"Number of downloaded {package} packages can be 1 or 0, got {len(found)}")
-
-        if len(found) == 0:
-            return None
-
-        package_path = found[0]
-        shutil.copy(
-            package_path,
-            self.packages_output_path,
-        )
-        return package_path
 
     def build_packages(
             self,
@@ -320,7 +290,10 @@ class PythonPackageBuilder(Runner):
 
     def publish_packages_to_packagecloud(
             self,
-            packages_dir_path: pl.Path
+            packages_dir_path: pl.Path,
+            token: str,
+            repo_name: str,
+            user_name: str,
     ):
 
         if self.runs_in_docker:
@@ -334,8 +307,8 @@ class PythonPackageBuilder(Runner):
         )
 
         config = {
-            "url":"https://packagecloud.io",
-            "token":"50552e5ef4df6c425e24d1213564910f1990c5fd25f2c4f4"
+            "url": "https://packagecloud.io",
+            "token": token
         }
 
         config_file_path = pl.Path.home() / ".packagecloud"
@@ -352,7 +325,7 @@ class PythonPackageBuilder(Runner):
                     [
                         "package_cloud",
                         "push",
-                        "ArthurSentinelone/DataSetAgent/any/any",
+                        f"{user_name}/{repo_name}/any/any",
                         str(package_path)
                     ]
                 )
@@ -365,28 +338,6 @@ class PythonPackageBuilder(Runner):
         else:
             logging.warning(f"No packages are published.")
 
-    def get_packagecloud_package_filename(
-        self,
-        package_name: str
-    ) -> str:
-
-        return PACKAGECLOUD_PACKAGES[package_name][self.PACKAGE_TYPE][self.PACKAGE_ARCHITECTURE]
-
-    def get_ready_package_filename_if_exists(self, package_name: str):
-        """
-        Returns package file name if content of that package is not changed, otherwise return None.
-        """
-
-        repo_package_filename = self.get_packagecloud_package_filename(package_name)
-        repo_package_version = self._parse_version_from_package_file_name(repo_package_filename)
-        _, repo_package_checksum = self._parse_package_version_parts(version=repo_package_version)
-
-        build_step = self.BUILD_STEPS[package_name]
-
-        if build_step.checksum != repo_package_checksum:
-            return None
-
-        return repo_package_filename
 
     def check_repo_packages_file_is_up_to_date(self, package_name: str):
 
@@ -411,7 +362,7 @@ class PythonPackageBuilder(Runner):
 
     def update_repo_package_file(self, package_name: str):
 
-        repo_package_file_name = self.get_packagecloud_package_filename(package_name)
+        repo_package_file_name = self.get_repo_package_filename(package_name)
         repo_package_version = self._parse_version_from_package_file_name(
             package_file_name=repo_package_file_name
         )
@@ -451,7 +402,7 @@ class PythonPackageBuilder(Runner):
         import requests
         from requests.auth import HTTPBasicAuth
 
-        repo_package_file_name = self.get_packagecloud_package_filename(
+        repo_package_file_name = self.get_repo_package_filename(
             package_name=package_name
         )
 
@@ -535,49 +486,23 @@ class PythonPackageBuilder(Runner):
             required=True,
             help="Path to a directory with packages to publish."
         )
-
-        get_ready_package_parser = subparsers.add_parser(
-            "get_ready_package_filename_if_exists"
-        )
-        get_ready_package_parser.add_argument(
-            "--package-name",
-            dest="package_name",
-            required=True,
-            choices=[PYTHON_PACKAGE_NAME, AGENT_LIBS_PACKAGE_NAME]
-        )
-
-        download_python_package_parser = subparsers.add_parser(
-            "download_package_from_packagecloud"
-        )
-
-        download_python_package_parser.add_argument(
-            "--package-name",
-            dest="package_name",
-            required=True,
-            choices=[PYTHON_PACKAGE_NAME, AGENT_LIBS_PACKAGE_NAME]
-        )
-
-        download_python_package_parser.add_argument(
+        publish_packages_parser.add_argument(
             "--token",
             required=True
         )
 
-        download_python_package_parser.add_argument(
+        publish_packages_parser.add_argument(
             "--user-name",
             dest="user_name",
             required=True
         )
 
-        download_python_package_parser.add_argument(
+        publish_packages_parser.add_argument(
             "--repo-name",
             dest="repo_name",
             required=True
         )
 
-        download_python_package_parser.add_argument(
-            "--output",
-            required=True
-        )
 
     @classmethod
     def handle_command_line_arguments(
@@ -608,48 +533,25 @@ class PythonPackageBuilder(Runner):
             )
         elif args.command == "publish":
             builder.publish_packages_to_packagecloud(
-                packages_dir_path=pl.Path(args.packages_dir)
+                packages_dir_path=pl.Path(args.packages_dir),
+                token=args.token,
+                user_name=args.user_name,
+                repo_name=args.repo_name,
             )
-        # elif args.command == "get_ready_package_filename_if_exists":
-        #     package_filename = builder.get_ready_package_filename_if_exists(
-        #         package_name=args.package_name
-        #     )
-        #     if package_filename is not None:
-        #         print(package_filename)
-        #     exit(0)
-        # elif args.command == "download_package_from_packagecloud":
-        #     package_path = builder.download_package_from_packagecloud(
-        #         package_name=PYTHON_PACKAGE_NAME,
-        #         token=args.token,
-        #         user_name=args.user_name,
-        #         repo_name=args.repo_name,
-        #         output_path=pl.Path(args.output)
-        #     )
-        #     if package_path:
-        #         print(package_path)
-        #         exit(0)
         else:
             logging.error(f"Unknown command {args.command}.")
             exit(1)
 
 
 class DebPythonPackageBuilderX64(PythonPackageBuilder):
-    # BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
+    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
     PACKAGE_ARCHITECTURE = "amd64"
     PACKAGE_TYPE = "deb"
-    # BUILD_PYTHON_STEP = BUILD_PYTHON_GLIBC_X86_64
-    # DOWNLOAD_PYTHON_PACKAGE = DOWNLOAD_PYTHON_PACKAGE_FROM_PACKAGECLOUD
-    # BUILD_AGENT_LIBS_STEP = BUILD_AGENT_LIBS_GLIBC_X86_64
-    # DOWNLOAD_AGENT_LIBS_PACKAGE = DOWNLOAD_AGENT_LIBS_PACKAGE_FROM_PACKAGECLOUD
 
     BUILD_STEPS = {
         PYTHON_PACKAGE_NAME: BUILD_PYTHON_GLIBC_X86_64,
         AGENT_LIBS_PACKAGE_NAME: BUILD_AGENT_LIBS_GLIBC_X86_64
     }
-    # DOWNLOAD_STEPS = {
-    #     PYTHON_PACKAGE_NAME: DOWNLOAD_PYTHON_PACKAGE_FROM_PACKAGECLOUD,
-    #     AGENT_LIBS_PACKAGE_NAME: DOWNLOAD_AGENT_LIBS_PACKAGE_FROM_PACKAGECLOUD
-    # }
 
 
 ALL_MANAGED_PACKAGE_BUILDERS = {
