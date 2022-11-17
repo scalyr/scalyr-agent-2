@@ -314,9 +314,9 @@ class PythonPackageBuilder(Runner):
                     RunnerMappedPath(packages_dir_path),
                     "--token",
                     token,
-                    "--repo_name",
+                    "--repo-name",
                     repo_name,
-                    "--user_name",
+                    "--user-name",
                     user_name
                 ]
             )
