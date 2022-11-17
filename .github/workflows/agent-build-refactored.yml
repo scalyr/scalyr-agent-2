@@ -187,7 +187,7 @@ jobs:
       #   "builder-fqdn": Fully qualified name of the builder to find its cached steps.
       #   "python-version": Version of python to set up on this runner. (NOTE: version of python used in images may differ, and it specified in the source code.)
       #   "os": Runner OS.
-      matrix: ${{ fromJSON(needs.pre_job.outputs.agent_image_build_matrix_json) }}
+      matrix: ${{ fromJSON(needs.pre_job.outputs.managed_packages_build_matrix_json) }}
 
     steps:
       - name: Checkout repository
