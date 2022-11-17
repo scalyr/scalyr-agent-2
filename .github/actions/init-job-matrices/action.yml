@@ -38,6 +38,7 @@ runs:
         
         echo "::set-output name=pre_build_steps_matrix_json::$(cat /tmp/final_matrices.json | jq -c '.pre_build_steps_matrix')"
         echo "::set-output name=agent_image_build_matrix_json::$(cat /tmp/final_matrices.json | jq -c '.agent_image_build_matrix')"
+        echo "::set-output name=agent_managed_packages_build_matrix_json::$(cat /tmp/final_matrices.json | jq -c '.agent_managed_packages_build_matrix')"
 
     - name: Print job matrices
       shell: bash
@@ -48,3 +49,6 @@ runs:
         
         echo "Image build job matrix: "
         echo '${{ steps.get-job-matrices.outputs.agent_image_build_matrix_json }}' | jq --color-output
+        
+        echo "Managed packages build job matrix: "
+        echo '${{ steps.get-job-matrices.outputs.agent_managed_packages_build_matrix_json }}' | jq --color-output

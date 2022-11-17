@@ -448,15 +448,15 @@ class DebPythonPackageBuilderX64(PythonPackageBuilder):
     }
 
 
-MANAGED_PACKAGE_BUILDERS = {
-    "deb-x64": DebPythonPackageBuilderX64
+ALL_MANAGED_PACKAGE_BUILDERS = {
+    "deb-amd64": DebPythonPackageBuilderX64
 }
 
 
 class AllPackagesVersionTracker(Runner):
 
     def check_version_files_up_to_date(self):
-        for builder_cls in MANAGED_PACKAGE_BUILDERS.values():
+        for builder_cls in ALL_MANAGED_PACKAGE_BUILDERS.values():
             builder = builder_cls(work_dir=self.work_dir)
             builder.check_package_version_file_up_to_date(
                 package=PYTHON_PACKAGE_NAME
