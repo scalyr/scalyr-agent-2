@@ -32,12 +32,6 @@ PYTHON_PACKAGE_SSL_VERSION = "1.1.1k"
 EMBEDDED_PYTHON_SHORT_VERSION = ".".join(EMBEDDED_PYTHON_VERSION.split(".")[:2])
 
 
-PACKAGE_CLOUD_TOKEN = os.environ.get("PACKAGE_CLOUD_TOKEN")
-
-if IN_CICD and not PACKAGE_CLOUD_TOKEN:
-    raise ValueError(f"The 'PACKAGE_CLOUD_TOKEN' environment variable has to be specified in CI/CD.")
-
-
 INSTALL_GCC_7_GLIBC_X86_64 = EnvironmentRunnerStep(
         name="install_gcc_7",
         script_path="agent_build_refactored/managed_packages/steps/install_gcc_7.sh",
