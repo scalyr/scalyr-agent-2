@@ -23,6 +23,7 @@ import pathlib as pl
 import shutil
 import logging
 import inspect
+import subprocess
 import sys
 from typing import Union, Optional, List, Dict, Type
 
@@ -850,7 +851,9 @@ class Runner:
             "AGENT_BUILD_IN_DOCKER=1"
         ]
 
-        if os.getlogin() != "root":
+        user_name = subprocess.check_output("whoami").decode().strip()
+
+        if user_name != "root":
 
             intermediate_user_container = f"{self.base_docker_image.name}_intermediate_user_container"
 
@@ -863,12 +866,17 @@ class Runner:
                 "--name",
                 intermediate_user_container,
                 self.base_docker_image.name,
-                "adduser",
-                "--disabled-password",
-                #"--gecos",
+                "useradd",
+                "-m",
+                "-g",
+                str(os.getgid()),
                 "-u",
                 str(os.getuid()),
-                os.getlogin()
+                "-p",
+                "pass",
+                user_name
+
+
 
             ])
 
@@ -891,7 +899,7 @@ class Runner:
             "--platform",
             str(self.base_docker_image.platform),
             "--user",
-            os.getlogin(),
+            f"{os.getuid()}:{os.getgid()}",
             #self.base_docker_image.name,
             base_image_name,
             python_executable,
