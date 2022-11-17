@@ -185,7 +185,8 @@ jobs:
 #      matrix: ${{ fromJSON(needs.pre_job.outputs.agent_image_build_matrix_json) }}
     strategy:
       matrix:
-        - { "package_type": "deb", "architecture": "amd64", "master_run_only": "false" }
+        packages:
+          - { "package_type": "deb", "architecture": "amd64", "master_run_only": "false" }
 
     steps:
       - name: Checkout repository
