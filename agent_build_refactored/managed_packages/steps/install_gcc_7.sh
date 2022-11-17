@@ -119,17 +119,17 @@ gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-SCLo
 EOT
 
 
-# RHSCL is installed, so we can install newer tools, such as gcc-7
-yum install -y devtoolset-7
-yum install -y scl-utils
-
-# Remove this preinstalled packages, since we build and install those libraries from source.
-yum remove -y help2man m4 perl
-
-echo "source /opt/rh/devtoolset-7/enable" >> ~/.bashrc
-echo "export LD_LIBRARY_PATH="/usr/local/lib:/usr/local/lib64:\${LD_LIBRARY_PATH}"" >> ~/.bashrc
-#echo "export PATH="/usr/local/bin:/root/.cargo/bin:\${PATH}"" >> ~/.bashrc
-#echo "export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:\${PATH}"" >> ~/.bashrc
-
-yum clean all
-rm -rf /var/cache/yum
+## RHSCL is installed, so we can install newer tools, such as gcc-7
+#yum install -y devtoolset-7
+#yum install -y scl-utils
+#
+## Remove this preinstalled packages, since we build and install those libraries from source.
+#yum remove -y help2man m4 perl
+#
+#echo "source /opt/rh/devtoolset-7/enable" >> ~/.bashrc
+#echo "export LD_LIBRARY_PATH="/usr/local/lib:/usr/local/lib64:\${LD_LIBRARY_PATH}"" >> ~/.bashrc
+##echo "export PATH="/usr/local/bin:/root/.cargo/bin:\${PATH}"" >> ~/.bashrc
+##echo "export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:\${PATH}"" >> ~/.bashrc
+#
+#yum clean all
+#rm -rf /var/cache/yum
