@@ -670,6 +670,8 @@ class EnvironmentRunnerStep(RunnerStep):
         print("IN_DOCKER?", IN_DOCKER)
         cache_directory.mkdir(parents=True, exist_ok=True)
         os.system(f"ls -l {cache_directory.parent}")
+        tt = cache_directory / "ttt.txt"
+        tt.touch()
         cached_image_path = cache_directory / self.result_image.name
         logging.info(
             f"Saving image '{self.result_image.name}' file for the step {self.name} into cache."
