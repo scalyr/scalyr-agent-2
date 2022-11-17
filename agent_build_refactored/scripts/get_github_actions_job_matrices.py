@@ -228,13 +228,14 @@ def main():
             }
         )
 
-    all_matrices = {
+    result = {
         "agent_image_build_matrix": result_images_build_matrix,
         "agent_managed_packages_build_matrix": result_managed_packages_build_matrix,
-        "pre_build_steps_matrix": pre_build_steps_matrix
+        "pre_build_steps_matrix": pre_build_steps_matrix,
+        "is_master_run": master_run
     }
 
-    print(json.dumps(all_matrices))
+    print(json.dumps(result))
 
 
 if __name__ == "__main__":

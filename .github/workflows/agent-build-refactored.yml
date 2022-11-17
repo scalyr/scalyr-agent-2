@@ -47,12 +47,6 @@ jobs:
         with:
           python-version: "3.8.13"
 
-      - name: Verify that the PACKAGECLOUD_PACKAGES file is up to date.
-        run: |
-          python3 build_package_new_refactored.py \
-            agent_build_refactored.managed_packages.managed_packages_builders.AllPackagesVersionTracker \
-            check_repo_package_file_is_up_to_date
-
       - name: Init job matrices
         uses: ./.github/actions/init-job-matrices
         id: init-matrices
@@ -78,6 +72,13 @@ jobs:
             [
               { "name": "deb-amd64", "master_run_only": false }
             ]
+
+      - name: Verify that the PACKAGECLOUD_PACKAGES file is up to date.
+        # if: steps.init-matrices.outputs.is_master_run == "true"
+        run: |
+          python3 build_package_new_refactored.py \
+            agent_build_refactored.managed_packages.managed_packages_builders.AllPackagesVersionTracker \
+            check_repo_package_file_is_up_to_date  
 
 #  # This job pre-executes and caches Runner steps that has to be executed in a separate job.
 #  # For example, we build platform-specific base docker images in a separate jobs to reduce overall build time, because
