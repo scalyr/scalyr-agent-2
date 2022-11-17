@@ -409,8 +409,11 @@ class RunnerStep:
         """
 
         isolated_source_root = self.get_isolated_root(work_dir=work_dir)
+        isolated_source_root.mkdir(parents=True, exist_ok=True)
         cache_directory = self.get_cache_directory(work_dir=work_dir)
+        cache_directory.mkdir(parents=True, exist_ok=True)
         output_directory = self.get_output_directory(work_dir=work_dir)
+        output_directory.mkdir(parents=True, exist_ok=True)
 
         if self.runs_in_docker:
             final_isolated_source_root = pl.Path("/tmp/agent_source")
