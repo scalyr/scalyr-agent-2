@@ -61,7 +61,7 @@ runs:
       shell: bash
       run: |
         
-        echo "Is master run: "
+        echo -n "Is master run: "
         echo '${{ steps.get-job-matrices.outputs.is_master_run }}' | jq --color-output
 
         echo "Image pre-build steps job matrix: "
