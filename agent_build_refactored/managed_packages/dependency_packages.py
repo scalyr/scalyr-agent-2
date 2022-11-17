@@ -168,51 +168,51 @@ PREPARE_TOOLSET_GLIBC_X86_64 = EnvironmentRunnerStep(
 )
 
 
-def create_download_from_packageloud_step(
-        name: str,
-        package_name: str,
-        package_type: str,
-        package_architecture: str,
-        user_name: str,
-        repo_name: str
-):
-    package_version = PACKAGES_VERSIONS[package_name][package_type][package_architecture]
-    package_filename = f"{package_name}_{package_version}_{package_architecture}.{package_type}"
-    return ArtifactRunnerStep(
-        name=name,
-        script_path="agent_build_refactored/managed_packages/steps/download_package_from_packagecloud.py",
-        tracked_files_globs=[
-            "agent_build_refactored/tools/steps_libs/constants.py",
-            "agent_build_refactored/tools/steps_libs/step_tools.py",
-            "agent_build_refactored/tools/steps_libs/build_logging.py"
-        ],
-        base=PREPARE_TOOLSET_GLIBC_X86_64,
-        environment_variables={
-            "PACKAGE_FILENAME": package_filename,
-            "USER_NAME": user_name,
-            "REPO_NAME": repo_name,
-            "TOKEN": PACKAGE_CLOUD_TOKEN or ""
-        },
-        github_actions_settings=GitHubActionsSettings(
-            cacheable=True
-        )
-    )
-
-
-DOWNLOAD_PYTHON_PACKAGE_FROM_PACKAGECLOUD = create_download_from_packageloud_step(
-    name="download_python_package_from_packagecloud",
-    package_name=PYTHON_PACKAGE_NAME,
-    package_type="deb",
-    package_architecture="amd64",
-    user_name="ArthurSentinelone",
-    repo_name="DataSetAgent"
-)
-
-DOWNLOAD_AGENT_LIBS_PACKAGE_FROM_PACKAGECLOUD = create_download_from_packageloud_step(
-    name="download_agent_libs_package_from_packagecloud",
-    package_name=AGENT_LIBS_PACKAGE_NAME,
-    package_type="deb",
-    package_architecture="amd64",
-    user_name="ArthurSentinelone",
-    repo_name="DataSetAgent"
-)
+# def create_download_from_packageloud_step(
+#         name: str,
+#         package_name: str,
+#         package_type: str,
+#         package_architecture: str,
+#         user_name: str,
+#         repo_name: str
+# ):
+#     package_version = PACKAGES_VERSIONS[package_name][package_type][package_architecture]
+#     package_filename = f"{package_name}_{package_version}_{package_architecture}.{package_type}"
+#     return ArtifactRunnerStep(
+#         name=name,
+#         script_path="agent_build_refactored/managed_packages/steps/download_package_from_packagecloud.py",
+#         tracked_files_globs=[
+#             "agent_build_refactored/tools/steps_libs/constants.py",
+#             "agent_build_refactored/tools/steps_libs/step_tools.py",
+#             "agent_build_refactored/tools/steps_libs/build_logging.py"
+#         ],
+#         base=PREPARE_TOOLSET_GLIBC_X86_64,
+#         environment_variables={
+#             "PACKAGE_FILENAME": package_filename,
+#             "USER_NAME": user_name,
+#             "REPO_NAME": repo_name,
+#             "TOKEN": PACKAGE_CLOUD_TOKEN or ""
+#         },
+#         github_actions_settings=GitHubActionsSettings(
+#             cacheable=True
+#         )
+#     )
+#
+#
+# DOWNLOAD_PYTHON_PACKAGE_FROM_PACKAGECLOUD = create_download_from_packageloud_step(
+#     name="download_python_package_from_packagecloud",
+#     package_name=PYTHON_PACKAGE_NAME,
+#     package_type="deb",
+#     package_architecture="amd64",
+#     user_name="ArthurSentinelone",
+#     repo_name="DataSetAgent"
+# )
+#
+# DOWNLOAD_AGENT_LIBS_PACKAGE_FROM_PACKAGECLOUD = create_download_from_packageloud_step(
+#     name="download_agent_libs_package_from_packagecloud",
+#     package_name=AGENT_LIBS_PACKAGE_NAME,
+#     package_type="deb",
+#     package_architecture="amd64",
+#     user_name="ArthurSentinelone",
+#     repo_name="DataSetAgent"
+# )
