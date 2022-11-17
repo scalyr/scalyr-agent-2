@@ -31,8 +31,8 @@ from agent_build_refactored.tools import check_call_with_log
 from agent_build_refactored.prepare_agent_filesystem import build_linux_lfs_agent_files
 from agent_build_refactored.managed_packages.dependency_packages import (
     BUILD_PYTHON_GLIBC_X86_64,
-    PACKAGES_VERSIONS,
-    PACKAGES_VERSIONS_PATH,
+    PACKAGECLOUD_PACKAGES,
+    PACKAGECLOUD_PACKAGES_VERSIONS_PATH,
     PYTHON_PACKAGE_NAME,
 
     BUILD_AGENT_LIBS_GLIBC_X86_64,
@@ -72,7 +72,7 @@ class PythonPackageBuilder(Runner):
         return self.output_path / "packages_roots"
 
     @staticmethod
-    def _get_package_version_parts(version: str) -> Tuple[int, str]:
+    def _parse_package_version_parts(version: str) -> Tuple[int, str]:
         """
         Deconstructs package version string and return tuple with version's iteration and checksum parts.
         """
@@ -85,8 +85,6 @@ class PythonPackageBuilder(Runner):
         _, version, _ = filename.split("_")
         return version
 
-    def get_package_version(self, package: str):
-        return PACKAGES_VERSIONS[package][self.PACKAGE_TYPE][self.PACKAGE_ARCHITECTURE]
 
     def build_python_package(
             self,
@@ -95,7 +93,7 @@ class PythonPackageBuilder(Runner):
         description = "Dependency package which provides Python interpreter which is used by the agent from the " \
                       "'scalyr-agent-2 package'"
 
-        iteration, _ = self._get_package_version_parts(
+        iteration, _ = self._parse_package_version_parts(
             version=self.get_package_version(package=PYTHON_PACKAGE_NAME)
         )
 
@@ -149,7 +147,7 @@ class PythonPackageBuilder(Runner):
         description = "Dependency package which provides Python requirement libraries which are used by the agent " \
                       "from the 'scalyr-agent-2 package'"
 
-        iteration, _ = self._get_package_version_parts(
+        iteration, _ = self._parse_package_version_parts(
             version=self.get_package_version(AGENT_LIBS_PACKAGE_NAME)
         )
 
@@ -196,18 +194,17 @@ class PythonPackageBuilder(Runner):
 
         return found[0]
 
-    def _is_package_changed(self, package: str, build_step_checksum: str):
-        current_version = self.get_package_version(package)
-        _, current_version_checksum = self._get_package_version_parts(current_version)
+    def _is_package_changed(self, package_name: str, build_step_checksum: str):
+        current_version = self.get_package_version(package_name)
+        _, current_version_checksum = self._parse_package_version_parts(current_version)
         return current_version_checksum != build_step_checksum
 
     def _look_for_existing_package(self, package: str) -> Optional[pl.Path]:
 
         build_step = self.BUILD_STEPS[package]
-        download_step = self.DOWNLOAD_STEPS[package]
 
         if self._is_package_changed(
-                package=package, build_step_checksum=build_step.checksum
+                package_name=package, build_step_checksum=build_step.checksum
         ):
             return None
 
@@ -253,7 +250,7 @@ class PythonPackageBuilder(Runner):
         if python_package_file_path is None:
             python_build_step = self.BUILD_STEPS[PYTHON_PACKAGE_NAME]
             increment_iteration = self._is_package_changed(
-                package=PYTHON_PACKAGE_NAME, build_step_checksum=python_build_step.checksum
+                package_name=PYTHON_PACKAGE_NAME, build_step_checksum=python_build_step.checksum
             )
             python_package_file_path = self.build_python_package(
                 increment_iteration=increment_iteration
@@ -270,7 +267,7 @@ class PythonPackageBuilder(Runner):
         if agent_libs_package_file_path is None:
             agent_libs_build_step = self.BUILD_STEPS[AGENT_LIBS_PACKAGE_NAME]
             increment_iteration = self._is_package_changed(
-                package=AGENT_LIBS_PACKAGE_NAME, build_step_checksum=agent_libs_build_step.checksum
+                package_name=AGENT_LIBS_PACKAGE_NAME, build_step_checksum=agent_libs_build_step.checksum
             )
 
             python_package_version = self._parse_version_from_package_file_name(
@@ -339,41 +336,74 @@ class PythonPackageBuilder(Runner):
         else:
             logging.warning(f"No packages are published.")
 
-    def check_package_version_file_up_to_date(self, package: str):
+    def get_packagecloud_package_filename(
+        self,
+        package_name: str
+    ) -> str:
 
-        build_step = self.BUILD_STEPS[package]
+        return PACKAGECLOUD_PACKAGES[package_name][self.PACKAGE_TYPE][self.PACKAGE_ARCHITECTURE]
 
-        current_version = PACKAGES_VERSIONS[package][self.PACKAGE_TYPE][self.PACKAGE_ARCHITECTURE]
-        _, current_package_checksum = self._get_package_version_parts(current_version)
+    def get_ready_package_filename_if_exists(self, package_name: str):
+        """
+        Returns package file name if content of that package is not changed, otherwise return None.
+        """
 
-        if build_step.checksum != current_package_checksum:
+        repo_package_filename = self.get_packagecloud_package_filename(package_name)
+        repo_package_version = self._parse_version_from_package_file_name(repo_package_filename)
+        _, repo_package_checksum = self._parse_package_version_parts(version=repo_package_version)
+
+        build_step = self.BUILD_STEPS[package_name]
+
+        if build_step.checksum != repo_package_checksum:
+            return None
+
+        return repo_package_filename
+
+    def check_repo_packages_file_is_up_to_date(self, package_name: str):
+
+        build_step = self.BUILD_STEPS[package_name]
+
+        repo_package_filename = PACKAGECLOUD_PACKAGES[package_name][self.PACKAGE_TYPE][self.PACKAGE_ARCHITECTURE]
+        repo_package_version = self._parse_version_from_package_file_name(repo_package_filename)
+        _, repo_package_checksum = self._parse_package_version_parts(repo_package_version)
+
+        if build_step.checksum != repo_package_checksum:
             logging.error(
-                f"Current version of the {package} {self.PACKAGE_TYPE} {self.PACKAGE_ARCHITECTURE} package does not match "
-                f"version in the {PACKAGES_VERSIONS_PATH} file"
+                f"Current version of the {package_name} {self.PACKAGE_TYPE} {self.PACKAGE_ARCHITECTURE} package does not match "
+                f"version in the {PACKAGECLOUD_PACKAGES_VERSIONS_PATH} file"
             )
             exit(1)
 
-    def update_package_version_file(self, package: str):
-        iteration, current_package_checksum = self._get_package_version_parts(
-            version=self.get_package_version(package=package)
+    def update_repo_package_file(self, package_name: str):
+
+        repo_package_file_name = self.get_packagecloud_package_filename(package_name)
+        repo_package_version = self._parse_version_from_package_file_name(
+            package_file_name=repo_package_file_name
         )
 
-        build_step = self.BUILD_STEPS[package]
+        iteration, current_package_checksum = self._parse_package_version_parts(
+            version=repo_package_version
+        )
+
+        build_step = self.BUILD_STEPS[package_name]
 
         if build_step.checksum != current_package_checksum:
-            new_package_versions = PACKAGES_VERSIONS.copy()
+            new_packagecloud_packages = PACKAGECLOUD_PACKAGES.copy()
 
             new_version = f"{iteration + 1}-{build_step.checksum}"
-            new_package_versions[package][self.PACKAGE_TYPE][self.PACKAGE_ARCHITECTURE] = new_version
+            new_filename = f"{package_name}_{new_version}_{self.PACKAGE_ARCHITECTURE}.{self.PACKAGE_TYPE}"
+            new_packagecloud_packages[package_name][self.PACKAGE_TYPE][self.PACKAGE_ARCHITECTURE] = new_filename
 
-            PACKAGES_VERSIONS_PATH.write_text(
+            PACKAGECLOUD_PACKAGES_VERSIONS_PATH.write_text(
                 json.dumps(
-                    new_package_versions,
+                    new_packagecloud_packages,
                     sort_keys=True,
                     indent=4
                 )
             )
-            logging.info(f"The {PACKAGES_VERSIONS_PATH} file is updated.")
+            logging.info(f"The {PACKAGECLOUD_PACKAGES_VERSIONS_PATH} file is updated.")
+
+
 
     def download_package_from_packagecloud(
             self,
@@ -385,8 +415,6 @@ class PythonPackageBuilder(Runner):
 
     ) -> Optional[pl.Path]:
 
-        package_version = PACKAGES_VERSIONS[package_name][self.PACKAGE_TYPE][self.PACKAGE_ARCHITECTURE]
-        package_filename = f"{package_name}_{package_version}_{self.PACKAGE_ARCHITECTURE}.{self.PACKAGE_TYPE}"
 
         import requests
         from requests.auth import HTTPBasicAuth
@@ -451,6 +479,16 @@ class PythonPackageBuilder(Runner):
             help="Path to a directory with packages to publish."
         )
 
+        get_ready_package_parser = subparsers.add_parser(
+            "get_ready_package_filename_if_exists"
+        )
+        get_ready_package_parser.add_argument(
+            "--package-name",
+            dest="package_name",
+            required=True,
+            choices=[PYTHON_PACKAGE_NAME, AGENT_LIBS_PACKAGE_NAME]
+        )
+
         download_python_package_parser = subparsers.add_parser(
             "download_package_from_packagecloud"
         )
@@ -510,6 +548,13 @@ class PythonPackageBuilder(Runner):
             builder.publish_packages_to_packagecloud(
                 packages_dir_path=pl.Path(args.packages_dir)
             )
+        elif args.command == "get_ready_package_filename_if_exists":
+            package_filename = builder.get_ready_package_filename_if_exists(
+                package_name=args.package_name
+            )
+            if package_filename is not None:
+                print(package_filename)
+            exit(0)
         elif args.command == "download_package_from_packagecloud":
             package_path = builder.download_package_from_packagecloud(
                 package_name=PYTHON_PACKAGE_NAME,
@@ -552,26 +597,26 @@ ALL_MANAGED_PACKAGE_BUILDERS = {
 
 class AllPackagesVersionTracker(Runner):
 
-    def check_version_files_up_to_date(self):
+    def check_repo_package_file_is_up_to_date(self):
         for builder_cls in ALL_MANAGED_PACKAGE_BUILDERS.values():
             builder = builder_cls(work_dir=self.work_dir)
-            builder.check_package_version_file_up_to_date(
-                package=PYTHON_PACKAGE_NAME
+            builder.check_repo_packages_file_is_up_to_date(
+                package_name=PYTHON_PACKAGE_NAME
             )
-            builder.check_package_version_file_up_to_date(
-                package=AGENT_LIBS_PACKAGE_NAME
+            builder.check_repo_packages_file_is_up_to_date(
+                package_name=AGENT_LIBS_PACKAGE_NAME
             )
 
         logging.info("All package version files are up to date.")
 
-    def update_version_files(self):
-        for builder_cls in MANAGED_PACKAGE_BUILDERS.values():
+    def update_repo_packages_file(self):
+        for builder_cls in ALL_MANAGED_PACKAGE_BUILDERS.values():
             builder = builder_cls(work_dir=self.work_dir)
-            builder.update_package_version_file(
-                package=PYTHON_PACKAGE_NAME
+            builder.update_repo_package_file(
+                package_name=PYTHON_PACKAGE_NAME
             )
-            builder.update_package_version_file(
-                package=AGENT_LIBS_PACKAGE_NAME
+            builder.update_repo_package_file(
+                package_name=AGENT_LIBS_PACKAGE_NAME
             )
 
     @classmethod
@@ -581,11 +626,11 @@ class AllPackagesVersionTracker(Runner):
         subparsers = parser.add_subparsers(dest="command", required=True)
 
         subparsers.add_parser(
-            "check-version-files-up-to-date"
+            "check_repo_package_file_is_up_to_date"
         )
 
         subparsers.add_parser(
-            "update-version-files"
+            "update_repo_packages_file"
         )
 
     @classmethod
@@ -599,8 +644,8 @@ class AllPackagesVersionTracker(Runner):
 
         builder = cls(work_dir=work_dir)
 
-        if args.command == "check-version-files-up-to-date":
-            builder.check_version_files_up_to_date()
+        if args.command == "check_repo_package_file_is_up_to_date":
+            builder.check_repo_package_file_is_up_to_date()
 
-        elif args.command == "update-version-files":
-            builder.update_version_files()
+        elif args.command == "update_repo_packages_file-files":
+            builder.update_repo_packages_file()

@@ -1,0 +1,12 @@
+{
+    "scalyr-agent-libs": {
+        "deb": {
+            "amd64": "scalyr-agent-libs_1-d8c302559de72902a6ea7e6f6339041cb467ee1d52fa626b834ecb59ed6267a5_amd64.deb"
+        }
+    },
+    "scalyr-agent-python3": {
+        "deb": {
+            "amd64": "scalyr-agent-python3_1-fc50f26f7c7af542d8797a68570bc04996046176fd9c95b214fbd870cc3ea5f6_amd64.deb"
+        }
+    }
+}
