@@ -48,9 +48,14 @@ runs:
           --managed-packages-build-matrix-json-file /tmp/managed-packages-build-matrix.json \
           > /tmp/final_matrices.json
         
-        echo "::set-output name=pre_build_steps_matrix_json::$(cat /tmp/final_matrices.json | jq -c '.pre_build_steps_matrix')"
-        echo "::set-output name=agent_image_build_matrix_json::$(cat /tmp/final_matrices.json | jq -c '.agent_image_build_matrix')"
-        echo "::set-output name=agent_managed_packages_build_matrix_json::$(cat /tmp/final_matrices.json | jq -c '.agent_managed_packages_build_matrix')"
+#        echo "::set-output name=pre_build_steps_matrix_json::$(cat /tmp/final_matrices.json | jq -c '.pre_build_steps_matrix')"
+#        echo "::set-output name=agent_image_build_matrix_json::$(cat /tmp/final_matrices.json | jq -c '.agent_image_build_matrix')"
+#        echo "::set-output name=agent_managed_packages_build_matrix_json::$(cat /tmp/final_matrices.json | jq -c '.agent_managed_packages_build_matrix')"
+
+
+       echo "pre_build_steps_matrix_json=$(cat /tmp/final_matrices.json | jq -c '.pre_build_steps_matrix')" >> $GITHUB_OUTPUT
+       echo "agent_image_build_matrix_json=$(cat /tmp/final_matrices.json | jq -c '.agent_image_build_matrix')" >> $GITHUB_OUTPUT
+       echo "agent_managed_packages_build_matrix_json=$(cat /tmp/final_matrices.json | jq -c '.agent_managed_packages_build_matrix')" >> $GITHUB_OUTPUT
 
     - name: Print job matrices
       shell: bash
