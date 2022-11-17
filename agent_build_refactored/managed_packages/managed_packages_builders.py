@@ -24,8 +24,6 @@ import os
 import pathlib as pl
 from typing import List, Tuple, Optional, Dict
 
-import requests
-from requests.auth import HTTPBasicAuth
 
 from agent_build_refactored.tools.runner import Runner, RunnerStep, ArtifactRunnerStep
 from agent_build_refactored.tools.constants import SOURCE_ROOT, EMBEDDED_PYTHON_VERSION
@@ -391,6 +389,9 @@ class PythonPackageBuilder(Runner):
 
         package_version = PACKAGES_VERSIONS[package_name][self.PACKAGE_TYPE][self.PACKAGE_ARCHITECTURE]
         package_filename = f"{package_name}_{package_version}_{self.PACKAGE_ARCHITECTURE}.{self.PACKAGE_TYPE}"
+
+        import requests
+        from requests.auth import HTTPBasicAuth
 
         auth = HTTPBasicAuth(token, "")
 
