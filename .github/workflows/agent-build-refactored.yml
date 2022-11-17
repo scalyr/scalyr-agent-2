@@ -218,7 +218,7 @@ jobs:
           
           ls -l /home/runner/work/scalyr-agent-2/scalyr-agent-2/ggg 
           
-          docker run -i -v /home/runner/work/scalyr-agent-2/scalyr-agent-2/ggg:/ggg centos:6 /usr/bin/echo "hello"
+          docker run -i -v /home/runner/work/scalyr-agent-2/scalyr-agent-2/ggg:/ggg centos:6 /bin/echo "hello"
           
           ls -l /home/runner/work/scalyr-agent-2/scalyr-agent-2/ggg 
           
