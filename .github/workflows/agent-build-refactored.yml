@@ -245,7 +245,7 @@ jobs:
 
   publish-managed-packages:
     name: Publish managed package ${{ matrix.name }}
-    if: needs.pre_job.outputs.is_master_run == true
+    if: needs.pre_job.outputs.is_master_run == 'true'
     needs:
       - pre_job
       - build-managed-packages
@@ -266,6 +266,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+
+      - name: Install python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
 
       - name: Download built packages.
         uses: actions/download-artifact@v3
