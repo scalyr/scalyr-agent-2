@@ -248,6 +248,7 @@ jobs:
     if: needs.pre_job.outputs.is_master_run == true
     needs:
       - pre_job
+      - build-managed-packages
       #- pre-build-cached-step
     runs-on: ${{ matrix.os }}
 
