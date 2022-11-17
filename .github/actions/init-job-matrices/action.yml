@@ -6,6 +6,10 @@ inputs:
     description: "JSON-formatted matrix for images to build."
     required: true
 
+  managed_packages_to_build:
+    description: "JSON-formatted matrix for managed packages to build."
+    required: true
+
 outputs:
   pre_build_steps_matrix_json:
     description: "JSON-formatted job matrix for steps that has to be built in separate jobs."
@@ -13,6 +17,9 @@ outputs:
   agent_image_build_matrix_json:
     description: "JSON-formatted job matrix to build images."
     value: ${{ steps.get-job-matrices.outputs.agent_image_build_matrix_json }}
+  managed_packages_build_matrix_json:
+    description: "JSON-formatted job matrix to build managed packages."
+    value: ${{ steps.get-job-matrices.outputs.agent_managed_packages_build_matrix_json }}
 
 runs:
   using: "composite"
