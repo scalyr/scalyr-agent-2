@@ -48,6 +48,8 @@ def remove_directory_in_docker(path: pl.Path):
     The workaround for that to delegate that deletion to a docker container as well.
     """
 
+    return
+
     if IN_DOCKER:
         shutil.rmtree(path)
         return
