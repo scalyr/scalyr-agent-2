@@ -231,6 +231,6 @@ jobs:
               build \
               --user-name ArthurSentinelone \
               --repo-name DataSetAgent \
-              --token ${{ secret.PACKAGE_CLOUD_TOKEN }} \
+              --token ${{ secrets.PACKAGE_CLOUD_TOKEN }} \
               --reuse-existing-repo-packages ${{ needs.pre_job.outputs.is_master_run == "true" }}
 
