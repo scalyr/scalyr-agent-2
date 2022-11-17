@@ -379,7 +379,7 @@ class PythonPackageBuilder(Runner):
     def add_command_line_arguments(cls, parser: argparse.ArgumentParser):
         super(PythonPackageBuilder, cls).add_command_line_arguments(parser=parser)
 
-        subparsers = parser.add_subparsers(dest="command", required=True)
+        subparsers = parser.add_subparsers(dest="command")
 
         build_packages_parser = subparsers.add_parser("build")
 
@@ -427,6 +427,9 @@ class PythonPackageBuilder(Runner):
             builder.publish_packages_to_packagecloud(
                 packages_dir_path=pl.Path(args.packages_dir)
             )
+        else:
+            logging.error(f"Unknown command {args.command}.")
+            exit(1)
 
 
 class DebPythonPackageBuilderX64(PythonPackageBuilder):

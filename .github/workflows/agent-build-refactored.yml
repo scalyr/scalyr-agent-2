@@ -210,3 +210,8 @@ jobs:
         with:
           runner-fqdn: ${{ matrix.builder-fqdn }}
 
+
+      - name: Build managed package with builder '${{ matrix.name }}'
+        run: |
+          python3 build_package_new_refactored.py ${{ matrix.name }} build
+
