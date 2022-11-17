@@ -27,6 +27,8 @@ jobs:
       # The following outputs will be used by the other jobs below as their strategy matrices.
       pre_build_steps_matrix_json: ${{ steps.init-matrices.outputs.pre_build_steps_matrix_json }}
       agent_image_build_matrix_json: ${{ steps.init-matrices.outputs.agent_image_build_matrix_json }}
+      managed_packages_build_matrix_json: ${{ steps.init-matrices.outputs.managed_packages_build_matrix_json }}
+
 
     steps:
       - id: skip_check
