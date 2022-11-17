@@ -169,6 +169,7 @@ jobs:
     name: Build package
     needs:
       - pre_job
+    if: matrix.packages.master_run_only == "false"
       #- pre-build-cached-step
 #    runs-on: ${{ matrix.os }}
 #
