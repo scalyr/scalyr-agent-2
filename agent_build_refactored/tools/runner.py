@@ -48,8 +48,6 @@ def remove_directory_in_docker(path: pl.Path):
     The workaround for that to delegate that deletion to a docker container as well.
     """
 
-    return
-
     if IN_DOCKER:
         shutil.rmtree(path)
         return
@@ -78,12 +76,6 @@ class DockerImageSpec:
         :param output_path: Result output file.
         """
 
-        p = output_path.parent
-        os.system("pwd")
-        os.system("whoami")
-        os.system(f"ls -l {str(output_path.parent.parent)}")
-        p.chmod(int('777', 8))
-        os.system(f"ls -l {str(output_path.parent.parent)}")
         check_call_with_log(["docker", "save", self.name, "--output", str(output_path)])
 
 
@@ -497,10 +489,6 @@ class RunnerStep:
             "-e",
             f"CHECKSUM={self.checksum}"
         ])
-
-        print("BEFORE!!!!!")
-        os.system(f"ls -l {cache_directory.parent}")
-
         check_call_with_log(
             [
                 "docker",
@@ -510,17 +498,14 @@ class RunnerStep:
                 self._step_container_name,
                 "--workdir",
                 str(final_isolated_source_root),
-                # "--user",
-                # self.user,
+                "--user",
+                self.user,
                 *mount_options,
                 *env_options,
                 self._base_docker_image.name,
                 *command_args,
             ]
         )
-
-        print("AFTER!!!!!")
-        os.system(f"ls -l {cache_directory.parent}")
 
     def run(self, work_dir: pl.Path):
         """
@@ -533,7 +518,6 @@ class RunnerStep:
 
         output_directory.parent.mkdir(parents=True, exist_ok=True)
         cache_directory.parent.mkdir(parents=True, exist_ok=True)
-        os.system(f"ls -l {cache_directory.parent}")
         skipped = self._restore_cache(
             output_directory=output_directory, cache_directory=cache_directory
         )
@@ -678,13 +662,7 @@ class EnvironmentRunnerStep(RunnerStep):
         check_call_with_log(
             ["docker", "commit", self._step_container_name, self.result_image.name]
         )
-        print("IN_DOCKER?", IN_DOCKER)
         cache_directory.mkdir(parents=True, exist_ok=True)
-
-        os.system(f"ls -l {cache_directory.parent.parent}")
-        os.system(f"ls -l {cache_directory.parent}")
-        tt = cache_directory / "ttt.txt"
-        tt.touch()
         cached_image_path = cache_directory / self.result_image.name
         logging.info(
             f"Saving image '{self.result_image.name}' file for the step {self.name} into cache."
@@ -977,9 +955,9 @@ class Runner:
 def cleanup():
     if IN_DOCKER:
         return
-    # check_output_with_log_debug([
-    #     "docker", "system", "prune", "-f", "--volumes"
-    # ])
-    # check_output_with_log_debug([
-    #     "docker", "system", "prune", "-f"
-    # ])
+    check_output_with_log_debug([
+        "docker", "system", "prune", "-f", "--volumes"
+    ])
+    check_output_with_log_debug([
+        "docker", "system", "prune", "-f"
+    ])
