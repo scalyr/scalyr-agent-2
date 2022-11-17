@@ -522,6 +522,7 @@ class RunnerStep:
 
         output_directory.parent.mkdir(parents=True, exist_ok=True)
         cache_directory.parent.mkdir(parents=True, exist_ok=True)
+        os.system(f"ls -l {cache_directory.parent}")
         skipped = self._restore_cache(
             output_directory=output_directory, cache_directory=cache_directory
         )
@@ -668,6 +669,7 @@ class EnvironmentRunnerStep(RunnerStep):
         )
         print("IN_DOCKER?", IN_DOCKER)
         cache_directory.mkdir(parents=True, exist_ok=True)
+        os.system(f"ls -l {cache_directory.parent}")
         cached_image_path = cache_directory / self.result_image.name
         logging.info(
             f"Saving image '{self.result_image.name}' file for the step {self.name} into cache."
