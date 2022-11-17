@@ -60,6 +60,9 @@ runs:
     - name: Print job matrices
       shell: bash
       run: |
+        
+        echo "Is master run: "
+        echo '${{ steps.get-job-matrices.outputs.is_master_run }}' | jq --color-output
 
         echo "Image pre-build steps job matrix: "
         echo '${{ steps.get-job-matrices.outputs.pre_build_steps_matrix_json }}' | jq --color-output

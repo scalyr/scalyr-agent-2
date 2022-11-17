@@ -28,6 +28,8 @@ jobs:
       pre_build_steps_matrix_json: ${{ steps.init-matrices.outputs.pre_build_steps_matrix_json }}
       agent_image_build_matrix_json: ${{ steps.init-matrices.outputs.agent_image_build_matrix_json }}
       managed_packages_build_matrix_json: ${{ steps.init-matrices.outputs.managed_packages_build_matrix_json }}
+      is_master_run: ${{ steps.init-matrices.outputs.is_master_run }}
+
 
 
     steps:
@@ -216,9 +218,8 @@ jobs:
         with:
           runner-fqdn: "agent_build_refactored.__init__.BuildTestEnvironment"
 
-      
 
-      - name: Prepare everything that is needed by image builder '${{ matrix.name }}'
+      - name: Prepare everything that is needed by builder '${{ matrix.name }}'
         uses: ./.github/actions/execute-runner
         with:
           runner-fqdn: ${{ matrix.builder-fqdn }}
@@ -226,5 +227,10 @@ jobs:
 
       - name: Build managed package with builder '${{ matrix.name }}'
         run: |
-            python3 build_package_new_refactored.py ${{ matrix.name }} build
+            python3 build_package_new_refactored.py ${{ matrix.name }} \
+              build \
+              --user-name ArthurSentinelone \
+              --repo-name DataSetAgent \
+              --token ${{ secret.PACKAGE_CLOUD_TOKEN }} \
+              --reuse-existing-repo-packages ${{ needs.pre_job.outputs.is_master_run == "true" }}
 
