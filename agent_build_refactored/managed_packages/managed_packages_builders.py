@@ -220,7 +220,17 @@ class PythonPackageBuilder(Runner):
 
         if self.runs_in_docker:
             self.run_in_docker(
-                command_args=["build"]
+                command_args=[
+                    "build",
+                    "--user-name",
+                    user_name,
+                    "--repo-name",
+                    repo_name,
+                    "--token",
+                    token,
+                    "--reuse-existing-repo-packages",
+                    reuse_existing_repo_packages
+                ]
             )
             return
 
