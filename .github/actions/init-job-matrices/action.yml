@@ -6,7 +6,7 @@ inputs:
     description: "JSON-formatted matrix for images to build."
     required: true
 
-  managed_packages_to_build:
+  managed-packages-to-build:
     description: "JSON-formatted matrix for managed packages to build."
     required: true
 
