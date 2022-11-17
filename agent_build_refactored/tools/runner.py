@@ -964,9 +964,9 @@ class Runner:
 def cleanup():
     if IN_DOCKER:
         return
-    check_output_with_log_debug([
-        "docker", "system", "prune", "-f", "--volumes"
-    ])
-    check_output_with_log_debug([
-        "docker", "system", "prune", "-f"
-    ])
+    # check_output_with_log_debug([
+    #     "docker", "system", "prune", "-f", "--volumes"
+    # ])
+    # check_output_with_log_debug([
+    #     "docker", "system", "prune", "-f"
+    # ])
