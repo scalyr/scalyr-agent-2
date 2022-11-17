@@ -205,10 +205,10 @@ jobs:
         with:
           driver-opts: network=host
 
-#      - name: Prepare everything that is needed by image builder '${{ matrix.name }}'
-#        uses: ./.github/actions/execute-runner
-#        with:
-#          runner-fqdn: ${{ matrix.builder-fqdn }}
+      - name: Prepare everything that is needed by image builder '${{ matrix.name }}'
+        uses: ./.github/actions/execute-runner
+        with:
+          runner-fqdn: ${{ matrix.builder-fqdn }}
 
 
       - name: Build managed package with builder '${{ matrix.name }}'
