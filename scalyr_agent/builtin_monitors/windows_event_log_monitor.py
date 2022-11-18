@@ -775,7 +775,7 @@ class NewJsonApi(NewApi):
         event_json = _strip_xmltodict_prefixes(event_json)
 
         # FormatMessage will replace insertion and parameter strings in the event message,
-        # however it will not not replace parameter strings in the event data.
+        # however it will not replace parameter strings in the event data.
         # Ref: https://learn.microsoft.com/en-us/windows/win32/eventlog/event-identifiers#message-definitions
         #      https://learn.microsoft.com/en-us/windows/win32/eventlog/message-files
         #      FormatMessage of https://github.com/mhammond/pywin32/blob/main/win32/Lib/win32evtlogutil.py
