@@ -25,6 +25,8 @@ This way we get accurate CPU utilization information.
 from __future__ import absolute_import
 from __future__ import print_function
 
+import sys
+
 import pytest
 
 from scalyr_agent.util import get_compress_and_decompress_func
@@ -32,6 +34,76 @@ from scalyr_agent.util import get_compress_and_decompress_func
 
 from .utils import read_bytes_from_log_fixture_file
 from .time_utils import process_time
+
+if sys.version_info < (3, 11, 0):
+    compression_algorithm_tuples = [
+        ("deflate", 3),
+        ("deflate", 6),
+        ("deflate", 9),
+        ("bz2", 9),
+        ("snappy", None),
+        ("zstandard", 3),
+        ("zstandard", 5),
+        ("zstandard", 10),
+        ("zstandard", 12),
+        ("brotli", 3),
+        ("brotli", 5),
+        ("brotli", 8),
+        ("lz4", 0),
+        ("lz4", 3),
+        ("lz4", 16),
+    ]
+    compression_algorithm_tuple_ids = [
+        "deflate_level_3",
+        "deflate_level_6_default",
+        "deflate_level_9",
+        "bz2_level_6_default",
+        "snappy",
+        "zstandard_level_3_default",
+        "zstandard_level_5",
+        "zstandard_level_10",
+        "zstandard_level_12",
+        "brotli_quality_3",
+        "brotli_quality_5",
+        "brotli_quality_8",
+        "lz4_level_0_default",
+        "lz4_level_3",
+        "lz4_level_16",
+    ]
+else:
+    # NOTE: snappy library (c extension) doesn't work under Python 3.11 yet
+    compression_algorithm_tuples = [
+        ("deflate", 3),
+        ("deflate", 6),
+        ("deflate", 9),
+        ("bz2", 9),
+        ("zstandard", 3),
+        ("zstandard", 5),
+        ("zstandard", 10),
+        ("zstandard", 12),
+        ("brotli", 3),
+        ("brotli", 5),
+        ("brotli", 8),
+        ("lz4", 0),
+        ("lz4", 3),
+        ("lz4", 16),
+    ]
+    compression_algorithm_tuple_ids = [
+        "deflate_level_3",
+        "deflate_level_6_default",
+        "deflate_level_9",
+        "bz2_level_6_default",
+        "zstandard_level_3_default",
+        "zstandard_level_5",
+        "zstandard_level_10",
+        "zstandard_level_12",
+        "brotli_quality_3",
+        "brotli_quality_5",
+        "brotli_quality_8",
+        "lz4_level_0_default",
+        "lz4_level_3",
+        "lz4_level_16",
+    ]
 
 
 # fmt: off
@@ -68,40 +140,8 @@ from .time_utils import process_time
 # fmt: on
 @pytest.mark.parametrize(
     "compression_algorithm_tuple",
-    [
-        ("deflate", 3),
-        ("deflate", 6),
-        ("deflate", 9),
-        ("bz2", 9),
-        ("snappy", None),
-        ("zstandard", 3),
-        ("zstandard", 5),
-        ("zstandard", 10),
-        ("zstandard", 12),
-        ("brotli", 3),
-        ("brotli", 5),
-        ("brotli", 8),
-        ("lz4", 0),
-        ("lz4", 3),
-        ("lz4", 16),
-    ],
-    ids=[
-        "deflate_level_3",
-        "deflate_level_6_default",
-        "deflate_level_9",
-        "bz2_level_6_default",
-        "snappy",
-        "zstandard_level_3_default",
-        "zstandard_level_5",
-        "zstandard_level_10",
-        "zstandard_level_12",
-        "brotli_quality_3",
-        "brotli_quality_5",
-        "brotli_quality_8",
-        "lz4_level_0_default",
-        "lz4_level_3",
-        "lz4_level_16",
-    ],
+    compression_algorithm_tuples,
+    ids=compression_algorithm_tuple_ids
 )
 @pytest.mark.benchmark(group="compress", timer=process_time)
 def test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
@@ -140,40 +180,8 @@ def test_compress_bytes(benchmark, compression_algorithm_tuple, log_tuple):
     ],
 )
 @pytest.mark.parametrize("compression_algorithm_tuple",
-    [
-        ("deflate", 3),
-        ("deflate", 6),
-        ("deflate", 9),
-        ("bz2", 9),
-        ("snappy", None),
-        ("zstandard", 3),
-        ("zstandard", 5),
-        ("zstandard", 10),
-        ("zstandard", 12),
-        ("brotli", 3),
-        ("brotli", 5),
-        ("brotli", 8),
-        ("lz4", 0),
-        ("lz4", 3),
-        ("lz4", 16),
-    ],
-    ids=[
-        "deflate_level_3",
-        "deflate_level_6_default",
-        "deflate_level_9",
-        "bz2_level_6_default",
-        "snappy",
-        "zstandard_level_3_default",
-        "zstandard_level_5",
-        "zstandard_level_10",
-        "zstandard_level_12",
-        "brotli_quality_3",
-        "brotli_quality_5",
-        "brotli_quality_8",
-        "lz4_level_0_default",
-        "lz4_level_3",
-        "lz4_level_16",
-    ],
+    compression_algorithm_tuples,
+    ids=compression_algorithm_tuple_ids
 )
 # fmt: on
 @pytest.mark.benchmark(group="decompress", timer=process_time)

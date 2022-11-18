@@ -128,8 +128,9 @@ def cache(global_config):
     )
 
     # update the config and return current cache
-    _k8s_cache.update_config(cache_config)
-    return _k8s_cache
+    k8s_cache = _get_k8s_cache()
+    k8s_cache.update_config(cache_config)
+    return k8s_cache
 
 
 def terminate_agent_process(reason):
@@ -2926,14 +2927,19 @@ class DockerMetricFetcher(object):
             self.__lock.release()
 
 
-def _create_k8s_cache():
+def _get_k8s_cache():
     """
-    creates a new k8s cache object
+    Gets (and creates if needed) a new k8s cache object
     """
 
-    return KubernetesCache(start_caching=False)
+    global _k8s_cache
+
+    if _k8s_cache is None:
+        _k8s_cache = KubernetesCache(start_caching=False)
+
+    return _k8s_cache
 
 
 # global cache object - the module loading system guarantees this is only ever
 # initialized once, regardless of how many modules import k8s.py
-_k8s_cache = _create_k8s_cache()
+_k8s_cache = None

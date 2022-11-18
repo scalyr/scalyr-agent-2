@@ -185,6 +185,7 @@ class TestReportStatus(ScalyrTestCase):
         self.status.version = "2.0.0.beta.7"
         self.status.revision = "git revision"
         self.status.python_version = "3.6.8"
+        self.status.avg_status_report_duration = 2
 
         config_status = ConfigStatus()
         self.status.config_status = config_status
@@ -403,6 +404,7 @@ Agent log:               /var/logs/scalyr-agent/agent.log
 ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
+Average status time:     2 sec.
 
 View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
@@ -496,6 +498,7 @@ Agent log:               /var/logs/scalyr-agent/agent.log
 ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
+Average status time:     2 sec.
 
 View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
@@ -586,6 +589,7 @@ Agent log:               /var/logs/scalyr-agent/agent.log
 ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
+Average status time:     2 sec.
 
 View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
@@ -686,6 +690,7 @@ Agent log:               /var/logs/scalyr-agent/agent.log
 ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
+Average status time:     2 sec.
 
 View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
@@ -779,6 +784,7 @@ Agent log:               /var/logs/scalyr-agent/agent.log
 ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
+Average status time:     2 sec.
 
 View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
@@ -936,6 +942,7 @@ Agent log:               /var/logs/scalyr-agent/agent.log
 ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
+Average status time:     2 sec.
 
 View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
@@ -1070,6 +1077,7 @@ Agent log:               /var/logs/scalyr-agent/agent.log
 ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
+Average status time:     2 sec.
 
 View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
@@ -1181,6 +1189,7 @@ Agent log:               /var/logs/scalyr-agent/agent.log
 ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
+Average status time:     2 sec.
 
 View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
@@ -1304,6 +1313,7 @@ Agent log:               /var/logs/scalyr-agent/agent.log
 ServerHost:              test_machine
 Compression algorithm:   deflate
 Compression level:       9
+Average status time:     2 sec.
 
 View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%%3D%%27test_machine%%27
 
@@ -1576,8 +1586,13 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
         content = self._read_status_file(status_file)
         self.assertFalse(content.startswith("{") and content.endswith("}"))
 
+        command_options = mock.Mock()
+        setattr(command_options, "debug", False)
+        command_options.stats_capture_interval = 1
+
         return_code = self.agent._ScalyrAgent__detailed_status(
             self.data_path,
+            command_options=command_options,
             status_format="text",
             health_check=False,
             zero_status_file=False,
@@ -1593,6 +1608,7 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
 
         return_code = self.agent._ScalyrAgent__detailed_status(
             self.data_path,
+            command_options=command_options,
             status_format="text",
             health_check=True,
             zero_status_file=False,
@@ -1610,6 +1626,7 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
 
         return_code = self.agent._ScalyrAgent__detailed_status(
             self.data_path,
+            command_options=command_options,
             status_format="text",
             health_check=False,
             zero_status_file=False,
@@ -1625,6 +1642,7 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
 
         return_code = self.agent._ScalyrAgent__detailed_status(
             self.data_path,
+            command_options=command_options,
             status_format="text",
             health_check=True,
             zero_status_file=False,
@@ -1642,6 +1660,7 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
 
         return_code = self.agent._ScalyrAgent__detailed_status(
             self.data_path,
+            command_options=command_options,
             status_format="json",
             health_check=False,
             zero_status_file=False,
@@ -1659,6 +1678,7 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
 
         return_code = self.agent._ScalyrAgent__detailed_status(
             self.data_path,
+            command_options=command_options,
             status_format="json",
             health_check=True,
             zero_status_file=False,
@@ -1676,6 +1696,7 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
 
         return_code = self.agent._ScalyrAgent__detailed_status(
             self.data_path,
+            command_options=command_options,
             status_format="text",
             health_check=False,
             zero_status_file=False,
@@ -1693,6 +1714,7 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
 
         return_code = self.agent._ScalyrAgent__detailed_status(
             self.data_path,
+            command_options=command_options,
             status_format="text",
             health_check=True,
             zero_status_file=False,
@@ -1710,6 +1732,7 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
 
         return_code = self.agent._ScalyrAgent__detailed_status(
             self.data_path,
+            command_options=command_options,
             status_format="json",
             health_check=False,
             zero_status_file=False,
@@ -1727,6 +1750,7 @@ class AgentMainStatusHandlerTestCase(ScalyrTestCase):
 
         return_code = self.agent._ScalyrAgent__detailed_status(
             self.data_path,
+            command_options=command_options,
             status_format="json",
             health_check=True,
             zero_status_file=False,

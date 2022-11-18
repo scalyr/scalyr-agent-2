@@ -37,7 +37,12 @@ from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
+import collections
+import datetime
+import json
 import platform
+import subprocess
+import tempfile
 import traceback
 import errno
 import gc
@@ -60,6 +65,11 @@ if False:
 # 1. https://github.com/scalyr/scalyr-agent-2/pull/700#issuecomment-761676613
 # 2. https://bugs.python.org/issue7980
 import _strptime  # NOQA
+
+try:
+    import psutil
+except ImportError:
+    psutil = None
 
 try:
     from __scalyr__ import SCALYR_VERSION
@@ -242,6 +252,12 @@ class ScalyrAgent(object):
         # Used below for a small cache for a slight optimization.
         self.__last_verify_config = None
 
+        # Collection of generation time intervals for recent status reports.
+        self.__agent_status_report_durations = collections.deque(maxlen=100)
+        # Average duration of the status report preparation, based on collection
+        # of all recent status report durations.
+        self.__agent_avg_status_report_duration = None
+
         self.__no_fork = False
         self.__last_total_bytes_skipped = 0
         self.__last_total_bytes_copied = 0
@@ -282,6 +298,8 @@ class ScalyrAgent(object):
         my_options.no_change_user = True
         my_options.no_check_remote = False
         my_options.extra_config_dir = None
+        my_options.debug = False
+        my_options.stats_capture_interval = 1
 
         if perform_config_check:
             command = "inner_run_with_checks"
@@ -399,6 +417,7 @@ class ScalyrAgent(object):
                     )
                 return self.__detailed_status(
                     agent_data_path,
+                    command_options=command_options,
                     status_format=status_format,
                     health_check=health_check,
                 )
@@ -689,9 +708,114 @@ class ScalyrAgent(object):
             log.info("Received signal to shutdown, attempt to shutdown cleanly.")
             self.__run_state.stop()
 
+    def _get_system_and_agent_stats(
+        self, data_directory, status_file_path
+    ):  # type: (six.text_type, six.text_type) -> Optional[Dict]
+        """
+        Return current machine's and agent process' stats.
+        :return: Dict with stats.
+        """
+
+        # Get information about agent process.
+        def get_agent_process_stats():
+            agent_process_stats = {}
+            if psutil is None:
+                return {"error": "No psutil"}
+
+            pidfile = os.path.join(self.__config.agent_log_path, "agent.pid")
+
+            if not os.path.exists(pidfile):
+                return {"error": "No PID file."}
+
+            try:
+                with open(pidfile, "r") as fp:
+                    pidfile_content = fp.read().strip()
+            except OSError as e:
+                return {"error": "Error during PID file read. Error: {}".format(e)}
+
+            try:
+                psutil_process = psutil.Process(pid=int(pidfile_content))
+            except psutil.Error as e:
+                return {"error": "Can't create psutil process. Error: {}".format(e)}
+
+            try:
+                with psutil_process.oneshot():
+                    agent_process_stats["pid"] = psutil_process.pid
+                    agent_process_stats["cpu_percent"] = psutil_process.cpu_percent()
+                    agent_process_stats["memory_rss"] = psutil_process.memory_info().rss
+            except Exception as e:
+                agent_process_stats["error"] = str(e)
+
+            return agent_process_stats
+
+        # Get information about machine's current state.
+        def get_machine_stats():
+            machine_stats = {}
+            try:
+                machine_stats["cpu_percent"] = psutil.cpu_percent()
+                machine_stats["cpu_count"] = psutil.cpu_count()
+                machine_stats["getloadavg"] = psutil.getloadavg()
+                machine_stats[
+                    "virtual_memory_percent"
+                ] = psutil.virtual_memory().percent
+            except Exception as e:
+                machine_stats["error"] = str(e)
+
+            return machine_stats
+
+        # Get list of related processes'
+        def find_agent_processes():
+            agent_processes = []
+            try:
+                ps_output = subprocess.check_output(
+                    [
+                        "ps",
+                        "aux",
+                    ]
+                ).decode()
+            except Exception as e:
+                return {"error": "Can't get list of processes. Error: {}".format(e)}
+
+            for line in ps_output.splitlines():
+                if "scalyr-agent" in line or "python" in line or "agent_main" in line:
+                    agent_processes.append(line)
+
+            return agent_processes
+
+        # Get status file stats and content.
+        def get_status_files_info():
+            result = {}
+            try:
+                ls_output = subprocess.check_output(
+                    ["ls", "-la", data_directory]
+                ).decode()
+                result["data_root_file_stats"] = ls_output.splitlines()
+            except Exception as e:
+                result["data_root_file_stats"] = six.text_type(e)
+
+            try:
+                with open(status_file_path, "rb") as fp:
+                    content = fp.read()
+                result["content"] = content.decode(errors="ignore")
+            except Exception as e:
+                result["content"] = six.text_type(e)
+
+            return result
+
+        result = {}
+        result.update(get_machine_stats())
+        result["timestamp"] = datetime.datetime.now().microsecond * 1000
+        result["agent_process"] = get_agent_process_stats()
+        if not platform.system().lower().startswith("windows"):
+            result["processes"] = find_agent_processes()
+            result["status_file_info"] = get_status_files_info()
+
+        return result
+
     def __detailed_status(
         self,
         data_directory,
+        command_options,
         status_format="text",
         health_check=False,
         zero_status_file=True,
@@ -715,6 +839,19 @@ class ScalyrAgent(object):
         # Health check ignores format but uses `json` under the hood
         if health_check:
             status_format = "json"
+
+        # List of all debug stats that are captured during status report.
+        debug_stats = []
+
+        status_file = os.path.join(data_directory, STATUS_FILE)
+        status_format_file = os.path.join(data_directory, STATUS_FORMAT_FILE)
+
+        # Capture debug stats at the beginning.
+        if command_options.debug:
+            stats = self._get_system_and_agent_stats(
+                data_directory=data_directory, status_file_path=status_file
+            )
+            debug_stats.append(stats)
 
         if status_format not in VALID_STATUS_FORMATS:
             print(
@@ -750,9 +887,6 @@ class ScalyrAgent(object):
                 file=sys.stderr,
             )
             return 1
-
-        status_file = os.path.join(data_directory, STATUS_FILE)
-        status_format_file = os.path.join(data_directory, STATUS_FORMAT_FILE)
 
         # This users needs to zero out the current status file (if it exists), so they need write access to it.
         # When we do create the status file, we give everyone read/write access, so it should not be an issue.
@@ -794,8 +928,20 @@ class ScalyrAgent(object):
         # We wait for five seconds at most to get the status.
         deadline = time.time() + 5
 
+        last_debug_stat_time = 0
         # Now loop until we see it show up.
         while True:
+            # Capture debug stats every second while waiting.
+            if command_options.debug and (
+                last_debug_stat_time + command_options.stats_capture_interval
+                < time.time()
+            ):
+                stats = self._get_system_and_agent_stats(
+                    data_directory=data_directory, status_file_path=status_file
+                )
+                debug_stats.append(stats)
+                last_debug_stat_time = time.time()
+
             try:
                 if os.path.isfile(status_file) and os.path.getsize(status_file) > 0:
                     break
@@ -817,9 +963,26 @@ class ScalyrAgent(object):
                     agent_log = os.path.join(
                         self.__default_paths.agent_log_path, AGENT_LOG_FILENAME
                     )
+
+                # Capture debug stats on timeout.
+                if command_options.debug:
+                    debug_stats.append(
+                        self._get_system_and_agent_stats(
+                            data_directory=data_directory, status_file_path=status_file
+                        )
+                    )
+
+                if command_options.debug:
+                    debug_stats_str = "Debug stats: {}".format(
+                        json.dumps(debug_stats, sort_keys=True, indent=4)
+                    )
+                else:
+                    debug_stats_str = ""
+
                 print(
                     "Failed to get status within 5 seconds.  Giving up.  The agent process is "
-                    "possibly stuck.  See %s for more details." % agent_log,
+                    "possibly stuck.  See %s for more details.\n%s"
+                    % (agent_log, debug_stats_str),
                     file=sys.stderr,
                 )
                 return 1
@@ -1757,6 +1920,8 @@ class ScalyrAgent(object):
         if self.__monitors_manager is not None:
             result.monitor_manager_status = self.__monitors_manager.generate_status()
 
+        result.avg_status_report_duration = self.__agent_avg_status_report_duration
+
         # Include GC stats (if enabled)
         if self.__config.enable_gc_stats:
             gc_stats = GCStatus()
@@ -1802,6 +1967,11 @@ class ScalyrAgent(object):
                 stats.skipped_preexisting_bytes,
                 stats.total_bytes_pending,
             )
+        )
+
+        log.debug(
+            'agent_status_debug avg_status_report_duration="%s"'
+            % (stats.avg_status_report_duration,)
         )
 
     def __log_bandwidth_stats(self, overall_stats):
@@ -2078,9 +2248,11 @@ class ScalyrAgent(object):
         :return: File path status data has been written to.
         :rtype: ``str``
         """
+
         # First determine the format user request. If no file with the requested format, we assume
         # text format is used (this way it's backward compatible and works correctly on upgraded)
         status_format = "text"
+        start_ts = time.time()
 
         status_format_file = os.path.join(
             self.__config.agent_data_path, STATUS_FORMAT_FILE
@@ -2118,12 +2290,27 @@ class ScalyrAgent(object):
             elif status_format == "json":
                 status_data = agent_status.to_dict()
                 status_data["overall_stats"] = self.__overall_stats.to_dict()
+                status_data[
+                    "avg_status_report_duration"
+                ] = agent_status.avg_status_report_duration
                 tmp_file.write(scalyr_util.json_encode(status_data))
 
             tmp_file.close()
             tmp_file = None
 
             os.rename(tmp_file_path, final_file_path)
+
+            # Calculate time that is spent for the whole status report.
+            end_ts = time.time()
+            self.__agent_status_report_durations.append(end_ts - start_ts)
+            # Calculate average status report duration.
+            if self.__agent_status_report_durations:
+                self.__agent_avg_status_report_duration = round(
+                    sum(self.__agent_status_report_durations)
+                    / len(self.__agent_status_report_durations),
+                    4,
+                )
+
         except (OSError, IOError) as e:
             # Temporary workaround to make race conditions less likely.
             # If agent status or health check is requested multiple times or concurrently around the
@@ -2276,6 +2463,22 @@ if __name__ == "__main__":
         default=False,
         help="For status command, prints health check status. Return code will be 0 for a passing check, and 2 for failing",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        dest="debug",
+        default=False,
+        help="Prints additional debug output. For now works only with --health-check option.",
+    )
+
+    parser.add_argument(
+        "--stats-capture-interval",
+        dest="stats_capture_interval",
+        type=float,
+        default=1,
+        help="Set interval before debug stats in the agent status are gathered. Only works with --debug option.",
+    )
+
     parser.add_argument(
         "--format",
         dest="status_format",
