@@ -3858,6 +3858,12 @@ cluster.
                 container, self.__mem_stat_metrics, metrics["stats"], k8s_extra
             )
 
+        # This adjustment is for consistency with the Kubelet api metrics / metrics-server, docker stats, etc
+        # used_memory = memory_stats.usage - memory_stats.stats.cache
+        # Ref: https://docs.docker.com/engine/api/v1.41/#tag/Container/operation/ContainerExport
+        if "usage" in metrics and "cache" in metrics.get("stats", {}):
+            metrics["usage"] -= metrics["stats"]["cache"]
+
         self.__log_metrics(container, self.__mem_metrics, metrics, k8s_extra)
 
     def __log_cpu_stats_metrics(self, container, metrics, k8s_extra):
