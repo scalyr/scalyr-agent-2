@@ -459,6 +459,8 @@ class PythonPackageBuilder(Runner):
             with package_path.open("wb") as f:
                 shutil.copyfileobj(resp.raw, f)
 
+        return package_path
+
 
     @classmethod
     def add_command_line_arguments(cls, parser: argparse.ArgumentParser):
@@ -565,7 +567,7 @@ class PythonPackageBuilder(Runner):
 
 
 class DebPythonPackageBuilderX64(PythonPackageBuilder):
-    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
+    # BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
     PACKAGE_ARCHITECTURE = "amd64"
     PACKAGE_TYPE = "deb"
 
