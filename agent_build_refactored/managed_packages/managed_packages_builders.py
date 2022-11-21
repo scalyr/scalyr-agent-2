@@ -249,6 +249,7 @@ class PythonPackageBuilder(Runner):
             )
 
         if python_package_path is None:
+            logging.info(f"The {python_package_path} package is reused from repository.")
             if reuse_existing_repo_packages:
                 increment_iteration = False
             else:
