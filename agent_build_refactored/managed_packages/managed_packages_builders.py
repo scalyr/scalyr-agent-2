@@ -14,6 +14,7 @@
 
 
 import datetime
+import hashlib
 import json
 import logging
 import shutil
@@ -90,40 +91,19 @@ class PythonPackageBuilder(Runner):
 
         return PACKAGECLOUD_PACKAGES[package_name][self.PACKAGE_TYPE][self.PACKAGE_ARCHITECTURE]
 
+    @property
+    def python_package_build_cmd_args(self) -> List[str]:
 
-    def build_python_package(
-            self,
-            increment_iteration: bool
-    ):
         description = "Dependency package which provides Python interpreter which is used by the agent from the " \
                       "'scalyr-agent-2 package'"
 
-        repo_package_filename = self.get_repo_package_filename(PYTHON_PACKAGE_NAME)
-        repo_package_version = self._parse_version_from_package_file_name(repo_package_filename)
-
-        build_step = self.BUILD_STEPS[PYTHON_PACKAGE_NAME]
-
-        if increment_iteration:
-            iteration, _ = self._parse_package_version_parts(
-                version=repo_package_version
-            )
-            iteration += 1
-            new_package_version = f"{iteration}-{build_step.checksum}"
-        else:
-            new_package_version = repo_package_version
-
-        package_root = build_step.get_output_directory(work_dir=self.work_dir) / "python"
-
-        check_call_with_log(
-            [
+        return [
                 # fmt: off
                 "fpm",
                 "-s", "dir",
                 "-a", self.PACKAGE_ARCHITECTURE,
                 "-t", self.PACKAGE_TYPE,
                 "-n", PYTHON_PACKAGE_NAME,
-                "-v", new_package_version,
-                "-C", str(package_root),
                 "--license", '"Apache 2.0"',
                 "--vendor", "Scalyr %s",
                 "--provides", "scalyr-agent-dependencies",
@@ -135,6 +115,82 @@ class PythonPackageBuilder(Runner):
                 "--rpm-user", "root",
                 "--rpm-group", "root",
                 # fmt: on
+            ]
+
+    @property
+    def agent_libs_build_command_args(self) -> List[str]:
+
+        description = "Dependency package which provides Python requirement libraries which are used by the agent " \
+                      "from the 'scalyr-agent-2 package'"
+
+        return [
+            # fmt: off
+            "fpm",
+            "-s", "dir",
+            "-a", self.PACKAGE_ARCHITECTURE,
+            "-t", self.PACKAGE_TYPE,
+            "-n", AGENT_LIBS_PACKAGE_NAME,
+            "--license", '"Apache 2.0"',
+            "--vendor", "Scalyr %s",
+            "--provides", "scalyr-agent-2-dependencies",
+            "--description", description,
+            "--depends", "bash >= 3.2",
+            "--url", "https://www.scalyr.com",
+            "--deb-user", "root",
+            "--deb-group", "root",
+            "--rpm-user", "root",
+            "--rpm-group", "root",
+            # fmt: on
+        ]
+
+    def _get_package_checksum(
+            self,
+            package_name: str,
+    ):
+        build_step = self.BUILD_STEPS[package_name]
+
+        if package_name == PYTHON_PACKAGE_NAME:
+            build_command_args = self.python_package_build_cmd_args
+        else:
+            build_command_args = self.agent_libs_build_command_args
+
+        sha256 = hashlib.sha256()
+        sha256.update(build_step.checksum.encode())
+
+        for arg in build_command_args:
+            sha256.update(arg.encode())
+
+        return sha256.hexdigest()
+
+    def build_python_package(
+            self,
+            increment_iteration: bool
+    ):
+
+        repo_package_filename = self.get_repo_package_filename(PYTHON_PACKAGE_NAME)
+        repo_package_version = self._parse_version_from_package_file_name(repo_package_filename)
+
+        package_checksum = self._get_package_checksum(
+            package_name=PYTHON_PACKAGE_NAME,
+        )
+
+        if increment_iteration:
+            iteration, _ = self._parse_package_version_parts(
+                version=repo_package_version
+            )
+            iteration += 1
+            new_package_version = f"{iteration}-{package_checksum}"
+        else:
+            new_package_version = repo_package_version
+
+        build_step = self.BUILD_STEPS[PYTHON_PACKAGE_NAME]
+        package_root = build_step.get_output_directory(work_dir=self.work_dir) / "python"
+
+        check_call_with_log(
+            [
+                *self.python_package_build_cmd_args,
+                "-v", new_package_version,
+                "-C", str(package_root),
             ],
             cwd=str(self.packages_output_path)
         )
@@ -152,49 +208,31 @@ class PythonPackageBuilder(Runner):
             increment_iteration: bool,
             python_package_version: str
     ):
-        description = "Dependency package which provides Python requirement libraries which are used by the agent " \
-                      "from the 'scalyr-agent-2 package'"
 
         repo_package_filename = self.get_repo_package_filename(AGENT_LIBS_PACKAGE_NAME)
         repo_package_version = self._parse_version_from_package_file_name(repo_package_filename)
 
-        build_step = self.BUILD_STEPS[AGENT_LIBS_PACKAGE_NAME]
+        package_checksum = self._get_package_checksum(
+            package_name=AGENT_LIBS_PACKAGE_NAME,
+        )
 
         if increment_iteration:
             iteration, _ = self._parse_package_version_parts(
                 version=repo_package_version
             )
             iteration += 1
-            new_package_version = f"{iteration}-{build_step.checksum}"
+            new_package_version = f"{iteration}-{package_checksum}"
         else:
             new_package_version = repo_package_version
 
         build_step = self.BUILD_STEPS[AGENT_LIBS_PACKAGE_NAME]
-
         package_root = build_step.get_output_directory(work_dir=self.work_dir) / "agent_libs"
 
         check_call_with_log(
             [
-                # fmt: off
-                "fpm",
-                "-s", "dir",
-                "-a", self.PACKAGE_ARCHITECTURE,
-                "-t", self.PACKAGE_TYPE,
-                "-n", AGENT_LIBS_PACKAGE_NAME,
                 "-v", new_package_version,
                 "-C", str(package_root),
-                "--license", '"Apache 2.0"',
-                "--vendor", "Scalyr %s",
-                "--provides", "scalyr-agent-2-dependencies",
-                "--description", description,
-                "--depends", "bash >= 3.2",
                 "--depends", f"scalyr-agent-python3 = {python_package_version}",
-                "--url", "https://www.scalyr.com",
-                "--deb-user", "root",
-                "--deb-group", "root",
-                "--rpm-user", "root",
-                "--rpm-group", "root",
-                # fmt: on
             ],
             cwd=str(self.packages_output_path)
         )
@@ -359,7 +397,6 @@ class PythonPackageBuilder(Runner):
         else:
             logging.warning(f"No packages are published.")
 
-
     def check_repo_packages_file_is_up_to_date(self, package_name: str):
 
         build_step = self.BUILD_STEPS[package_name]
@@ -368,7 +405,10 @@ class PythonPackageBuilder(Runner):
         repo_package_version = self._parse_version_from_package_file_name(repo_package_filename)
         _, repo_package_checksum = self._parse_package_version_parts(repo_package_version)
 
-        if build_step.checksum != repo_package_checksum:
+        package_checksum = self._get_package_checksum(
+            package_name=package_name,
+        )
+        if package_checksum != repo_package_checksum:
             logging.error(
                 f"Current version of the {package_name} {self.PACKAGE_TYPE} {self.PACKAGE_ARCHITECTURE} package does "
                 f"not match version in the {PACKAGECLOUD_PACKAGES_VERSIONS_PATH} file"
@@ -392,12 +432,12 @@ class PythonPackageBuilder(Runner):
             version=repo_package_version
         )
 
-        build_step = self.BUILD_STEPS[package_name]
+        package_checksum = self.package_checksums[package_name]
 
-        if build_step.checksum != current_package_checksum:
+        if package_checksum!= current_package_checksum:
             new_packagecloud_packages = PACKAGECLOUD_PACKAGES.copy()
 
-            new_version = f"{iteration + 1}-{build_step.checksum}"
+            new_version = f"{iteration + 1}-{package_checksum}"
             new_filename = f"{package_name}_{new_version}_{self.PACKAGE_ARCHITECTURE}.{self.PACKAGE_TYPE}"
             new_packagecloud_packages[package_name][self.PACKAGE_TYPE][self.PACKAGE_ARCHITECTURE] = new_filename
 
@@ -418,7 +458,6 @@ class PythonPackageBuilder(Runner):
             repo_name: str,
 
     ) -> Optional[pl.Path]:
-
 
         import requests
         from requests.auth import HTTPBasicAuth
