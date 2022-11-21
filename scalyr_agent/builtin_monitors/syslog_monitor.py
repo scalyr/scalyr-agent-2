@@ -1,3 +1,4 @@
+# Copyright 2017-2022 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ------------------------------------------------------------------------
-# author:  Imron Alston <imron@scalyr.com>
+# author: scalyr-cloudtech@scalyr.com
 
 from __future__ import unicode_literals
 from __future__ import absolute_import
@@ -19,7 +20,7 @@ from __future__ import absolute_import
 from __future__ import print_function
 from scalyr_agent import compat
 
-__author__ = "imron@scalyr.com"
+__author__ = "scalyr-cloudtech@scalyr.com"
 
 import errno
 import glob
@@ -500,7 +501,8 @@ class SyslogUDPHandler(six.moves.socketserver.BaseRequestHandler):
 
     def handle(self):
         data = six.ensure_text(self.request[0].strip(), "utf-8", errors="ignore")
-        self.server.syslog_handler.handle(data)
+        extra = {'proto':'udp', 'srcip':self.client_address[0], 'destport':self.server.server_address[1]}
+        self.server.syslog_handler.handle(data, extra)
 
 
 class SyslogRequestParser(object):
@@ -517,10 +519,14 @@ class SyslogRequestParser(object):
     def __init__(
         self,
         socket,
+        socket_client_address,
+        socket_server_address,
         max_buffer_size,
         message_size_can_exceed_tcp_buffer=False,
     ):
         self._socket = socket
+        self._client_address = socket_client_address
+        self._server_address = socket_server_address
 
         if socket:
             self._socket.setblocking(False)
@@ -583,6 +589,8 @@ class SyslogRequestParser(object):
         # process the buffer until we are out of bytes
         frames_handled = 0
 
+        extra = {'proto':'tcp', 'srcip':self._client_address[0], 'destport':self._server_address[1]}
+
         while self._offset < size:
             # get the first byte to determine if framed or not
             # 2->TODO use slicing to get bytes in both python versions.
@@ -625,7 +633,7 @@ class SyslogRequestParser(object):
                     frame_data = six.ensure_text(
                         self._remaining, "utf-8", errors="ignore"
                     )
-                    handle_frame(frame_data)
+                    handle_frame(frame_data, extra)
 
                     frames_handled += 1
                     # add a space to ensure the next frame won't start with a number
@@ -641,7 +649,7 @@ class SyslogRequestParser(object):
             frame_data = six.ensure_text(
                 self._remaining[self._offset : frame_end].strip(), "utf-8", "ignore"
             )
-            handle_frame(frame_data)
+            handle_frame(frame_data, extra)
             frames_handled += 1
 
             self._offset += frame_length + skip
@@ -671,7 +679,8 @@ class SyslogRawRequestParser(SyslogRequestParser):
     """
 
     def process(self, data, handle_frame):
-        handle_frame(data)
+        extra = {'proto':'tcp', 'srcip':self._client_address[0], 'destport':self._server_address[1]}
+        handle_frame(data, extra)
 
 
 class SyslogBatchedRequestParser(SyslogRequestParser):
@@ -691,11 +700,15 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
     def __init__(
         self,
         socket,
+        socket_client_address,
+        socket_server_address,
         max_buffer_size,
         incomplete_frame_timeout=None,
         message_delimiter="\n",
     ):
         self._socket = socket
+        self._client_address = socket_client_address
+        self._server_address = socket_server_address
 
         if socket:
             self._socket.setblocking(False)
@@ -735,6 +748,8 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
         # data to file.
         frames_handled = 0
         data_to_write = bytearray()
+
+        extra = {'proto':'tcp', 'srcip':self._client_address[0], 'destport':self._server_address[1]}
 
         while self._offset < size:
             # 2->TODO use slicing to get bytes in both python versions.
@@ -782,7 +797,7 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
                         limit_key="syslog-incomplete-message-flush",
                     )
 
-                    handle_frame(self._remaining.decode("utf-8", "ignore").strip())
+                    handle_frame(self._remaining.decode("utf-8", "ignore").strip(), extra)
                     frames_handled += 1
 
                     self._last_handle_frame_call_time = int(time.time())
@@ -816,7 +831,7 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
 
         # All the currently available data has been processed, output it and reset the buffer
         if data_to_write:
-            handle_frame(data_to_write.decode("utf-8", "ignore").strip())
+            handle_frame(data_to_write.decode("utf-8", "ignore").strip(), extra)
             data_to_write = bytearray()
 
             self._last_handle_frame_call_time = int(time.time())
@@ -846,12 +861,16 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
         if self.request_parser == "default":
             request_stream = SyslogRequestParser(
                 socket=self.request,
+                socket_client_address=self.client_address,
+                socket_server_address=self.server.server_address,
                 max_buffer_size=self.server.tcp_buffer_size,
                 message_size_can_exceed_tcp_buffer=self.server.message_size_can_exceed_tcp_buffer,
             )
         elif self.request_parser == "batch":
             request_stream = SyslogBatchedRequestParser(
                 socket=self.request,
+                socket_client_address=self.client_address,
+                socket_server_address=self.server.server_address,
                 max_buffer_size=self.server.tcp_buffer_size,
                 incomplete_frame_timeout=self.incomplete_frame_timeout,
                 message_delimiter=self.message_delimiter,
@@ -859,6 +878,8 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
         elif self.request_parser == "raw":
             request_stream = SyslogRawRequestParser(
                 socket=self.request,
+                socket_client_address=self.client_address,
+                socket_server_address=self.server.server_address,
                 max_buffer_size=self.server.tcp_buffer_size,
             )
         else:
@@ -1428,7 +1449,7 @@ class SyslogHandler(object):
         if self.__docker_log_deleter:
             self.__docker_log_deleter.check_for_old_logs(current_log_files)
 
-    def handle(self, data):  # type: (six.text_type) -> None
+    def handle(self, data, extra):  # type: (six.text_type) -> None
         """
         Feed syslog messages to the appropriate loggers.
         """
@@ -1438,6 +1459,8 @@ class SyslogHandler(object):
         if self.__docker_logging:
             self.__handle_docker_logs(data)
         else:
+            # FIXME STOPPED The app-name and source hostname can be parsed from the data here
+            print('SyslogHandler.handle', repr(data), extra)
             self.__logger.info(data)
         # We add plus one because the calling code strips off the trailing new lines.
         self.__line_reporter(data.count("\n") + 1)
