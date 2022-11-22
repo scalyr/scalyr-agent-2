@@ -285,13 +285,13 @@ class PythonPackageBuilder(Runner):
             if last_repo_python_package_file:
                 command_args.extend([
                     "--last-repo-python-package-file",
-                    last_repo_python_package_file
+                    RunnerMappedPath(last_repo_python_package_file)
                 ])
 
             if last_repo_agent_libs_package_file:
                 command_args.extend([
                     "--last-repo-agent-libs-package-file",
-                    last_repo_agent_libs_package_file
+                    RunnerMappedPath(last_repo_agent_libs_package_file)
                 ])
 
             self.run_in_docker(command_args=command_args)
@@ -316,12 +316,6 @@ class PythonPackageBuilder(Runner):
             package_name=PYTHON_PACKAGE_NAME,
             last_repo_package_file_path=last_repo_python_package_path
         )
-
-        print("!!!!!!")
-        print(last_repo_python_package_path)
-        print(final_python_package_path)
-        print(final_python_version)
-        print("222222222")
 
         # Python package is not found in repo, build it.
         if final_python_package_path is None:
