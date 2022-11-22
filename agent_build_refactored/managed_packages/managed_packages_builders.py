@@ -17,6 +17,7 @@ import datetime
 import hashlib
 import json
 import logging
+import re
 import shutil
 import subprocess
 import tarfile
@@ -118,16 +119,24 @@ class PythonPackageBuilder(Runner):
         iteration, checksum = version.split("+")
         return int(iteration), checksum
 
-    @staticmethod
-    def _parse_version_from_package_file_name(package_file_name: str):
+    def _parse_version_from_package_file_name(self, package_file_name: str):
         """
         Parse version of the package from its filename.
         """
-        # split filename to name and extension
-        filename, _ = package_file_name.split(".")
-        # then split name to name prefix, version and architecture.
-        _, version, _ = filename.split("_")
-        return version
+        if self.PACKAGE_TYPE == "deb":
+            # split filename to name and extension
+            filename, _ = package_file_name.split(".")
+            # then split name to name prefix, version and architecture.
+            _, version, _ = filename.split("_")
+            return version
+        else:
+            # split filename to name, arch, and extension
+            filename, _, _ = package_file_name.split(".")
+            # split with release
+            prefix, _ = filename.rsplit("-", 1)
+            # split with version
+            _, version = filename.rsplit("-", 1)
+            return version
 
     @property
     def python_package_build_cmd_args(self) -> List[str]:
