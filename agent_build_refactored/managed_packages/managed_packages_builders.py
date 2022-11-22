@@ -13,37 +13,166 @@
 # limitations under the License.
 
 
-import datetime
 import hashlib
 import json
 import logging
-import re
 import shutil
 import subprocess
-import tarfile
 import argparse
 import os
 import pathlib as pl
 from typing import List, Tuple, Optional, Dict
 
 
-from agent_build_refactored.tools.runner import Runner, RunnerStep, ArtifactRunnerStep, RunnerMappedPath
-from agent_build_refactored.tools.constants import SOURCE_ROOT, EMBEDDED_PYTHON_VERSION
+from agent_build_refactored.tools.runner import Runner, RunnerStep, ArtifactRunnerStep, RunnerMappedPath, EnvironmentRunnerStep, DockerImageSpec,GitHubActionsSettings
+from agent_build_refactored.tools.constants import SOURCE_ROOT, EMBEDDED_PYTHON_VERSION, DockerPlatform
 from agent_build_refactored.tools import check_call_with_log
-from agent_build_refactored.prepare_agent_filesystem import build_linux_lfs_agent_files
-from agent_build_refactored.managed_packages.dependency_packages import (
-    BUILD_PYTHON_GLIBC_X86_64,
-    PYTHON_PACKAGE_NAME,
-
-    BUILD_AGENT_LIBS_GLIBC_X86_64,
-    AGENT_LIBS_PACKAGE_NAME,
-
-    PREPARE_TOOLSET_GLIBC_X86_64,
-    AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME,
-    EMBEDDED_PYTHON_SHORT_VERSION
-)
 
 logger = logging.getLogger(__name__)
+
+
+AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME = "scalyr-agent-2-dependencies"
+PYTHON_PACKAGE_NAME = "scalyr-agent-python3"
+AGENT_LIBS_PACKAGE_NAME = "scalyr-agent-libs"
+
+
+PYTHON_PACKAGE_SSL_VERSION = "1.1.1k"
+EMBEDDED_PYTHON_SHORT_VERSION = ".".join(EMBEDDED_PYTHON_VERSION.split(".")[:2])
+
+
+def create_build_dependencies_step(
+        base_image: EnvironmentRunnerStep
+):
+
+    return EnvironmentRunnerStep(
+        name="install_build_dependencies",
+        script_path="agent_build_refactored/managed_packages/steps/install_build_dependencies.sh",
+        base=base_image,
+        environment_variables={
+            "PERL_VERSION": "5.36.0",
+            "ZX_VERSION": "5.2.6",
+            "TEXTINFO_VERSION": "6.8",
+            "M4_VERSION": "1.4.19",
+            "LIBTOOL_VERSION": "2.4.6",
+            "AUTOCONF_VERSION": "2.71",
+            "AUTOMAKE_VERSION": "1.16",
+            "HELP2MAN_VERSION": "1.49.2",
+            "LZMA_VERSION": "4.32.7",
+            "OPENSSL_VERSION": PYTHON_PACKAGE_SSL_VERSION,
+            "LIBFFI_VERSION": "3.4.2",
+            "UTIL_LINUX_VERSION": "2.38",
+            "NCURSES_VERSION": "6.3",
+            "LIBEDIT_VERSION": "20210910-3.1",
+            "GDBM_VERSION": "1.23",
+            "ZLIB_VERSION": "1.2.13",
+            "BZIP_VERSION": "1.0.8",
+            "RUST_VERSION": "1.63.0",
+        },
+        github_actions_settings=GitHubActionsSettings(
+            cacheable=True
+        )
+    )
+
+def create_build_python_step(
+        base_step: EnvironmentRunnerStep
+):
+    return ArtifactRunnerStep(
+        name="build_python",
+        script_path="agent_build_refactored/managed_packages/steps/build_python.sh",
+        tracked_files_globs=[
+            "agent_build_refactored/managed_packages/files/scalyr-agent-2-python3",
+        ],
+        base=base_step,
+        environment_variables={
+            "PYTHON_VERSION": EMBEDDED_PYTHON_VERSION,
+            "PYTHON_SHORT_VERSION": EMBEDDED_PYTHON_SHORT_VERSION,
+            "PYTHON_INSTALL_PREFIX": "/usr",
+            "SUBDIR_NAME": AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME
+        },
+        github_actions_settings=GitHubActionsSettings(
+            cacheable=True
+        )
+    )
+
+
+def create_build_agent_libs_step(
+        base_step: EnvironmentRunnerStep,
+        build_python_step: ArtifactRunnerStep
+):
+    return ArtifactRunnerStep(
+        name="build_agent_libs",
+        script_path="agent_build_refactored/managed_packages/steps/build_agent_libs.sh",
+        tracked_files_globs=[
+            "agent_build/requirement-files/*.txt",
+            "dev-requirements.txt"
+        ],
+        base=base_step,
+        required_steps={
+            "BUILD_PYTHON": build_python_step
+        },
+        environment_variables={
+            "PYTHON_SHORT_VERSION": EMBEDDED_PYTHON_SHORT_VERSION,
+            "RUST_VERSION": "1.63.0",
+            "SUBDIR_NAME": AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME
+        },
+        github_actions_settings=GitHubActionsSettings(
+            cacheable=True
+        )
+    )
+
+
+# Step that prepares initial environment for X86_64 build environment.
+INSTALL_GCC_7_GLIBC_X86_64 = EnvironmentRunnerStep(
+        name="install_gcc_7",
+        script_path="agent_build_refactored/managed_packages/steps/install_gcc_7.sh",
+        base=DockerImageSpec(
+            name="centos:6",
+            platform=DockerPlatform.AMD64.value
+        ),
+        github_actions_settings=GitHubActionsSettings(
+            cacheable=True
+        )
+    )
+# Step that installs Python build requirements to the build environment.
+INSTALL_BUILD_DEPENDENCIES_GLIBC_X86_64 = create_build_dependencies_step(
+    base_image=INSTALL_GCC_7_GLIBC_X86_64
+)
+
+# Create step that builds Python interpreter.
+BUILD_PYTHON_GLIBC_X86_64 = create_build_python_step(
+    base_step=INSTALL_BUILD_DEPENDENCIES_GLIBC_X86_64
+)
+
+# Create step that builds agent requirement libs.
+BUILD_AGENT_LIBS_GLIBC_X86_64 = create_build_agent_libs_step(
+    base_step=INSTALL_BUILD_DEPENDENCIES_GLIBC_X86_64,
+    build_python_step=BUILD_PYTHON_GLIBC_X86_64
+)
+
+# Create step that prepare environment with all needed tools.
+PREPARE_TOOLSET_GLIBC_X86_64 = EnvironmentRunnerStep(
+    name="prepare_toolset",
+    script_path="agent_build_refactored/managed_packages/steps/prepare_toolset.sh",
+    base=DockerImageSpec(
+        name="ubuntu:22.04",
+        platform=DockerPlatform.AMD64.value
+    ),
+    required_steps={
+        "BUILD_PYTHON": BUILD_PYTHON_GLIBC_X86_64,
+        "BUILD_AGENT_LIBS": BUILD_AGENT_LIBS_GLIBC_X86_64
+    },
+    environment_variables={
+        "SUBDIR_NAME": AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME,
+        "FPM_VERSION": "1.14.2",
+        "PACKAGECLOUD_VERSION": "0.3.11",
+        "USER_NAME": subprocess.check_output("whoami").decode().strip(),
+        "USER_ID": str(os.getuid()),
+        "USER_GID": str(os.getgid()),
+    },
+    github_actions_settings=GitHubActionsSettings(
+        cacheable=True
+    )
+)
 
 
 class PythonPackageBuilder(Runner):
@@ -130,16 +259,12 @@ class PythonPackageBuilder(Runner):
             _, version, _ = filename.split("_")
             return version
         else:
-            print("!!!!!")
             # split filename to name, arch, and extension
             filename, _, _ = package_file_name.split(".")
-            print(1, filename)
             # split with release
             prefix, _ = filename.rsplit("-", 1)
-            print(2, prefix)
             # split with version
             _, version = prefix.rsplit("-", 1)
-            print(3, version)
             return version
 
     @property
