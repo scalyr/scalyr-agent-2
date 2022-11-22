@@ -317,6 +317,11 @@ class PythonPackageBuilder(Runner):
             last_repo_package_file_path=last_repo_python_package_path
         )
 
+        print("!!!!!!")
+        print(last_repo_python_package_path)
+        print(final_python_package_path)
+        print(final_python_version)
+
         # Python package is not found in repo, build it.
         if final_python_package_path is None:
             package_root = self.PYTHON_BUILD_STEP.get_output_directory(work_dir=self.work_dir) / "python"
