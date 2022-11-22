@@ -335,13 +335,14 @@ class PythonPackageBuilder(Runner):
             ))
             assert len(found) == 1, f"Number of result Python packages has to be 1, got {len(found)}"
             packages_to_publish.append(found[0].name)
-            logger.info(f"Package {PYTHON_PACKAGE_NAME} is built.")
+            logger.info(f"Package {found[0]} is built.")
         else:
             # Current python package is not changed, and it already exists in repo, reuse it.
             shutil.copy(
                 final_python_package_path,
                 self.packages_output_path
             )
+            logger.info(f"Package {final_python_package_path.name} is reused from repo.")
 
         # Do the same with the 'agent-libs' package.
         final_agent_libs_package_path, final_agent_libs_version = self._get_final_package_path_and_version(
@@ -367,13 +368,14 @@ class PythonPackageBuilder(Runner):
             ))
             assert len(found) == 1, f"Number of result agent_libs packages has to be 1, got {len(found)}"
             packages_to_publish.append(found[0].name)
-            logger.info(f"Package {AGENT_LIBS_PACKAGE_NAME} is built.")
+            logger.info(f"Package {found[0].name} is built.")
         else:
             # Current agent-libs package is not changed, and it already exists in repo, reuse it.
             shutil.copy(
                 final_agent_libs_package_path,
                 self.packages_output_path
             )
+            logger.info(f"Package {final_agent_libs_package_path.name} is reused from repo.")
 
         # Also write special json file which contain information about packages that have to be published.
         # We have to use it in order to skip the publishing of the packages that are reused and already in the repo.
