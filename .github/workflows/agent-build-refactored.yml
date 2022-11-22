@@ -279,10 +279,10 @@ jobs:
                 --package-filename "${{ steps.get_last_packages_names.outputs.last_repo_python_package_name }}" \
                 --output-dir /tmp/python-package
               )
-            else
-              
-            fi
+            elif [ -n "${{ steps.get_last_packages_names.outputs.last_repo_python_package_name }}" ]; then
               LAST_REPO_PYTHON_PACKAGE_PATH="/tmp/python-package/${{ steps.get_last_packages_names.outputs.last_repo_python_package_name }}"
+            fi
+              
             
             echo "last_repo_python_package_path=${LAST_REPO_PYTHON_PACKAGE_PATH}" >> $GITHUB_OUTPUT
 
@@ -302,7 +302,7 @@ jobs:
                 --package-filename "${{ steps.get_last_packages_names.outputs.last_repo_agent_libs_package_name }}" \
                 --output-dir /tmp/agent-libs-package
               )
-            else
+            elif [ -n "${{ steps.get_last_packages_names.outputs.last_repo_agent_libs_package_name }}" ]; then
               LAST_REPO_AGENT_LIBS_PACKAGE_PATH="/tmp/agent-libs-package/${{ steps.get_last_packages_names.outputs.last_repo_agent_libs_package_name }}"
             fi
           
