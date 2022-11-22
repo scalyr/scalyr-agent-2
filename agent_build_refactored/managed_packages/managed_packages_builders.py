@@ -162,170 +162,119 @@ class PythonPackageBuilder(Runner):
 
         return sha256.hexdigest()
 
-    def build_python_package(
-            self,
-            version: str
-    ):
-
-        build_step = self.BUILD_STEPS[PYTHON_PACKAGE_NAME]
-        package_root = build_step.get_output_directory(work_dir=self.work_dir) / "python"
-
-        check_call_with_log(
-            [
-                *self.python_package_build_cmd_args,
-                "-v", version,
-                "-C", str(package_root),
-            ],
-            cwd=str(self.packages_output_path)
-        )
-
-        found = list(self.packages_output_path.glob(
-            f"{PYTHON_PACKAGE_NAME}_{version}_{self.PACKAGE_ARCHITECTURE}.{self.PACKAGE_TYPE}"
-        ))
-
-        assert len(found) == 1, f"Number of result Python packages has to be 1, got {len(found)}"
-
-        return found[0]
-
-    def build_agent_libs_package(
-            self,
-            token: str,
-            repo_name: str,
-            user_name: str,
-            reuse_existing_python_package: bool,
-            version: str
-    ):
-
-        current_python_package_checksum = self._get_package_checksum(
-            package_name=PYTHON_PACKAGE_NAME
-        )
-
-        if reuse_existing_python_package:
-            recent_python_package_version = self.find_most_recent_package_from_packagecloud(
-                package_name=PYTHON_PACKAGE_NAME,
-                package_checksum=self._get_package_checksum(PYTHON_PACKAGE_NAME),
-                token=token,
-                repo_name=repo_name,
-                user_name=user_name,
-            )
-
-            if recent_python_package_version is None:
-                recent_python_package_version = "0+0"
-
-            repo_python_package_iteration, repo_python_package_checksum = self._parse_package_version_parts(
-                version=recent_python_package_version
-            )
-
-            if current_python_package_checksum == repo_python_package_checksum:
-                python_package_version = recent_python_package_version
-                build_python_package = False
-            else:
-                new_iteration = repo_python_package_iteration + 1
-                python_package_version = f"{new_iteration}+{current_python_package_checksum}"
-                build_python_package = True
-        else:
-            python_package_version = f"dev+{current_python_package_checksum}"
-            build_python_package = True
-
-        if build_python_package:
-            self.build_python_package(
-                version=python_package_version
-            )
-
-        build_step = self.BUILD_STEPS[AGENT_LIBS_PACKAGE_NAME]
-        package_root = build_step.get_output_directory(work_dir=self.work_dir) / "agent_libs"
-
-        check_call_with_log(
-            [
-                *self.agent_libs_build_command_args,
-                "-v", version,
-                "-C", str(package_root),
-                "--depends", f"scalyr-agent-python3 = {python_package_version}",
-            ],
-            cwd=str(self.packages_output_path)
-        )
-
-        found = list(self.packages_output_path.glob(
-            f"{AGENT_LIBS_PACKAGE_NAME}_{version}_{self.PACKAGE_ARCHITECTURE}.{self.PACKAGE_TYPE}"
-        ))
-
-        assert len(found) == 1, f"Number of result agent_libs packages has to be 1, got {len(found)}"
-
-        return found[0]
-
     def build_packages(
             self,
-            token: str,
-            repo_name: str,
-            user_name: str,
-            reuse_existing_repo_packages: bool,
-            python_package_file_path: pl.Path = None,
-            agent_libs_package_file_path: pl.Path = None
+            last_repo_python_package_file: str = None,
+            last_repo_agent_libs_package_file: str = None
 
     ):
 
         self.run_required()
 
         if self.runs_in_docker:
-            self.run_in_docker(
-                command_args=[
-                    "build",
-                    "--user-name",
-                    user_name,
-                    "--repo-name",
-                    repo_name,
-                    "--token",
-                    token,
-                    "--reuse-existing-repo-packages",
-                    reuse_existing_repo_packages
-                ]
-            )
+            command_args = ["build"]
+            if last_repo_python_package_file:
+                command_args.extend([
+                    "--last-repo-python-package-file-dir",
+                    last_repo_python_package_file
+                ])
+
+            if last_repo_agent_libs_package_file:
+                command_args.extend([
+                    "--last-repo-python-package-file-dir",
+                    last_repo_agent_libs_package_file
+                ])
+
+            self.run_in_docker(command_args=command_args)
             return
+
+        last_repo_python_package_path = last_repo_python_package_file and pl.Path(last_repo_python_package_file)
+        last_repo_agent_libs_package_path = last_repo_agent_libs_package_file and pl.Path(last_repo_agent_libs_package_file)
 
         self.packages_output_path.mkdir(parents=True)
 
-        current_agent_libs_package_checksum = self._get_package_checksum(
-            package_name=AGENT_LIBS_PACKAGE_NAME
+        def get_final_package_path_and_version(
+                package_name: str,
+                last_repo_package_file_path: pl.Path = None,
+        ):
+            final_package_path = None
+
+            current_package_checksum = self._get_package_checksum(
+                package_name=package_name
+            )
+            if last_repo_package_file_path is None:
+                final_package_version = f"1+{current_package_checksum}"
+            else:
+                last_repo_package_version = self._parse_version_from_package_file_name(
+                    package_file_name=last_repo_package_file_path.name
+                )
+                last_repo_package_iteration, last_repo_package_checksum = self._parse_package_version_parts(
+                    version=last_repo_package_version
+                )
+                if current_package_checksum == last_repo_package_checksum:
+                    final_package_version = last_repo_package_version
+                    final_package_path = last_repo_python_package_path
+                else:
+                    final_package_version = f"{last_repo_package_iteration + 1}+{current_package_checksum}"
+
+            return final_package_path, final_package_version
+
+
+        final_python_package_path, final_python_version = get_final_package_path_and_version(
+            package_name=PYTHON_PACKAGE_NAME,
+            last_repo_package_file_path=last_repo_python_package_path
         )
 
-        if reuse_existing_repo_packages:
-            recent_agent_libs_package_version = self.find_most_recent_package_from_packagecloud(
-                package_name=AGENT_LIBS_PACKAGE_NAME,
-                package_checksum=self._get_package_checksum(AGENT_LIBS_PACKAGE_NAME),
-                token=token,
-                repo_name=repo_name,
-                user_name=user_name,
+        if final_python_package_path is None:
+            python_build_step = self.BUILD_STEPS[PYTHON_PACKAGE_NAME]
+            package_root = python_build_step.get_output_directory(work_dir=self.work_dir) / "python"
+
+            check_call_with_log(
+                [
+                    *self.python_package_build_cmd_args,
+                    "-v", final_python_version,
+                    "-C", str(package_root),
+                ],
+                cwd=str(self.packages_output_path)
             )
 
-            if recent_agent_libs_package_version is None:
-                recent_agent_libs_package_version = f"0+0"
-
-            recent_package_iteration, recent_package_checksum = self._parse_package_version_parts(
-                version=recent_agent_libs_package_version
-            )
-
-            if current_agent_libs_package_checksum == recent_package_checksum:
-                agent_libs_package_version = recent_agent_libs_package_version
-                build_agent_libs_package = False
-            else:
-                new_iteration = recent_package_iteration + 1
-                agent_libs_package_version = f"{new_iteration}+{current_agent_libs_package_checksum}"
-                build_agent_libs_package = True
+            found = list(self.packages_output_path.glob(
+                f"{PYTHON_PACKAGE_NAME}_{final_python_version}_{self.PACKAGE_ARCHITECTURE}.{self.PACKAGE_TYPE}"
+            ))
+            assert len(found) == 1, f"Number of result Python packages has to be 1, got {len(found)}"
         else:
-            agent_libs_package_version = f"dev+{current_agent_libs_package_checksum}"
-            build_agent_libs_package = True
-
-        if build_agent_libs_package:
-            self.build_agent_libs_package(
-                version=agent_libs_package_version,
-                token=token,
-                repo_name=repo_name,
-                user_name=user_name,
-                reuse_existing_python_package=reuse_existing_repo_packages
+            shutil.copy(
+                last_repo_python_package_path,
+                self.packages_output_path
             )
 
+        final_agent_libs_package_path, final_agent_libs_version = get_final_package_path_and_version(
+            package_name=AGENT_LIBS_PACKAGE_NAME,
+            last_repo_package_file_path=last_repo_agent_libs_package_path
+        )
 
-        return
+        if final_agent_libs_package_path is None:
+            agent_libs_build_step = self.BUILD_STEPS[AGENT_LIBS_PACKAGE_NAME]
+            package_root = agent_libs_build_step.get_output_directory(work_dir=self.work_dir) / "agent_libs"
+
+            check_call_with_log(
+                [
+                    *self.agent_libs_build_command_args,
+                    "-v", final_agent_libs_version,
+                    "-C", str(package_root),
+                    "--depends", f"scalyr-agent-python3 = {final_python_package_path}",
+                ],
+                cwd=str(self.packages_output_path)
+            )
+            found = list(self.packages_output_path.glob(
+                f"{AGENT_LIBS_PACKAGE_NAME}_{final_agent_libs_version}_{self.PACKAGE_ARCHITECTURE}.{self.PACKAGE_TYPE}"
+            ))
+            assert len(found) == 1, f"Number of result agent_libs packages has to be 1, got {len(found)}"
+        else:
+            shutil.copy(
+                final_agent_libs_package_path,
+                self.packages_output_path
+            )
 
     def publish_packages_to_packagecloud(
             self,
@@ -351,46 +300,103 @@ class PythonPackageBuilder(Runner):
             )
             return
 
-    def find_most_recent_package_from_packagecloud(
+    def _search_for_package_in_repo(
             self,
-            package_name: str,
-            package_checksum: str,
+            params: Dict,
             token: str,
             user_name: str,
             repo_name: str,
-
-    ) -> Optional[str]:
-
+    ):
         import requests
         from requests.auth import HTTPBasicAuth
 
         auth = HTTPBasicAuth(token, "")
 
         if self.PACKAGE_TYPE == "deb":
-            query_package_type_filter = "debs"
+            params["filter"] = "debs"
         else:
             raise Exception(f"Unknown package type {self.PACKAGE_TYPE}.")
 
         with requests.Session() as s:
             resp = s.get(
                 url=f"https://packagecloud.io/api/v1/repos/{user_name}/{repo_name}/search.json",
-                params={
-                    "q": f"{package_name}",
-                    "filter": query_package_type_filter
-                },
+                params=params,
                 auth=auth
             )
 
         resp.raise_for_status()
-        packages = resp.json()
+        return resp.json()
+
+
+    def find_last_repo_package(
+            self,
+            package_name: str,
+            token: str,
+            user_name: str,
+            repo_name: str,
+
+    ) -> Optional[str]:
+
+        packages = self._search_for_package_in_repo(
+            params={
+                "q": f"{package_name}",
+            },
+            token=token,
+            user_name=user_name,
+            repo_name=repo_name
+        )
 
         if len(packages) == 0:
-            logger.info(f"Package with checksum {package_checksum} is not in the Packagecloud repository.")
+            logger.info(f"Could not found any package with name {package_name}")
             return None
 
-        recent_package = packages[-1]
+        last_package = packages[-1]
 
-        return recent_package["version"]
+        return last_package["filename"]
+
+    def download_package_from_repo(
+            self,
+            package_filename: str,
+            output_dir: str,
+            token: str,
+            user_name: str,
+            repo_name: str,
+    ):
+
+        packages = self._search_for_package_in_repo(
+            params={
+                "q": f"{package_filename}",
+            },
+            token=token,
+            user_name=user_name,
+            repo_name=repo_name
+        )
+
+        assert len(packages) == 1, f"Expected number of found packages is 1, got {len(packages)}."
+        last_package = packages[-1]
+
+        import requests
+        from requests.auth import HTTPBasicAuth
+
+        auth = HTTPBasicAuth(token, "")
+        with requests.Session() as s:
+            resp = s.get(
+                url=last_package["download_url"],
+                auth=auth
+            )
+            resp.raise_for_status()
+
+            output_dir_path = pl.Path(output_dir)
+            output_dir_path.mkdir(parents=True, exist_ok=True)
+            package_path = pl.Path(output_dir) / package_filename
+            with package_path.open("wb") as f:
+                for chunk in resp.iter_content(chunk_size=8192):
+                    # If you have chunk encoded response uncomment if
+                    # and set chunk_size parameter to None.
+                    # if chunk:
+                    f.write(chunk)
+
+        return package_path
 
     @classmethod
     def add_command_line_arguments(cls, parser: argparse.ArgumentParser):
@@ -410,26 +416,72 @@ class PythonPackageBuilder(Runner):
             dest="version",
         )
         build_packages_parser.add_argument(
+            "--last-repo-python-package-file",
+            dest="last_repo_python_package_file",
+            required=False
+        )
+        build_packages_parser.add_argument(
+            "--last-repo-agent-libs-package-file",
+            dest="last_repo_agent_libs_package_file",
+            required=False
+        )
+
+        find_last_repo_package_parser = subparsers.add_parser(
+            "find_last_repo_package"
+        )
+
+        find_last_repo_package_parser.add_argument(
+            "--package-name",
+            dest="package_name",
+            required=True
+        )
+
+        find_last_repo_package_parser.add_argument(
             "--token",
             required=True
         )
 
-        build_packages_parser.add_argument(
+        find_last_repo_package_parser.add_argument(
             "--user-name",
             dest="user_name",
             required=True
         )
 
-        build_packages_parser.add_argument(
+        find_last_repo_package_parser.add_argument(
             "--repo-name",
             dest="repo_name",
             required=True
         )
 
-        build_packages_parser.add_argument(
-            "--reuse-existing-repo-packages",
-            dest="reuse_existing_repo_packages",
-            default="false"
+        download_package_parser = subparsers.add_parser(
+            "download_package"
+        )
+        download_package_parser.add_argument(
+            "--package-filename",
+            dest="package_filename",
+            required=True
+        )
+        download_package_parser.add_argument(
+            "--output-dir",
+            dest="output_dir",
+            required=True
+        )
+
+        download_package_parser.add_argument(
+            "--token",
+            required=True
+        )
+
+        download_package_parser.add_argument(
+            "--user-name",
+            dest="user_name",
+            required=True
+        )
+
+        download_package_parser.add_argument(
+            "--repo-name",
+            dest="repo_name",
+            required=True
         )
 
         publish_packages_parser = subparsers.add_parser("publish")
@@ -470,10 +522,8 @@ class PythonPackageBuilder(Runner):
 
         if args.command == "build":
             builder.build_packages(
-                token=args.token,
-                user_name=args.user_name,
-                repo_name=args.repo_name,
-                reuse_existing_repo_packages=args.reuse_existing_repo_packages == "true"
+                last_repo_python_package_file=args.last_repo_python_package_file,
+                last_repo_agent_libs_package_file=args.last_repo_agent_libs_package_file,
             )
 
             output_path = SOURCE_ROOT / "build"
@@ -491,6 +541,27 @@ class PythonPackageBuilder(Runner):
                 user_name=args.user_name,
                 repo_name=args.repo_name,
             )
+        elif args.command == "find_last_repo_package":
+            last_package_filename = builder.find_last_repo_package(
+                package_name=args.package_name,
+                token=args.token,
+                user_name=args.user_name,
+                repo_name=args.repo_name,
+            )
+            if last_package_filename:
+                print(last_package_filename)
+
+        elif args.command == "download_package":
+            last_package_path = builder.download_package_from_repo(
+                package_filename=args.package_filename,
+                output_dir=args.output_dir,
+                token=args.token,
+                user_name=args.user_name,
+                repo_name=args.repo_name,
+            )
+            if last_package_path:
+                print(last_package_path)
+
         else:
             logging.error(f"Unknown command {args.command}.")
             exit(1)

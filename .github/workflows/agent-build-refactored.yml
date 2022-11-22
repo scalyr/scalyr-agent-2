@@ -225,6 +225,76 @@ jobs:
           runner-fqdn: ${{ matrix.builder-fqdn }}
 
 
+      - name: Get last packages names from repo for the '${{ matrix.name }}'
+        id: get_last_packages_names
+        run: |
+            LAST_REPO_PYTHON_PACKAGE_NAME=$(
+              python3 build_package_new_refactored.py ${{ matrix.name }} \
+              find_last_repo_package \
+              --user-name ArthurSentinelone \
+              --repo-name DataSetAgent \
+              --token ${{ secrets.PACKAGE_CLOUD_TOKEN }} \
+              --package-name "scalyr-agent-python3"
+            )
+            
+            LAST_REPO_AGENT_LIBS_PACKAGE_NAME=$(
+              python3 build_package_new_refactored.py ${{ matrix.name }} \
+              find_last_repo_package \
+              --user-name ArthurSentinelone \
+              --repo-name DataSetAgent \
+              --token ${{ secrets.PACKAGE_CLOUD_TOKEN }} \
+              --package-name "scalyr-agent-libs"
+            )
+          
+            echo "last_repo_python_package_name=${LAST_REPO_PYTHON_PACKAGE_NAME}" >> $GITHUB_OUTPUT
+            echo "last_repo_agent_libs_package_name=${LAST_REPO_AGENT_LIBS_PACKAGE_NAME}" >> $GITHUB_OUTPUT
+      
+      - name: Cache last repo Python package.
+        if: steps.get_last_packages_names.outputs.last_repo_python_package_name
+        id: cache_python
+        uses: actions/cache@v3
+        with:
+          path: /tmp/python-package
+          key: python-package-${{ steps.get_last_packages_names.outputs.last_repo_python_package_name }}-${{ matrix.name }}
+
+      - name: Cache last repo agent libs package.
+        if: steps.get_last_packages_names.outputs.last_repo_agent_libs_package_name
+        uses: actions/cache@v3
+        with:
+          path: /tmp/agent-libs-package
+          key: python-package-${{ steps.get_last_packages_names.outputs.last_repo_agent_libs_package_name }}-${{ matrix.name }}
+
+      - name: Download python package
+        if: steps.cache_python.outputs.cache-hit != 'true'
+        run: |
+            LAST_REPO_PYTHON_PACKAGE_PATH=$(
+              python3 build_package_new_refactored.py ${{ matrix.name }} \
+              download_package \
+              --user-name ArthurSentinelone \
+              --repo-name DataSetAgent \
+              --token ${{ secrets.PACKAGE_CLOUD_TOKEN }} \
+              --package-filename "${{ steps.get_last_packages_names.outputs.last_repo_python_package_name }}" \
+              --output-dir /tmp/python-package
+            )
+          
+            echo "last_repo_python_package_path=${LAST_REPO_PYTHON_PACKAGE_PATH}" >> $GITHUB_OUTPUT
+
+        - name: Download agent libs package
+          if: steps.cache_python.outputs.cache-hit != 'true'
+          id: download_python
+          run: |
+              LAST_REPO_AGENT_LIBS_PACKAGE_PATH=$(
+                python3 build_package_new_refactored.py ${{ matrix.name }} \
+                download_package \
+                --user-name ArthurSentinelone \
+                --repo-name DataSetAgent \
+                --token ${{ secrets.PACKAGE_CLOUD_TOKEN }} \
+                --package-filename "${{ steps.get_last_packages_names.outputs.last_repo_agent_libs_package_name }}" \
+                --output-dir /tmp/agent-libs-package
+              )
+            
+              echo "last_repo_agent_libs_package_path=${LAST_REPO_AGENT_LIBS_PACKAGE_PATH}" >> $GITHUB_OUTPUT
+
       - name: Build managed package with builder '${{ matrix.name }}'
         run: |
             python3 build_package_new_refactored.py ${{ matrix.name }} \
@@ -232,7 +302,8 @@ jobs:
               --user-name ArthurSentinelone \
               --repo-name DataSetAgent \
               --token ${{ secrets.PACKAGE_CLOUD_TOKEN }} \
-              --reuse-existing-repo-packages ${{ needs.pre_job.outputs.is_master_run == true }}
+              --last-repo-python-package-file ${{ steps.download_python.outputs.last_repo_python_package_path }} \
+              --last-repo-agent-libs-package-file ${{ steps.download_python.outputs.last_repo_agent_libs_package_path }}
           
 
       - name: Save registry data root with result packages as artifact
