@@ -99,4 +99,3 @@ mv "${AGENT_LIBS_BUILD_ROOT}/usr/bin" "${AGENT_LIBS_ROOT}/usr/libexec/${SUBDIR_N
 # Check if there are any files that have been left uncopied from the build root.
 REMAINING_AGENT_FILES=$(find "${AGENT_LIBS_BUILD_ROOT}" -type f)
 test "$(echo -n "${REMAINING_AGENT_FILES}" | wc -l)" = "0" || die "There are still files that are remaining non-copied to a result agent libs directory. Files: '${REMAINING_AGENT_FILES}'"
-
