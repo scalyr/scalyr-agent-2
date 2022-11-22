@@ -236,9 +236,14 @@ class PythonPackageBuilder(Runner):
         current_package_checksum = self._get_package_checksum(
             package_name=package_name
         )
+
         if last_repo_package_file_path is None:
+            # If there is no any recent version of the package in repo then build new version for the first package.
             final_package_version = f"1+{current_package_checksum}"
         else:
+            # If there is a recent version of the package in the repo, then parse its checksum and compare it
+            # with the checksum of the current package. If checksums are identical, then we can reuse
+            # package version for the repo.
             last_repo_package_version = self._parse_version_from_package_file_name(
                 package_file_name=last_repo_package_file_path.name
             )
@@ -249,6 +254,7 @@ class PythonPackageBuilder(Runner):
                 final_package_version = last_repo_package_version
                 final_package_path = last_repo_package_file_path
             else:
+                # checksums are not identical, create new version of the package.
                 final_package_version = f"{last_repo_package_iteration + 1}+{current_package_checksum}"
 
         return final_package_path, final_package_version
@@ -288,9 +294,12 @@ class PythonPackageBuilder(Runner):
             self.run_in_docker(command_args=command_args)
             return
 
+        packages_to_publish = []
+
         last_repo_python_package_path = None
         last_repo_agent_libs_package_path = None
 
+        # Check if there are packages to reuse provided.
         if last_repo_python_package_file:
             last_repo_python_package_path = pl.Path(last_repo_python_package_file)
 
@@ -299,11 +308,13 @@ class PythonPackageBuilder(Runner):
 
         self.packages_output_path.mkdir(parents=True)
 
+        # Get reused package from repo, in case current package is unchanged and it is already in repo.
         final_python_package_path, final_python_version = self._get_final_package_path_and_version(
             package_name=PYTHON_PACKAGE_NAME,
             last_repo_package_file_path=last_repo_python_package_path
         )
 
+        # Python package is not found in repo, build it.
         if final_python_package_path is None:
             package_root = self.PYTHON_BUILD_STEP.get_output_directory(work_dir=self.work_dir) / "python"
 
@@ -320,17 +331,21 @@ class PythonPackageBuilder(Runner):
                 f"{PYTHON_PACKAGE_NAME}_{final_python_version}_{self.PACKAGE_ARCHITECTURE}.{self.PACKAGE_TYPE}"
             ))
             assert len(found) == 1, f"Number of result Python packages has to be 1, got {len(found)}"
+            packages_to_publish.append(found[0].name)
         else:
+            # Current python package is not changed, and it already exists in repo, reuse it.
             shutil.copy(
                 last_repo_python_package_path,
                 self.packages_output_path
             )
 
+        # Do the same with the 'agent-libs' package.
         final_agent_libs_package_path, final_agent_libs_version = self._get_final_package_path_and_version(
             package_name=AGENT_LIBS_PACKAGE_NAME,
             last_repo_package_file_path=last_repo_agent_libs_package_path
         )
 
+        # The agent-libs package is not found in repo, build it.
         if final_agent_libs_package_path is None:
             package_root = self.AGENT_LIBS_BUILD_STEP.get_output_directory(work_dir=self.work_dir) / "agent_libs"
 
@@ -347,11 +362,20 @@ class PythonPackageBuilder(Runner):
                 f"{AGENT_LIBS_PACKAGE_NAME}_{final_agent_libs_version}_{self.PACKAGE_ARCHITECTURE}.{self.PACKAGE_TYPE}"
             ))
             assert len(found) == 1, f"Number of result agent_libs packages has to be 1, got {len(found)}"
+            packages_to_publish.append(found[0].name)
         else:
+            # Current agent-libs package is not changed, and it already exists in repo, reuse it.
             shutil.copy(
                 final_agent_libs_package_path,
                 self.packages_output_path
             )
+
+        # Also write special json file which contain information about packages that have to be published.
+        # We have to use it in order to skip the publishing of the packages that are reused and already in the repo.
+        packages_to_publish_file = self.packages_output_path / "packages_to_publish.json"
+        packages_to_publish_file.write_text(
+            json.dumps(packages_to_publish)
+        )
 
     def publish_packages_to_packagecloud(
             self,
@@ -396,7 +420,13 @@ class PythonPackageBuilder(Runner):
             json.dumps(config)
         )
 
-        for package_path in packages_dir_path.glob(f"*.{self.PACKAGE_TYPE}"):
+        packages_to_publish_file = self.packages_output_path / "packages_to_publish.json"
+        packages_to_publish = json.loads(
+            packages_to_publish_file.read_text()
+        )
+
+        for package_name in packages_to_publish:
+            package_path = self.packages_output_path / package_name
             if self.PACKAGE_TYPE == "deb":
                 check_call_with_log(
                     [
@@ -407,7 +437,7 @@ class PythonPackageBuilder(Runner):
                     ]
                 )
 
-            logging.info(f"Package {package_path.name} is published.")
+            logging.info(f"Package {package_name} is published.")
 
     def _search_for_packages_in_repo(
             self,
