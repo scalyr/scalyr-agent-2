@@ -327,7 +327,7 @@ jobs:
               --last-repo-agent-libs-package-file "${{ steps.download_agent_libs.outputs.last_repo_agent_libs_package_path }}"
           
 
-      - name: Save registry data root with result packages as artifact
+      - name: Save packages as artifact
         uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.name }}-packages
