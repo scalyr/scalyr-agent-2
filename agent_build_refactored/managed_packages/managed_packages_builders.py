@@ -32,8 +32,6 @@ from agent_build_refactored.tools import check_call_with_log
 from agent_build_refactored.prepare_agent_filesystem import build_linux_lfs_agent_files
 from agent_build_refactored.managed_packages.dependency_packages import (
     BUILD_PYTHON_GLIBC_X86_64,
-    PACKAGECLOUD_PACKAGES,
-    PACKAGECLOUD_PACKAGES_VERSIONS_PATH,
     PYTHON_PACKAGE_NAME,
 
     BUILD_AGENT_LIBS_GLIBC_X86_64,
@@ -473,7 +471,7 @@ class PythonPackageBuilder(Runner):
         )
 
         if len(packages) == 0:
-            logger.info(f"Could not found any package with name {package_name}")
+            logger.info(f"Could not find any package with name {package_name}")
             return None
 
         last_package = packages[-1]

@@ -20,10 +20,6 @@ import subprocess
 from agent_build_refactored.tools.runner import EnvironmentRunnerStep, GitHubActionsSettings, DockerImageSpec, ArtifactRunnerStep
 from agent_build_refactored.tools.constants import DockerPlatform, EMBEDDED_PYTHON_VERSION, IN_CICD
 
-PACKAGECLOUD_PACKAGES_VERSIONS_PATH = pl.Path(__file__).parent / "PACKAGECLOUD_PACKAGES"
-
-PACKAGECLOUD_PACKAGES = json.loads(PACKAGECLOUD_PACKAGES_VERSIONS_PATH.read_text())
-
 AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME = "scalyr-agent-2-dependencies"
 PYTHON_PACKAGE_NAME = "scalyr-agent-python3"
 AGENT_LIBS_PACKAGE_NAME = "scalyr-agent-libs"
