@@ -42,7 +42,12 @@ EMBEDDED_PYTHON_SHORT_VERSION = ".".join(EMBEDDED_PYTHON_VERSION.split(".")[:2])
 
 def create_build_dependencies_step(
         base_image: EnvironmentRunnerStep
-):
+) -> EnvironmentRunnerStep:
+    """
+    This function creates step that installsP Python build requirements, to a given environment.
+    :param base_image: Environment step runner with the target environment.
+    :return: Result step.
+    """
 
     return EnvironmentRunnerStep(
         name="install_build_dependencies",
@@ -73,9 +78,15 @@ def create_build_dependencies_step(
         )
     )
 
+
 def create_build_python_step(
         base_step: EnvironmentRunnerStep
 ):
+    """
+    Function that creates step instance that build Python interpreter.
+    :param base_step: Step with environment where to build.
+    :return: Result step.
+    """
     return ArtifactRunnerStep(
         name="build_python",
         script_path="agent_build_refactored/managed_packages/steps/build_python.sh",
@@ -99,6 +110,12 @@ def create_build_agent_libs_step(
         base_step: EnvironmentRunnerStep,
         build_python_step: ArtifactRunnerStep
 ):
+    """
+    Function that creates step that installs agent requirement libraries.
+    :param base_step: Step with environment where to build.
+    :param build_python_step: Required step that builds Python.
+    :return: Result step.
+    """
     return ArtifactRunnerStep(
         name="build_agent_libs",
         script_path="agent_build_refactored/managed_packages/steps/build_agent_libs.sh",
