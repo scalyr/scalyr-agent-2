@@ -252,6 +252,7 @@ jobs:
 
       - name: Cache last repo agent libs package.
         if: steps.get_last_packages_names.outputs.last_repo_agent_libs_package_name
+        id: cache_agent_libs
         uses: actions/cache@v3
         with:
           path: /tmp/agent-libs-package
@@ -259,6 +260,7 @@ jobs:
 
       - name: Download python package
         if: steps.cache_python.outputs.cache-hit != 'true'
+        id: download_python
         run: |
             LAST_REPO_PYTHON_PACKAGE_PATH=$(
               python3 build_package_new_refactored.py ${{ matrix.name }} \
@@ -273,8 +275,8 @@ jobs:
             echo "last_repo_python_package_path=${LAST_REPO_PYTHON_PACKAGE_PATH}" >> $GITHUB_OUTPUT
 
       - name: Download agent libs package
-        if: steps.cache_python.outputs.cache-hit != 'true'
-        id: download_python
+        if: steps.cache_agent_libs.outputs.cache-hit != 'true'
+        id: download_agent_libs
         run: |
             LAST_REPO_AGENT_LIBS_PACKAGE_PATH=$(
               python3 build_package_new_refactored.py ${{ matrix.name }} \
@@ -296,7 +298,7 @@ jobs:
               --repo-name DataSetAgent \
               --token ${{ secrets.PACKAGE_CLOUD_TOKEN }} \
               --last-repo-python-package-file ${{ steps.download_python.outputs.last_repo_python_package_path }} \
-              --last-repo-agent-libs-package-file ${{ steps.download_python.outputs.last_repo_agent_libs_package_path }}
+              --last-repo-agent-libs-package-file ${{ steps.download_agent_libs.outputs.last_repo_agent_libs_package_path }}
           
 
       - name: Save registry data root with result packages as artifact
