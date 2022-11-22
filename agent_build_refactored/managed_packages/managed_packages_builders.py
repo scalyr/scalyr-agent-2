@@ -224,7 +224,7 @@ class PythonPackageBuilder(Runner):
             self,
             package_name: str,
             last_repo_package_file_path: pl.Path = None,
-    ) -> Tuple[Optional[str], str]:
+    ) -> Tuple[Optional[pl.Path], str]:
         """
         Get path to path and version of the final package to build.
         :param package_name: name of the package.
@@ -335,10 +335,11 @@ class PythonPackageBuilder(Runner):
             ))
             assert len(found) == 1, f"Number of result Python packages has to be 1, got {len(found)}"
             packages_to_publish.append(found[0].name)
+            logger.info(f"Package {PYTHON_PACKAGE_NAME} is built.")
         else:
             # Current python package is not changed, and it already exists in repo, reuse it.
-            shutil.copy(
-                last_repo_python_package_path,
+            shutil.copy2(
+                final_python_package_path,
                 self.packages_output_path
             )
 
@@ -366,6 +367,7 @@ class PythonPackageBuilder(Runner):
             ))
             assert len(found) == 1, f"Number of result agent_libs packages has to be 1, got {len(found)}"
             packages_to_publish.append(found[0].name)
+            logger.info(f"Package {AGENT_LIBS_PACKAGE_NAME} is built.")
         else:
             # Current agent-libs package is not changed, and it already exists in repo, reuse it.
             shutil.copy(
@@ -713,7 +715,7 @@ class PythonPackageBuilder(Runner):
 
 
 class DebPythonPackageBuilderX64(PythonPackageBuilder):
-    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
+    # BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
     PACKAGE_ARCHITECTURE = "amd64"
     PACKAGE_TYPE = "deb"
     PYTHON_BUILD_STEP = BUILD_PYTHON_GLIBC_X86_64
