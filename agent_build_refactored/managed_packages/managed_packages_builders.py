@@ -426,12 +426,15 @@ class PythonPackageBuilder(Runner):
         )
 
         packages_to_publish_file = packages_dir_path / "packages_to_publish.json"
-        packages_to_publish = json.loads(
+        packages_to_publish = set(json.loads(
             packages_to_publish_file.read_text()
-        )
+        ))
 
-        for package_name in packages_to_publish:
-            package_path = packages_dir_path / package_name
+        for package_path in packages_dir_path.glob(f"*.{self.PACKAGE_TYPE}"):
+            if package_path.name not in packages_to_publish:
+                logger.info(f"Package {package_path.name} has been skipped since it's already in repo.")
+                continue
+
             if self.PACKAGE_TYPE == "deb":
                 check_call_with_log(
                     [
@@ -442,7 +445,7 @@ class PythonPackageBuilder(Runner):
                     ]
                 )
 
-            logging.info(f"Package {package_name} is published.")
+            logging.info(f"Package {package_path.name} is published.")
 
     def _search_for_packages_in_repo(
             self,
