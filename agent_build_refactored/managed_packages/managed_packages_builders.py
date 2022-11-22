@@ -48,10 +48,48 @@ logger = logging.getLogger(__name__)
 
 
 class PythonPackageBuilder(Runner):
+    """
+    Builder class that is responsible for the building of the Linux agent deb and rpm packages that are managed by package
+        managers such as apt and yum.
+
+    Besides building the agent package itself, it also builds dependency packages:
+        - scalyr-agent-python3
+        - scalyr-agent-libs
+
+    These packages are needed to make agent package completely independent of a target system.
+
+
+    The 'scalyr-agent-python3' package provides Python interpreter that is specially built to be used by the agemt.
+        Its main feature that it is built against the oldest GLIBC possible, so it has to be enough to maintain
+        only one build of the package in order to support all target systems.
+
+
+    The 'scalyr-agent-libs' package provides requirement libraries for the agent, for example Python 'requests' or
+        'orjson' libraries. It is intended to ship it separately from the 'scalyr-agent-python3' because we update
+        agent's requirements much more often than Python interpreter.
+
+    The structure of the mentioned packages has to guarantee that files of these packages does not interfere with
+        files of local system Python interpreter. To achieve that, the dependency packages files are installed in their
+        own 'sub-directories'
+
+        /usr/libe/scalyr-agent-2-dependencies
+        /usr/libexec/scalyr-agent-2-dependencies
+        /usr/shared/scalyr-agent-2-dependencies
+        /usr/include/scalyr-agent-2-dependencies
+
+        and agent from the 'scalyr-agent-2' package has to use the
+        '/usr/libexec/scalyr-agent-2-dependencies/scalyr-agent-2-python3' executable.
+    """
+
+    # type of the package, aka 'deb' or 'rpm'
     PACKAGE_TYPE: str
+
+    # package architecture, for example: amd64 for deb.
     PACKAGE_ARCHITECTURE: str
 
+    # Instance of the step that builds filesystem for the python package.
     PYTHON_BUILD_STEP: ArtifactRunnerStep
+    # Instance of the step that builds filesystem for the agent-libs package.
     AGENT_LIBS_BUILD_STEP: ArtifactRunnerStep
 
     @classmethod
