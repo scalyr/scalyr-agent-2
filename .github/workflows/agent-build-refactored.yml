@@ -269,7 +269,8 @@ jobs:
         # if: steps.get_last_packages_names.outputs.last_repo_python_package_name && steps.cache_python.outputs.cache-hit != 'true'
         id: download_python
         run: |
-            if [ -n "${{ steps.get_last_packages_names.outputs.last_repo_python_package_name }}" && "${{ steps.cache_python.outputs.cache-hit }}" != "true" ]; then
+            set -e 
+            if [ -n "${{ steps.get_last_packages_names.outputs.last_repo_python_package_name }}" ] && [ "${{ steps.cache_python.outputs.cache-hit }}" != "true" ]; then
               LAST_REPO_PYTHON_PACKAGE_PATH=$(
                 python3 build_package_new_refactored.py ${{ matrix.name }} \
                 download_package \
@@ -291,8 +292,8 @@ jobs:
         #if: steps.get_last_packages_names.outputs.last_repo_agent_libs_package_name && steps.cache_agent_libs.outputs.cache-hit != 'true'
         id: download_agent_libs
         run: |
-            
-            if [ -n "${{ steps.get_last_packages_names.outputs.last_repo_agent_libs_package_name }}" && "${{ steps.cache_agent_libs.outputs.cache-hit }}" != "true" ]; then
+            set -e
+            if [ -n "${{ steps.get_last_packages_names.outputs.last_repo_agent_libs_package_name }}" ] && [ "${{ steps.cache_agent_libs.outputs.cache-hit }}" != "true" ]; then
               LAST_REPO_AGENT_LIBS_PACKAGE_PATH=$(
                 python3 build_package_new_refactored.py ${{ matrix.name }} \
                 download_package \
