@@ -13,10 +13,13 @@
 # limitations under the License.
 import dataclasses
 import enum
+import os
 import pathlib as pl
 
 SOURCE_ROOT = pl.Path(__file__).parent.parent.parent.absolute()
 AGENT_BUILD_PATH = SOURCE_ROOT / "agent_build"
+
+IN_CICD = bool(os.environ.get("AGENT_BUILD_IN_CICD"))
 
 
 @dataclasses.dataclass(frozen=True)
