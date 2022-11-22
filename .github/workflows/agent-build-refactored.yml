@@ -269,7 +269,7 @@ jobs:
         # if: steps.get_last_packages_names.outputs.last_repo_python_package_name && steps.cache_python.outputs.cache-hit != 'true'
         id: download_python
         run: |
-            
+            ls /tmp
             ls /tmp/python-package
             ls /tmp/agent-libs-package
             set -e 
