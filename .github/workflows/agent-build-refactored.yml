@@ -266,7 +266,7 @@ jobs:
 
       # If python package is not in cache, then we have to download it from the Packagecloud.
       - name: Download or use cached python package
-        if: steps.get_last_packages_names.outputs.last_repo_python_package_name && steps.cache_python.outputs.cache-hit != 'true'
+        # if: steps.get_last_packages_names.outputs.last_repo_python_package_name && steps.cache_python.outputs.cache-hit != 'true'
         id: download_python
         run: |
             if [ "${{ steps.cache_python.outputs.cache-hit }}" != "true" ]; then
