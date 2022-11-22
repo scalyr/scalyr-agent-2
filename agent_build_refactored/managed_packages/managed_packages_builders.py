@@ -136,6 +136,8 @@ class PythonPackageBuilder(Runner):
             prefix, _ = filename.rsplit("-", 1)
             # split with version
             _, version = filename.rsplit("-", 1)
+            print("!!!!!")
+            print(version)
             return version
 
     @property
