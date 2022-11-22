@@ -130,14 +130,16 @@ class PythonPackageBuilder(Runner):
             _, version, _ = filename.split("_")
             return version
         else:
+            print("!!!!!")
             # split filename to name, arch, and extension
             filename, _, _ = package_file_name.split(".")
+            print(1, filename)
             # split with release
             prefix, _ = filename.rsplit("-", 1)
+            print(2, prefix)
             # split with version
             _, version = filename.rsplit("-", 1)
-            print("!!!!!")
-            print(version)
+            print(3, version)
             return version
 
     @property
