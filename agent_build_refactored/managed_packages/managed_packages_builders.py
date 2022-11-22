@@ -329,10 +329,17 @@ class PythonPackageBuilder(Runner):
                 ],
                 cwd=str(self.packages_output_path)
             )
+            if self.PACKAGE_TYPE == "deb":
+                found = list(self.packages_output_path.glob(
+                    f"{PYTHON_PACKAGE_NAME}_{final_python_version}_{self.PACKAGE_ARCHITECTURE}.{self.PACKAGE_TYPE}"
+                ))
+            elif self.PACKAGE_TYPE == "rpm":
+                found = list(self.packages_output_path.glob(
+                    f"{PYTHON_PACKAGE_NAME}-{final_python_version}-1.{self.PACKAGE_ARCHITECTURE}.{self.PACKAGE_TYPE}"
+                ))
+            else:
+                raise Exception(f"Unknown package type {self.PACKAGE_TYPE}")
 
-            found = list(self.packages_output_path.glob(
-                f"{PYTHON_PACKAGE_NAME}_{final_python_version}_{self.PACKAGE_ARCHITECTURE}.{self.PACKAGE_TYPE}"
-            ))
             assert len(found) == 1, f"Number of result Python packages has to be 1, got {len(found)}"
             packages_to_publish.append(found[0].name)
             logger.info(f"Package {found[0]} is built.")
@@ -363,9 +370,17 @@ class PythonPackageBuilder(Runner):
                 ],
                 cwd=str(self.packages_output_path)
             )
-            found = list(self.packages_output_path.glob(
-                f"{AGENT_LIBS_PACKAGE_NAME}_{final_agent_libs_version}_{self.PACKAGE_ARCHITECTURE}.{self.PACKAGE_TYPE}"
-            ))
+            if self.PACKAGE_TYPE == "deb":
+                found = list(self.packages_output_path.glob(
+                    f"{AGENT_LIBS_PACKAGE_NAME}_{final_agent_libs_version}_{self.PACKAGE_ARCHITECTURE}.{self.PACKAGE_TYPE}"
+                ))
+            elif self.PACKAGE_TYPE == "rpm":
+                found = list(self.packages_output_path.glob(
+                    f"{AGENT_LIBS_PACKAGE_NAME}-{final_agent_libs_version}-1.{self.PACKAGE_ARCHITECTURE}.{self.PACKAGE_TYPE}"
+                ))
+            else:
+                raise Exception(f"Unknown package type {self.PACKAGE_TYPE}")
+
             assert len(found) == 1, f"Number of result agent_libs packages has to be 1, got {len(found)}"
             packages_to_publish.append(found[0].name)
             logger.info(f"Package {found[0].name} is built.")

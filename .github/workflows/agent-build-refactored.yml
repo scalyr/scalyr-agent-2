@@ -323,12 +323,6 @@ jobs:
       # to reuse them instead of building if they are not changed.
       - name: Build managed package with builder '${{ matrix.name }}'
         run: |
-            
-            ls /tmp
-            echo "11111"
-            ls /tmp/python-package
-            ls /tmp/agent-libs-package
-          
             echo "${{ steps.download_python.outputs.last_repo_python_package_path }}"
             echo "${{ steps.download_agent_libs.outputs.last_repo_agent_libs_package_path }}"
             python3 build_package_new_refactored.py ${{ matrix.name }} \
