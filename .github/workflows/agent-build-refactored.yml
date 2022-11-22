@@ -253,7 +253,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: /tmp/python-package
-          key: python-package-${{ steps.get_last_packages_names.outputs.last_repo_python_package_name }}-${{ matrix.name }}
+          key: python-package-${{ steps.get_last_packages_names.outputs.last_repo_python_package_name }}-${{ matrix.name }}-v1
 
       # Look for agent-libs package in cache, so we don't have to download it every time from the Packagecloud.
       - name: Cache last repo agent libs package.
@@ -262,7 +262,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: /tmp/agent-libs-package
-          key: agent-libs-package-${{ steps.get_last_packages_names.outputs.last_repo_agent_libs_package_name }}-${{ matrix.name }}
+          key: agent-libs-package-${{ steps.get_last_packages_names.outputs.last_repo_agent_libs_package_name }}-${{ matrix.name }}-v1
 
       # If python package is not in cache, then we have to download it from the Packagecloud.
       - name: Download or use cached python package
