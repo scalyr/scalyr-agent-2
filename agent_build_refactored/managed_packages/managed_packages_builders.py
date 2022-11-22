@@ -359,7 +359,7 @@ class PythonPackageBuilder(Runner):
                     *self.agent_libs_build_command_args,
                     "-v", final_agent_libs_version,
                     "-C", str(package_root),
-                    "--depends", f"scalyr-agent-python3 = {final_python_package_path}",
+                    "--depends", f"scalyr-agent-python3 = {final_python_version}",
                 ],
                 cwd=str(self.packages_output_path)
             )
@@ -437,15 +437,19 @@ class PythonPackageBuilder(Runner):
                 logger.info(f"Package {package_path.name} has been skipped since it's already in repo.")
                 continue
 
-            if self.PACKAGE_TYPE == "deb":
-                check_call_with_log(
-                    [
-                        "package_cloud",
-                        "push",
-                        f"{user_name}/{repo_name}/any/any",
-                        str(package_path)
-                    ]
-                )
+            repo_paths = {
+                "deb": f"{user_name}/{repo_name}/any/any",
+                "rpm": f"{user_name}/{repo_name}/rpm_any/rpm_any",
+            }
+
+            check_call_with_log(
+                [
+                    "package_cloud",
+                    "push",
+                    repo_paths[self.PACKAGE_TYPE],
+                    str(package_path)
+                ]
+            )
 
             logging.info(f"Package {package_path.name} is published.")
 
@@ -469,10 +473,12 @@ class PythonPackageBuilder(Runner):
 
         auth = HTTPBasicAuth(token, "")
 
-        if self.PACKAGE_TYPE == "deb":
-            params["filter"] = "debs"
-        else:
-            raise Exception(f"Unknown package type {self.PACKAGE_TYPE}.")
+        param_filters = {
+            "deb": "debs",
+            "rpm": "rpms"
+        }
+
+        params["filter"] = param_filters[self.PACKAGE_TYPE]
 
         with requests.Session() as s:
             resp = s.get(
@@ -482,7 +488,13 @@ class PythonPackageBuilder(Runner):
             )
 
         resp.raise_for_status()
-        return resp.json()
+
+        packages = resp.json()
+
+        # filter only packages with appropriate architecture.
+
+        arch_packages = [p for p in packages]
+        return arch_packages
 
     def find_last_repo_package(
             self,
@@ -727,6 +739,15 @@ class DebPythonPackageBuilderX64(PythonPackageBuilder):
     AGENT_LIBS_BUILD_STEP = BUILD_AGENT_LIBS_GLIBC_X86_64
 
 
+class RpmPythonPackageBuilderX64(PythonPackageBuilder):
+    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
+    PACKAGE_ARCHITECTURE = "x86_64"
+    PACKAGE_TYPE = "rpm"
+    PYTHON_BUILD_STEP = BUILD_PYTHON_GLIBC_X86_64
+    AGENT_LIBS_BUILD_STEP = BUILD_AGENT_LIBS_GLIBC_X86_64
+
+
 ALL_MANAGED_PACKAGE_BUILDERS = {
-    "deb-amd64": DebPythonPackageBuilderX64
+    "deb-amd64": DebPythonPackageBuilderX64,
+    "rpm-x86_64": RpmPythonPackageBuilderX64
 }

@@ -40,7 +40,7 @@ cp -a "${BUILD_AGENT_LIBS}/dev_libs/." /
 ln -s /usr/libexec/${SUBDIR_NAME}/scalyr-agent-2-python3 /usr/bin/python3
 
 apt update
-DEBIAN_FRONTEND=noninteractive apt install -y ruby ruby-dev rubygems build-essential
+DEBIAN_FRONTEND=noninteractive apt install -y ruby ruby-dev rubygems build-essential rpm
 gem install fpm:${FPM_VERSION} package_cloud:${PACKAGECLOUD_VERSION}
 
 
