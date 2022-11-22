@@ -77,6 +77,9 @@ class PythonPackageBuilder(Runner):
 
         and agent from the 'scalyr-agent-2' package has to use the
         '/usr/libexec/scalyr-agent-2-dependencies/scalyr-agent-2-python3' executable.
+
+    This builder provides next functionality.
+        'build_packages' - Build all needed packages.
     """
 
     # type of the package, aka 'deb' or 'rpm'
@@ -426,7 +429,7 @@ class PythonPackageBuilder(Runner):
         )
 
         for package_name in packages_to_publish:
-            package_path = self.packages_output_path / package_name
+            package_path = packages_dir_path / package_name
             if self.PACKAGE_TYPE == "deb":
                 check_call_with_log(
                     [
@@ -570,23 +573,18 @@ class PythonPackageBuilder(Runner):
         build_packages_parser = subparsers.add_parser("build")
 
         build_packages_parser.add_argument(
-            "--build-for",
-            dest="build_for"
-        )
-
-        build_packages_parser.add_argument(
-            "--version",
-            dest="version",
-        )
-        build_packages_parser.add_argument(
             "--last-repo-python-package-file",
             dest="last_repo_python_package_file",
-            required=False
+            required=False,
+            help="Path to the python package file. If specified, then the python "
+                 "dependency package from this path will be reused instead of building a new one."
         )
         build_packages_parser.add_argument(
             "--last-repo-agent-libs-package-file",
             dest="last_repo_agent_libs_package_file",
-            required=False
+            required=False,
+            help="Path to the agent libs package file. If specified, then the agent-libs dependency package from this "
+                 "path will be reused instead of building a new one."
         )
 
         find_last_repo_package_parser = subparsers.add_parser(
