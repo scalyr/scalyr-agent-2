@@ -138,7 +138,7 @@ class PythonPackageBuilder(Runner):
             prefix, _ = filename.rsplit("-", 1)
             print(2, prefix)
             # split with version
-            _, version = filename.rsplit("-", 1)
+            _, version = prefix.rsplit("-", 1)
             print(3, version)
             return version
 
