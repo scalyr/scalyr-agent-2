@@ -570,7 +570,9 @@ class PythonPackageBuilder(Runner):
 
         subparsers = parser.add_subparsers(dest="command")
 
-        build_packages_parser = subparsers.add_parser("build")
+        build_packages_parser = subparsers.add_parser(
+            "build", help="Build needed packages."
+        )
 
         build_packages_parser.add_argument(
             "--last-repo-python-package-file",
@@ -608,8 +610,21 @@ class PythonPackageBuilder(Runner):
                 help="Target repo for packagecloud."
             )
 
+        publish_packages_parser = subparsers.add_parser(
+            "publish",
+            help="Publish packages that are built by 'build' command."
+        )
+        publish_packages_parser.add_argument(
+            "--packages-dir",
+            dest="packages_dir",
+            required=True,
+            help="Path to a directory with packages to publish."
+        )
+        _add_packagecloud_args(publish_packages_parser)
+
         find_last_repo_package_parser = subparsers.add_parser(
-            "find_last_repo_package"
+            "find_last_repo_package",
+            help="Find existing packages in repo, in order to reuse them."
         )
 
         find_last_repo_package_parser.add_argument(
@@ -622,7 +637,8 @@ class PythonPackageBuilder(Runner):
         _add_packagecloud_args(find_last_repo_package_parser)
 
         download_package_parser = subparsers.add_parser(
-            "download_package"
+            "download_package",
+            help="Download package from repo. Used by CI/CD to reuse already existing packages from repo."
         )
         download_package_parser.add_argument(
             "--package-filename",
@@ -637,15 +653,6 @@ class PythonPackageBuilder(Runner):
             help="Path where to store downloaded package."
         )
         _add_packagecloud_args(download_package_parser)
-
-        publish_packages_parser = subparsers.add_parser("publish")
-        publish_packages_parser.add_argument(
-            "--packages-dir",
-            dest="packages_dir",
-            required=True,
-            help="Path to a directory with packages to publish."
-        )
-        _add_packagecloud_args(publish_packages_parser)
 
     @classmethod
     def handle_command_line_arguments(
