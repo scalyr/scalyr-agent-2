@@ -148,9 +148,6 @@ _user_name = subprocess.check_output("whoami").decode().strip()
 PREPARE_TOOLSET_GLIBC_X86_64 = EnvironmentRunnerStep(
     name="prepare_toolset",
     script_path="agent_build_refactored/managed_packages/steps/prepare_toolset.sh",
-    tracked_files_globs=[
-        "agent_build_refactored/tools/steps_libs/step_tools.py"
-    ],
     base=DockerImageSpec(
         name="ubuntu:22.04",
         platform=DockerPlatform.AMD64.value
@@ -187,7 +184,7 @@ PREPARE_TOOLSET_GLIBC_X86_64 = EnvironmentRunnerStep(
 #     package_filename = f"{package_name}_{package_version}_{package_architecture}.{package_type}"
 #     return ArtifactRunnerStep(
 #         name=name,
-#         script_path="agent_build_refactored/managed_packages/steps/download_package_from_packagecloud.py",
+#         script_path="agent_build_refactored/managed_packages/steps/find_most_recent_package_from_packagecloud.py",
 #         tracked_files_globs=[
 #             "agent_build_refactored/tools/steps_libs/constants.py",
 #             "agent_build_refactored/tools/steps_libs/step_tools.py",
