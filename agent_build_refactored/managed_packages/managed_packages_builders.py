@@ -25,7 +25,7 @@ from typing import List, Tuple, Optional, Dict
 
 
 from agent_build_refactored.tools.runner import Runner, RunnerStep, ArtifactRunnerStep, RunnerMappedPath, EnvironmentRunnerStep, DockerImageSpec,GitHubActionsSettings
-from agent_build_refactored.tools.constants import SOURCE_ROOT, EMBEDDED_PYTHON_VERSION, DockerPlatform
+from agent_build_refactored.tools.constants import SOURCE_ROOT, DockerPlatform
 from agent_build_refactored.tools import check_call_with_log
 
 logger = logging.getLogger(__name__)
@@ -36,8 +36,10 @@ PYTHON_PACKAGE_NAME = "scalyr-agent-python3"
 AGENT_LIBS_PACKAGE_NAME = "scalyr-agent-libs"
 
 
-PYTHON_PACKAGE_SSL_VERSION = "1.1.1k"
+EMBEDDED_PYTHON_VERSION = "3.11.0"
 EMBEDDED_PYTHON_SHORT_VERSION = ".".join(EMBEDDED_PYTHON_VERSION.split(".")[:2])
+
+PYTHON_PACKAGE_SSL_VERSION = "1.1.1k"
 
 
 def create_build_dependencies_step(
@@ -224,9 +226,6 @@ class PythonPackageBuilder(Runner):
 
         and agent from the 'scalyr-agent-2' package has to use the
         '/usr/libexec/scalyr-agent-2-dependencies/scalyr-agent-2-python3' executable.
-
-    This builder provides next functionality.
-        'build_packages' - Build all needed packages.
     """
 
     # type of the package, aka 'deb' or 'rpm'

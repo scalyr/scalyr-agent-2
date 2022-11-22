@@ -19,8 +19,6 @@ import pathlib as pl
 SOURCE_ROOT = pl.Path(__file__).parent.parent.parent.absolute()
 AGENT_BUILD_PATH = SOURCE_ROOT / "agent_build"
 
-EMBEDDED_PYTHON_VERSION = "3.11.0"
-
 IN_CICD = bool(os.environ.get("AGENT_BUILD_IN_CICD"))
 
 
