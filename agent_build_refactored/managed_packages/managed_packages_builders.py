@@ -30,9 +30,48 @@ from agent_build_refactored.tools import check_call_with_log
 
 logger = logging.getLogger(__name__)
 
+"""
+This module is responsible for building Python agent for Linux distributions with package managers.
 
+It defines builder class that is responsible for the building of the Linux agent deb and rpm packages that are 
+    managed by package managers such as apt and yum.
+
+Besides building the agent package itself, it also builds dependency packages:
+    - scalyr-agent-python3
+    - scalyr-agent-libs
+
+These packages are needed to make agent package completely independent of a target system.
+
+
+The 'scalyr-agent-python3' package provides Python interpreter that is specially built to be used by the agent.
+    Its main feature that it is built against the oldest possible version of gLibc, so it has to be enough to maintain
+    only one build of the package in order to support all target systems.
+
+
+The 'scalyr-agent-libs' package provides requirement libraries for the agent, for example Python 'requests' or
+    'orjson' libraries. It is intended to ship it separately from the 'scalyr-agent-python3' because we update
+    agent's requirements much more often than Python interpreter.
+
+The structure of the mentioned packages has to guarantee that files of these packages does not interfere with
+    files of local system Python interpreter. To achieve that, the dependency packages files are installed in their
+    own 'sub-directories'
+
+    /usr/libe/scalyr-agent-2-dependencies
+    /usr/libexec/scalyr-agent-2-dependencies
+    /usr/shared/scalyr-agent-2-dependencies
+    /usr/include/scalyr-agent-2-dependencies
+
+    and agent from the 'scalyr-agent-2' package has to use the
+    '/usr/libexec/scalyr-agent-2-dependencies/scalyr-agent-2-python3' executable.
+"""
+
+# Name of the subdirectory of dependency packages.
 AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME = "scalyr-agent-2-dependencies"
+
+# Name of the dependency package with Python interpreter.
 PYTHON_PACKAGE_NAME = "scalyr-agent-python3"
+
+# name of the dependency package with agent requirement libraries.
 AGENT_LIBS_PACKAGE_NAME = "scalyr-agent-libs"
 
 
@@ -42,190 +81,10 @@ EMBEDDED_PYTHON_SHORT_VERSION = ".".join(EMBEDDED_PYTHON_VERSION.split(".")[:2])
 PYTHON_PACKAGE_SSL_VERSION = "1.1.1k"
 
 
-def create_build_dependencies_step(
-        base_image: EnvironmentRunnerStep
-) -> EnvironmentRunnerStep:
-    """
-    This function creates step that installsP Python build requirements, to a given environment.
-    :param base_image: Environment step runner with the target environment.
-    :return: Result step.
-    """
-
-    return EnvironmentRunnerStep(
-        name="install_build_dependencies",
-        script_path="agent_build_refactored/managed_packages/steps/install_build_dependencies.sh",
-        base=base_image,
-        environment_variables={
-            "PERL_VERSION": "5.36.0",
-            "ZX_VERSION": "5.2.6",
-            "TEXTINFO_VERSION": "6.8",
-            "M4_VERSION": "1.4.19",
-            "LIBTOOL_VERSION": "2.4.6",
-            "AUTOCONF_VERSION": "2.71",
-            "AUTOMAKE_VERSION": "1.16",
-            "HELP2MAN_VERSION": "1.49.2",
-            "LZMA_VERSION": "4.32.7",
-            "OPENSSL_VERSION": PYTHON_PACKAGE_SSL_VERSION,
-            "LIBFFI_VERSION": "3.4.2",
-            "UTIL_LINUX_VERSION": "2.38",
-            "NCURSES_VERSION": "6.3",
-            "LIBEDIT_VERSION": "20210910-3.1",
-            "GDBM_VERSION": "1.23",
-            "ZLIB_VERSION": "1.2.13",
-            "BZIP_VERSION": "1.0.8",
-            "RUST_VERSION": "1.63.0",
-        },
-        github_actions_settings=GitHubActionsSettings(
-            cacheable=True
-        )
-    )
-
-
-def create_build_python_step(
-        base_step: EnvironmentRunnerStep
-):
-    """
-    Function that creates step instance that build Python interpreter.
-    :param base_step: Step with environment where to build.
-    :return: Result step.
-    """
-    return ArtifactRunnerStep(
-        name="build_python",
-        script_path="agent_build_refactored/managed_packages/steps/build_python.sh",
-        tracked_files_globs=[
-            "agent_build_refactored/managed_packages/files/scalyr-agent-2-python3",
-        ],
-        base=base_step,
-        environment_variables={
-            "PYTHON_VERSION": EMBEDDED_PYTHON_VERSION,
-            "PYTHON_SHORT_VERSION": EMBEDDED_PYTHON_SHORT_VERSION,
-            "PYTHON_INSTALL_PREFIX": "/usr",
-            "SUBDIR_NAME": AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME
-        },
-        github_actions_settings=GitHubActionsSettings(
-            cacheable=True
-        )
-    )
-
-
-def create_build_agent_libs_step(
-        base_step: EnvironmentRunnerStep,
-        build_python_step: ArtifactRunnerStep
-):
-    """
-    Function that creates step that installs agent requirement libraries.
-    :param base_step: Step with environment where to build.
-    :param build_python_step: Required step that builds Python.
-    :return: Result step.
-    """
-    return ArtifactRunnerStep(
-        name="build_agent_libs",
-        script_path="agent_build_refactored/managed_packages/steps/build_agent_libs.sh",
-        tracked_files_globs=[
-            "agent_build/requirement-files/*.txt",
-            "dev-requirements.txt"
-        ],
-        base=base_step,
-        required_steps={
-            "BUILD_PYTHON": build_python_step
-        },
-        environment_variables={
-            "PYTHON_SHORT_VERSION": EMBEDDED_PYTHON_SHORT_VERSION,
-            "RUST_VERSION": "1.63.0",
-            "SUBDIR_NAME": AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME
-        },
-        github_actions_settings=GitHubActionsSettings(
-            cacheable=True
-        )
-    )
-
-
-# Step that prepares initial environment for X86_64 build environment.
-INSTALL_GCC_7_GLIBC_X86_64 = EnvironmentRunnerStep(
-        name="install_gcc_7",
-        script_path="agent_build_refactored/managed_packages/steps/install_gcc_7.sh",
-        base=DockerImageSpec(
-            name="centos:6",
-            platform=DockerPlatform.AMD64.value
-        ),
-        github_actions_settings=GitHubActionsSettings(
-            cacheable=True
-        )
-    )
-# Step that installs Python build requirements to the build environment.
-INSTALL_BUILD_DEPENDENCIES_GLIBC_X86_64 = create_build_dependencies_step(
-    base_image=INSTALL_GCC_7_GLIBC_X86_64
-)
-
-# Create step that builds Python interpreter.
-BUILD_PYTHON_GLIBC_X86_64 = create_build_python_step(
-    base_step=INSTALL_BUILD_DEPENDENCIES_GLIBC_X86_64
-)
-
-# Create step that builds agent requirement libs.
-BUILD_AGENT_LIBS_GLIBC_X86_64 = create_build_agent_libs_step(
-    base_step=INSTALL_BUILD_DEPENDENCIES_GLIBC_X86_64,
-    build_python_step=BUILD_PYTHON_GLIBC_X86_64
-)
-
-# Create step that prepare environment with all needed tools.
-PREPARE_TOOLSET_GLIBC_X86_64 = EnvironmentRunnerStep(
-    name="prepare_toolset",
-    script_path="agent_build_refactored/managed_packages/steps/prepare_toolset.sh",
-    base=DockerImageSpec(
-        name="ubuntu:22.04",
-        platform=DockerPlatform.AMD64.value
-    ),
-    required_steps={
-        "BUILD_PYTHON": BUILD_PYTHON_GLIBC_X86_64,
-        "BUILD_AGENT_LIBS": BUILD_AGENT_LIBS_GLIBC_X86_64
-    },
-    environment_variables={
-        "SUBDIR_NAME": AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME,
-        "FPM_VERSION": "1.14.2",
-        "PACKAGECLOUD_VERSION": "0.3.11",
-        "USER_NAME": subprocess.check_output("whoami").decode().strip(),
-        "USER_ID": str(os.getuid()),
-        "USER_GID": str(os.getgid()),
-    },
-    github_actions_settings=GitHubActionsSettings(
-        cacheable=True
-    )
-)
-
-
-class PythonPackageBuilder(Runner):
+class ManagedPackagesBuilder(Runner):
     """
     Builder class that is responsible for the building of the Linux agent deb and rpm packages that are managed by package
         managers such as apt and yum.
-
-    Besides building the agent package itself, it also builds dependency packages:
-        - scalyr-agent-python3
-        - scalyr-agent-libs
-
-    These packages are needed to make agent package completely independent of a target system.
-
-
-    The 'scalyr-agent-python3' package provides Python interpreter that is specially built to be used by the agemt.
-        Its main feature that it is built against the oldest GLIBC possible, so it has to be enough to maintain
-        only one build of the package in order to support all target systems.
-
-
-    The 'scalyr-agent-libs' package provides requirement libraries for the agent, for example Python 'requests' or
-        'orjson' libraries. It is intended to ship it separately from the 'scalyr-agent-python3' because we update
-        agent's requirements much more often than Python interpreter.
-
-    The structure of the mentioned packages has to guarantee that files of these packages does not interfere with
-        files of local system Python interpreter. To achieve that, the dependency packages files are installed in their
-        own 'sub-directories'
-
-        /usr/libe/scalyr-agent-2-dependencies
-        /usr/libexec/scalyr-agent-2-dependencies
-        /usr/shared/scalyr-agent-2-dependencies
-        /usr/include/scalyr-agent-2-dependencies
-
-        and agent from the 'scalyr-agent-2' package has to use the
-        '/usr/libexec/scalyr-agent-2-dependencies/scalyr-agent-2-python3' executable.
     """
 
     # type of the package, aka 'deb' or 'rpm'
@@ -241,7 +100,7 @@ class PythonPackageBuilder(Runner):
 
     @classmethod
     def get_all_required_steps(cls) -> List[RunnerStep]:
-        steps = super(PythonPackageBuilder, cls).get_all_required_steps()
+        steps = super(ManagedPackagesBuilder, cls).get_all_required_steps()
 
         steps.extend([
             cls.PYTHON_BUILD_STEP,
@@ -754,7 +613,7 @@ class PythonPackageBuilder(Runner):
 
     @classmethod
     def add_command_line_arguments(cls, parser: argparse.ArgumentParser):
-        super(PythonPackageBuilder, cls).add_command_line_arguments(parser=parser)
+        super(ManagedPackagesBuilder, cls).add_command_line_arguments(parser=parser)
 
         subparsers = parser.add_subparsers(dest="command")
 
@@ -847,7 +706,7 @@ class PythonPackageBuilder(Runner):
         cls,
         args,
     ):
-        super(PythonPackageBuilder, cls).handle_command_line_arguments(args=args)
+        super(ManagedPackagesBuilder, cls).handle_command_line_arguments(args=args)
 
         work_dir = pl.Path(args.work_dir)
 
@@ -900,7 +759,159 @@ class PythonPackageBuilder(Runner):
             exit(1)
 
 
-class DebPythonPackageBuilderX64(PythonPackageBuilder):
+def create_build_dependencies_step(
+        base_image: EnvironmentRunnerStep
+) -> EnvironmentRunnerStep:
+    """
+    This function creates step that installsP Python build requirements, to a given environment.
+    :param base_image: Environment step runner with the target environment.
+    :return: Result step.
+    """
+
+    return EnvironmentRunnerStep(
+        name="install_build_dependencies",
+        script_path="agent_build_refactored/managed_packages/steps/install_build_dependencies.sh",
+        base=base_image,
+        environment_variables={
+            "PERL_VERSION": "5.36.0",
+            "ZX_VERSION": "5.2.6",
+            "TEXTINFO_VERSION": "6.8",
+            "M4_VERSION": "1.4.19",
+            "LIBTOOL_VERSION": "2.4.6",
+            "AUTOCONF_VERSION": "2.71",
+            "AUTOMAKE_VERSION": "1.16",
+            "HELP2MAN_VERSION": "1.49.2",
+            "LZMA_VERSION": "4.32.7",
+            "OPENSSL_VERSION": PYTHON_PACKAGE_SSL_VERSION,
+            "LIBFFI_VERSION": "3.4.2",
+            "UTIL_LINUX_VERSION": "2.38",
+            "NCURSES_VERSION": "6.3",
+            "LIBEDIT_VERSION": "20210910-3.1",
+            "GDBM_VERSION": "1.23",
+            "ZLIB_VERSION": "1.2.13",
+            "BZIP_VERSION": "1.0.8",
+            "RUST_VERSION": "1.63.0",
+        },
+        github_actions_settings=GitHubActionsSettings(
+            cacheable=True
+        )
+    )
+
+
+def create_build_python_step(
+        base_step: EnvironmentRunnerStep
+):
+    """
+    Function that creates step instance that build Python interpreter.
+    :param base_step: Step with environment where to build.
+    :return: Result step.
+    """
+    return ArtifactRunnerStep(
+        name="build_python",
+        script_path="agent_build_refactored/managed_packages/steps/build_python.sh",
+        tracked_files_globs=[
+            "agent_build_refactored/managed_packages/files/scalyr-agent-2-python3",
+        ],
+        base=base_step,
+        environment_variables={
+            "PYTHON_VERSION": EMBEDDED_PYTHON_VERSION,
+            "PYTHON_SHORT_VERSION": EMBEDDED_PYTHON_SHORT_VERSION,
+            "PYTHON_INSTALL_PREFIX": "/usr",
+            "SUBDIR_NAME": AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME
+        },
+        github_actions_settings=GitHubActionsSettings(
+            cacheable=True
+        )
+    )
+
+
+def create_build_agent_libs_step(
+        base_step: EnvironmentRunnerStep,
+        build_python_step: ArtifactRunnerStep
+):
+    """
+    Function that creates step that installs agent requirement libraries.
+    :param base_step: Step with environment where to build.
+    :param build_python_step: Required step that builds Python.
+    :return: Result step.
+    """
+    return ArtifactRunnerStep(
+        name="build_agent_libs",
+        script_path="agent_build_refactored/managed_packages/steps/build_agent_libs.sh",
+        tracked_files_globs=[
+            "agent_build/requirement-files/*.txt",
+            "dev-requirements.txt"
+        ],
+        base=base_step,
+        required_steps={
+            "BUILD_PYTHON": build_python_step
+        },
+        environment_variables={
+            "PYTHON_SHORT_VERSION": EMBEDDED_PYTHON_SHORT_VERSION,
+            "RUST_VERSION": "1.63.0",
+            "SUBDIR_NAME": AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME
+        },
+        github_actions_settings=GitHubActionsSettings(
+            cacheable=True
+        )
+    )
+
+
+# Step that prepares initial environment for X86_64 build environment.
+INSTALL_GCC_7_GLIBC_X86_64 = EnvironmentRunnerStep(
+        name="install_gcc_7",
+        script_path="agent_build_refactored/managed_packages/steps/install_gcc_7.sh",
+        base=DockerImageSpec(
+            name="centos:6",
+            platform=DockerPlatform.AMD64.value
+        ),
+        github_actions_settings=GitHubActionsSettings(
+            cacheable=True
+        )
+    )
+# Step that installs Python build requirements to the build environment.
+INSTALL_BUILD_DEPENDENCIES_GLIBC_X86_64 = create_build_dependencies_step(
+    base_image=INSTALL_GCC_7_GLIBC_X86_64
+)
+
+# Create step that builds Python interpreter.
+BUILD_PYTHON_GLIBC_X86_64 = create_build_python_step(
+    base_step=INSTALL_BUILD_DEPENDENCIES_GLIBC_X86_64
+)
+
+# Create step that builds agent requirement libs.
+BUILD_AGENT_LIBS_GLIBC_X86_64 = create_build_agent_libs_step(
+    base_step=INSTALL_BUILD_DEPENDENCIES_GLIBC_X86_64,
+    build_python_step=BUILD_PYTHON_GLIBC_X86_64
+)
+
+# Create step that prepare environment with all needed tools.
+PREPARE_TOOLSET_GLIBC_X86_64 = EnvironmentRunnerStep(
+    name="prepare_toolset",
+    script_path="agent_build_refactored/managed_packages/steps/prepare_toolset.sh",
+    base=DockerImageSpec(
+        name="ubuntu:22.04",
+        platform=DockerPlatform.AMD64.value
+    ),
+    required_steps={
+        "BUILD_PYTHON": BUILD_PYTHON_GLIBC_X86_64,
+        "BUILD_AGENT_LIBS": BUILD_AGENT_LIBS_GLIBC_X86_64
+    },
+    environment_variables={
+        "SUBDIR_NAME": AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME,
+        "FPM_VERSION": "1.14.2",
+        "PACKAGECLOUD_VERSION": "0.3.11",
+        "USER_NAME": subprocess.check_output("whoami").decode().strip(),
+        "USER_ID": str(os.getuid()),
+        "USER_GID": str(os.getgid()),
+    },
+    github_actions_settings=GitHubActionsSettings(
+        cacheable=True
+    )
+)
+
+
+class DebManagedPackagesBuilderX64(ManagedPackagesBuilder):
     BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
     PACKAGE_ARCHITECTURE = "amd64"
     PACKAGE_TYPE = "deb"
@@ -908,7 +919,7 @@ class DebPythonPackageBuilderX64(PythonPackageBuilder):
     AGENT_LIBS_BUILD_STEP = BUILD_AGENT_LIBS_GLIBC_X86_64
 
 
-class RpmPythonPackageBuilderX64(PythonPackageBuilder):
+class RpmManagedPackagesBuilderX64(ManagedPackagesBuilder):
     BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
     PACKAGE_ARCHITECTURE = "x86_64"
     PACKAGE_TYPE = "rpm"
@@ -917,6 +928,6 @@ class RpmPythonPackageBuilderX64(PythonPackageBuilder):
 
 
 ALL_MANAGED_PACKAGE_BUILDERS = {
-    "deb-amd64": DebPythonPackageBuilderX64,
-    "rpm-x86_64": RpmPythonPackageBuilderX64
+    "deb-amd64": DebManagedPackagesBuilderX64,
+    "rpm-x86_64": RpmManagedPackagesBuilderX64
 }
