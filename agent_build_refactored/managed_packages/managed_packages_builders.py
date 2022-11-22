@@ -344,7 +344,7 @@ class PythonPackageBuilder(Runner):
             logger.info(f"Package {PYTHON_PACKAGE_NAME} is built.")
         else:
             # Current python package is not changed, and it already exists in repo, reuse it.
-            shutil.copy2(
+            shutil.copy(
                 final_python_package_path,
                 self.packages_output_path
             )
