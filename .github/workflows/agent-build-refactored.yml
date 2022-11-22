@@ -225,6 +225,8 @@ jobs:
       - name: Get last packages names from repo for the '${{ matrix.name }}'
         id: get_last_packages_names
         run: |
+            set -e
+            
             LAST_REPO_PYTHON_PACKAGE_NAME=$(
               python3 build_package_new_refactored.py ${{ matrix.name }} \
               find_last_repo_package \
@@ -269,9 +271,6 @@ jobs:
         # if: steps.get_last_packages_names.outputs.last_repo_python_package_name && steps.cache_python.outputs.cache-hit != 'true'
         id: download_python
         run: |
-#            ls /tmp
-#            ls /tmp/python-package
-#            ls /tmp/agent-libs-package
             set -e 
             if [ -n "${{ steps.get_last_packages_names.outputs.last_repo_python_package_name }}" ] && [ "${{ steps.cache_python.outputs.cache-hit }}" != "true" ]; then
               LAST_REPO_PYTHON_PACKAGE_PATH=$(
