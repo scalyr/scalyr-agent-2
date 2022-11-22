@@ -280,8 +280,12 @@ jobs:
                 --package-filename "${{ steps.get_last_packages_names.outputs.last_repo_python_package_name }}" \
                 --output-dir /tmp/python-package
               )
+              echo "::notice::Re-using downloaded python package from the Packagecloud."
             elif [ -n "${{ steps.get_last_packages_names.outputs.last_repo_python_package_name }}" ]; then
               LAST_REPO_PYTHON_PACKAGE_PATH="/tmp/python-package/${{ steps.get_last_packages_names.outputs.last_repo_python_package_name }}"
+              echo "::notice::Re-using python package from cache."
+            else
+              echo "::notice::No python packages to reuse."
             fi
               
             
@@ -303,8 +307,12 @@ jobs:
                 --package-filename "${{ steps.get_last_packages_names.outputs.last_repo_agent_libs_package_name }}" \
                 --output-dir /tmp/agent-libs-package
               )
+              echo "::notice::Re-using downloaded agent-libs package from the Packagecloud."
             elif [ -n "${{ steps.get_last_packages_names.outputs.last_repo_agent_libs_package_name }}" ]; then
               LAST_REPO_AGENT_LIBS_PACKAGE_PATH="/tmp/agent-libs-package/${{ steps.get_last_packages_names.outputs.last_repo_agent_libs_package_name }}"
+              echo "::notice::Re-using agent-libs package from cache."
+            else
+              echo "::notice::No agent-libs packages to reuse."
             fi
           
             echo "last_repo_agent_libs_package_path=${LAST_REPO_AGENT_LIBS_PACKAGE_PATH}" >> $GITHUB_OUTPUT
