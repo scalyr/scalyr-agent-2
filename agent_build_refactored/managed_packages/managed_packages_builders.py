@@ -423,7 +423,7 @@ class PythonPackageBuilder(Runner):
             json.dumps(config)
         )
 
-        packages_to_publish_file = self.packages_output_path / "packages_to_publish.json"
+        packages_to_publish_file = packages_dir_path / "packages_to_publish.json"
         packages_to_publish = json.loads(
             packages_to_publish_file.read_text()
         )
@@ -587,6 +587,27 @@ class PythonPackageBuilder(Runner):
                  "path will be reused instead of building a new one."
         )
 
+        def _add_packagecloud_args(_parser):
+            _parser.add_argument(
+                "--token",
+                required=True,
+                help="Auth token for packagecloud."
+            )
+
+            _parser.add_argument(
+                "--user-name",
+                dest="user_name",
+                required=True,
+                help="Target username for packagecloud."
+            )
+
+            _parser.add_argument(
+                "--repo-name",
+                dest="repo_name",
+                required=True,
+                help="Target repo for packagecloud."
+            )
+
         find_last_repo_package_parser = subparsers.add_parser(
             "find_last_repo_package"
         )
@@ -594,25 +615,11 @@ class PythonPackageBuilder(Runner):
         find_last_repo_package_parser.add_argument(
             "--package-name",
             dest="package_name",
-            required=True
+            required=True,
+            choices=[PYTHON_PACKAGE_NAME, AGENT_LIBS_PACKAGE_NAME],
+            help="Name of the package to find."
         )
-
-        find_last_repo_package_parser.add_argument(
-            "--token",
-            required=True
-        )
-
-        find_last_repo_package_parser.add_argument(
-            "--user-name",
-            dest="user_name",
-            required=True
-        )
-
-        find_last_repo_package_parser.add_argument(
-            "--repo-name",
-            dest="repo_name",
-            required=True
-        )
+        _add_packagecloud_args(find_last_repo_package_parser)
 
         download_package_parser = subparsers.add_parser(
             "download_package"
@@ -620,30 +627,16 @@ class PythonPackageBuilder(Runner):
         download_package_parser.add_argument(
             "--package-filename",
             dest="package_filename",
-            required=True
+            required=True,
+            help="Package filename to download."
         )
         download_package_parser.add_argument(
             "--output-dir",
             dest="output_dir",
-            required=True
+            required=True,
+            help="Path where to store downloaded package."
         )
-
-        download_package_parser.add_argument(
-            "--token",
-            required=True
-        )
-
-        download_package_parser.add_argument(
-            "--user-name",
-            dest="user_name",
-            required=True
-        )
-
-        download_package_parser.add_argument(
-            "--repo-name",
-            dest="repo_name",
-            required=True
-        )
+        _add_packagecloud_args(download_package_parser)
 
         publish_packages_parser = subparsers.add_parser("publish")
         publish_packages_parser.add_argument(
@@ -652,23 +645,7 @@ class PythonPackageBuilder(Runner):
             required=True,
             help="Path to a directory with packages to publish."
         )
-        publish_packages_parser.add_argument(
-            "--token",
-            required=True
-        )
-
-        publish_packages_parser.add_argument(
-            "--user-name",
-            dest="user_name",
-            required=True
-        )
-
-        publish_packages_parser.add_argument(
-            "--repo-name",
-            dest="repo_name",
-            required=True
-        )
-
+        _add_packagecloud_args(publish_packages_parser)
 
     @classmethod
     def handle_command_line_arguments(
