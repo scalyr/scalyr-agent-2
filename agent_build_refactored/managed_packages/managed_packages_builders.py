@@ -275,13 +275,13 @@ class PythonPackageBuilder(Runner):
             command_args = ["build"]
             if last_repo_python_package_file:
                 command_args.extend([
-                    "--last-repo-python-package-file-dir",
+                    "--last-repo-python-package-file",
                     last_repo_python_package_file
                 ])
 
             if last_repo_agent_libs_package_file:
                 command_args.extend([
-                    "--last-repo-python-package-file-dir",
+                    "--last-repo-python-package-file",
                     last_repo_agent_libs_package_file
                 ])
 
