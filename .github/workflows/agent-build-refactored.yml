@@ -228,8 +228,8 @@ jobs:
             LAST_REPO_PYTHON_PACKAGE_NAME=$(
               python3 build_package_new_refactored.py ${{ matrix.name }} \
               find_last_repo_package \
-              --user-name ArthurSentinelone \
-              --repo-name DataSetAgent \
+              --user-name "${{ secrets.PACKAGE_CLOUD_USER }}" \
+              --repo-name "${{ secrets.PACKAGE_CLOUD_REPO }}" \
               --token ${{ secrets.PACKAGE_CLOUD_TOKEN }} \
               --package-name "scalyr-agent-python3"
             )
@@ -237,8 +237,8 @@ jobs:
             LAST_REPO_AGENT_LIBS_PACKAGE_NAME=$(
               python3 build_package_new_refactored.py ${{ matrix.name }} \
               find_last_repo_package \
-              --user-name ArthurSentinelone \
-              --repo-name DataSetAgent \
+              --user-name "${{ secrets.PACKAGE_CLOUD_USER }}" \
+              --repo-name "${{ secrets.PACKAGE_CLOUD_REPO }}" \
               --token ${{ secrets.PACKAGE_CLOUD_TOKEN }} \
               --package-name "scalyr-agent-libs"
             )
@@ -273,8 +273,8 @@ jobs:
               LAST_REPO_PYTHON_PACKAGE_PATH=$(
                 python3 build_package_new_refactored.py ${{ matrix.name }} \
                 download_package \
-                --user-name ArthurSentinelone \
-                --repo-name DataSetAgent \
+                --user-name "${{ secrets.PACKAGE_CLOUD_USER }}" \
+                --repo-name "${{ secrets.PACKAGE_CLOUD_REPO }}" \
                 --token ${{ secrets.PACKAGE_CLOUD_TOKEN }} \
                 --package-filename "${{ steps.get_last_packages_names.outputs.last_repo_python_package_name }}" \
                 --output-dir /tmp/python-package
@@ -296,8 +296,8 @@ jobs:
               LAST_REPO_AGENT_LIBS_PACKAGE_PATH=$(
                 python3 build_package_new_refactored.py ${{ matrix.name }} \
                 download_package \
-                --user-name ArthurSentinelone \
-                --repo-name DataSetAgent \
+                --user-name "${{ secrets.PACKAGE_CLOUD_USER }}" \
+                --repo-name "${{ secrets.PACKAGE_CLOUD_REPO }}" \
                 --token ${{ secrets.PACKAGE_CLOUD_TOKEN }} \
                 --package-filename "${{ steps.get_last_packages_names.outputs.last_repo_agent_libs_package_name }}" \
                 --output-dir /tmp/agent-libs-package
