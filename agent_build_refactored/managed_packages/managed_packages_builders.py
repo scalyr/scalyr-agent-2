@@ -648,7 +648,7 @@ class PythonPackageBuilder(Runner):
 
 
 class DebPythonPackageBuilderX64(PythonPackageBuilder):
-    # BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
+    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
     PACKAGE_ARCHITECTURE = "amd64"
     PACKAGE_TYPE = "deb"
 
