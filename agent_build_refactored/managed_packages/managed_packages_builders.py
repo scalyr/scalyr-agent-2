@@ -327,6 +327,16 @@ class PythonPackageBuilder(Runner):
             )
             return
 
+        config = {
+            "url":"https://packagecloud.io",
+            "token":"50552e5ef4df6c425e24d1213564910f1990c5fd25f2c4f4"
+        }
+
+        config_file_path = pl.Path.home() / ".packagecloud"
+        config_file_path.write_text(
+            json.dumps(config)
+        )
+
         for package_path in packages_dir_path.glob(f"*.{self.PACKAGE_TYPE}"):
             if self.PACKAGE_TYPE == "deb":
                 check_call_with_log(
