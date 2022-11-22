@@ -64,11 +64,10 @@ class PythonPackageBuilder(Runner):
 
     @property
     def packages_output_path(self) -> pl.Path:
+        """
+        Directory path with result packages.
+        """
         return self.output_path / "packages"
-
-    @property
-    def packages_roots_path(self) -> pl.Path:
-        return self.output_path / "packages_roots"
 
     @staticmethod
     def _parse_package_version_parts(version: str) -> Tuple[int, str]:
@@ -80,20 +79,20 @@ class PythonPackageBuilder(Runner):
 
     @staticmethod
     def _parse_version_from_package_file_name(package_file_name: str):
+        """
+        Parse version of the package from its filename.
+        """
+        # split filename to name and extension
         filename, _ = package_file_name.split(".")
+        # then split name to name prefix, version and architecture.
         _, version, _ = filename.split("_")
         return version
 
-    def get_repo_package_filename(
-        self,
-        package_name: str
-    ) -> str:
-
-        return PACKAGECLOUD_PACKAGES[package_name][self.PACKAGE_TYPE][self.PACKAGE_ARCHITECTURE]
-
     @property
     def python_package_build_cmd_args(self) -> List[str]:
-
+        """
+        Returns list of arguments for the command that builds python package.
+        """
 
         description = "Dependency package which provides Python interpreter which is used by the agent from the " \
                       "'scalyr-agent-2 package'"
@@ -120,6 +119,9 @@ class PythonPackageBuilder(Runner):
 
     @property
     def agent_libs_build_command_args(self) -> List[str]:
+        """
+        Returns list of arguments for command that build agent-libs package.
+        """
 
         description = "Dependency package which provides Python requirement libraries which are used by the agent " \
                       "from the 'scalyr-agent-2 package'"
@@ -334,8 +336,8 @@ class PythonPackageBuilder(Runner):
             return
 
         config = {
-            "url":"https://packagecloud.io",
-            "token":"50552e5ef4df6c425e24d1213564910f1990c5fd25f2c4f4"
+            "url": "https://packagecloud.io",
+            "token": token
         }
 
         config_file_path = pl.Path.home() / ".packagecloud"
