@@ -290,7 +290,7 @@ class PythonPackageBuilder(Runner):
 
             if last_repo_agent_libs_package_file:
                 command_args.extend([
-                    "--last-repo-python-package-file",
+                    "--last-repo-agent-libs-package-file",
                     last_repo_agent_libs_package_file
                 ])
 
@@ -321,6 +321,7 @@ class PythonPackageBuilder(Runner):
         print(last_repo_python_package_path)
         print(final_python_package_path)
         print(final_python_version)
+        print("222222222")
 
         # Python package is not found in repo, build it.
         if final_python_package_path is None:
