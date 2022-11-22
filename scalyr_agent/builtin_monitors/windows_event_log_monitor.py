@@ -12,12 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ------------------------------------------------------------------------
-# author:  Imron Alston <imron@scalyr.com>
+# author: scalyr-cloudtech@scalyr.com
 
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+import copy
+import collections
 import os
+import re
 import threading
 import time
 
@@ -146,6 +149,15 @@ define_config_option(
     "json",
     "Optional (defaults to `false`). Format events as json? Supports inclusion of "
     "all event fields. This option is only valid on Windows Vista and above.",
+    default=False,
+    convert_to=bool,
+)
+
+define_config_option(
+    __monitor__,
+    "placeholder_render",
+    "Optional (defaults to `false`). Render %%n placeholders in event data?  "
+    "This option is only valid on Windows Vista and above.",
     default=False,
     convert_to=bool,
 )
@@ -724,6 +736,14 @@ class NewJsonApi(NewApi):
             win32evtlog.EvtRenderContextSystem
         )
 
+        self._placeholder_render = config.get("placeholder_render")
+        if self._placeholder_render:
+            self._dll_cache = Cache(size=10)
+            self._param_cache = Cache(size=1000)
+            self._langid = win32api.MAKELANGID(
+                win32con.LANG_NEUTRAL, win32con.SUBLANG_NEUTRAL
+            )
+
     def log_event(self, event):
         values = win32evtlog.EvtRender(
             event, win32evtlog.EvtRenderEventValues, Context=self._render_context
@@ -754,6 +774,14 @@ class NewJsonApi(NewApi):
         #        => '{"entry": {"text": "bar", "#text": "foo"}}'
         event_json = _strip_xmltodict_prefixes(event_json)
 
+        # FormatMessage will replace insertion and parameter strings in the event message,
+        # however it will not replace parameter strings in the event data.
+        # Ref: https://learn.microsoft.com/en-us/windows/win32/eventlog/event-identifiers#message-definitions
+        #      https://learn.microsoft.com/en-us/windows/win32/eventlog/message-files
+        #      FormatMessage of https://github.com/mhammond/pywin32/blob/main/win32/Lib/win32evtlogutil.py
+        if self._placeholder_render:
+            event_json = self._replace_param_placeholders(event_json)
+
         # Populate the record here with fields that would normally be added by the log formatter,
         # this avoids having to unmarshal and remarshal later in the log formatter.
         # Refer to the use of DummyFormatter in WindowEventLogMonitor.open_metric_log().
@@ -772,6 +800,91 @@ class NewJsonApi(NewApi):
             win32evtlog.EvtUpdateBookmark(self._bookmarks[channel], event)
         finally:
             self._bookmark_lock.release()
+
+    def _param_placeholder_value(self, channel, provider, param):
+        if not re.match("^%%[0-9]+$", param):
+            return param
+
+        if channel == "Security":
+            provider = "Security"
+
+        param_key = "%s-%s-%s" % (channel, provider, param)
+        if param_key in self._param_cache:
+            return self._param_cache[param_key]
+
+        dll_key = "%s-%s" % (channel, provider)
+        if dll_key in self._dll_cache:
+            if not isinstance(self._dll_cache[dll_key], _DLL):
+                return param
+        else:
+            # Before opening a new handle to a dll check if another handle to the same dll is open;
+            # multiple event log providers may ultimately reference the same dll.
+
+            try:
+                dllpath = _DLL.dllpath(channel, provider)
+            except Exception as e:
+                self._dll_cache[dll_key] = e
+                return param
+
+            found = False
+            for dll in self._dll_cache.values():
+                if dll.path == dllpath:
+                    self._dll_cache[dll_key] = dll
+                    found = True
+                    break
+
+            if not found:
+                try:
+                    self._dll_cache[dll_key] = _DLL(channel, provider)
+                except Exception as e:
+                    self._dll_cache[dll_key] = e
+                    return param
+
+        try:
+            value = win32api.FormatMessageW(
+                win32con.FORMAT_MESSAGE_FROM_HMODULE,
+                self._dll_cache[dll_key].handle,
+                int(param[2:]),
+                self._langid,
+                None,
+            )
+            self._param_cache[param_key] = value.strip()
+        except:
+            self._param_cache[param_key] = param
+
+        return self._param_cache[param_key]
+
+    def _replace_param_placeholders(self, event):
+        rv = copy.deepcopy(event)
+
+        try:
+            event_data = event["Event"]["EventData"]["Data"]
+            channel = event["Event"]["System"]["Channel"]
+            provider = event["Event"]["System"]["Provider"]["Name"]
+        except:
+            return rv
+
+        if isinstance(event_data, str) and re.match("^%%[0-9]+$", event_data):
+            rv["Event"]["EventData"]["Data"] = self._param_placeholder_value(
+                channel, provider, event_data
+            )
+
+        elif isinstance(event_data, dict):
+            for key, val in event_data.items():
+                if isinstance(val, str) and re.match("^%%[0-9]+$", val):
+                    rv["Event"]["EventData"]["Data"][
+                        key
+                    ] = self._param_placeholder_value(channel, provider, val)
+                elif (
+                    isinstance(val, dict)
+                    and "Text" in val
+                    and re.match("^%%[0-9]+$", val["Text"])
+                ):
+                    rv["Event"]["EventData"]["Data"][key][
+                        "Text"
+                    ] = self._param_placeholder_value(channel, provider, val["Text"])
+
+        return rv
 
 
 def _convert_json_array_to_object(x):
@@ -821,6 +934,47 @@ def _strip_xmltodict_prefixes(x):
         return [_strip_xmltodict_prefixes(y) for y in x]
     else:
         return x
+
+
+class _DLL:
+    @staticmethod
+    def dllpath(channel, provider):
+        keyname = "SYSTEM\\CurrentControlSet\\Services\\EventLog\\%s\\%s" % (
+            channel,
+            provider,
+        )
+        keyhandle = win32api.RegOpenKey(win32con.HKEY_LOCAL_MACHINE, keyname)
+        try:
+            return win32api.ExpandEnvironmentStrings(
+                win32api.RegQueryValueEx(keyhandle, "ParameterMessageFile")[0]
+            )
+        finally:
+            win32api.RegCloseKey(keyhandle)
+
+    def __init__(self, channel, provider):
+        try:
+            self.path = self.dllpath(channel, provider)
+            self.handle = win32api.LoadLibraryEx(
+                self.path, 0, win32con.LOAD_LIBRARY_AS_DATAFILE
+            )
+        except Exception as e:
+            self.handle = None
+            raise e
+
+    def __del__(self):
+        if self.handle:
+            win32api.FreeLibrary(self.handle)
+
+
+class Cache(collections.OrderedDict):
+    def __init__(self, size):
+        super().__init__()
+        self.__size = size
+
+    def __setitem__(self, key, val):
+        while len(self) >= self.__size:
+            self.popitem(last=False)
+        super().__setitem__(key, val)
 
 
 class WindowEventLogMonitor(ScalyrMonitor):
