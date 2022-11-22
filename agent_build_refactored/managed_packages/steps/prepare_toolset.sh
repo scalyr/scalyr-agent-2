@@ -30,6 +30,8 @@
 
 set -e
 
+# Add new user which matches user of the host in order to
+# workaround files permission issues.
 groupadd -f -g ${USER_GID} mygroup
 useradd -m -g "${USER_GID}" -u ${USER_ID} -p root ${USER_NAME}
 

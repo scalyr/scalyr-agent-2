@@ -239,7 +239,7 @@ class ManagedPackagesBuilder(Runner):
             last_repo_package_file_path: pl.Path = None,
     ) -> Tuple[Optional[pl.Path], str]:
         """
-        Get path to path and version of the final package to build.
+        Get path and version of the final package to build.
         :param package_name: name of the package.
         :param last_repo_package_file_path: Path to a last package from the repo. If specified and there are no changes
             between current package and package from repo, then package from repo is used instead of building a new one.
@@ -259,7 +259,7 @@ class ManagedPackagesBuilder(Runner):
         else:
             # If there is a recent version of the package in the repo, then parse its checksum and compare it
             # with the checksum of the current package. If checksums are identical, then we can reuse
-            # package version for the repo.
+            # package version from the repo.
             last_repo_package_version = self._parse_version_from_package_file_name(
                 package_file_name=last_repo_package_file_path.name
             )
@@ -489,7 +489,7 @@ class ManagedPackagesBuilder(Runner):
             repo_name: str,
     ) -> List:
         """
-
+        Search packages with the given query params in the Packagecloud repository.
         :param params: Params for the url query.
         :param token: Packagecloud token
         :param repo_name: Target Packagecloud repo.
@@ -533,7 +533,7 @@ class ManagedPackagesBuilder(Runner):
 
     ) -> Optional[str]:
         """
-        Find the most recent version of the given package in the repo..
+        Find the most recent version of the given package in the repo.
         :param package_name: Name of the package.
         :param token: Packagecloud token
         :param repo_name: Target Packagecloud repo.
@@ -576,6 +576,7 @@ class ManagedPackagesBuilder(Runner):
         :return: Path of the downloaded package.
         """
 
+        # Query needed package info.
         packages = self._search_for_packages_in_repo(
             params={
                 "q": f"{package_filename}",
@@ -591,6 +592,7 @@ class ManagedPackagesBuilder(Runner):
         import requests
         from requests.auth import HTTPBasicAuth
 
+        # Download found package file.
         auth = HTTPBasicAuth(token, "")
         with requests.Session() as s:
             resp = s.get(
@@ -604,9 +606,6 @@ class ManagedPackagesBuilder(Runner):
             package_path = pl.Path(output_dir) / package_filename
             with package_path.open("wb") as f:
                 for chunk in resp.iter_content(chunk_size=8192):
-                    # If you have chunk encoded response uncomment if
-                    # and set chunk_size parameter to None.
-                    # if chunk:
                     f.write(chunk)
 
         return package_path
@@ -911,7 +910,7 @@ PREPARE_TOOLSET_GLIBC_X86_64 = EnvironmentRunnerStep(
 )
 
 
-class DebManagedPackagesBuilderX64(ManagedPackagesBuilder):
+class DebManagedPackagesBuilderX86_64(ManagedPackagesBuilder):
     BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
     PACKAGE_ARCHITECTURE = "amd64"
     PACKAGE_TYPE = "deb"
@@ -919,7 +918,7 @@ class DebManagedPackagesBuilderX64(ManagedPackagesBuilder):
     AGENT_LIBS_BUILD_STEP = BUILD_AGENT_LIBS_GLIBC_X86_64
 
 
-class RpmManagedPackagesBuilderX64(ManagedPackagesBuilder):
+class RpmManagedPackagesBuilderx86_64(ManagedPackagesBuilder):
     BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
     PACKAGE_ARCHITECTURE = "x86_64"
     PACKAGE_TYPE = "rpm"
@@ -928,6 +927,6 @@ class RpmManagedPackagesBuilderX64(ManagedPackagesBuilder):
 
 
 ALL_MANAGED_PACKAGE_BUILDERS = {
-    "deb-amd64": DebManagedPackagesBuilderX64,
-    "rpm-x86_64": RpmManagedPackagesBuilderX64
+    "deb-amd64": DebManagedPackagesBuilderX86_64,
+    "rpm-x86_64": RpmManagedPackagesBuilderx86_64
 }

@@ -70,19 +70,18 @@ INCLUDE_DIR="include"
 	--with-openssl="/usr/local" \
 	--with-readline=edit \
 	--prefix="${PYTHON_INSTALL_PREFIX}" \
+	--enable-optimizations \
+	--with-lto \
 	--with-ensurepip=install \
 	--bindir="${PYTHON_INSTALL_PREFIX}/${BIN_DIR}/${SUBDIR_NAME}" \
 	--datarootdir="${PYTHON_INSTALL_PREFIX}/${DATA_ROOT_DIR}/${SUBDIR_NAME}" \
 	--includedir="${PYTHON_INSTALL_PREFIX}/${INCLUDE_DIR}/${SUBDIR_NAME}" \
 	--with-platlibdir="${LIB_DIR}/${SUBDIR_NAME}"
 
-#	--enable-optimizations \
-#	--with-lto \
-
 
 
 make -j "$(nproc)"
-#make test
+make test
 make DESTDIR="/tmp/python" install
 popd
 popd

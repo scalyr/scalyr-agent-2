@@ -19,7 +19,7 @@
 #
 # This script prepares base build environment for the X86_64 linux GLIBC binary packages, it expects to be run in
 # Centos 6 to compile against lower GLIBS (2.12).
-# It switches to Centos 6 vault repository sources (since its original sources now disabled)
+# It switches to Centos 6 vault repository sources (since its original sources are now disabled)
 # and installs newer version of gcc.
 
 set -e
