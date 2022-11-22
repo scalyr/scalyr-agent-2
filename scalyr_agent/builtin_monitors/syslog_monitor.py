@@ -43,6 +43,8 @@ import six
 from six.moves import range
 import six.moves.socketserver
 
+import syslogmp
+
 from scalyr_agent import (
     ScalyrMonitor,
     define_config_option,
@@ -1449,6 +1451,25 @@ class SyslogHandler(object):
         if self.__docker_log_deleter:
             self.__docker_log_deleter.check_for_old_logs(current_log_files)
 
+    @staticmethod
+    def _parse_syslog(msg):
+        # The syslogmp module is based on RFC 3164.
+        # For support for RFC 5424 use the syslog_rfc5424_parser module.
+        rv = {'hostname':None, 'appname':None}
+        try:
+            parsed = syslogmp.parse(msg.encode('utf-8'))
+        except:
+            global_log.log(scalyr_logging.DEBUG_LEVEL_4, "Unable to parse: %s" % msg)
+            return rv
+
+        rv['hostname'] = parsed.hostname
+
+        mat = re.search('^(.+?)(\[\d+\])?:? ', parsed.message.decode('utf-8'))
+        if mat:
+            rv['appname'] = mat.group(1)
+
+        return rv
+
     def handle(self, data, extra):  # type: (six.text_type) -> None
         """
         Feed syslog messages to the appropriate loggers.
@@ -1459,8 +1480,11 @@ class SyslogHandler(object):
         if self.__docker_logging:
             self.__handle_docker_logs(data)
         else:
-            # FIXME STOPPED The app-name and source hostname can be parsed from the data here
+            extra.update(SyslogHandler._parse_syslog(data))
+
+            # FIXME STOPPED given the extra data apply it to the message_log template to write to multiple files
             print('SyslogHandler.handle', repr(data), extra)
+
             self.__logger.info(data)
         # We add plus one because the calling code strips off the trailing new lines.
         self.__line_reporter(data.count("\n") + 1)
