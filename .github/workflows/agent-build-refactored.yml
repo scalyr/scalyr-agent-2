@@ -294,8 +294,8 @@ jobs:
         run: |
             python3 build_package_new_refactored.py ${{ matrix.name }} \
               build \
-              --last-repo-python-package-file ${{ steps.download_python.outputs.last_repo_python_package_path }} \
-              --last-repo-agent-libs-package-file ${{ steps.download_agent_libs.outputs.last_repo_agent_libs_package_path }}
+              --last-repo-python-package-file "${{ steps.download_python.outputs.last_repo_python_package_path }}" \
+              --last-repo-agent-libs-package-file "${{ steps.download_agent_libs.outputs.last_repo_agent_libs_package_path }}"
           
 
       - name: Save registry data root with result packages as artifact
