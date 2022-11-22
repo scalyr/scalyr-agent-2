@@ -234,8 +234,14 @@ class PythonPackageBuilder(Runner):
             self.run_in_docker(command_args=command_args)
             return
 
-        last_repo_python_package_path = last_repo_python_package_file and pl.Path(last_repo_python_package_file)
-        last_repo_agent_libs_package_path = last_repo_agent_libs_package_file and pl.Path(last_repo_agent_libs_package_file)
+        last_repo_python_package_path = None
+        last_repo_agent_libs_package_path = None
+
+        if last_repo_python_package_file:
+            last_repo_python_package_path = pl.Path(last_repo_python_package_file)
+
+        if last_repo_agent_libs_package_file:
+            last_repo_agent_libs_package_path = pl.Path(last_repo_agent_libs_package_file)
 
         self.packages_output_path.mkdir(parents=True)
 
