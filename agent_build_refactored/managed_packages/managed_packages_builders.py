@@ -51,14 +51,16 @@ class PythonPackageBuilder(Runner):
     PACKAGE_TYPE: str
     PACKAGE_ARCHITECTURE: str
 
-    BUILD_STEPS: Dict[str, ArtifactRunnerStep]
+    PYTHON_BUILD_STEP: ArtifactRunnerStep
+    AGENT_LIBS_BUILD_STEP: ArtifactRunnerStep
 
     @classmethod
     def get_all_required_steps(cls) -> List[RunnerStep]:
         steps = super(PythonPackageBuilder, cls).get_all_required_steps()
 
         steps.extend([
-            *cls.BUILD_STEPS.values(),
+            cls.PYTHON_BUILD_STEP,
+            cls.AGENT_LIBS_BUILD_STEP
         ])
         return steps
 
@@ -150,16 +152,30 @@ class PythonPackageBuilder(Runner):
             self,
             package_name: str,
     ):
-        build_step = self.BUILD_STEPS[package_name]
+        """
+        Get checksum of the package. We try to take into account every possible variable
+            that may affect the result package.
+
+        For now, those are:
+            - checksum of the step that produces files for package.
+            - command line arguments that are used to build the package.
+
+        :param package_name:
+        :return:
+        """
 
         if package_name == PYTHON_PACKAGE_NAME:
+            build_step = self.PYTHON_BUILD_STEP
             build_command_args = self.python_package_build_cmd_args
         else:
+            build_step = self.AGENT_LIBS_BUILD_STEP
             build_command_args = self.agent_libs_build_command_args
 
+        # Add checksum of the step that builds package files.
         sha256 = hashlib.sha256()
         sha256.update(build_step.checksum.encode())
 
+        # Add arguments that are used to build package.
         for arg in build_command_args:
             sha256.update(arg.encode())
 
@@ -253,8 +269,7 @@ class PythonPackageBuilder(Runner):
         )
 
         if final_python_package_path is None:
-            python_build_step = self.BUILD_STEPS[PYTHON_PACKAGE_NAME]
-            package_root = python_build_step.get_output_directory(work_dir=self.work_dir) / "python"
+            package_root = self.PYTHON_BUILD_STEP.get_output_directory(work_dir=self.work_dir) / "python"
 
             check_call_with_log(
                 [
@@ -281,8 +296,7 @@ class PythonPackageBuilder(Runner):
         )
 
         if final_agent_libs_package_path is None:
-            agent_libs_build_step = self.BUILD_STEPS[AGENT_LIBS_PACKAGE_NAME]
-            package_root = agent_libs_build_step.get_output_directory(work_dir=self.work_dir) / "agent_libs"
+            package_root = self.AGENT_LIBS_BUILD_STEP.get_output_directory(work_dir=self.work_dir) / "agent_libs"
 
             check_call_with_log(
                 [
@@ -335,6 +349,7 @@ class PythonPackageBuilder(Runner):
             )
             return
 
+        # Set packagecloud's credentials file.
         config = {
             "url": "https://packagecloud.io",
             "token": token
