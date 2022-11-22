@@ -72,7 +72,8 @@ jobs:
 
           managed-packages-to-build: |
             [
-              { "name": "deb-amd64", "master_run_only": false }
+              { "name": "deb-amd64", "master_run_only": false },
+              { "name": "rpm-x86_64", "master_run_only": false }
             ]
 
 #  # This job pre-executes and caches Runner steps that has to be executed in a separate job.
