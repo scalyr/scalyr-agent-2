@@ -94,6 +94,7 @@ class PythonPackageBuilder(Runner):
     @property
     def python_package_build_cmd_args(self) -> List[str]:
 
+
         description = "Dependency package which provides Python interpreter which is used by the agent from the " \
                       "'scalyr-agent-2 package'"
 
@@ -162,15 +163,60 @@ class PythonPackageBuilder(Runner):
 
         return sha256.hexdigest()
 
+    def _get_final_package_path_and_version(
+            self,
+            package_name: str,
+            last_repo_package_file_path: pl.Path = None,
+    ) -> Tuple[Optional[str], str]:
+        """
+        Get path to path and version of the final package to build.
+        :param package_name: name of the package.
+        :param last_repo_package_file_path: Path to a last package from the repo. If specified and there are no changes
+            between current package and package from repo, then package from repo is used instead of building a new one.
+        :return: Tuple with:
+            - Path to the final package. None if package is not found in repo.
+            - Version of the final package.
+        """
+        final_package_path = None
+
+        current_package_checksum = self._get_package_checksum(
+            package_name=package_name
+        )
+        if last_repo_package_file_path is None:
+            final_package_version = f"1+{current_package_checksum}"
+        else:
+            last_repo_package_version = self._parse_version_from_package_file_name(
+                package_file_name=last_repo_package_file_path.name
+            )
+            last_repo_package_iteration, last_repo_package_checksum = self._parse_package_version_parts(
+                version=last_repo_package_version
+            )
+            if current_package_checksum == last_repo_package_checksum:
+                final_package_version = last_repo_package_version
+                final_package_path = last_repo_package_file_path
+            else:
+                final_package_version = f"{last_repo_package_iteration + 1}+{current_package_checksum}"
+
+        return final_package_path, final_package_version
+
     def build_packages(
             self,
             last_repo_python_package_file: str = None,
             last_repo_agent_libs_package_file: str = None
 
     ):
+        """
+        Build needed packages.
+
+        :param last_repo_python_package_file: Path to the python package file. If specified, then the python
+            dependency package from this path will be reused instead of building a new one.
+        :param last_repo_agent_libs_package_file: Path to the agent libs package file. If specified, then the agent-libs
+            dependency package from this path will be reused instead of building a new one.
+        """
 
         self.run_required()
 
+        # Run inside the docker if needed.
         if self.runs_in_docker:
             command_args = ["build"]
             if last_repo_python_package_file:
@@ -193,34 +239,7 @@ class PythonPackageBuilder(Runner):
 
         self.packages_output_path.mkdir(parents=True)
 
-        def get_final_package_path_and_version(
-                package_name: str,
-                last_repo_package_file_path: pl.Path = None,
-        ):
-            final_package_path = None
-
-            current_package_checksum = self._get_package_checksum(
-                package_name=package_name
-            )
-            if last_repo_package_file_path is None:
-                final_package_version = f"1+{current_package_checksum}"
-            else:
-                last_repo_package_version = self._parse_version_from_package_file_name(
-                    package_file_name=last_repo_package_file_path.name
-                )
-                last_repo_package_iteration, last_repo_package_checksum = self._parse_package_version_parts(
-                    version=last_repo_package_version
-                )
-                if current_package_checksum == last_repo_package_checksum:
-                    final_package_version = last_repo_package_version
-                    final_package_path = last_repo_python_package_path
-                else:
-                    final_package_version = f"{last_repo_package_iteration + 1}+{current_package_checksum}"
-
-            return final_package_path, final_package_version
-
-
-        final_python_package_path, final_python_version = get_final_package_path_and_version(
+        final_python_package_path, final_python_version = self._get_final_package_path_and_version(
             package_name=PYTHON_PACKAGE_NAME,
             last_repo_package_file_path=last_repo_python_package_path
         )
@@ -248,7 +267,7 @@ class PythonPackageBuilder(Runner):
                 self.packages_output_path
             )
 
-        final_agent_libs_package_path, final_agent_libs_version = get_final_package_path_and_version(
+        final_agent_libs_package_path, final_agent_libs_version = self._get_final_package_path_and_version(
             package_name=AGENT_LIBS_PACKAGE_NAME,
             last_repo_package_file_path=last_repo_agent_libs_package_path
         )
@@ -283,7 +302,15 @@ class PythonPackageBuilder(Runner):
             repo_name: str,
             user_name: str,
     ):
+        """
+        Publish packages that are built by the 'build_packages' method.
+        :param packages_dir_path: Path to a directory with target packages.
+        :param token: Auth token to Packagecloud.
+        :param repo_name: Target Packagecloud repo.
+        :param user_name: Target Packagecloud user.
+        """
 
+        # Run in docker if needed.
         if self.runs_in_docker:
             self.run_in_docker(
                 command_args=[
@@ -300,13 +327,34 @@ class PythonPackageBuilder(Runner):
             )
             return
 
-    def _search_for_package_in_repo(
+        for package_path in packages_dir_path.glob(f"*.{self.PACKAGE_TYPE}"):
+            if self.PACKAGE_TYPE == "deb":
+                check_call_with_log(
+                    [
+                        "package_cloud",
+                        "push",
+                        f"{user_name}/{repo_name}/any/any",
+                        str(package_path)
+                    ]
+                )
+
+            logging.info(f"Package {package_path.name} is published.")
+
+    def _search_for_packages_in_repo(
             self,
             params: Dict,
             token: str,
             user_name: str,
             repo_name: str,
-    ):
+    ) -> List:
+        """
+
+        :param params: Params for the url query.
+        :param token: Packagecloud token
+        :param repo_name: Target Packagecloud repo.
+        :param user_name: Target Packagecloud user.
+        :return: List of found packages.
+        """
         import requests
         from requests.auth import HTTPBasicAuth
 
@@ -327,7 +375,6 @@ class PythonPackageBuilder(Runner):
         resp.raise_for_status()
         return resp.json()
 
-
     def find_last_repo_package(
             self,
             package_name: str,
@@ -336,8 +383,16 @@ class PythonPackageBuilder(Runner):
             repo_name: str,
 
     ) -> Optional[str]:
+        """
+        Find the most recent version of the given package in the repo..
+        :param package_name: Name of the package.
+        :param token: Packagecloud token
+        :param repo_name: Target Packagecloud repo.
+        :param user_name: Target Packagecloud user.
+        :return: filename of the package if found, or None.
+        """
 
-        packages = self._search_for_package_in_repo(
+        packages = self._search_for_packages_in_repo(
             params={
                 "q": f"{package_name}",
             },
@@ -362,8 +417,17 @@ class PythonPackageBuilder(Runner):
             user_name: str,
             repo_name: str,
     ):
+        """
+        Download package file by the given filename.
+        :param package_filename: Filename of the package.
+        :param output_dir: Directory path to store the downloaded package.
+        :param token: Packagecloud token
+        :param repo_name: Target Packagecloud repo.
+        :param user_name: Target Packagecloud user.
+        :return: Path of the downloaded package.
+        """
 
-        packages = self._search_for_package_in_repo(
+        packages = self._search_for_packages_in_repo(
             params={
                 "q": f"{package_filename}",
             },
