@@ -16,6 +16,7 @@
 import hashlib
 import json
 import logging
+import operator
 import shutil
 import subprocess
 import argparse
@@ -97,6 +98,13 @@ class ManagedPackagesBuilder(Runner):
     PYTHON_BUILD_STEP: ArtifactRunnerStep
     # Instance of the step that builds filesystem for the agent-libs package.
     AGENT_LIBS_BUILD_STEP: ArtifactRunnerStep
+
+    # Name of a target distribution in the packagecloud.
+    PACKAGECLOUD_DISTRO: str
+
+    # Version of a target distribution in the packagecloud.
+    PACKAGECLOUD_DISTRO_VERSION: str
+
 
     @classmethod
     def get_all_required_steps(cls) -> List[RunnerStep]:
@@ -519,6 +527,8 @@ class ManagedPackagesBuilder(Runner):
             "rpm": "rpms"
         }
 
+        packages = []
+
         # First get the first page to get pagination links from response headers.
         with requests.Session() as s:
             resp = s.get(
@@ -526,52 +536,71 @@ class ManagedPackagesBuilder(Runner):
                 params={
                     "q": package_name,
                     "filter": param_filters[self.PACKAGE_TYPE],
-                    "per_page": 250
+                    "per_page": "250"
                 },
                 auth=auth
             )
-
             resp.raise_for_status()
 
-            links = resp.headers.get("Link")
+            packages.extend(resp.json())
 
-            if links is None:
-                # Link header does not exist, this page has to be the only one.
-                found_packages = resp.json()
-            else:
-                # Get link to the last page.
-                last_page_url = {
+            # Iterate through other pages.
+            while True:
+                links = resp.headers.get("Link")
+
+                if links is None:
+                    break
+                # Get link to the next page.
+
+                links_dict = {
                     link["rel"]: link["url"] for link in parse_header_links(links)
-                }["last"]
+                }
+
+                next_page_url = links_dict.get("next")
+                if next_page_url is None:
+                    break
 
                 resp = s.get(
-                    url=last_page_url,
+                    url=next_page_url,
                     auth=auth
                 )
                 resp.raise_for_status()
+                packages.extend(resp.json())
 
-                found_packages = resp.json()
+        filtered_packages = []
+        distro_version = f"{self.PACKAGECLOUD_DISTRO}/{self.PACKAGECLOUD_DISTRO_VERSION}"
 
-        matching_packages = []
+        for p in packages:
+            # filter by package type
+            if p["type"] != self.PACKAGE_TYPE:
+                continue
 
-        for p in found_packages:
+            # filter by distro version.
+            if distro_version != p["distro_version"]:
+                continue
+
+            # filter only packages with appropriate architecture
             _, _, arch, _ = self._parser_package_file_parts(
                 package_file_name=p["filename"]
             )
-            # filter only packages with appropriate architecture
-            if arch == self.PACKAGE_ARCHITECTURE:
-                matching_packages.append(p)
+            if arch != self.PACKAGE_ARCHITECTURE:
+                continue
 
-        if len(matching_packages) == 0:
+            filtered_packages.append(p)
+
+        if len(filtered_packages) == 0:
             logger.info(f"Could not find any package with name {package_name}")
             return None
 
-        last_package = matching_packages[-1]
+        # sort packages by version and get the last one.
+        sorted_packages = sorted(filtered_packages, key=operator.itemgetter("version"))
+
+        last_package = sorted_packages[-1]
 
         return last_package["filename"]
 
+    @staticmethod
     def download_package_from_repo(
-            self,
             package_filename: str,
             output_dir: str,
             token: str,
@@ -594,6 +623,8 @@ class ManagedPackagesBuilder(Runner):
 
         auth = HTTPBasicAuth(token, "")
 
+        # There's no need to use pagination, since we provide file name of an exact package and there has to be only
+        # one occurrence.
         with requests.Session() as s:
             resp = s.get(
                 url=f"https://packagecloud.io/api/v1/repos/{user_name}/{repo_name}/search.json",
@@ -779,7 +810,7 @@ def create_build_dependencies_step(
         base_image: EnvironmentRunnerStep
 ) -> EnvironmentRunnerStep:
     """
-    This function creates step that installsP Python build requirements, to a given environment.
+    This function creates step that installs Python build requirements, to a given environment.
     :param base_image: Environment step runner with the target environment.
     :return: Result step.
     """
@@ -905,16 +936,13 @@ BUILD_AGENT_LIBS_GLIBC_X86_64 = create_build_agent_libs_step(
 PREPARE_TOOLSET_GLIBC_X86_64 = EnvironmentRunnerStep(
     name="prepare_toolset",
     script_path="agent_build_refactored/managed_packages/steps/prepare_toolset.sh",
-    tracked_files_globs=[
-        "agent_build_refactored/build-requirements.txt"
-    ],
     base=DockerImageSpec(
         name="ubuntu:22.04",
         platform=DockerPlatform.AMD64.value
     ),
     required_steps={
         "BUILD_PYTHON": BUILD_PYTHON_GLIBC_X86_64,
-        #"BUILD_AGENT_LIBS": BUILD_AGENT_LIBS_GLIBC_X86_64
+        "BUILD_AGENT_LIBS": BUILD_AGENT_LIBS_GLIBC_X86_64
     },
     environment_variables={
         "SUBDIR_NAME": AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME,
@@ -931,11 +959,13 @@ PREPARE_TOOLSET_GLIBC_X86_64 = EnvironmentRunnerStep(
 
 
 class DebManagedPackagesBuilderX86_64(ManagedPackagesBuilder):
-    # BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
+    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
     PACKAGE_ARCHITECTURE = "amd64"
     PACKAGE_TYPE = "deb"
     PYTHON_BUILD_STEP = BUILD_PYTHON_GLIBC_X86_64
     AGENT_LIBS_BUILD_STEP = BUILD_AGENT_LIBS_GLIBC_X86_64
+    PACKAGECLOUD_DISTRO = "any"
+    PACKAGECLOUD_DISTRO_VERSION = "any"
 
 
 class RpmManagedPackagesBuilderx86_64(ManagedPackagesBuilder):
@@ -944,6 +974,8 @@ class RpmManagedPackagesBuilderx86_64(ManagedPackagesBuilder):
     PACKAGE_TYPE = "rpm"
     PYTHON_BUILD_STEP = BUILD_PYTHON_GLIBC_X86_64
     AGENT_LIBS_BUILD_STEP = BUILD_AGENT_LIBS_GLIBC_X86_64
+    PACKAGECLOUD_DISTRO = "rpm_any"
+    PACKAGECLOUD_DISTRO_VERSION = "rpm_any"
 
 
 ALL_MANAGED_PACKAGE_BUILDERS: Dict[str, Type[ManagedPackagesBuilder]] = {
