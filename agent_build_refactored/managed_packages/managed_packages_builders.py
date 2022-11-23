@@ -21,7 +21,7 @@ import subprocess
 import argparse
 import os
 import pathlib as pl
-from typing import List, Tuple, Optional, Dict
+from typing import List, Tuple, Optional, Dict, Type
 
 
 from agent_build_refactored.tools.runner import Runner, RunnerStep, ArtifactRunnerStep, RunnerMappedPath, EnvironmentRunnerStep, DockerImageSpec,GitHubActionsSettings
@@ -123,24 +123,31 @@ class ManagedPackagesBuilder(Runner):
         iteration, checksum = version.split("+")
         return int(iteration), checksum
 
+    def _parser_package_file_parts(self, package_file_name: str):
+        if self.PACKAGE_TYPE == "deb":
+            # split filename to name and extension
+            filename, ext = package_file_name.split(".")
+            # then split name to name prefix, version and architecture.
+            package_name, version, arch = filename.split("_")
+        else:
+            # split filename to name, arch, and extension
+            filename, arch, ext = package_file_name.split(".")
+            # split with release
+            prefix, release = filename.rsplit("-", 1)
+            # split with version
+            package_name, version = prefix.rsplit("-", 1)
+
+        return package_name, version, arch, ext
+
     def _parse_version_from_package_file_name(self, package_file_name: str):
         """
         Parse version of the package from its filename.
         """
-        if self.PACKAGE_TYPE == "deb":
-            # split filename to name and extension
-            filename, _ = package_file_name.split(".")
-            # then split name to name prefix, version and architecture.
-            _, version, _ = filename.split("_")
-            return version
-        else:
-            # split filename to name, arch, and extension
-            filename, _, _ = package_file_name.split(".")
-            # split with release
-            prefix, _ = filename.rsplit("-", 1)
-            # split with version
-            _, version = prefix.rsplit("-", 1)
-            return version
+        _, version, _, _ = self._parser_package_file_parts(
+            package_file_name=package_file_name
+        )
+        return version
+
 
     @property
     def python_package_build_cmd_args(self) -> List[str]:
@@ -409,7 +416,10 @@ class ManagedPackagesBuilder(Runner):
         # We have to use it in order to skip the publishing of the packages that are reused and already in the repo.
         packages_to_publish_file = self.packages_output_path / "packages_to_publish.json"
         packages_to_publish_file.write_text(
-            json.dumps(packages_to_publish)
+            json.dumps(
+                packages_to_publish,
+                indent=4
+            )
         )
 
     def publish_packages_to_packagecloud(
@@ -481,49 +491,6 @@ class ManagedPackagesBuilder(Runner):
 
             logging.info(f"Package {package_path.name} is published.")
 
-    def _search_for_packages_in_repo(
-            self,
-            params: Dict,
-            token: str,
-            user_name: str,
-            repo_name: str,
-    ) -> List:
-        """
-        Search packages with the given query params in the Packagecloud repository.
-        :param params: Params for the url query.
-        :param token: Packagecloud token
-        :param repo_name: Target Packagecloud repo.
-        :param user_name: Target Packagecloud user.
-        :return: List of found packages.
-        """
-        import requests
-        from requests.auth import HTTPBasicAuth
-
-        auth = HTTPBasicAuth(token, "")
-
-        param_filters = {
-            "deb": "debs",
-            "rpm": "rpms"
-        }
-
-        params["filter"] = param_filters[self.PACKAGE_TYPE]
-
-        with requests.Session() as s:
-            resp = s.get(
-                url=f"https://packagecloud.io/api/v1/repos/{user_name}/{repo_name}/search.json",
-                params=params,
-                auth=auth
-            )
-
-        resp.raise_for_status()
-
-        packages = resp.json()
-
-        # filter only packages with appropriate architecture.
-
-        arch_packages = [p for p in packages]
-        return arch_packages
-
     def find_last_repo_package(
             self,
             package_name: str,
@@ -541,20 +508,65 @@ class ManagedPackagesBuilder(Runner):
         :return: filename of the package if found, or None.
         """
 
-        packages = self._search_for_packages_in_repo(
-            params={
-                "q": f"{package_name}",
-            },
-            token=token,
-            user_name=user_name,
-            repo_name=repo_name
-        )
+        import requests
+        from requests.auth import HTTPBasicAuth
+        from requests.utils import parse_header_links
 
-        if len(packages) == 0:
+        auth = HTTPBasicAuth(token, "")
+
+        param_filters = {
+            "deb": "debs",
+            "rpm": "rpms"
+        }
+
+        # First get the first page to get pagination links from response headers.
+        with requests.Session() as s:
+            resp = s.get(
+                url=f"https://packagecloud.io/api/v1/repos/{user_name}/{repo_name}/search.json",
+                params={
+                    "q": package_name,
+                    "filter": param_filters[self.PACKAGE_TYPE],
+                    "per_page": 250
+                },
+                auth=auth
+            )
+
+            resp.raise_for_status()
+
+            links = resp.headers.get("Link")
+
+            if links is None:
+                # Link header does not exist, this page has to be the only one.
+                found_packages = resp.json()
+            else:
+                # Get link to the last page.
+                last_page_url = {
+                    link["rel"]: link["url"] for link in parse_header_links(links)
+                }["last"]
+
+                resp = s.get(
+                    url=last_page_url,
+                    auth=auth
+                )
+                resp.raise_for_status()
+
+                found_packages = resp.json()
+
+        matching_packages = []
+
+        for p in found_packages:
+            _, _, arch, _ = self._parser_package_file_parts(
+                package_file_name=p["filename"]
+            )
+            # filter only packages with appropriate architecture
+            if arch == self.PACKAGE_ARCHITECTURE:
+                matching_packages.append(p)
+
+        if len(matching_packages) == 0:
             logger.info(f"Could not find any package with name {package_name}")
             return None
 
-        last_package = packages[-1]
+        last_package = matching_packages[-1]
 
         return last_package["filename"]
 
@@ -577,20 +589,25 @@ class ManagedPackagesBuilder(Runner):
         """
 
         # Query needed package info.
-        packages = self._search_for_packages_in_repo(
-            params={
-                "q": f"{package_filename}",
-            },
-            token=token,
-            user_name=user_name,
-            repo_name=repo_name
-        )
-
-        assert len(packages) == 1, f"Expected number of found packages is 1, got {len(packages)}."
-        last_package = packages[-1]
-
         import requests
         from requests.auth import HTTPBasicAuth
+
+        auth = HTTPBasicAuth(token, "")
+
+        with requests.Session() as s:
+            resp = s.get(
+                url=f"https://packagecloud.io/api/v1/repos/{user_name}/{repo_name}/search.json",
+                params={
+                    "q": f"{package_filename}",
+                },
+                auth=auth
+            )
+            resp.raise_for_status()
+
+            found_packages = resp.json()
+
+        assert len(found_packages) == 1, f"Expected number of found packages is 1, got {len(found_packages)}."
+        last_package = found_packages[0]
 
         # Download found package file.
         auth = HTTPBasicAuth(token, "")
@@ -888,13 +905,16 @@ BUILD_AGENT_LIBS_GLIBC_X86_64 = create_build_agent_libs_step(
 PREPARE_TOOLSET_GLIBC_X86_64 = EnvironmentRunnerStep(
     name="prepare_toolset",
     script_path="agent_build_refactored/managed_packages/steps/prepare_toolset.sh",
+    tracked_files_globs=[
+        "agent_build_refactored/build-requirements.txt"
+    ],
     base=DockerImageSpec(
         name="ubuntu:22.04",
         platform=DockerPlatform.AMD64.value
     ),
     required_steps={
         "BUILD_PYTHON": BUILD_PYTHON_GLIBC_X86_64,
-        "BUILD_AGENT_LIBS": BUILD_AGENT_LIBS_GLIBC_X86_64
+        #"BUILD_AGENT_LIBS": BUILD_AGENT_LIBS_GLIBC_X86_64
     },
     environment_variables={
         "SUBDIR_NAME": AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME,
@@ -911,7 +931,7 @@ PREPARE_TOOLSET_GLIBC_X86_64 = EnvironmentRunnerStep(
 
 
 class DebManagedPackagesBuilderX86_64(ManagedPackagesBuilder):
-    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
+    # BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
     PACKAGE_ARCHITECTURE = "amd64"
     PACKAGE_TYPE = "deb"
     PYTHON_BUILD_STEP = BUILD_PYTHON_GLIBC_X86_64
@@ -926,7 +946,7 @@ class RpmManagedPackagesBuilderx86_64(ManagedPackagesBuilder):
     AGENT_LIBS_BUILD_STEP = BUILD_AGENT_LIBS_GLIBC_X86_64
 
 
-ALL_MANAGED_PACKAGE_BUILDERS = {
+ALL_MANAGED_PACKAGE_BUILDERS: Dict[str, Type[ManagedPackagesBuilder]] = {
     "deb-amd64": DebManagedPackagesBuilderX86_64,
     "rpm-x86_64": RpmManagedPackagesBuilderx86_64
 }

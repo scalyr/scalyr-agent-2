@@ -233,7 +233,7 @@ jobs:
               python3 build_package_new_refactored.py ${{ matrix.name }} \
               find_last_repo_package \
               --user-name "${{ secrets.PACKAGE_CLOUD_USER }}" \
-              --repo-name "${{ secrets.PACKAGE_CLOUD_REPO }}" \
+              --repo-name "${{ secrets.PACKAGE_CLOUD_INTERNAL_REPO }}" \
               --token ${{ secrets.PACKAGE_CLOUD_TOKEN }} \
               --package-name "scalyr-agent-python3"
             )
@@ -242,7 +242,7 @@ jobs:
               python3 build_package_new_refactored.py ${{ matrix.name }} \
               find_last_repo_package \
               --user-name "${{ secrets.PACKAGE_CLOUD_USER }}" \
-              --repo-name "${{ secrets.PACKAGE_CLOUD_REPO }}" \
+              --repo-name "${{ secrets.PACKAGE_CLOUD_INTERNAL_REPO }}" \
               --token ${{ secrets.PACKAGE_CLOUD_TOKEN }} \
               --package-name "scalyr-agent-libs"
             )
@@ -279,7 +279,7 @@ jobs:
                 python3 build_package_new_refactored.py ${{ matrix.name }} \
                 download_package \
                 --user-name "${{ secrets.PACKAGE_CLOUD_USER }}" \
-                --repo-name "${{ secrets.PACKAGE_CLOUD_REPO }}" \
+                --repo-name "${{ secrets.PACKAGE_CLOUD_INTERNAL_REPO }}" \
                 --token ${{ secrets.PACKAGE_CLOUD_TOKEN }} \
                 --package-filename "${{ steps.get_last_packages_names.outputs.last_repo_python_package_name }}" \
                 --output-dir /tmp/python-package
@@ -306,7 +306,7 @@ jobs:
                 python3 build_package_new_refactored.py ${{ matrix.name }} \
                 download_package \
                 --user-name "${{ secrets.PACKAGE_CLOUD_USER }}" \
-                --repo-name "${{ secrets.PACKAGE_CLOUD_REPO }}" \
+                --repo-name "${{ secrets.PACKAGE_CLOUD_INTERNAL_REPO }}" \
                 --token ${{ secrets.PACKAGE_CLOUD_TOKEN }} \
                 --package-filename "${{ steps.get_last_packages_names.outputs.last_repo_agent_libs_package_name }}" \
                 --output-dir /tmp/agent-libs-package

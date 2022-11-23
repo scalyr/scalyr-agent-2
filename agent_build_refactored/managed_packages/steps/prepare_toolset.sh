@@ -37,7 +37,9 @@ useradd -m -g "${USER_GID}" -u ${USER_ID} -p root ${USER_NAME}
 
 source ~/.bashrc
 cp -a "${BUILD_PYTHON}/python/." /
-cp -a "${BUILD_AGENT_LIBS}/dev_libs/." /
+
+/usr/libexec/${SUBDIR_NAME}/scalyr-agent-2-python3 -m pip install -v  \
+  -r "${SOURCE_ROOT}/agent_build_refactored/build-requirements.txt"
 
 ln -s /usr/libexec/${SUBDIR_NAME}/scalyr-agent-2-python3 /usr/bin/python3
 
