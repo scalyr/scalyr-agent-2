@@ -810,7 +810,7 @@ def create_build_dependencies_step(
         base_image: EnvironmentRunnerStep
 ) -> EnvironmentRunnerStep:
     """
-    This function creates step that installsP Python build requirements, to a given environment.
+    This function creates step that installs Python build requirements, to a given environment.
     :param base_image: Environment step runner with the target environment.
     :return: Result step.
     """
