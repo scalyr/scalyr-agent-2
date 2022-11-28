@@ -191,12 +191,40 @@ jobs:
 #          path: /tmp/result
 #          retention-days: 1
 
+  clean-ec2-tests-prefix-list-old-entries:
+    name: Build managed package ${{ matrix.name }}
+    needs:
+      - pre_job
+    runs-on: ubuntu-20.04
+    strategy:
+      steps:
+        - name: Checkout repository
+          uses: actions/checkout@v3
+
+        - name: Install python
+          uses: actions/setup-python@v4
+          with:
+            python-version: ${{ matrix.python-version }}
+
+        - name: Prepare environment.
+          uses: ./.github/actions/execute-runner
+          with:
+            runner-fqdn: "agent_build_refactored.__init__.BuildTestEnvironment"
+
+        - name: Cleanup old prefix lists for ec2 test security group.
+          run: |
+            python3 tests/end_to_end_tests/run_in_remote_machine/cleanup_old_test_ec2_prefix_list_entries.py \
+              --access-key "${{ secrets.AWS_DEV_ACCESS_KEY }}" \
+              --secret-key "${{ secrets.AWS_DEV_SECRET_KEY }}" \
+              --prefix-list-id "${{ secrets.AWS_SECURITY_GROUPS_NAMED_PREFIX_ID }}" \
+              --region ${{ secrets.AWS_DEV_REGION }}
 
   build-managed-packages:
     name: Build managed package ${{ matrix.name }}
     needs:
       - pre_job
     runs-on: ${{ matrix.os }}
+
 
     strategy:
       # This job receives its matrix from the 'pre_job' job. The matrix itself is created by the .github/actions/init-job-matrices action.

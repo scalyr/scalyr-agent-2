@@ -22,7 +22,7 @@ def _search_for_old_entries(entries: List):
     return result
 
 
-def _get_prefix_list_version(client, prefix_list_id: str):
+def get_prefix_list_version(client, prefix_list_id: str):
     resp = client.describe_managed_prefix_lists(
         Filters=[
             {
@@ -105,25 +105,6 @@ def prepare_aws_prefix_list(
 
     public_ip = resp.content.decode()
 
-    resp = client.get_managed_prefix_list_entries(
-        PrefixListId=prefix_list_id
-    )
-
-    entries = resp["Entries"]
-
-    sorted_entries = sorted(
-        entries, key=lambda entry: _parse_entry_timestamp(entry)
-    )
-
-    entries_ro_remove = _search_for_old_entries(sorted_entries)
-
-    if entries_ro_remove:
-        remove_prefix_list_entries(
-            client=client,
-            entries=entries_ro_remove,
-            prefix_list_id=prefix_list_id
-        )
-
     new_cidr = f'{public_ip}/32'
 
     attempts = 0
@@ -136,18 +117,11 @@ def prepare_aws_prefix_list(
             )
             break
         except botocore.exceptions.ClientError as e:
-            if "You've reached the maximum number of entries for the prefix list" in str(e):
-                logger.info("Removing oldest entries from prefix list to add new IP.")
-                remove_prefix_list_entries(
-                    client=client,
-                    entries=[sorted_entries[0]],
-                    prefix_list_id=prefix_list_id,
-                )
-
             if attempts >= MAX_PREFIX_LIST_UPDATE_ATTEMPTS:
                 logger.exception(f"Can not add new entry to the prefix list {prefix_list_id}")
                 raise e
 
+            attempts += 1
             time.sleep(1)
 
     return new_cidr
