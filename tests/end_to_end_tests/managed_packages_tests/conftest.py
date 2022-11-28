@@ -12,6 +12,7 @@ from typing import List
 
 import pytest
 
+from agent_build_refactored.tools.constants import SOURCE_ROOT
 from agent_build_refactored.tools.runner import Runner, RunnerMappedPath
 from agent_build_refactored.managed_packages.managed_packages_builders import PYTHON_PACKAGE_NAME, AGENT_LIBS_PACKAGE_NAME, DebManagedPackagesBuilderX86_64, RpmManagedPackagesBuilderx86_64, ALL_MANAGED_PACKAGE_BUILDERS, PREPARE_TOOLSET_GLIBC_X86_64
 from tests.end_to_end_tests.run_in_remote_machine.portable_pytest_runner import PortablePytestRunnerBuilder, PORTABLE_RUNNER_NAME
@@ -281,17 +282,22 @@ gpgcheck=0"""
 
 
 @pytest.fixture()
-def add_repo(package_builder):
+def add_repo(package_builder, distro_name: str):
     if package_builder.PACKAGE_TYPE == "deb":
         def add(repo_url):
             repo_file_path = pl.Path("/etc/apt/sources.list.d/test.list")
             repo_file_path.write_text(
                 f"deb [ allow-insecure=yes ] {repo_url} trusty main"
             )
-            _call_apt(["update", "--allow-unauthenticated"])
+            _call_apt(["update", "--allow-unauthenticated"], distro_name=distro_name)
     elif package_builder.PACKAGE_TYPE == "rpm":
         def add(repo_url):
             repo_file_path = pl.Path("/etc/yum.repos.d/test.repo")
+            if distro_name == "centos6":
+                shutil.copy(
+                    SOURCE_ROOT / "tests/end_to_end_tests/run_in_remote_machine/centos6.repo",
+                    "/etc/yum.repos.d/CentOS-Base.repo"
+                )
             repo_file_path.write_text(
                 _YUM_REPO_CONFIG_TEMPLATE.format(repo_url=repo_url)
             )
