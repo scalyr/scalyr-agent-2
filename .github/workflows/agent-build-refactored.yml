@@ -356,7 +356,7 @@ jobs:
           retention-days: 1
 
   test_managed_packages:
-    name: Test package ${{ matrix.name }} on  ${{ matrix.distro }}
+    name: Test package on ${{ matrix.distro }}, ${{ matrix.name }}
     if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     needs:
       - pre_job
