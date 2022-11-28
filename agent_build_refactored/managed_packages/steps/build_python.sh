@@ -59,7 +59,8 @@ LIB_DIR="lib"
 DATA_ROOT_DIR="share"
 INCLUDE_DIR="include"
 
-
+PACKAGE_INSTALL_PREFIX="/usr/share/${SUBDIR_NAME}"
+PACKAGE_INSTALL_EXEC_PREFIX="/usr/lib/${SUBDIR_NAME}"
 
 # Configure Python. Also provide options to store result files in sub-directories.
 ../configure \
@@ -69,93 +70,53 @@ INCLUDE_DIR="include"
 	--enable-shared \
 	--with-openssl="/usr/local" \
 	--with-readline=edit \
-	--prefix="${PYTHON_INSTALL_PREFIX}" \
-	--with-ensurepip=install \
-	--bindir="${PYTHON_INSTALL_PREFIX}/${BIN_DIR}/${SUBDIR_NAME}" \
-	--datarootdir="${PYTHON_INSTALL_PREFIX}/${DATA_ROOT_DIR}/${SUBDIR_NAME}" \
-	--includedir="${PYTHON_INSTALL_PREFIX}/${INCLUDE_DIR}/${SUBDIR_NAME}" \
-	--with-platlibdir="${LIB_DIR}/${SUBDIR_NAME}"
-#
-#		--enable-optimizations \
+	--prefix="${PACKAGE_INSTALL_PREFIX}" \
+	--exec-prefix="${PACKAGE_INSTALL_EXEC_PREFIX}" \
+	--with-ensurepip=upgrade \
+	--with-suffix="-orig"
+
+	#		--enable-optimizations \
 #	--with-lto \
 
 
+BUILD_ROOT="/tmp/python"
 
 make -j "$(nproc)"
 #make test
-make DESTDIR="/tmp/python" install
+make DESTDIR="${BUILD_ROOT}" install
 popd
 popd
 popd
 
-# Uncomment this in order to save built Python files with original filesystem structure. May be useful for debugging.
-# cp -a /tmp/python "${STEP_OUTPUT_PATH}/python_original"
-
-
-BUILD_ROOT="/tmp/python${PYTHON_INSTALL_PREFIX}"
-
-FINAL_PACKAGE_ROOT="${STEP_OUTPUT_PATH}/python${PYTHON_INSTALL_PREFIX}"
-
-# Create package root with a final structure, where all installation files are located in the sub-directories.
-# We have to do this because Python's build script's does not fully respect some options and leave some files
-# outside of the sub-directories.
-
-mkdir -p "${FINAL_PACKAGE_ROOT}/${BIN_DIR}"
-mkdir -p "${FINAL_PACKAGE_ROOT}/${LIB_DIR}"
-mkdir -p "${FINAL_PACKAGE_ROOT}/${DATA_ROOT_DIR}"
-mkdir -p "${FINAL_PACKAGE_ROOT}/${INCLUDE_DIR}"
-
-# Move created subdirectories.
-mv "${BUILD_ROOT}/${BIN_DIR}/${SUBDIR_NAME}" "${FINAL_PACKAGE_ROOT}/${BIN_DIR}/${SUBDIR_NAME}"
-mv "${BUILD_ROOT}/${LIB_DIR}/${SUBDIR_NAME}" "${FINAL_PACKAGE_ROOT}/${LIB_DIR}/${SUBDIR_NAME}"
-mv "${BUILD_ROOT}/${DATA_ROOT_DIR}/${SUBDIR_NAME}" "${FINAL_PACKAGE_ROOT}/${DATA_ROOT_DIR}/${SUBDIR_NAME}"
-mv "${BUILD_ROOT}/${INCLUDE_DIR}/${SUBDIR_NAME}" "${FINAL_PACKAGE_ROOT}/${INCLUDE_DIR}/${SUBDIR_NAME}"
-
-# Copy remaining files that have been created outside of sub-directories to those sub-directories.
-cp -ar ${BUILD_ROOT}/bin/. "${FINAL_PACKAGE_ROOT}/${BIN_DIR}/${SUBDIR_NAME}"
-cp -ar ${BUILD_ROOT}/lib/. "${FINAL_PACKAGE_ROOT}/${LIB_DIR}/${SUBDIR_NAME}"
-cp -ar ${BUILD_ROOT}/share/. "${FINAL_PACKAGE_ROOT}/${DATA_ROOT_DIR}/${SUBDIR_NAME}"
-cp -ar ${BUILD_ROOT}/include/. "${FINAL_PACKAGE_ROOT}/${INCLUDE_DIR}/${SUBDIR_NAME}"
-
-# Cleanup build root.
-rm -r ${BUILD_ROOT}/bin
-rm -r ${BUILD_ROOT}/libexec
-rm -r ${BUILD_ROOT}/lib
-rm -r ${BUILD_ROOT}/share
-rm -r ${BUILD_ROOT}/include
-
-
-function die() {
-    message=$1
-    >&2 echo "${message}"
-    exit 1
-}
-
-# Check that there's nothing left in the original build root directory.
-BUILT_ROOT_CONTENT=$(find "${BUILD_ROOT}" -type f)
-test $( echo -n "${BUILT_ROOT_CONTENT}" | wc -l) = 0 || die "Some files are still remaining not copied to a final package folder. Files: ${BUILT_ROOT_CONTENT}"
-
+#Uncomment this in order to save built Python files with original filesystem structure. May be useful for debugging.
+cp -a ${BUILD_ROOT} "${STEP_OUTPUT_PATH}/python_original"
 
 # Copy Python dependency shared libraries.
-cp -a /usr/local/lib/libz.so* "${FINAL_PACKAGE_ROOT}/${LIB_DIR}/${SUBDIR_NAME}"
-cp -a /usr/local/lib/libbz2.so* "${FINAL_PACKAGE_ROOT}/${LIB_DIR}/${SUBDIR_NAME}"
-cp -a /usr/local/lib/libedit.so* "${FINAL_PACKAGE_ROOT}/${LIB_DIR}/${SUBDIR_NAME}"
-cp -a /usr/local/lib/libncurses.so* "${FINAL_PACKAGE_ROOT}/${LIB_DIR}/${SUBDIR_NAME}"
-cp -a /usr/local/lib/liblzma.so* "${FINAL_PACKAGE_ROOT}/${LIB_DIR}/${SUBDIR_NAME}"
-cp -a /usr/local/lib/libuuid.so* "${FINAL_PACKAGE_ROOT}/${LIB_DIR}/${SUBDIR_NAME}"
-cp -a /usr/local/lib/libgdbm.so* "${FINAL_PACKAGE_ROOT}/${LIB_DIR}/${SUBDIR_NAME}"
-cp -a /usr/local/lib/libgdbm_compat.so* "${FINAL_PACKAGE_ROOT}/${LIB_DIR}/${SUBDIR_NAME}"
-cp -a /usr/local/lib64/libffi.so* "${FINAL_PACKAGE_ROOT}/${LIB_DIR}/${SUBDIR_NAME}"
-cp -a /usr/local/lib64/libcrypto.so* "${FINAL_PACKAGE_ROOT}/${LIB_DIR}/${SUBDIR_NAME}"
-cp -a /usr/local/lib64/libssl.so* "${FINAL_PACKAGE_ROOT}/${LIB_DIR}/${SUBDIR_NAME}"
+cp -a /usr/local/lib/libz.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
+cp -a /usr/local/lib/libbz2.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
+cp -a /usr/local/lib/libedit.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
+cp -a /usr/local/lib/libncurses.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
+cp -a /usr/local/lib/liblzma.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
+cp -a /usr/local/lib/libuuid.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
+cp -a /usr/local/lib/libgdbm.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
+cp -a /usr/local/lib/libgdbm_compat.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
+cp -a /usr/local/lib64/libffi.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
+cp -a /usr/local/lib64/libcrypto.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
+cp -a /usr/local/lib64/libssl.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
 
 # Copy wrapper for Python interpreter executable.
-cp -a "${SOURCE_ROOT}/agent_build_refactored/managed_packages/files/scalyr-agent-2-python3" "${FINAL_PACKAGE_ROOT}/${BIN_DIR}/${SUBDIR_NAME}/scalyr-agent-2-python3"
+cp -a "${SOURCE_ROOT}/agent_build_refactored/managed_packages/files/python3" "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/bin/python3"
 
 # Remove some of the files to reduce package size
-PYTHON_LIBS_PATH="${FINAL_PACKAGE_ROOT}/${LIB_DIR}/${SUBDIR_NAME}/python${PYTHON_SHORT_VERSION}"
+PYTHON_EXEC_LIBS_PATH="${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib/python${PYTHON_SHORT_VERSION}"
+PYTHON_LIBS_PATH="${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/lib/python${PYTHON_SHORT_VERSION}"
 
+find ${PYTHON_EXEC_LIBS_PATH} -name "__pycache__" -type d -prune -exec rm -r {} \;
 find ${PYTHON_LIBS_PATH} -name "__pycache__" -type d -prune -exec rm -r {} \;
+
 rm -r ${PYTHON_LIBS_PATH}/test
 rm -r ${PYTHON_LIBS_PATH}/config-${PYTHON_SHORT_VERSION}-x86_64-linux-gnu
 rm -r ${PYTHON_LIBS_PATH}/lib2to3
+
+
+cp -a ${BUILD_ROOT} "${STEP_OUTPUT_PATH}/python"
