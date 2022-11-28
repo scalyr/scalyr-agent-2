@@ -7,7 +7,7 @@ import time
 from typing import List, Dict, Optional
 
 from agent_build_refactored.tools.constants import Architecture
-from tests.end_to_end_tests.run_in_remote_machine.ec2_prefix_lists import prepare_aws_prefix_list, remove_prefix_list_entry
+from tests.end_to_end_tests.run_in_remote_machine.ec2_prefix_lists import add_current_ip_to_prefix_list, remove_prefix_list_entry
 
 logger = logging.getLogger(__name__)
 
@@ -266,9 +266,9 @@ def run_test_in_ec2_instance(
     )
 
     # Add current public IP to security group's prefix list.
-    # We have to update that prefix list each time because there are to many GitHub actions public IPs and
+    # We have to update that prefix list each time because there are to many GitHub actions public IPs, and
     # it is not possible to whitelist all of them in the AWS prefix list.
-    new_cidr = prepare_aws_prefix_list(
+    add_current_ip_to_prefix_list(
         client=boto_client,
         prefix_list_id=security_groups_prefix_list_id,
     )
@@ -280,13 +280,6 @@ def run_test_in_ec2_instance(
     finally:
         if node:
             destroy_node_and_cleanup(driver=driver, node=node)
-
-        # Also cleanup prefix list.
-        remove_prefix_list_entry(
-            client=boto_client,
-            prefix_list_id=security_groups_prefix_list_id,
-            cidr=new_cidr
-        )
 
     duration = int(time.time()) - start_time
 

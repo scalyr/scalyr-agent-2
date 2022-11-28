@@ -1,3 +1,4 @@
+import json
 import re
 import time
 import logging
@@ -6,7 +7,7 @@ from typing import List, Dict
 logger = logging.getLogger(__name__)
 
 
-MAX_PREFIX_LIST_UPDATE_ATTEMPTS = 3
+MAX_PREFIX_LIST_UPDATE_ATTEMPTS = 10
 PREFIX_LIST_ENTRY_REMOVE_THRESHOLD = 60 * 1  # 1 hour.
 
 
@@ -43,8 +44,13 @@ def _parse_entry_timestamp(entry: Dict):
     )
 
 
-def add_new_entry(client, cidr: str, prefix_list_id:str):
-    version = _get_prefix_list_version(
+def add_new_entry(
+        client,
+        cidr: str, prefix_list_id: str,
+        workflow_id: str = None
+
+):
+    version = get_prefix_list_version(
         client=client,
         prefix_list_id=prefix_list_id
     )
@@ -54,7 +60,10 @@ def add_new_entry(client, cidr: str, prefix_list_id:str):
         AddEntries=[
             {
                 'Cidr': cidr,
-                'Description': f"Creation timestamp: {int(time.time())}"
+                'Description': json.dumps({
+                    "time": int(time.time()),
+                    "workflow_id": workflow_id
+                })
             },
         ]
     )
@@ -90,10 +99,10 @@ def remove_prefix_list_entries(client, entries: List, prefix_list_id: str):
             time.sleep(1)
 
 
-
-def prepare_aws_prefix_list(
+def add_current_ip_to_prefix_list(
     client,
     prefix_list_id: str,
+    workflow_id: str = None
 ):
     import botocore.exceptions
     import requests
@@ -113,7 +122,8 @@ def prepare_aws_prefix_list(
             add_new_entry(
                 client=client,
                 cidr=new_cidr,
-                prefix_list_id=prefix_list_id
+                prefix_list_id=prefix_list_id,
+                workflow_id=workflow_id
             )
             break
         except botocore.exceptions.ClientError as e:
@@ -122,6 +132,7 @@ def prepare_aws_prefix_list(
                 raise e
 
             attempts += 1
+            print(f"Can not modify prefix list, retry. Reason: {str(e)}")
             time.sleep(1)
 
     return new_cidr

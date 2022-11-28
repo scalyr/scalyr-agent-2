@@ -1,9 +1,10 @@
 import argparse
+import json
 import re
 import sys
 import time
 import pathlib as pl
-from typing import Dict
+from typing import Dict, List
 
 import boto3
 import botocore.exceptions
@@ -18,43 +19,19 @@ from tests.end_to_end_tests.run_in_remote_machine.ec2_prefix_lists import get_pr
 PREFIX_LIST_ENTRY_REMOVE_THRESHOLD = 60 * 7  # Minutes
 
 
+def _parse_entry_description(entry: Dict):
+    return json.loads(entry["Description"])
+
+
 def _parse_entry_timestamp(entry: Dict):
-    return int(
-        re.search(r"Creation timestamp: (\d+)", entry["Description"]).group(1)
-    )
+    return _parse_entry_description(entry)["time"]
 
 
-def main(
-    access_key: str,
-    secret_key: str,
-    prefix_list_id: str,
-    region: str,
+def _remove_entries(
+        client,
+        entries: List,
+        prefix_list_id: str
 ):
-
-    client = boto3.client(
-        "ec2",
-        aws_access_key_id=access_key,
-        aws_secret_access_key=secret_key,
-        region_name=region
-    )
-
-    resp = client.get_managed_prefix_list_entries(
-        PrefixListId=prefix_list_id
-    )
-
-    entries = resp["Entries"]
-
-    entries_to_remove = []
-
-    current_time = time.time()
-    for entry in entries:
-        timestamp = _parse_entry_timestamp(entry)
-        if timestamp <= current_time - PREFIX_LIST_ENTRY_REMOVE_THRESHOLD:
-            entries_to_remove.append(entry)
-
-    if not entries_to_remove:
-        return
-
     attempts = 10
     while True:
         try:
@@ -84,6 +61,40 @@ def main(
             time.sleep(1)
 
 
+def main(
+    client,
+    prefix_list_id: str,
+    workflow_id: str = None
+):
+    resp = boto_client.get_managed_prefix_list_entries(
+        PrefixListId=args.prefix_list_id
+    )
+    entries = resp["Entries"]
+
+    entries_to_remove = []
+
+    if workflow_id:
+        for entry in entries:
+            description = _parse_entry_description(entry)
+            if description["workflow_id"] and description["workflow_id"] == workflow_id:
+                entries_to_remove.append(entry)
+    else:
+        current_time = time.time()
+        for entry in entries:
+            timestamp = _parse_entry_timestamp(entry)
+            if timestamp <= current_time - PREFIX_LIST_ENTRY_REMOVE_THRESHOLD:
+                entries_to_remove.append(entry)
+
+    if not entries_to_remove:
+        return
+
+    _remove_entries(
+        client=client,
+        entries=entries_to_remove,
+        prefix_list_id=prefix_list_id
+    )
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -102,12 +113,22 @@ if __name__ == '__main__':
         "--region",
         required=True
     )
+    parser.add_argument(
+        "--workflow-id",
+        required=False
+    )
     args = parser.parse_args()
 
+    boto_client = boto3.client(
+        "ec2",
+        aws_access_key_id=args.access_key,
+        aws_secret_access_key=args.secret_key,
+        region_name=args.region
+    )
+
     main(
-        access_key=args.access_key,
-        secret_key=args.secret_key,
+        client=boto_client,
         prefix_list_id=args.prefix_list_id,
-        region=args.region
+        workflow_id=args.workflow_id
     )
 
