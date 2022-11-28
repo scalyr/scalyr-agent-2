@@ -5,7 +5,7 @@ inputs:
   minikube_version:
     description: "Minikube version to use"
     required: false
-    default: "v1.26.1"
+    default: "v1.28.0"
   k8s_version:
     description: "Kubernetes version to be installed by minikube (if any)"
     required: false
@@ -25,6 +25,8 @@ inputs:
 runs:
   using: "composite"
   steps:
+    # NOTE: Due to a bug in v1.24.0, we need a workaround for it. That issue
+    # appears to have been fixed in v1.25.x
     - name: Create minikube Kubernetes ${{ inputs.k8s_version }} Cluster
       id: create-minikube-cluster
       if: ${{ inputs.k8s_version != '' && inputs.k8s_version != 'v1.24.0' }}
