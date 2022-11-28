@@ -64,7 +64,7 @@ def remove_prefix_list_entries(client, entries: List, prefix_list_id: str):
     import botocore.exceptions
 
     attempts = 10
-    while attempts > 0:
+    while True:
         try:
             version = _get_prefix_list_version(
                 client=client,
@@ -79,6 +79,12 @@ def remove_prefix_list_entries(client, entries: List, prefix_list_id: str):
         except botocore.exceptions.ClientError as e:
             if "The prefix list has the incorrect version number" in str(e):
                 continue
+
+            if "The request cannot be completed while the prefix" in str(e):
+                continue
+
+            if attempts == 0:
+                raise
 
             attempts -= 1
             time.sleep(1)

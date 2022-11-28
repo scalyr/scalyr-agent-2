@@ -20,7 +20,7 @@ DISTROS: Dict[str, Dict[Architecture, EC2DistroImage]] = {
     "ubuntu2004": {
         "ec2": {
             Architecture.X86_64: EC2DistroImage(
-                image_id="ami-0149b2da6ceec4bb0 ",
+                image_id="ami-0149b2da6ceec4bb0",
                 image_name="Ubuntu Server 20.04 LTS (HVM), SSD Volume Type",
                 size_id="m1.small",
                 ssh_username="ubuntu"
