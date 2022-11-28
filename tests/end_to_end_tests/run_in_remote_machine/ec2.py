@@ -33,12 +33,84 @@ EC2_IMAGES: Dict[str, Dict[Architecture, EC2DistroImage]] = {
             ssh_username="ubuntu",
         )
     },
+    "ubuntu2004": {
+        Architecture.X86_64: EC2DistroImage(
+            image_id="ami-0149b2da6ceec4bb0 ",
+            image_name="Ubuntu Server 20.04 LTS (HVM), SSD Volume Type",
+            size_id="m1.small",
+            ssh_username="ubuntu"
+        )
+    },
+    "ubuntu1804": {
+        Architecture.X86_64: EC2DistroImage(
+            image_id="ami-07ebfd5b3428b6f4d",
+            image_name="Ubuntu Server 18.04 LTS (HVM), SSD Volume Type",
+            size_id="m1.small",
+            ssh_username="ubuntu"
+        )
+    },
+    "ubuntu1604": {
+        Architecture.X86_64: EC2DistroImage(
+                image_id="ami-08bc77a2c7eb2b1da",
+                image_name="Ubuntu Server 16.04 LTS (HVM), SSD Volume Type",
+                size_id="m1.small",
+                ssh_username="ubuntu",
+            )
+    },
+    "ubuntu1404": {
+        Architecture.X86_64: EC2DistroImage(
+                image_id="ami-07957d39ebba800d5",
+                image_name="Ubuntu Server 14.04 LTS (HVM)",
+                size_id="t2.small",
+                ssh_username="ubuntu",
+        )
+    },
+    "debian11": {
+        Architecture.X86_64: EC2DistroImage(
+            image_id="ami-09a41e26df464c548",
+            image_name="Debian 11 (HVM), SSD Volume Type",
+            size_id="t2.small",
+            ssh_username="ubuntu",
+        )
+    },
+    "debian10": {
+        Architecture.X86_64: EC2DistroImage(
+            image_id="ami-0b9a611a02047d3b1",
+            image_name="Debian 10 Buster",
+            size_id="t2.small",
+            ssh_username="admin",
+        )
+    },
+    "centos8": {
+            Architecture.X86_64: EC2DistroImage(
+                image_id="ami-01ca03df4a6012157",
+                image_name="CentOS 8 (x86_64) - with Updates HVM",
+                size_id="t2.small",
+                ssh_username="centos",
+            )
+    },
     "centos7": {
         Architecture.X86_64: EC2DistroImage(
             image_id="ami-0affd4508a5d2481b",
             image_name="CentOS 7 (x86_64) - with Updates HVM",
             size_id="t2.small",
             ssh_username="centos",
+        )
+    },
+    "centos6": {
+        Architecture.X86_64: EC2DistroImage(
+            image_id="ami-03a941394ec9849de",
+            image_name="CentOS 6 (x86_64) - with Updates HVM",
+            size_id="t2.small",
+            ssh_username="root",
+        )
+    },
+    "amazonlinux2": {
+        Architecture.X86_64: EC2DistroImage(
+            image_id="ami-09d95fab7fff3776c",
+            image_name="Amazon Linux 2 AMI (HVM), SSD Volume Type",
+            size_id="t2.small",
+            ssh_username="ec2-user",
         )
     },
 }
