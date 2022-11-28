@@ -806,6 +806,53 @@ class ManagedPackagesBuilder(Runner):
             exit(1)
 
 
+pr = EnvironmentRunnerStep(
+        name="download_build_dependencies_prepare",
+        script_path="agent_build_refactored/managed_packages/steps/download_build_dependencies/download_build_dependencies_prepare.sh",
+        base=DockerImageSpec(
+            name="ubuntu:22.04",
+            platform=DockerPlatform.AMD64.value
+        ),
+
+    )
+download_build_dependencies = ArtifactRunnerStep(
+        name="download_build_dependencies",
+        script_path="agent_build_refactored/managed_packages/steps/download_build_dependencies/download_build_dependencies.sh",
+        tracked_files_globs=[
+            "agent_build_refactored/managed_packages/steps/download_build_dependencies/gnu-keyring.gpg",
+            "agent_build_refactored/managed_packages/steps/download_build_dependencies/gpgkey-5C1D1AA44BE649DE760A.gpg",
+        ],
+        # base=DockerImageSpec(
+        #     name="ubuntu:22.04",
+        #     platform=DockerPlatform.AMD64.value
+        # ),
+        base=pr,
+        environment_variables={
+            # "ZX_VERSION": "5.2.6",
+            # "PERL_VERSION": "5.36.0",
+            #"TEXTINFO_VERSION": "6.8",
+            #"M4_VERSION": "1.4.19",
+            #"LIBTOOL_VERSION": "2.4.6",
+            #"AUTOCONF_VERSION": "2.71",
+            #"AUTOMAKE_VERSION": "1.16",
+            #"HELP2MAN_VERSION": "1.49.2",
+            "LZMA_VERSION": "4.32.7",
+            #"OPENSSL_VERSION": PYTHON_PACKAGE_SSL_VERSION,
+            #"LIBFFI_VERSION": "3.4.2",
+            #"UTIL_LINUX_VERSION": "2.38",
+            #"NCURSES_VERSION": "6.3",
+            #"LIBEDIT_VERSION": "20210910-3.1",
+            #"GDBM_VERSION": "1.23",
+            #"ZLIB_VERSION": "1.2.13",
+            #"BZIP_VERSION": "1.0.8",
+        },
+
+    )
+
+download_build_dependencies.run(work_dir=pl.Path("/Users/arthur/PycharmProjects/scalyr-agent-2-final/agent_build_output"))
+a=10
+
+
 def create_build_dependencies_step(
         base_image: EnvironmentRunnerStep
 ) -> EnvironmentRunnerStep:
@@ -837,7 +884,6 @@ def create_build_dependencies_step(
             "GDBM_VERSION": "1.23",
             "ZLIB_VERSION": "1.2.13",
             "BZIP_VERSION": "1.0.8",
-            "RUST_VERSION": "1.63.0",
         },
         github_actions_settings=GitHubActionsSettings(
             cacheable=True
