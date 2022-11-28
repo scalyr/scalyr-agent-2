@@ -272,7 +272,11 @@ gpgcheck=0"""
 @pytest.fixture()
 def add_repo(package_builder):
     if package_builder.PACKAGE_TYPE == "deb":
-        pass
+        def add(repo_url):
+            repo_file_path = pl.Path("/etc/apt/sources.list.d/test.list")
+            repo_file_path.write_text(
+                f"deb [ allow-insecure=yes ] {repo_url} trusty main"
+            )
     elif package_builder.PACKAGE_TYPE == "rpm":
         def add(repo_url):
             repo_file_path = pl.Path("/etc/yum.repos.d/test.repo")
