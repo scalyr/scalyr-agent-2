@@ -68,7 +68,7 @@ runs:
         echo "K8S_NODE_NAME=${K8S_NODE_NAME}" >> ${GITHUB_ENV}
         echo "Using node name: ${K8S_NODE_NAME}"
 
-        export K8S_CLUSTER_NAME="${{ inputs.cluster_name_prefix }}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+        export K8S_CLUSTER_NAME="${{ inputs.scalyr_k8s_cluster_name_prefix }}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
         echo "K8S_CLUSTER_NAME=${K8S_CLUSTER_NAME}" >> ${GITHUB_ENV}
         echo "Using cluster name: ${K8S_CLUSTER_NAME}"
 
