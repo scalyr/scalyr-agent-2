@@ -101,6 +101,12 @@ def distro(request):
     return request.config.option.distro
 
 
+@pytest.fixture(scope="session")
+def distro_name(distro):
+    _, distro_name = distro.split(":")
+    return distro_name
+
+
 _APT_REPO_CONF = """
 Origin: test_repo
 Label: test_repo
@@ -308,10 +314,13 @@ def _call_yum(command: List, distro: str):
     )
 
 
-def _call_apt(command: List[str]):
+def _call_apt(command: List[str], distro_name: str):
     env = {
         "DEBIAN_FRONTEND": "noninteractive"
     }
+
+    if distro_name == "ubuntu1804":
+        env["PATH"] = "/usr/sbin:/usr/local/sbin:/sbin"
     subprocess.check_call(
         ["apt", *command],
         env=env
@@ -319,13 +328,13 @@ def _call_apt(command: List[str]):
 
 
 @pytest.fixture()
-def install_package(package_builder, distro):
+def install_package(package_builder, distro_name):
     if package_builder.PACKAGE_TYPE == "deb":
         def install(package_name: str):
             _call_apt(["install", "-y", "--allow-unauthenticated", package_name])
     elif package_builder.PACKAGE_TYPE == "rpm":
         def install(package_name: str):
-            _call_yum(["install", "-y", package_name], distro=distro)
+            _call_yum(["install", "-y", package_name], distro=distro_name)
     else:
         raise Exception(f"Unknown package type {package_builder.PACKAGE_TYPE}")
 
