@@ -6,7 +6,7 @@ from agent_build_refactored.tools.constants import Architecture, DockerPlatform
 from agent_build_refactored.managed_packages.managed_packages_builders import ManagedPackagesBuilder
 from tests.end_to_end_tests.run_in_remote_machine.ec2 import EC2DistroImage, run_test_in_ec2_instance, AwsSettings
 
-DISTROS: Dict[str, Dict[Architecture, EC2DistroImage]] = {
+DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
     "ubuntu2204": {
         "ec2": {
             Architecture.X86_64: EC2DistroImage(
@@ -119,6 +119,7 @@ DISTROS: Dict[str, Dict[Architecture, EC2DistroImage]] = {
     },
 }
 
+
 def run_test_remotely(
         remote_distro_name: str,
         command: List[str],
@@ -163,7 +164,8 @@ def run_test_remotely(
             private_key_name=test_options.aws_private_key_name,
             region=test_options.aws_region,
             security_group=test_options.aws_security_group,
-            security_groups_prefix_list_id=test_options.aws_security_groups_prefix_list_id
+            security_groups_prefix_list_id=test_options.aws_security_groups_prefix_list_id,
+            workflow_id=test_options.workflow_id
         )
     else:
         mount_options = []

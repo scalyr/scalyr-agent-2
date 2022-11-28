@@ -150,6 +150,7 @@ def run_test_in_ec2_instance(
         max_tries: int = 3,
         deploy_overall_timeout: int = 100,
         file_mappings: Dict = None,
+        workflow_id: str = None
 ):
     import paramiko
     from libcloud.compute.types import Provider
@@ -271,6 +272,7 @@ def run_test_in_ec2_instance(
     add_current_ip_to_prefix_list(
         client=boto_client,
         prefix_list_id=security_groups_prefix_list_id,
+        workflow_id=workflow_id
     )
 
     node = None

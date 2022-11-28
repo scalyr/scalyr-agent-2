@@ -445,6 +445,7 @@ jobs:
             --distro ${{ matrix.distro }} \
             --packages-source-type dir \
             --packages-source /tmp/packages \
+            --workflow-id ${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }} \
             --aws-access-key "${{ secrets.AWS_DEV_ACCESS_KEY }}" \
             --aws-secret-key "${{ secrets.AWS_DEV_SECRET_KEY }}" \
             --aws-private-key-path /tmp/private_key.pem \

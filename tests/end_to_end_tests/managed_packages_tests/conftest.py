@@ -80,6 +80,11 @@ def pytest_addoption(parser):
         required=False,
         help="ID of the prefix list of the security group. Required for testing in ec2 instances."
     )
+    parser.addoption(
+        "--workflow-id",
+        required=False
+    )
+
 
 @pytest.fixture(scope="session")
 def package_builder_name(request):
