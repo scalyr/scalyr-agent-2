@@ -61,15 +61,28 @@ def add_new_entry(client, cidr: str, prefix_list_id:str):
 
 
 def remove_prefix_list_entries(client, entries: List, prefix_list_id: str):
-    version = _get_prefix_list_version(
-        client=client,
-        prefix_list_id=prefix_list_id
-    )
-    client.modify_managed_prefix_list(
-        PrefixListId=prefix_list_id,
-        CurrentVersion=version,
-        RemoveEntries=[{"Cidr":e["Cidr"]} for e in entries]
-    )
+    import botocore.exceptions
+
+    attempts = 10
+    while attempts > 0:
+        try:
+            version = _get_prefix_list_version(
+                client=client,
+                prefix_list_id=prefix_list_id
+            )
+            client.modify_managed_prefix_list(
+                PrefixListId=prefix_list_id,
+                CurrentVersion=version,
+                RemoveEntries=[{"Cidr":e["Cidr"]} for e in entries]
+            )
+            break
+        except botocore.exceptions.ClientError as e:
+            if "The prefix list has the incorrect version number" in str(e):
+                continue
+
+            attempts -= 1
+            time.sleep(1)
+
 
 
 def prepare_aws_prefix_list(
