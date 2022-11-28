@@ -71,26 +71,26 @@ def main(
     )
     entries = resp["Entries"]
 
-    entries_to_remove = []
+    entries_to_remove = {}
+
+    current_time = time.time()
+    for entry in entries:
+        timestamp = _parse_entry_timestamp(entry)
+        if timestamp <= current_time - PREFIX_LIST_ENTRY_REMOVE_THRESHOLD:
+            entries_to_remove[entry["Cidr"]] = entry
 
     if workflow_id:
         for entry in entries:
             description = _parse_entry_description(entry)
             if description["workflow_id"] and description["workflow_id"] == workflow_id:
-                entries_to_remove.append(entry)
-    else:
-        current_time = time.time()
-        for entry in entries:
-            timestamp = _parse_entry_timestamp(entry)
-            if timestamp <= current_time - PREFIX_LIST_ENTRY_REMOVE_THRESHOLD:
-                entries_to_remove.append(entry)
+                entries_to_remove[entry["Cidr"]] = entry
 
     if not entries_to_remove:
         return
 
     _remove_entries(
         client=client,
-        entries=entries_to_remove,
+        entries=list(entries_to_remove.values()),
         prefix_list_id=prefix_list_id
     )
 
