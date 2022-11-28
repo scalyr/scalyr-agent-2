@@ -282,7 +282,7 @@ def add_repo(package_builder):
             repo_file_path.write_text(
                 f"deb [ allow-insecure=yes ] {repo_url} trusty main"
             )
-            _call_apt(["update"])
+            _call_apt(["update", "--allow-unauthenticated"])
     elif package_builder.PACKAGE_TYPE == "rpm":
         def add(repo_url):
             repo_file_path = pl.Path("/etc/yum.repos.d/test.repo")
