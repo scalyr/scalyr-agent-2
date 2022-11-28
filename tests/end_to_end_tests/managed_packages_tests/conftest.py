@@ -317,10 +317,10 @@ def _call_apt(command: List[str]):
 def install_package(package_builder, distro):
     if package_builder.PACKAGE_TYPE == "deb":
         def install(package_name: str):
-            _call_apt(["install", "-y", package_name])
+            _call_apt(["install", "-y", "--allow-unauthenticated", package_name])
     elif package_builder.PACKAGE_TYPE == "rpm":
         def install(package_name: str):
-            _call_yum(["install", "-y", "--allow-unauthenticated", package_name], distro=distro)
+            _call_yum(["install", "-y", package_name], distro=distro)
     else:
         raise Exception(f"Unknown package type {package_builder.PACKAGE_TYPE}")
 
