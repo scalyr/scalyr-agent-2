@@ -479,6 +479,7 @@ jobs:
 
   clean-ec2-tests-prefix-list-entries:
     name: Remove ec2 test workflow prefix list entries
+    if: ${{ always() }}
     needs:
       - pre_job
       - test_managed_packages
