@@ -508,6 +508,7 @@ jobs:
     needs:
       - pre_job
       - clean-ec2-tests-prefix-list-old-entries
+      - test_managed_packages
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout repository
