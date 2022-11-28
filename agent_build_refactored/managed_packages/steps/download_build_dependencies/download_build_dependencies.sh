@@ -1,9 +1,55 @@
+# Copyright 2014-2022 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This script is meant to be executed by the instance of the 'agent_build_refactored.tools.runner.RunnerStep' class.
+# Every RunnerStep provides common environment variables to its script:
+#   SOURCE_ROOT: Path to the projects root.
+#   STEP_OUTPUT_PATH: Path to the step's output directory.
+#
+# This script downloads source files for all libraries that are required to build Python. Since we build Python and its
+# requirements in a legacy OS (such as Centos 6) to achieve binary compatibility, we also have to build many essential
+# build tools because tools from legacy OS's ate too old.
+#
+# It expects next environment variables:
+#
+#   XZ_VERSION: version of XZ Utils to build. Python requirement. ALso required by some make and configure scripts.
+#   PERL_VERSION: version of Perl to build. Required by some make and configure scripts.
+#   TEXINFO_VERSION: version of texinfo to build. Required by some make and configure scripts.
+#   M4_VERSION: version of M4 to build. Required by some make and configure scripts.
+#   AUTOCONF_VERSION: version of autoconf to build. Required by some make and configure scripts.
+#   LIBTOOL_VERSION: version of libtool to build. Required by some make and configure scripts.
+#   HELP2MAN_VERSION: version of help2man to build. Required by some make and configure scripts.
+#   AUTOMAKE_VERSION: version of automake to build. Required by some make and configure scripts.
+#   LZMA_VERSION: version of lzma to build. Python requirement.
+#   ZLIB_VERSION: version of zlib to build. Python requirement. Provides zlib module.
+#   BZIP_VERSION: version of bzip to build. Python requirement. Provides bz2 module.
+#   UTIL_LINUX_VERSION: version of lzma to build. Python requirement. Provides uuid module.
+#   NCURSES_VERSION: version of ncurses to build. Python requirement. Provides curses module.
+#   LIBEDIT_VERSION: version of libedit to build. Python requirement. Provides non-GPL alternative for readline module.
+#   GDBM_VERSION: version of gdbm to build. Python requirement. Provides dbm module.
+#   LIBFFI_VERSION: version of libffi to build. Python requirement. Provides ctypes module and essential for C bindings.
+#   OPENSSL_VERSION: version of OpenSSL to build. Python requirement. Provides ssl module.
+
 set -e
 
+apt update
+
+DEBIAN_FRONTEND=noninteractive apt install -y git curl gnupg gnupg2 xz-utils
 
 
-
-XZ_PUBLIC_KEY="-----BEGIN PGP PUBLIC KEY BLOCK-----
+# Import XZ public key
+echo -n "-----BEGIN PGP PUBLIC KEY BLOCK-----
 
 mQINBEzEOZIBEACxg/IuXERlDB48JBWmF4NxNUuuup1IhJAJyFGFSKh3OGAO2Ard
 sNuRLjANsFXA7m7P5eTFcG+BoHHuAVYmKnI3PPZtHVLnUt4pGItPczQZ2BE1WpcI
@@ -77,27 +123,28 @@ eUy2pBqS1302sBB+nfrGFTFmJC4ypzY8uQFG98dxBozqME836KrMhiBbeLIghXgs
 OQHHt+gXyQVzvzskedUxZ4mxzZ1D/+JfJhwxGvxZFn5sAGLbAmRbXoIv0duHk/JW
 2F1vt/S03rzec8y37B3LLWnIO9LK
 =V4Re
------END PGP PUBLIC KEY BLOCK-----"
+-----END PGP PUBLIC KEY BLOCK-----" | gpg --import
 
-gpg --import <<< ${XZ_PUBLIC_KEY}
-
-#mkdir "${STEP_OUTPUT_PATH}/xz"
-#pushd "${STEP_OUTPUT_PATH}/xz"
-#XZ_VERSION="5.2.6"
-#curl -L "https://tukaani.org/xz/xz-${XZ_VERSION}.tar.gz" > xz.tar.gz
-#curl -L "https://tukaani.org/xz/xz-${XZ_VERSION}.tar.gz.sig" > xz.tar.gz.sig
-#gpg --verify xz.tar.gz.sig xz.tar.gz
-
-#
-#mkdir "${STEP_OUTPUT_PATH}/perl"
-#pushd "${STEP_OUTPUT_PATH}/perl"
-#curl -L  http://www.cpan.org/src/5.0/perl-5.36.0.tar.gz > perl.tar.gz
-#
-#echo -n "e26085af8ac396f62add8a533c3a0ea8c8497d836f0689347ac5abd7b7a4e00a  perl.tar.gz" > perl.tar.gz.sha256
-#sha256sum -c perl.tar.gz.sha256
+mkdir "${STEP_OUTPUT_PATH}/xz"
+pushd "${STEP_OUTPUT_PATH}/xz"
+curl -L "https://tukaani.org/xz/xz-${XZ_VERSION}.tar.gz" > xz.tar.gz
+curl -L "https://tukaani.org/xz/xz-${XZ_VERSION}.tar.gz.sig" > xz.tar.gz.sig
+gpg --verify xz.tar.gz.sig xz.tar.gz
+popd
 
 
-GNU_PUBLIC_KEY="-----BEGIN PGP PUBLIC KEY BLOCK-----
+mkdir "${STEP_OUTPUT_PATH}/perl"
+pushd "${STEP_OUTPUT_PATH}/perl"
+curl -L  http://www.cpan.org/src/5.0/perl-${PERL_VERSION}.tar.gz > perl.tar.gz
+
+# Public keys and signatures for perl source couldn't be found, so we just verify the checksum of the particular version.
+echo -n "e26085af8ac396f62add8a533c3a0ea8c8497d836f0689347ac5abd7b7a4e00a  perl.tar.gz" > perl.tar.gz.sha256
+sha256sum -c perl.tar.gz.sha256
+popd
+
+
+# Import gnu public key. Used for many libraries.
+echo -n "-----BEGIN PGP PUBLIC KEY BLOCK-----
 Version: GnuPG v1.2.4 (GNU/Linux)
 
 mQELBEZXGZkBCAC+Q78u3O8o0T3CccKzs/Bc90ooDpczOqCvkdJVFHJtAGL6ge9X
@@ -114,72 +161,63 @@ Huqba4uzzTOVO3KXwQEwEJhQVY1MssUXyjnvxRnfvYt22Y1+KOuv2Ps+DCw8J0Gs
 pJIb4TMNGOA95S/JNQzSzHrHir2EID0KSKTzlLjdQNMa1/It1vgh6IEPidai8ik/
 sMB+Qkul/Hc+0BLBe+OVT6Ml1IAL
 =AXHk
------END PGP PUBLIC KEY BLOCK-----"
+-----END PGP PUBLIC KEY BLOCK-----
+" | gpg --import
 
-gpg --import <<< ${GNU_PUBLIC_KEY}
 
 GNU_KEYRING_PATH="${SOURCE_ROOT}/agent_build_refactored/managed_packages/steps/download_build_dependencies/gnu-keyring.gpg"
 
-#mkdir "${STEP_OUTPUT_PATH}/texinfo"
-#pushd "${STEP_OUTPUT_PATH}/texinfo"
-#TEXTINFO_VERSION="6.8"
-#curl -L "https://ftp.gnu.org/gnu/texinfo/texinfo-${TEXTINFO_VERSION}.tar.gz" > texinfo.tar.gz
-#curl -L "https://ftp.gnu.org/gnu/texinfo/texinfo-${TEXTINFO_VERSION}.tar.gz.sig" > texinfo.tar.gz.sig
-#
-#gpg --verify --keyring "${SOURCE_ROOT}/agent_build_refactored/managed_packages/steps/download_build_dependencies/gnu-keyring.gpg" \
-#  texinfo.tar.gz.sig \
-#  texinfo.tar.gz
+mkdir "${STEP_OUTPUT_PATH}/texinfo"
+pushd "${STEP_OUTPUT_PATH}/texinfo"
+curl -L "https://ftp.gnu.org/gnu/texinfo/texinfo-${TEXINFO_VERSION}.tar.gz" > texinfo.tar.gz
+curl -L "https://ftp.gnu.org/gnu/texinfo/texinfo-${TEXINFO_VERSION}.tar.gz.sig" > texinfo.tar.gz.sig
+gpg --verify --keyring "${GNU_KEYRING_PATH}" texinfo.tar.gz.sig texinfo.tar.gz
+popd
+
+
+mkdir "${STEP_OUTPUT_PATH}/m4"
+pushd "${STEP_OUTPUT_PATH}/m4"
+curl -L "https://ftp.gnu.org/gnu/m4/m4-${M4_VERSION}.tar.gz" > m4.tar.gz
+curl -L "https://ftp.gnu.org/gnu/m4/m4-${M4_VERSION}.tar.gz.sig" > m4.tar.gz.sig
+gpg --verify --keyring "${GNU_KEYRING_PATH}" m4.tar.gz.sig m4.tar.gz
+popd
+
+mkdir "${STEP_OUTPUT_PATH}/autoconf"
+pushd "${STEP_OUTPUT_PATH}/autoconf"
+curl -L "http://ftp.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VERSION}.tar.gz" > autoconf.tar.gz
+curl -L "http://ftp.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VERSION}.tar.gz.sig" > autoconf.tar.gz.sig
+gpg --verify --keyring "${GNU_KEYRING_PATH}" autoconf.tar.gz.sig autoconf.tar.gz
+popd
+
+
+mkdir "${STEP_OUTPUT_PATH}/libtool"
+pushd "${STEP_OUTPUT_PATH}/libtool"
+curl -L http://ftp.gnu.org/gnu/libtool/libtool-${LIBTOOL_VERSION}.tar.gz > libtool.tar.gz
+curl -L http://ftp.gnu.org/gnu/libtool/libtool-${LIBTOOL_VERSION}.tar.gz.sig > libtool.tar.gz.sig
+gpg --verify --keyring "${GNU_KEYRING_PATH}" libtool.tar.gz.sig libtool.tar.gz
+popd
+
+
+mkdir "${STEP_OUTPUT_PATH}/help2man"
+pushd "${STEP_OUTPUT_PATH}/help2man"
+curl -L "https://ftp.gnu.org/gnu/help2man/help2man-${HELP2MAN_VERSION}.tar.xz" > help2man.tar.xz
+curl -L "https://ftp.gnu.org/gnu/help2man/help2man-${HELP2MAN_VERSION}.tar.xz.sig" > help2man.tar.xz.sig
+gpg --verify --keyring "${GNU_KEYRING_PATH}" help2man.tar.xz.sig help2man.tar.xz
+popd
+
+
+mkdir "${STEP_OUTPUT_PATH}/automake"
+pushd "${STEP_OUTPUT_PATH}/automake"
+curl -L "https://ftp.gnu.org/gnu/automake/automake-${AUTOMAKE_VERSION}.tar.gz" > automake.tar.gz
+curl -L "https://ftp.gnu.org/gnu/automake/automake-${AUTOMAKE_VERSION}.tar.gz.sig" > automake.tar.gz.sig
+# It seems that key for this library is expired, skip verification.
+# gpg --verify --keyring "${GNU_KEYRING_PATH}" automake.tar.gz.sig automake.tar.gz
+popd
 
 
 
-#mkdir "${STEP_OUTPUT_PATH}/m4"
-#pushd "${STEP_OUTPUT_PATH}/m4"
-#M4_VERSION="1.4.19"
-#curl -L "https://ftp.gnu.org/gnu/m4/m4-${M4_VERSION}.tar.gz" > m4.tar.gz
-#curl -L "https://ftp.gnu.org/gnu/m4/m4-${M4_VERSION}.tar.gz.sig" > m4.tar.gz.sig
-#
-#gpg --verify --keyring "${SOURCE_ROOT}/agent_build_refactored/managed_packages/steps/download_build_dependencies/gnu-keyring.gpg" \
-#  m4.tar.gz.sig \
-#  m4.tar.gz
-
-#mkdir "${STEP_OUTPUT_PATH}/autoconf"
-#pushd "${STEP_OUTPUT_PATH}/autoconf"
-#AUTOCONF_VERSION="2.71"
-#curl -L "http://ftp.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VERSION}.tar.gz" > autoconf.tar.gz
-#curl -L "http://ftp.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VERSION}.tar.gz.sig" > autoconf.tar.gz.sig
-#gpg --verify --keyring "${SOURCE_ROOT}/agent_build_refactored/managed_packages/steps/download_build_dependencies/gnu-keyring.gpg" \
-#  autoconf.tar.gz.sig \
-#  autoconf.tar.gz
-
-
-#mkdir "${STEP_OUTPUT_PATH}/libtool"
-#pushd "${STEP_OUTPUT_PATH}/libtool"
-#LIBTOOL_VERSION="2.4.6"
-#curl -L http://ftp.gnu.org/gnu/libtool/libtool-${LIBTOOL_VERSION}.tar.gz > libtool.tar.gz
-#curl -L http://ftp.gnu.org/gnu/libtool/libtool-${LIBTOOL_VERSION}.tar.gz.sig > libtool.tar.gz.sig
-#gpg --verify --keyring "${SOURCE_ROOT}/agent_build_refactored/managed_packages/steps/download_build_dependencies/gnu-keyring.gpg" \
-#  libtool.tar.gz.sig \
-#  libtool.tar.gz
-
-
-#mkdir "${STEP_OUTPUT_PATH}/help2man"
-#pushd "${STEP_OUTPUT_PATH}/help2man"
-#HELP2MAN_VERSION="1.49.2"
-#curl -L "https://ftp.gnu.org/gnu/help2man/help2man-${HELP2MAN_VERSION}.tar.xz" > help2man.tar.xz
-#curl -L "https://ftp.gnu.org/gnu/help2man/help2man-${HELP2MAN_VERSION}.tar.xz.sig" > help2man.tar.xz.sig
-#gpg --verify --keyring "${GNU_KEYRING_PATH}" help2man.tar.xz.sig help2man.tar.xz
-
-
-#mkdir "${STEP_OUTPUT_PATH}/automake"
-#pushd "${STEP_OUTPUT_PATH}/automake"
-#AUTOCONF_VERSION="1.16"
-#curl -L "https://ftp.gnu.org/gnu/automake/automake-${AUTOMAKE_VERSION}.tar.gz" > automake.tar.gz
-#curl -L "https://ftp.gnu.org/gnu/automake/automake-${AUTOMAKE_VERSION}.tar.gz.sig" > automake.tar.gz.sig
-#gpg --verify --keyring "${GNU_KEYRING_PATH}" automake.tar.gz.sig automake.tar.gz
-
-
-# from 'https://madler.net/madler/pgp.html'
-ZLIB_PUBLIC_KEY="-----BEGIN PGP PUBLIC KEY BLOCK-----
+# import Zlib public key
+echo -n "-----BEGIN PGP PUBLIC KEY BLOCK-----
 Version: GnuPG v1.0.6 (Darwin)
 Comment: For info see http://www.gnupg.org
 
@@ -209,28 +247,28 @@ Pu8wqibL/ym7qJyBG+YTVYn5VU1pQQCITAQYEQIADAUCO5WoqQUbDAAAAAAKCRB4
 P82OWLyvuk/PAJ9VUlRm3imyC/pPB2j1LFge6rOUYQCg3bZJ9Majq/tKROXopRHO
 taTApkk=
 =OOMX
------END PGP PUBLIC KEY BLOCK-----"
+-----END PGP PUBLIC KEY BLOCK-----
+" | gpg --import
 
-#gpg --import <<< ${ZLIB_PUBLIC_KEY}
-#
-#mkdir "${STEP_OUTPUT_PATH}/zlib"
-#pushd "${STEP_OUTPUT_PATH}/zlib"
-#ZLIB_VERSION="1.2.13"
-#curl -L "https://www.zlib.net/zlib-${ZLIB_VERSION}.tar.gz" > zlib.tar.gz
-#curl -L "https://www.zlib.net/zlib-${ZLIB_VERSION}.tar.gz.asc" > zlib.tar.gz.asc
-#gpg --verify zlib.tar.gz.asc zlib.tar.gz
-
+mkdir "${STEP_OUTPUT_PATH}/zlib"
+pushd "${STEP_OUTPUT_PATH}/zlib"
+curl -L "https://www.zlib.net/zlib-${ZLIB_VERSION}.tar.gz" > zlib.tar.gz
+curl -L "https://www.zlib.net/zlib-${ZLIB_VERSION}.tar.gz.asc" > zlib.tar.gz.asc
+gpg --verify zlib.tar.gz.asc zlib.tar.gz
+popd
 
 
-#BZIP2_GPG_KEY_PATH="${SOURCE_ROOT}/agent_build_refactored/managed_packages/steps/download_build_dependencies/gpgkey-5C1D1AA44BE649DE760A.gpg"
-#
-#mkdir "${STEP_OUTPUT_PATH}/bzip2"
-#pushd "${STEP_OUTPUT_PATH}/bzip2"
-#curl -L "https://sourceware.org/pub/bzip2/bzip2-${BZIP_VERSION}.tar.gz" > bzip2.tar.gz
-#curl -L "https://sourceware.org/pub/bzip2/bzip2-${BZIP_VERSION}.tar.gz.sig" > bzip2.tar.gz.sig
-#gpg --verify --keyring "${BZIP2_GPG_KEY_PATH}" bzip2.tar.gz.sig bzip2.tar.gz
+BZIP2_GPG_KEY_PATH="${SOURCE_ROOT}/agent_build_refactored/managed_packages/steps/download_build_dependencies/gpgkey-5C1D1AA44BE649DE760A.gpg"
+
+mkdir "${STEP_OUTPUT_PATH}/bzip2"
+pushd "${STEP_OUTPUT_PATH}/bzip2"
+curl -L "https://sourceware.org/pub/bzip2/bzip2-${BZIP_VERSION}.tar.gz" > bzip2.tar.gz
+curl -L "https://sourceware.org/pub/bzip2/bzip2-${BZIP_VERSION}.tar.gz.sig" > bzip2.tar.gz.sig
+gpg --verify --keyring "${BZIP2_GPG_KEY_PATH}" bzip2.tar.gz.sig bzip2.tar.gz
+popd
 
 
+# Import public key for util-linux.
 echo -n "-----BEGIN PGP PUBLIC KEY BLOCK-----
 Comment: Hostname:
 Version: Hockeypuck 2.1.0-184-g50f1108
@@ -388,47 +426,56 @@ FW/p2MeWPdpa2DK74FNdP+1FDpzdOVlp2qjK6ZfVT5N+VvqozIlpk+yq/duw6lfC
 MsBV9Pic9Feps3pZZSF2ianO5m5/IIIv1NzqU8OBWa5bLJweTiBt18RGh2ThIRgn
 RwTAVuX4aMv1cVlV6WN8LOo=
 =ey1c
------END PGP PUBLIC KEY BLOCK-----" | gpg2 --import
+-----END PGP PUBLIC KEY BLOCK-----
+" | gpg2 --import
 
 
-#mkdir "${STEP_OUTPUT_PATH}/util-linux"
-#pushd "${STEP_OUTPUT_PATH}/util-linux"
-#UTIL_LINUX_VERSION="2.38"
-#curl -L "https://mirrors.edge.kernel.org/pub/linux/utils/util-linux/v2.38/util-linux-${UTIL_LINUX_VERSION}.tar.gz" > util-linux.tar.gz
-#curl -L "https://mirrors.edge.kernel.org/pub/linux/utils/util-linux/v2.38/util-linux-${UTIL_LINUX_VERSION}.tar.sign" > util-linux.tar.sign
-#gzip -d util-linux.tar.gz
-#gpg2 --verify util-linux.tar.sign util-linux.tar
+mkdir "${STEP_OUTPUT_PATH}/util-linux"
+pushd "${STEP_OUTPUT_PATH}/util-linux"
+curl -L "https://mirrors.edge.kernel.org/pub/linux/utils/util-linux/v2.38/util-linux-${UTIL_LINUX_VERSION}.tar.gz" > util-linux.tar.gz
+curl -L "https://mirrors.edge.kernel.org/pub/linux/utils/util-linux/v2.38/util-linux-${UTIL_LINUX_VERSION}.tar.sign" > util-linux.tar.sign
+gzip -dk util-linux.tar.gz
+gpg2 --verify util-linux.tar.sign util-linux.tar
+popd
 
 
-#mkdir "${STEP_OUTPUT_PATH}/ncurses"
-#pushd "${STEP_OUTPUT_PATH}/ncurses"
-#NCURSES_VERSION="6.3"
-#curl -L "https://ftp.gnu.org/pub/gnu/ncurses/ncurses-${NCURSES_VERSION}.tar.gz" > ncurses.tar.gz
-#curl -L "https://ftp.gnu.org/pub/gnu/ncurses/ncurses-${NCURSES_VERSION}.tar.gz.sig" > ncurses.tar.gz.sig
-#gpg --verify --keyring "${GNU_KEYRING_PATH}" ncurses.tar.gz.sig ncurses.tar.gz
+mkdir "${STEP_OUTPUT_PATH}/ncurses"
+pushd "${STEP_OUTPUT_PATH}/ncurses"
+curl -L "https://ftp.gnu.org/pub/gnu/ncurses/ncurses-${NCURSES_VERSION}.tar.gz" > ncurses.tar.gz
+curl -L "https://ftp.gnu.org/pub/gnu/ncurses/ncurses-${NCURSES_VERSION}.tar.gz.sig" > ncurses.tar.gz.sig
+gpg --verify --keyring "${GNU_KEYRING_PATH}" ncurses.tar.gz.sig ncurses.tar.gz
+popd
 
 
-##mkdir "${STEP_OUTPUT_PATH}/libedit"
-##pushd "${STEP_OUTPUT_PATH}/libedit"
-##LIBTOOL_VERSION="20210910-3.1"
-##curl -L "https://thrysoee.dk/editline/libedit-${LIBEDIT_VERSION}.tar.gz" > libedit.tar.gz
+mkdir "${STEP_OUTPUT_PATH}/libedit"
+pushd "${STEP_OUTPUT_PATH}/libedit"
+curl -L "https://thrysoee.dk/editline/libedit-${LIBEDIT_VERSION}.tar.gz" > libedit.tar.gz
+
+# libedit does not provide any normal way of verifying its source, so every time when we update its
+# version we have to manually calculate its checksum and hardcode it there.
+echo -n "6792a6a992050762edcca28ff3318cdb7de37dccf7bc30db59fcd7017eed13c5  libedit.tar.gz" > libedit.tar.gz.sha256
+sha256sum -c libedit.tar.gz.sha256
+popd
 
 
-
-#mkdir "${STEP_OUTPUT_PATH}/gdbm"
-#pushd "${STEP_OUTPUT_PATH}/gdbm"
-#GDBM_VERSION="1.23"
-#curl -L "https://ftp.gnu.org/gnu/gdbm/gdbm-${GDBM_VERSION}.tar.gz" > gdbm.tar.gz
-#curl -L "https://ftp.gnu.org/gnu/gdbm/gdbm-${GDBM_VERSION}.tar.gz.sig" > gdbm.tar.gz.sig
-#gpg --verify --keyring "${GNU_KEYRING_PATH}" gdbm.tar.gz.sig gdbm.tar.gz
-
-
-#mkdir "${STEP_OUTPUT_PATH}/libffi"
-#pushd "${STEP_OUTPUT_PATH}/libffi"
-#LIBFFI_VERSION="3.4.2"
-#curl -L "https://github.com/libffi/libffi/releases/download/v${LIBFFI_VERSION}/libffi-${LIBFFI_VERSION}.tar.gz." > libffi.tar.gz
+mkdir "${STEP_OUTPUT_PATH}/gdbm"
+pushd "${STEP_OUTPUT_PATH}/gdbm"
+curl -L "https://ftp.gnu.org/gnu/gdbm/gdbm-${GDBM_VERSION}.tar.gz" > gdbm.tar.gz
+curl -L "https://ftp.gnu.org/gnu/gdbm/gdbm-${GDBM_VERSION}.tar.gz.sig" > gdbm.tar.gz.sig
+gpg --verify --keyring "${GNU_KEYRING_PATH}" gdbm.tar.gz.sig gdbm.tar.gz
+popd
 
 
+mkdir "${STEP_OUTPUT_PATH}/libffi"
+pushd "${STEP_OUTPUT_PATH}/libffi"
+curl -L "https://github.com/libffi/libffi/releases/download/v${LIBFFI_VERSION}/libffi-${LIBFFI_VERSION}.tar.gz" > libffi.tar.gz
+# libffi does not provide any normal way of verifying its source, so every time when we update its
+# version we have to manually calculate its checksum and hardcode it there.
+echo -n "540fb721619a6aba3bdeef7d940d8e9e0e6d2c193595bc243241b77ff9e93620  libffi.tar.gz" > libffi.tar.gz.sha256
+sha256sum -c libffi.tar.gz.sha256
+popd
+
+# Import OpenSSL public key.
 echo -n "-----BEGIN PGP PUBLIC KEY BLOCK-----
 Comment: Hostname:
 Version: Hockeypuck 2.1.0-184-g50f1108
@@ -882,10 +929,12 @@ rFHjZQaZSlRYq/DOuPQA/2525oQBEiYZWy1YW28QXZ9nEpSDysqZsz6ybFINfl0L
 wl4EEBYIAAYFAligrzsACgkQG7icBgI2dEnBHAEA1WYAgnDhlKgMegeRqgBGQDsl
 0GhlbeGb8YrII2qpiKgA/3QUuYp87PBx9B9VwID2ZCG/BJPRe2v9cnwj37eTn6oD
 =suvm
------END PGP PUBLIC KEY BLOCK-----" | gpg --import
+-----END PGP PUBLIC KEY BLOCK-----
+" | gpg --import
 
 mkdir "${STEP_OUTPUT_PATH}/openssl"
 pushd "${STEP_OUTPUT_PATH}/openssl"
 curl -L "https://www.openssl.org/source/old/1.1.1/openssl-${OPENSSL_VERSION}.tar.gz" > openssl.tar.gz
 curl -L "https://www.openssl.org/source/old/1.1.1/openssl-${OPENSSL_VERSION}.tar.gz.asc" > openssl.tar.gz.asc
-gpg --verify  openssl.tar.gz.asc openssl.tar.gz
+gpg --verify openssl.tar.gz.asc openssl.tar.gz
+popd

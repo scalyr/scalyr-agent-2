@@ -23,9 +23,9 @@
 #
 # It expects next environment variables:
 #
-#   ZX_VERSION: version of XZ Utils to build. Python requirement. ALso required by some make and configure scripts.
+#   XZ_VERSION: version of XZ Utils to build. Python requirement. ALso required by some make and configure scripts.
 #   PERL_VERSION: version of Perl to build. Required by some make and configure scripts.
-#   TEXTINFO_VERSION: version of texinfo to build. Required by some make and configure scripts.
+#   TEXINFO_VERSION: version of texinfo to build. Required by some make and configure scripts.
 #   M4_VERSION: version of M4 to build. Required by some make and configure scripts.
 #   AUTOCONF_VERSION: version of autoconf to build. Required by some make and configure scripts.
 #   LIBTOOL_VERSION: version of libtool to build. Required by some make and configure scripts.
@@ -52,9 +52,8 @@ source ~/.bashrc
 
 mkdir /tmp/build-xz
 pushd /tmp/build-xz
-curl -L "https://tukaani.org/xz/xz-${ZX_VERSION}.tar.gz" > xz.tar.gz
-tar -xvf "xz.tar.gz"
-pushd "xz-${ZX_VERSION}"
+tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/xz/xz.tar.gz"
+pushd "xz-${XZ_VERSION}"
 ./configure
 make -j "$(nproc)"
 make install
@@ -63,8 +62,7 @@ popd
 
 mkdir /tmp/build-perl
 pushd /tmp/build-perl
-curl -L http://www.cpan.org/src/5.0/perl-${PERL_VERSION}.tar.gz > perl.tar.gz
-tar -xvf perl.tar.gz
+tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/perl/perl.tar.gz"
 pushd "perl-${PERL_VERSION}"
 ./Configure -des
 make -j "$(nproc)"
@@ -74,9 +72,8 @@ popd
 
 mkdir /tmp/build-texinfo
 pushd /tmp/build-texinfo
-curl -L "https://ftp.gnu.org/gnu/texinfo/texinfo-${TEXTINFO_VERSION}.tar.gz" > texinfo.tar.gz
-tar -xvf texinfo.tar.gz
-pushd "texinfo-${TEXTINFO_VERSION}"
+tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/texinfo/texinfo.tar.gz"
+pushd "texinfo-${TEXINFO_VERSION}"
 ./configure
 make -j "$(nproc)"
 make install
@@ -86,8 +83,7 @@ popd
 
 mkdir /tmp/build-m4
 pushd /tmp/build-m4
-curl -L "https://ftp.gnu.org/gnu/m4/m4-${M4_VERSION}.tar.gz" > m4.tar.gz
-tar -xvf m4.tar.gz
+tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/m4/m4.tar.gz"
 pushd "m4-${M4_VERSION}"
 ./configure
 make -j "$(nproc)"
@@ -98,8 +94,7 @@ popd
 
 mkdir /tmp/build-autoconf
 pushd /tmp/build-autoconf
-curl -L "http://ftp.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VERSION}.tar.gz" > autoconf.tar.gz
-tar -xvf autoconf.tar.gz
+tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/autoconf/autoconf.tar.gz"
 pushd "autoconf-${AUTOCONF_VERSION}"
 ./configure
 make -j "$(nproc)"
@@ -110,8 +105,7 @@ popd
 
 mkdir /tmp/build-libtool
 pushd /tmp/build-libtool
-curl -L https://ftpmirror.gnu.org/libtool/libtool-${LIBTOOL_VERSION}.tar.gz > libtool.tar.gz
-tar -xvf libtool.tar.gz
+tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/libtool/libtool.tar.gz"
 pushd "libtool-${LIBTOOL_VERSION}"
 ./configure
 make -j "$(nproc)"
@@ -122,8 +116,7 @@ popd
 
 mkdir /tmp/build-help2man
 pushd /tmp/build-help2man
-curl -L "https://ftp.gnu.org/gnu/help2man/help2man-${HELP2MAN_VERSION}.tar.xz" > help2man.tar.xz
-tar -xvf help2man.tar.xz
+tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/help2man/help2man.tar.xz"
 pushd "help2man-${HELP2MAN_VERSION}"
 ./configure
 make -j "$(nproc)"
@@ -134,8 +127,7 @@ popd
 
 mkdir /tmp/build-automake
 pushd /tmp/build-automake
-curl -L "https://ftp.gnu.org/gnu/automake/automake-${AUTOMAKE_VERSION}.tar.gz" > automake.tar.gz
-tar -xvf automake.tar.gz
+tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/automake/automake.tar.gz"
 pushd "automake-${AUTOMAKE_VERSION}"
 ./configure
 make -j "$(nproc)"
@@ -144,22 +136,9 @@ popd
 popd
 
 
-mkdir /tmp/build-lzma
-pushd /tmp/build-lzma
-curl -L "https://tukaani.org/lzma/lzma-${LZMA_VERSION}.tar.gz" > lzma.tar.gz
-tar -xvf "lzma.tar.gz"
-pushd "lzma-${LZMA_VERSION}"
-./configure --prefix=/usr/local
-make -j "$(nproc)"
-make install
-popd
-popd
-
-
 mkdir /tmp/build-zlib
 pushd /tmp/build-zlib
-curl -L "https://www.zlib.net/zlib-${ZLIB_VERSION}.tar.gz" > zlib.tar.gz
-tar -xvf "zlib.tar.gz"
+tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/zlib/zlib.tar.gz"
 pushd "zlib-${ZLIB_VERSION}"
 ./configure --shared
 make -j "$(nproc)"
@@ -170,8 +149,7 @@ popd
 
 mkdir /tmp/build-bzip
 pushd /tmp/build-bzip
-curl -L "https://sourceware.org/pub/bzip2/bzip2-${BZIP_VERSION}.tar.gz" > bzip2.tar.gz
-tar -xvf "bzip2.tar.gz"
+tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/bzip2/bzip2.tar.gz"
 pushd "bzip2-${BZIP_VERSION}"
 make -f Makefile-libbz2_so -j "$(nproc)"
 make install
@@ -181,11 +159,9 @@ popd
 
 
 
-build_dir="/tmp/build"
 mkdir /tmp/build-util-linux
 pushd /tmp/build-util-linux
-curl -L "https://mirrors.edge.kernel.org/pub/linux/utils/util-linux/v2.38/util-linux-${UTIL_LINUX_VERSION}.tar.gz" > util-linux.tar.gz
-tar -xvf "util-linux.tar.gz"
+tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/util-linux/util-linux.tar"
 pushd "util-linux-${UTIL_LINUX_VERSION}"
 ./configure --disable-all-programs --enable-libuuid --prefix=/usr/local
 make -j "$(nproc)"
@@ -194,11 +170,9 @@ popd
 popd
 
 
-build_dir="/tmp/build"
 mkdir /tmp/build-ncurses
 pushd /tmp/build-ncurses
-curl -L "https://ftp.gnu.org/pub/gnu/ncurses/ncurses-${NCURSES_VERSION}.tar.gz" > ncurses.tar.gz
-tar -xvf "ncurses.tar.gz"
+tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/ncurses/ncurses.tar.gz"
 pushd "ncurses-${NCURSES_VERSION}"
 ./configure --with-shared --prefix=/usr/local
 make -j "$(nproc)"
@@ -209,8 +183,7 @@ popd
 
 mkdir /tmp/build-libedit
 pushd /tmp/build-libedit
-curl -L "https://thrysoee.dk/editline/libedit-${LIBEDIT_VERSION}.tar.gz" > libedit.tar.gz
-tar -xvf "libedit.tar.gz"
+tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/libedit/libedit.tar.gz"
 pushd "libedit-${LIBEDIT_VERSION}"
 ./configure \
   CFLAGS="-I/usr/local/include -I/usr/local/include/ncurses" \
@@ -224,8 +197,7 @@ popd
 
 mkdir /tmp/build-gdbm
 pushd /tmp/build-gdbm
-curl -L "https://ftp.gnu.org/gnu/gdbm/gdbm-${GDBM_VERSION}.tar.gz" > gdbm.tar.gz
-tar -xvf "gdbm.tar.gz"
+tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/gdbm/gdbm.tar.gz"
 pushd "gdbm-${GDBM_VERSION}"
 ./configure --enable-libgdbm-compat
 make -j "$(nproc)"
@@ -236,10 +208,8 @@ popd
 
 mkdir /tmp/build-libffi
 pushd /tmp/build-libffi
-curl -L "https://codeload.github.com/libffi/libffi/tar.gz/v${LIBFFI_VERSION}" > libffi.tar.gz
-tar -xvf libffi.tar.gz
+tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/libffi/libffi.tar.gz"
 pushd "libffi-${LIBFFI_VERSION}"
-./autogen.sh
 mkdir build
 pushd build
 ../configure --enable-shared
@@ -253,9 +223,8 @@ popd
 mkdir /tmp/build-openssl
 pushd /tmp/build-openssl
 OPENSSL_VERSION_UNDERSCORED="${OPENSSL_VERSION//./_}"
-curl -L "https://github.com/openssl/openssl/archive/refs/tags/OpenSSL_${OPENSSL_VERSION_UNDERSCORED}.tar.gz" > openssl.tar.gz
-tar -xvf "openssl.tar.gz"
-pushd "openssl-OpenSSL_${OPENSSL_VERSION_UNDERSCORED}"
+tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/openssl/openssl.tar.gz"
+pushd "openssl-${OPENSSL_VERSION}"
 ./Configure linux-x86_64 shared
 make -j "$(nproc)"
 make install_sw
