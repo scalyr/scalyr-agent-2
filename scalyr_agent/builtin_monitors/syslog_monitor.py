@@ -121,6 +121,19 @@ define_config_option(
 
 define_config_option(
     __monitor__,
+    "message_log_template",
+    "Optional (defaults to `None`, overrides `message_log` when set). Template used to create log "
+    "file paths to store syslog messages.  The variables $PROTO, $SRCIP, $DESTPORT, $HOSTNAME, "
+    "$APPNAME will be substituted appropriately.  If the path is not absolute, then it is assumed "
+    "to be relative to the main Scalyr Agent log directory.",
+    convert_to=six.text_type,
+    default=None
+)
+
+# TODO Retire the use of message_log in lieu of message_log_template in the future
+
+define_config_option(
+    __monitor__,
     "parser",
     "Optional (defaults to `agentSyslog`). Parser name for the log file. We recommend using "
     "a single parser for each distinct log type, as this improves maintainability and "
@@ -332,6 +345,47 @@ define_config_option(
     convert_to=bool,
     default=True,
 )
+
+define_config_option(
+    __monitor__,
+    "check_for_unused_logs_mins",
+    "Optional (defaults to `60`). Number of minutes to wait between checks for log files matching "
+    "the `message_log_template` that haven't been written to for a while, and can be deleted.",
+    convert_to=int,
+    default=60,
+)
+
+define_config_option(
+    __monitor__,
+    "delete_unused_logs_hours",
+    "Optional (defaults to `24`). Number of hours to wait before deleting log files matching the "
+    "`message_log_template`.",
+    convert_to=int,
+    default=24,
+)
+
+define_config_option(
+    __monitor__,
+    "check_rotated_timestamps",
+    "Optional (defaults to `true`). When `true` the timestamps of all file rotations are checked "
+    "for deletion, based on the log deletion configuration options. When `false`, only the file "
+    "modification time of the main log file is checked, and rotated files are deleted when the "
+    "main log file is deleted.",
+    convert_to=bool,
+    default=True,
+)
+
+define_config_option(
+    __monitor__,
+    "expire_log",
+    "Optional (defaults to `300`). The number of seconds of inactivity from a specific log source "
+    "before the log file is removed. The log will be created again if a new message is received "
+    "from its source.",
+    default=300,
+    convert_to=int,
+)
+
+# TODO Merge the *{check_for_unused_log_mins,delete_unused_log_hours,check_rotated_timestamps,expire_log} options
 
 define_config_option(
     __monitor__,
@@ -1146,6 +1200,24 @@ class SyslogHandler(object):
         if max_log_size is None:
             max_log_size = default_max_bytes
 
+        self.__syslog_file_template = None
+        self.__syslog_log_deleter = None
+        if config.get('message_log_template'):
+            self.__syslog_file_template = Template(config.get('message_log_template'))
+            global_log.info("Using message_log_template of %s", self.__syslog_file_template.template)
+            self.__syslog_log_deleter = LogDeleter(
+                config.get("check_for_unused_logs_mins"),
+                config.get("delete_unused_logs_hours"),
+                config.get("check_rotated_timestamps"),
+                rotation_count,
+                log_path,
+                self.__syslog_file_template,
+            )
+        self.__syslog_expire_log = config.get("expire_log")
+        self.__syslog_loggers = {}
+        self.__syslog_parser = config.get("parser")
+        self.__syslog_attributes = config.get("attributes") or {}
+
         if docker_logging:
             self._docker_options = docker_options
             if self._docker_options is None:
@@ -1451,6 +1523,83 @@ class SyslogHandler(object):
         if self.__docker_log_deleter:
             self.__docker_log_deleter.check_for_old_logs(current_log_files)
 
+    def __handle_syslog_logs(self, data, extra):
+        extra.update(SyslogHandler._parse_syslog(data))
+        extra = {k.upper():v for k, v in extra.items()}
+
+        watcher = None
+        module = None
+        if self.__get_log_watcher:
+            watcher, module = self.__get_log_watcher()
+
+        logger = None
+        logfiles = []
+
+        self.__logger_lock.acquire()
+        try:
+            path = os.path.join(
+                self.__log_path,
+                self.__syslog_file_template.safe_substitute(**extra),
+            )
+            if path not in self.__syslog_loggers:
+                logfile = AutoFlushingRotatingFile(
+                    filename = path,
+                    max_bytes = self.__max_log_size,
+                    backup_count = self.__max_log_rotations,
+                    flush_delay = self.__flush_delay,
+                )
+
+                log_config = {
+                    'parser': self.__syslog_parser,
+                    'attributes': self.__syslog_attributes,
+                    'path': path,
+                }
+                
+                if watcher and module:
+                    log_config = watcher.add_log_config(module.module_name, log_config)
+
+                self.__syslog_loggers[path] = {
+                    'log_config': log_config,
+                    'logger': logfile,
+                }
+
+            logger = self.__syslog_loggers[path]
+            logger['last_seen'] = time.time()
+
+            if self.__expire_count >= RUN_EXPIRE_COUNT:
+                self.__expire_count = 0
+
+                now = time.time()
+                expired = [
+                    k for k, v in self.__syslog_loggers
+                        if now - v['last_seen'] > self.__syslog_expire_log
+                ]
+                for k in expired:
+                    v = self.__syslog_loggers.pop(k, None)
+                    if v:
+                        v['logger'].close()
+                        if watcher and module:
+                            watcher.remove_log_path(module.module_name, v['log_config']['path'])
+
+                if self.__syslog_log_deleter:
+                    logfiles = list(self.__syslog_loggers.keys())
+                    self.__syslog_log_deleter.check_for_old_logs(logfiles)
+
+            self.__expire_count += 1
+
+        finally:
+            self.__logger_lock.release()
+
+        if logger:
+            logger['logger'].write(data)
+        else:
+            global_log.warning(
+                'Syslog writing logs to base syslog file instead of templated file',
+                limit_once_per_x_secs=600,
+                limit_key='syslog-not-template-log',
+            )
+            self.__logger.info(data)
+
     @staticmethod
     def _parse_syslog(msg):
         # The syslogmp module is based on RFC 3164.
@@ -1479,13 +1628,11 @@ class SyslogHandler(object):
 
         if self.__docker_logging:
             self.__handle_docker_logs(data)
+        elif self.__syslog_file_template:
+            self.__handle_syslog_logs(data, extra)
         else:
-            extra.update(SyslogHandler._parse_syslog(data))
-
-            # FIXME STOPPED given the extra data apply it to the message_log template to write to multiple files
-            print('SyslogHandler.handle', repr(data), extra)
-
             self.__logger.info(data)
+
         # We add plus one because the calling code strips off the trailing new lines.
         self.__line_reporter(data.count("\n") + 1)
 
