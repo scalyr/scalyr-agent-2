@@ -364,6 +364,7 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       # This job receives its matrix from the 'pre_job' job. The matrix itself is created by the .github/actions/init-job-matrices action.
       # The matrix, for now, consists only from the 'include' part with following fields:
       #   "name": name of the builder that builds the target packages.
