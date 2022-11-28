@@ -298,10 +298,21 @@ def _call_yum(command: List, distro: str):
     )
 
 
+def _call_apt(command: List[str]):
+    env = {
+        "DEBIAN_FRONTEND": "noninteractive"
+    }
+    subprocess.check_call(
+        ["apt", *command],
+        env=env
+    )
+
+
 @pytest.fixture()
 def install_package(package_builder, distro):
     if package_builder.PACKAGE_TYPE == "deb":
-        pass
+        def install(package_name: str):
+            _call_apt(["install", "-y", package_name])
     elif package_builder.PACKAGE_TYPE == "rpm":
         def install(package_name: str):
             _call_yum(["install", "-y", package_name], distro=distro)
