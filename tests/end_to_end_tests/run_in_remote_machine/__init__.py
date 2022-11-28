@@ -60,7 +60,8 @@ def run_test_remotely(
         _validate_option("--aws-private-key-path")
         _validate_option("--aws-private-key-name")
         _validate_option("--aws-region")
-        _validate_option("--aws-security-groups")
+        _validate_option("--aws-security-group")
+        _validate_option("--aws-security-groups-prefix-list-id")
 
         distro_image = distro[architecture]
 
@@ -75,7 +76,8 @@ def run_test_remotely(
             private_key_path=test_options.aws_private_key_path,
             private_key_name=test_options.aws_private_key_name,
             region=test_options.aws_region,
-            security_groups=test_options.aws_security_groups.split(",")
+            security_group=test_options.aws_security_group,
+            security_groups_prefix_list_id=test_options.aws_security_groups_prefix_list_id
         )
     else:
         mount_options = []

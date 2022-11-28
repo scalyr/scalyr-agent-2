@@ -413,7 +413,8 @@ jobs:
             --aws-private-key-path /tmp/private_key.pem \
             --aws-private-key-name ${{ secrets.AWS_DEV_US_EAST_1_KEYPAIR_NAME }}  \
             --aws-region ${{ secrets.AWS_DEV_REGION }} \
-            --aws-security-groups ${{ secrets.AWS_DEV_SECURITY_GROUPS }}
+            --aws-security-groups ${{ secrets.AWS_DEV_SECURITY_GROUPS }} \
+            --aws-security-groups-prefix-list-id "${{ secrets.AWS_DEV_SECURITY_GROUPS_PREFIX_LIST_ID }}"
 
 
 

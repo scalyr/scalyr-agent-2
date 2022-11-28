@@ -68,14 +68,18 @@ def pytest_addoption(parser):
     parser.addoption(
         "--aws-region",
         required=False,
-        help="Name of the AWS region. Required for testing in ec2 instances."
+        help="Name of a AWS region. Required for testing in ec2 instances."
     )
     parser.addoption(
-        "--aws-security-groups",
+        "--aws-security-group",
         required=False,
-        help="Comma separated list of AWS security groups. Required for testing in ec2 instances."
+        help="Name of an AWS security group. Required for testing in ec2 instances."
     )
-
+    parser.addoption(
+        "--aws-security-groups-prefix-list-id",
+        required=False,
+        help="ID of the prefix list of the security group. Required for testing in ec2 instances."
+    )
 
 @pytest.fixture(scope="session")
 def package_builder_name(request):

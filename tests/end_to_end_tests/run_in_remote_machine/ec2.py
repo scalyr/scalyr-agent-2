@@ -3,12 +3,11 @@ import logging
 import os
 import pathlib as pl
 import shlex
-import subprocess
-import sys
 import time
 from typing import List, Dict, Optional
 
 from agent_build_refactored.tools.constants import Architecture
+from tests.end_to_end_tests.run_in_remote_machine.ec2_prefix_lists import prepare_aws_prefix_list, remove_prefix_list_entry
 
 logger = logging.getLogger(__name__)
 
@@ -166,7 +165,8 @@ def run_test_in_ec2_instance(
         access_key: str,
         secret_key: str,
         region: str,
-        security_groups: List,
+        security_group: str,
+        security_groups_prefix_list_id: str,
         max_tries: int = 3,
         deploy_overall_timeout: int = 100,
         file_mappings: Dict = None,
@@ -181,68 +181,63 @@ def run_test_in_ec2_instance(
         FileDeployment,
         MultiStepDeployment,
     )
+    import boto3
 
-    driver_cls = get_driver(Provider.EC2)
-    driver = driver_cls(
-        access_key,
-        secret_key,
-        region=region
-    )
+    def prepare_node():
 
-    size = NodeSize(
-        id=ec2_image.size_id,
-        name=ec2_image.size_id,
-        ram=0,
-        disk=0,
-        bandwidth=0,
-        price=0,
-        driver=driver,
-    )
-    image = NodeImage(
-        id=ec2_image.image_id,
-        name=ec2_image.image_name,
-        driver=driver
-    )
-
-    name = f"{INSTANCE_NAME_STRING}-{node_name_suffix}-{ec2_image.image_name}"
-
-    logger.info("Starting node provisioning ...")
-
-    start_time = int(time.time())
-
-    file_mappings = file_mappings or {}
-    file_mappings[test_runner_path] = f"/tmp/test_runner"
-
-    file_deployment_steps = []
-    for source, dst in file_mappings.items():
-        file_deployment_steps.append(
-            FileDeployment(str(source), str(dst))
+        size = NodeSize(
+            id=ec2_image.size_id,
+            name=ec2_image.size_id,
+            ram=0,
+            disk=0,
+            bandwidth=0,
+            price=0,
+            driver=driver,
+        )
+        image = NodeImage(
+            id=ec2_image.image_id,
+            name=ec2_image.image_name,
+            driver=driver
         )
 
-    deployment = MultiStepDeployment(add=file_deployment_steps)
+        name = f"{INSTANCE_NAME_STRING}-{node_name_suffix}-{ec2_image.image_name}"
 
-    try:
-        node = driver.deploy_node(
-            name=name,
-            image=image,
-            size=size,
-            ssh_key=private_key_path,
-            ex_keyname=private_key_name,
-            ex_security_groups=security_groups,
-            ssh_username=ec2_image.ssh_username,
-            ssh_timeout=20,
-            max_tries=max_tries,
-            wait_period=15,
-            timeout=deploy_overall_timeout,
-            deploy=deployment,
-            at_exit_func=destroy_node_and_cleanup,
-        )
-    except DeploymentError as e:
-        print("Deployment failed: %s" % (str(e)))
-        node = e.node
-        stdout = getattr(e.original_error, "stdout", None)
-        stderr = getattr(e.original_error, "stderr", None)
-        raise Exception(f"Deployment is not successful.\nStdout: {stdout}\nStderr: {stderr}")
+        logger.info("Starting node provisioning ...")
+
+        file_mappings[test_runner_path] = f"/tmp/test_runner"
+
+        file_deployment_steps = []
+        for source, dst in file_mappings.items():
+            file_deployment_steps.append(
+                FileDeployment(str(source), str(dst))
+            )
+
+        deployment = MultiStepDeployment(add=file_deployment_steps)
+
+        try:
+            node = driver.deploy_node(
+                name=name,
+                image=image,
+                size=size,
+                ssh_key=private_key_path,
+                ex_keyname=private_key_name,
+                ex_security_groups=[security_group],
+                ssh_username=ec2_image.ssh_username,
+                ssh_timeout=20,
+                max_tries=max_tries,
+                wait_period=15,
+                timeout=deploy_overall_timeout,
+                deploy=deployment,
+                at_exit_func=destroy_node_and_cleanup,
+            )
+        except DeploymentError as e:
+            print("Deployment failed: %s" % (str(e)))
+            node = e.node
+            stdout = getattr(e.original_error, "stdout", None)
+            stderr = getattr(e.original_error, "stderr", None)
+            raise Exception(f"Deployment is not successful.\nStdout: {stdout}\nStderr: {stderr}")
+
+        return node
 
     def run_command():
 
@@ -273,11 +268,45 @@ def run_test_in_ec2_instance(
 
         assert stdout.channel.recv_exit_status() == 0, "Remote test execution has failed with."
 
+    file_mappings = file_mappings or {}
+    start_time = int(time.time())
+
+    driver_cls = get_driver(Provider.EC2)
+    driver = driver_cls(
+        access_key,
+        secret_key,
+        region=region
+    )
+
+    boto_client = boto3.client(
+        "ec2",
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
+        region_name=region
+    )
+
+    # Add current public IP to security group's prefix list.
+    # We have to update that prefix list each time because there are to many GitHub actions public IPs and
+    # it is not possible to whitelist all of them in the AWS prefix list.
+    new_cidr = prepare_aws_prefix_list(
+        client=boto_client,
+        prefix_list_id=security_groups_prefix_list_id,
+    )
+
+    node = None
     try:
+        node = prepare_node()
         run_command()
     finally:
         if node:
             destroy_node_and_cleanup(driver=driver, node=node)
+
+        # Also cleanup prefix list.
+        remove_prefix_list_entry(
+            client=boto_client,
+            prefix_list_id=security_groups_prefix_list_id,
+            cidr=new_cidr
+        )
 
     duration = int(time.time()) - start_time
 
