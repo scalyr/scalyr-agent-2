@@ -1,4 +1,5 @@
 import json
+import random
 import re
 import time
 import logging
@@ -133,7 +134,7 @@ def add_current_ip_to_prefix_list(
 
             attempts += 1
             print(f"Can not modify prefix list, retry. Reason: {str(e)}")
-            time.sleep(1)
+            time.sleep(random.randint(1, 5))
 
     return new_cidr
 

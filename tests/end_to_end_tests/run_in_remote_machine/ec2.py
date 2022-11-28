@@ -275,6 +275,8 @@ def run_test_in_ec2_instance(
         workflow_id=workflow_id
     )
 
+    time.sleep(5)
+
     node = None
     try:
         node = prepare_node()

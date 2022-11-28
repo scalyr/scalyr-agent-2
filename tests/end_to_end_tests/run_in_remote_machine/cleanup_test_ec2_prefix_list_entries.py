@@ -1,5 +1,6 @@
 import argparse
 import json
+import random
 import re
 import sys
 import time
@@ -58,7 +59,7 @@ def _remove_entries(
 
             attempts -= 1
             print(f"Can not modify prefix list, retry. Reason: {str(e)}")
-            time.sleep(1)
+            time.sleep(random.randint(1, 5))
 
 
 def main(
