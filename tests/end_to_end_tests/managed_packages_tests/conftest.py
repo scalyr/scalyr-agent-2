@@ -1,4 +1,5 @@
 import dataclasses
+import os
 import pathlib as pl
 import shutil
 import subprocess
@@ -293,14 +294,14 @@ def add_repo(package_builder, distro_name: str):
     elif package_builder.PACKAGE_TYPE == "rpm":
         def add(repo_url):
             repo_file_path = pl.Path("/etc/yum.repos.d/test.repo")
+            repo_file_path.write_text(
+                _YUM_REPO_CONFIG_TEMPLATE.format(repo_url=repo_url)
+            )
             if distro_name == "centos6":
                 shutil.copy(
                     SOURCE_ROOT / "tests/end_to_end_tests/run_in_remote_machine/centos6.repo",
                     "/etc/yum.repos.d/CentOS-Base.repo"
                 )
-            repo_file_path.write_text(
-                _YUM_REPO_CONFIG_TEMPLATE.format(repo_url=repo_url)
-            )
     else:
         raise Exception(f"Unknown package type {package_builder.PACKAGE_TYPE}")
 
@@ -326,7 +327,8 @@ def _call_apt(command: List[str], distro_name: str):
     }
 
     if distro_name == "ubuntu1804":
-        env["PATH"] = "/usr/sbin:/usr/local/sbin:/sbin"
+        env["PATH"] = f"/usr/sbin:/usr/local/sbin:/sbin:${os.environ['PATH']}"
+
     subprocess.check_call(
         ["apt", *command],
         env=env
@@ -337,7 +339,10 @@ def _call_apt(command: List[str], distro_name: str):
 def install_package(package_builder, distro_name):
     if package_builder.PACKAGE_TYPE == "deb":
         def install(package_name: str):
-            _call_apt(["install", "-y", "--allow-unauthenticated", package_name])
+            _call_apt(
+                ["install", "-y", "--allow-unauthenticated", package_name],
+                distro_name=distro_name
+            )
     elif package_builder.PACKAGE_TYPE == "rpm":
         def install(package_name: str):
             _call_yum(["install", "-y", package_name], distro=distro_name)

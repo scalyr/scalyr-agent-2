@@ -65,7 +65,8 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
                 size_id="t2.small",
                 ssh_username="ubuntu",
             )
-        }
+        },
+        "docker": "debian:11"
     },
     "debian10": {
         "ec2": {
@@ -106,6 +107,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
                 ssh_username="root",
             )
         },
+        "docker": "centos:6"
     },
     "amazonlinux2": {
         "ec2": {
