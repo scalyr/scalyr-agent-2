@@ -231,7 +231,7 @@ def repo_dir(package_builder_name, package_builder, request, tmp_path_factory):
 
     """
     Fixture with directory where tested packages are stored.
-    Depending on provided tests arguments, it may a directory with ready repo, or just a directory
+    Depending on provided tests arguments, it may be a directory with ready repo, or just a directory
     with packages. In the second case repo is built inplace.
     """
     packages_dir = None
@@ -250,7 +250,7 @@ def repo_dir(package_builder_name, package_builder, request, tmp_path_factory):
             raise Exception(f"Unknown package source type {packages_source_type}")
 
     if repo_dir:
-        # packages are already in for of repo.
+        # packages are already in the form of repo.
         if repo_dir.is_file():
             with tarfile.open(repo_dir) as tf:
                 repo_dir = tmp_path_factory.mktemp("repo")
@@ -330,11 +330,14 @@ def add_repo(package_builder, distro_name: str):
             repo_file_path.write_text(
                 _YUM_REPO_CONFIG_TEMPLATE.format(repo_url=repo_url)
             )
+
+            # For centos 6 we use repo file with vault repo because its own repositories are shut down.
             if distro_name == "centos6":
                 shutil.copy(
                     SOURCE_ROOT / "tests/end_to_end_tests/managed_packages_tests/fixtures/centos6.repo",
                     "/etc/yum.repos.d/CentOS-Base.repo"
                 )
+            # Same with centos 8 but we replace repo url inplace.
             elif distro_name == "centos8":
                 def replace_repo_to_vault(repo_file: pl.Path):
                     repo_file.write_text(

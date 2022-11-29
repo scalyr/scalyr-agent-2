@@ -24,22 +24,12 @@ from agent_build_refactored.managed_packages.managed_packages_builders import PY
 
 logger = logging.getLogger(__name__)
 
-
-def _get_package_from_repo_dir(
-        package_name: str,
-        package_type: str,
-        repo_dir: pl.Path
-):
-    if package_type == "deb":
-        package_dir_path = repo_dir / f"pool/main/s/{package_name}"
-    elif package_type == "rpm":
-        package_dir_path = repo_dir
-    else:
-        raise Exception(f"Unknown package type: {package_type}")
-
-    found = list(package_dir_path.rglob(f"{package_name}*.{package_type}"))
-    assert len(found) == 1
-    return found[0]
+"""
+This test module preforms end to end testing of the Linux agent package and its dependency packages. 
+Since we perform testing for multiple distributions, those tests are mainly run inside another remote machines, 
+such as ec2 instance or docker container. If needed, it can be run locally, but you have to be aware that those tests
+are changing system state and maust be aware of risks.
+"""
 
 
 def _verify_package_subdirectories(
@@ -59,11 +49,16 @@ def _verify_package_subdirectories(
     :param expected_folders: List of paths that are expected to be in this package.
     """
 
-    package_path = _get_package_from_repo_dir(
-        package_name=package_name,
-        package_type=package_type,
-        repo_dir=repo_dir
-    )
+    if package_type == "deb":
+        package_dir_path = repo_dir / f"pool/main/s/{package_name}"
+    elif package_type == "rpm":
+        package_dir_path = repo_dir
+    else:
+        raise Exception(f"Unknown package type: {package_type}")
+
+    found = list(package_dir_path.rglob(f"{package_name}*.{package_type}"))
+    assert len(found) == 1
+    package_path = found[0]
 
     package_root = output_dir / package_name
     package_root.mkdir()
