@@ -385,7 +385,7 @@ define_config_option(
     convert_to=int,
 )
 
-# TODO Merge the *{check_for_unused_log_mins,delete_unused_log_hours,check_rotated_timestamps,expire_log} options
+# TODO Merge the *{check_for_unused_logs_mins,delete_unused_logs_hours,check_rotated_timestamps,expire_log} options
 
 define_config_option(
     __monitor__,
@@ -1070,13 +1070,15 @@ class LogDeleter(object):
         max_log_rotations,
         log_path,
         log_file_template,
+        substitutions=['CID', 'CNAME'],
     ):
         self._check_interval = check_interval_mins * 60
         self._delete_interval = delete_interval_hours * 60 * 60
         self._check_rotated_timestamps = check_rotated_timestamps
         self._max_log_rotations = max_log_rotations
         self._log_glob = os.path.join(
-            log_path, log_file_template.safe_substitute(CID="*", CNAME="*")
+            log_path,
+            log_file_template.safe_substitute(**{s:'*' for s in substitutions})
         )
 
         self._last_check = time.time()
@@ -1212,6 +1214,7 @@ class SyslogHandler(object):
                 rotation_count,
                 log_path,
                 self.__syslog_file_template,
+                substitutions=['PROTO', 'SRCIP', 'DESTPORT', 'HOSTNAME', 'APPNAME'],
             )
         self.__syslog_expire_log = config.get("expire_log")
         self.__syslog_loggers = {}
@@ -1235,6 +1238,7 @@ class SyslogHandler(object):
                 rotation_count,
                 log_path,
                 self.__docker_file_template,
+                substitutions=['CID', 'CNAME'],
             )
 
             if config.get("docker_use_daemon_to_resolve"):
@@ -1571,7 +1575,7 @@ class SyslogHandler(object):
 
                 now = time.time()
                 expired = [
-                    k for k, v in self.__syslog_loggers
+                    k for k, v in self.__syslog_loggers.items()
                         if now - v['last_seen'] > self.__syslog_expire_log
                 ]
                 for k in expired:
