@@ -1,7 +1,0 @@
-[C6.10-base]
-name=CentOS-6.10 - Base
-baseurl=https://vault.centos.org/8.5.2111/os/\$basearch/
-gpgcheck=1
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-6
-enabled=1
-metadata_expire=never

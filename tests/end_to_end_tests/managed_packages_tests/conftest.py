@@ -288,9 +288,9 @@ def add_repo(package_builder, distro_name: str):
         def add(repo_url):
             repo_file_path = pl.Path("/etc/apt/sources.list.d/test.list")
             repo_file_path.write_text(
-                f"deb [ allow-insecure=yes ] {repo_url} trusty main"
+                f"deb [ trusted=yes ] {repo_url} trusty main"
             )
-            _call_apt(["update", "--allow-unauthenticated"], distro_name=distro_name)
+            _call_apt(["--allow-unauthenticated", "update"], distro_name=distro_name)
     elif package_builder.PACKAGE_TYPE == "rpm":
         def add(repo_url):
             repo_file_path = pl.Path("/etc/yum.repos.d/test.repo")
@@ -340,7 +340,7 @@ def _call_apt(command: List[str], distro_name: str):
         "DEBIAN_FRONTEND": "noninteractive"
     }
 
-    if distro_name == "ubuntu1804" or distro_name == "ubuntu1404":
+    if distro_name in ["ubuntu1804", "ubuntu1604", "ubuntu1404"]:
         env["PATH"] = f"/usr/sbin:/usr/local/sbin:/sbin:${os.environ['PATH']}"
 
     subprocess.check_call(

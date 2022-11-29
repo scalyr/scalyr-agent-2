@@ -87,7 +87,7 @@ jobs:
               { "name": "deb-amd64", "distro": "docker:ubuntu1404",  "master_run_only": false },
               { "name": "deb-amd64", "distro": "ec2:debian10",  "master_run_only": false },
               { "name": "deb-amd64", "distro": "docker:debian11",  "master_run_only": false },
-              { "name": "rpm-x86_64", "distro": "ec2:centos8",  "master_run_only": false },
+              { "name": "rpm-x86_64", "distro": "docker:centos8",  "master_run_only": false },
               { "name": "rpm-x86_64", "distro": "ec2:centos7",  "master_run_only": false },
               { "name": "rpm-x86_64", "distro": "docker:centos6",  "master_run_only": false },
               { "name": "rpm-x86_64", "distro": "ec2:amazonlinux2",  "master_run_only": false }
