@@ -127,7 +127,7 @@ define_config_option(
     "$APPNAME will be substituted appropriately.  If the path is not absolute, then it is assumed "
     "to be relative to the main Scalyr Agent log directory.",
     convert_to=six.text_type,
-    default=None
+    default=None,
 )
 
 # TODO Retire the use of message_log in lieu of message_log_template in the future
@@ -557,7 +557,11 @@ class SyslogUDPHandler(six.moves.socketserver.BaseRequestHandler):
 
     def handle(self):
         data = six.ensure_text(self.request[0].strip(), "utf-8", errors="ignore")
-        extra = {'proto':'udp', 'srcip':self.client_address[0], 'destport':self.server.server_address[1]}
+        extra = {
+            "proto": "udp",
+            "srcip": self.client_address[0],
+            "destport": self.server.server_address[1],
+        }
         self.server.syslog_handler.handle(data, extra)
 
 
@@ -645,7 +649,11 @@ class SyslogRequestParser(object):
         # process the buffer until we are out of bytes
         frames_handled = 0
 
-        extra = {'proto':'tcp', 'srcip':self._client_address[0], 'destport':self._server_address[1]}
+        extra = {
+            "proto": "tcp",
+            "srcip": self._client_address[0],
+            "destport": self._server_address[1],
+        }
 
         while self._offset < size:
             # get the first byte to determine if framed or not
@@ -735,7 +743,11 @@ class SyslogRawRequestParser(SyslogRequestParser):
     """
 
     def process(self, data, handle_frame):
-        extra = {'proto':'tcp', 'srcip':self._client_address[0], 'destport':self._server_address[1]}
+        extra = {
+            "proto": "tcp",
+            "srcip": self._client_address[0],
+            "destport": self._server_address[1],
+        }
         handle_frame(data, extra)
 
 
@@ -805,7 +817,11 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
         frames_handled = 0
         data_to_write = bytearray()
 
-        extra = {'proto':'tcp', 'srcip':self._client_address[0], 'destport':self._server_address[1]}
+        extra = {
+            "proto": "tcp",
+            "srcip": self._client_address[0],
+            "destport": self._server_address[1],
+        }
 
         while self._offset < size:
             # 2->TODO use slicing to get bytes in both python versions.
@@ -853,7 +869,9 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
                         limit_key="syslog-incomplete-message-flush",
                     )
 
-                    handle_frame(self._remaining.decode("utf-8", "ignore").strip(), extra)
+                    handle_frame(
+                        self._remaining.decode("utf-8", "ignore").strip(), extra
+                    )
                     frames_handled += 1
 
                     self._last_handle_frame_call_time = int(time.time())
@@ -1070,7 +1088,7 @@ class LogDeleter(object):
         max_log_rotations,
         log_path,
         log_file_template,
-        substitutions=['CID', 'CNAME'],
+        substitutions=["CID", "CNAME"],
     ):
         self._check_interval = check_interval_mins * 60
         self._delete_interval = delete_interval_hours * 60 * 60
@@ -1078,7 +1096,7 @@ class LogDeleter(object):
         self._max_log_rotations = max_log_rotations
         self._log_glob = os.path.join(
             log_path,
-            log_file_template.safe_substitute(**{s:'*' for s in substitutions})
+            log_file_template.safe_substitute(**{s: "*" for s in substitutions}),
         )
 
         self._last_check = time.time()
@@ -1204,9 +1222,11 @@ class SyslogHandler(object):
 
         self.__syslog_file_template = None
         self.__syslog_log_deleter = None
-        if config.get('message_log_template'):
-            self.__syslog_file_template = Template(config.get('message_log_template'))
-            global_log.info("Using message_log_template of %s", self.__syslog_file_template.template)
+        if config.get("message_log_template"):
+            self.__syslog_file_template = Template(config.get("message_log_template"))
+            global_log.info(
+                "Using message_log_template of %s", self.__syslog_file_template.template
+            )
             self.__syslog_log_deleter = LogDeleter(
                 config.get("check_for_unused_logs_mins"),
                 config.get("delete_unused_logs_hours"),
@@ -1214,7 +1234,7 @@ class SyslogHandler(object):
                 rotation_count,
                 log_path,
                 self.__syslog_file_template,
-                substitutions=['PROTO', 'SRCIP', 'DESTPORT', 'HOSTNAME', 'APPNAME'],
+                substitutions=["PROTO", "SRCIP", "DESTPORT", "HOSTNAME", "APPNAME"],
             )
         self.__syslog_expire_log = config.get("expire_log")
         self.__syslog_loggers = {}
@@ -1238,7 +1258,7 @@ class SyslogHandler(object):
                 rotation_count,
                 log_path,
                 self.__docker_file_template,
-                substitutions=['CID', 'CNAME'],
+                substitutions=["CID", "CNAME"],
             )
 
             if config.get("docker_use_daemon_to_resolve"):
@@ -1529,7 +1549,7 @@ class SyslogHandler(object):
 
     def __handle_syslog_logs(self, data, extra):
         extra.update(SyslogHandler._parse_syslog(data))
-        extra = {k.upper():v for k, v in extra.items()}
+        extra = {k.upper(): v for k, v in extra.items()}
 
         watcher = None
         module = None
@@ -1547,43 +1567,46 @@ class SyslogHandler(object):
             )
             if path not in self.__syslog_loggers:
                 logfile = AutoFlushingRotatingFile(
-                    filename = path,
-                    max_bytes = self.__max_log_size,
-                    backup_count = self.__max_log_rotations,
-                    flush_delay = self.__flush_delay,
+                    filename=path,
+                    max_bytes=self.__max_log_size,
+                    backup_count=self.__max_log_rotations,
+                    flush_delay=self.__flush_delay,
                 )
 
                 log_config = {
-                    'parser': self.__syslog_parser,
-                    'attributes': self.__syslog_attributes,
-                    'path': path,
+                    "parser": self.__syslog_parser,
+                    "attributes": self.__syslog_attributes,
+                    "path": path,
                 }
-                
+
                 if watcher and module:
                     log_config = watcher.add_log_config(module.module_name, log_config)
 
                 self.__syslog_loggers[path] = {
-                    'log_config': log_config,
-                    'logger': logfile,
+                    "log_config": log_config,
+                    "logger": logfile,
                 }
 
             logger = self.__syslog_loggers[path]
-            logger['last_seen'] = time.time()
+            logger["last_seen"] = time.time()
 
             if self.__expire_count >= RUN_EXPIRE_COUNT:
                 self.__expire_count = 0
 
                 now = time.time()
                 expired = [
-                    k for k, v in self.__syslog_loggers.items()
-                        if now - v['last_seen'] > self.__syslog_expire_log
+                    k
+                    for k, v in self.__syslog_loggers.items()
+                    if now - v["last_seen"] > self.__syslog_expire_log
                 ]
                 for k in expired:
                     v = self.__syslog_loggers.pop(k, None)
                     if v:
-                        v['logger'].close()
+                        v["logger"].close()
                         if watcher and module:
-                            watcher.remove_log_path(module.module_name, v['log_config']['path'])
+                            watcher.remove_log_path(
+                                module.module_name, v["log_config"]["path"]
+                            )
 
                 if self.__syslog_log_deleter:
                     logfiles = list(self.__syslog_loggers.keys())
@@ -1595,12 +1618,12 @@ class SyslogHandler(object):
             self.__logger_lock.release()
 
         if logger:
-            logger['logger'].write(data)
+            logger["logger"].write(data)
         else:
             global_log.warning(
-                'Syslog writing logs to base syslog file instead of templated file',
+                "Syslog writing logs to base syslog file instead of templated file",
                 limit_once_per_x_secs=600,
-                limit_key='syslog-not-template-log',
+                limit_key="syslog-not-template-log",
             )
             self.__logger.info(data)
 
@@ -1608,18 +1631,18 @@ class SyslogHandler(object):
     def _parse_syslog(msg):
         # The syslogmp module is based on RFC 3164.
         # For support for RFC 5424 use the syslog_rfc5424_parser module.
-        rv = {'hostname':None, 'appname':None}
+        rv = {"hostname": None, "appname": None}
         try:
-            parsed = syslogmp.parse(msg.encode('utf-8'))
+            parsed = syslogmp.parse(msg.encode("utf-8"))
         except:
             global_log.log(scalyr_logging.DEBUG_LEVEL_4, "Unable to parse: %s" % msg)
             return rv
 
-        rv['hostname'] = parsed.hostname
+        rv["hostname"] = parsed.hostname
 
-        mat = re.search('^(.+?)(\[\d+\])?:? ', parsed.message.decode('utf-8'))
+        mat = re.search("^(.+?)(\[\d+\])?:? ", parsed.message.decode("utf-8"))
         if mat:
-            rv['appname'] = mat.group(1)
+            rv["appname"] = mat.group(1)
 
         return rv
 
