@@ -1,10 +1,14 @@
 import pathlib as pl
 import subprocess
-from typing import List, Dict, Type, Union
+from typing import List, Dict
 
 from agent_build_refactored.tools.constants import Architecture
-from tests.end_to_end_tests.run_in_remote_machine.ec2 import EC2DistroImage, run_test_in_ec2_instance, AwsSettings
+from tests.end_to_end_tests.run_in_remote_machine.ec2 import EC2DistroImage, run_test_in_ec2_instance
 
+"""
+This module defines logic that allows to run end to end tests inside remote machines such as ec2 instance or docker
+container. 
+"""
 
 # Collection of remote machine distro specifications for end to end remote tests.
 DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {

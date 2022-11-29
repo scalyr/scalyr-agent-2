@@ -30,11 +30,8 @@
 #       <etc?
 #   the result package is expected to be:
 #       /usr
-#          libexec/<subdir>/<package_files>       // The bin folder files are moved to libexec
-#                                                 // because its files are not supposed to be used by user, only by
-#                                                 // other packages.
-#          lib/<subdir>/<package_files>
-#          share/<subdir>/<package_files>
+#          lib/<subdir>/<exec-prefix>       // Prefix directory with all platform-dependent files.
+#          share/<subdir>/<prefix>          // Prefix directory with all platform-independent files.
 #
 #
 # It expects next environment variables:

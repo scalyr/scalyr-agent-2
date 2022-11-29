@@ -22,10 +22,11 @@ import tarfile
 
 import pytest
 
-from agent_build_refactored.tools.constants import DockerPlatform, Architecture
-from tests.end_to_end_tests.run_in_remote_machine import run_test_remotely, DISTROS
+from tests.end_to_end_tests.run_in_remote_machine import run_test_remotely
 from tests.end_to_end_tests.run_in_remote_machine.portable_pytest_runner import PortablePytestRunnerBuilder
 
+# Special environment variable flag that indicates that test case is already running inside remote machine,
+# so we have to skip remote execution to avoid loop.
 RUNS_REMOTELY = bool(os.environ.get("TEST_RUNS_REMOTELY"))
 
 
@@ -39,6 +40,7 @@ def test_remotely(
         tmp_path,
         request
 ):
+
     pytest_runner_builder = PortablePytestRunnerBuilder()
     pytest_runner_builder.build()
 

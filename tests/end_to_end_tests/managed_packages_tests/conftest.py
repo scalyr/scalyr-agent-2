@@ -332,7 +332,7 @@ def add_repo(package_builder, distro_name: str):
             )
             if distro_name == "centos6":
                 shutil.copy(
-                    SOURCE_ROOT / "tests/end_to_end_tests/run_in_remote_machine/centos6.repo",
+                    SOURCE_ROOT / "tests/end_to_end_tests/managed_packages_tests/fixtures/centos6.repo",
                     "/etc/yum.repos.d/CentOS-Base.repo"
                 )
             elif distro_name == "centos8":
