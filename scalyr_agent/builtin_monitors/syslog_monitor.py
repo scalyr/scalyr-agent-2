@@ -43,7 +43,11 @@ import six
 from six.moves import range
 import six.moves.socketserver
 
-import syslogmp
+try:
+    # Only available for python >= 3.6
+    import syslogmp
+except ImportError:
+    syslogmp = None
 
 from scalyr_agent import (
     ScalyrMonitor,
@@ -1982,6 +1986,12 @@ From Search view, query [monitor = 'syslog_monitor'](https://app.scalyr.com/even
                 "Failing syslog monitor since docker mode was requested but the docker module could not be imported. "
                 "This may be due to not including the docker library when building container image.",
                 "mode",
+            )
+
+        if self._config.get("message_log_template") and syslogmp == None:
+            raise BadMonitorConfiguration(
+                "Failing syslog monitor because its dependency (syslogmp module) could not be imported. "
+                "The syslogmp module requires Python >= 3.6"
             )
 
         # the main server
