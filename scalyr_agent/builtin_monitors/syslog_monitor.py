@@ -1988,10 +1988,11 @@ From Search view, query [monitor = 'syslog_monitor'](https://app.scalyr.com/even
                 "mode",
             )
 
-        if self._config.get("message_log_template") and syslogmp == None:
+        if self._config.get("message_log_template") and syslogmp is None:
             raise BadMonitorConfiguration(
                 "Failing syslog monitor because its dependency (syslogmp module) could not be imported. "
-                "The syslogmp module requires Python >= 3.6"
+                "The syslogmp module requires Python >= 3.6",
+                "message_log_template",
             )
 
         # the main server

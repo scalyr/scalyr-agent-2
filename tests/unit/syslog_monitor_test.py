@@ -320,11 +320,11 @@ class TestSyslogMonitor(SyslogMonitor):
 class TestSyslogHandler(syslog_monitor.SyslogHandler):
     """Subclass of the SyslogHandler. It does not affect any internal logic, it just only make some check assertions."""
 
-    def handle(self, data):
+    def handle(self, data, extra):
         assert (
             type(data) == six.text_type
         ), "SyslogHandler.handle function accepts only unicode strings."
-        return super(TestSyslogHandler, self).handle(data, None)
+        return super(TestSyslogHandler, self).handle(data, extra)
 
 
 class SyslogMonitorConnectTest(SyslogMonitorTestCase):
