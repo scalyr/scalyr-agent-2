@@ -130,7 +130,7 @@ define_config_option(
     default=None,
 )
 
-# TODO Retire the use of message_log in lieu of message_log_template in the future
+# TODO Retire the use of message_log in lieu of message_log_template
 
 define_config_option(
     __monitor__,
