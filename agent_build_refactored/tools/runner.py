@@ -745,7 +745,8 @@ class Runner:
         module_path = pl.Path(sys.modules[cls.__module__].__file__)
         module_rel_path = module_path.relative_to(SOURCE_ROOT)
 
-        module_fqdn = str(module_rel_path).strip(".py").replace(os.sep, ".")
+        module_without_ext = module_rel_path.parent / module_rel_path.stem
+        module_fqdn = str(module_without_ext).replace(os.sep, ".")
         return f"{module_fqdn}.{cls.__qualname__}"
 
     @classmethod

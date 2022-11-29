@@ -46,16 +46,15 @@ from agent_build_refactored.tools.runner import Runner
 from agent_build_refactored.docker_image_builders import (
     ALL_IMAGE_BUILDERS,
 )
-from agent_build_refactored.managed_packages.managed_packages_builders import (
-    ALL_MANAGED_PACKAGE_BUILDERS,
-)
+from agent_build_refactored.managed_packages.managed_packages_builders import ALL_MANAGED_PACKAGE_BUILDERS
 
 
 _AGENT_BUILD_PATH = __SOURCE_ROOT__ / "agent_build"
 
 
 BUILDERS: Dict[str, Runner] = UniqueDict(
-    **ALL_IMAGE_BUILDERS, **ALL_MANAGED_PACKAGE_BUILDERS
+    **ALL_IMAGE_BUILDERS,
+    **ALL_MANAGED_PACKAGE_BUILDERS
 )
 
 if __name__ == "__main__":

@@ -3,3 +3,5 @@
 # running test suites, and mocking Python Objects for the Scalyr Agent.
 -r agent_build/requirement-files/testing-requirements.txt
 -r agent_build/requirement-files/compression-requirements.txt
+-r agent_build/requirement-files/build-requirements.txt
+
