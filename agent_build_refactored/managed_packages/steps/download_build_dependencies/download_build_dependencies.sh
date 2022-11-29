@@ -47,6 +47,15 @@ apt update
 
 DEBIAN_FRONTEND=noninteractive apt install -y git curl gnupg gnupg2 xz-utils
 
+function clear_public_keys() {
+    gpg --list-keys --with-colons \
+  | awk -F: '$1 == "pub" { print $5 }' \
+  | xargs gpg --batch --yes --delete-keys
+
+    gpg2 --list-keys --with-colons \
+  | awk -F: '$1 == "pub" { print $5 }' \
+  | xargs gpg2 --batch --yes --delete-keys
+}
 
 # Import XZ public key
 echo -n "-----BEGIN PGP PUBLIC KEY BLOCK-----
@@ -132,6 +141,8 @@ curl -L "https://tukaani.org/xz/xz-${XZ_VERSION}.tar.gz.sig" > xz.tar.gz.sig
 gpg --verify xz.tar.gz.sig xz.tar.gz
 popd
 
+clear_public_keys
+
 
 mkdir "${STEP_OUTPUT_PATH}/perl"
 pushd "${STEP_OUTPUT_PATH}/perl"
@@ -215,6 +226,24 @@ curl -L "https://ftp.gnu.org/gnu/automake/automake-${AUTOMAKE_VERSION}.tar.gz.si
 popd
 
 
+mkdir "${STEP_OUTPUT_PATH}/gdbm"
+pushd "${STEP_OUTPUT_PATH}/gdbm"
+curl -L "https://ftp.gnu.org/gnu/gdbm/gdbm-${GDBM_VERSION}.tar.gz" > gdbm.tar.gz
+curl -L "https://ftp.gnu.org/gnu/gdbm/gdbm-${GDBM_VERSION}.tar.gz.sig" > gdbm.tar.gz.sig
+gpg --verify --keyring "${GNU_KEYRING_PATH}" gdbm.tar.gz.sig gdbm.tar.gz
+popd
+
+
+mkdir "${STEP_OUTPUT_PATH}/ncurses"
+pushd "${STEP_OUTPUT_PATH}/ncurses"
+curl -L "https://ftp.gnu.org/pub/gnu/ncurses/ncurses-${NCURSES_VERSION}.tar.gz" > ncurses.tar.gz
+curl -L "https://ftp.gnu.org/pub/gnu/ncurses/ncurses-${NCURSES_VERSION}.tar.gz.sig" > ncurses.tar.gz.sig
+gpg --verify --keyring "${GNU_KEYRING_PATH}" ncurses.tar.gz.sig ncurses.tar.gz
+popd
+
+clear_public_keys
+
+
 
 # import Zlib public key
 echo -n "-----BEGIN PGP PUBLIC KEY BLOCK-----
@@ -257,6 +286,8 @@ curl -L "https://www.zlib.net/zlib-${ZLIB_VERSION}.tar.gz.asc" > zlib.tar.gz.asc
 gpg --verify zlib.tar.gz.asc zlib.tar.gz
 popd
 
+clear_public_keys
+
 
 BZIP2_GPG_KEY_PATH="${SOURCE_ROOT}/agent_build_refactored/managed_packages/steps/download_build_dependencies/gpgkey-5C1D1AA44BE649DE760A.gpg"
 
@@ -266,6 +297,8 @@ curl -L "https://sourceware.org/pub/bzip2/bzip2-${BZIP_VERSION}.tar.gz" > bzip2.
 curl -L "https://sourceware.org/pub/bzip2/bzip2-${BZIP_VERSION}.tar.gz.sig" > bzip2.tar.gz.sig
 gpg --verify --keyring "${BZIP2_GPG_KEY_PATH}" bzip2.tar.gz.sig bzip2.tar.gz
 popd
+
+clear_public_keys
 
 
 # Import public key for util-linux.
@@ -438,13 +471,7 @@ gzip -dk util-linux.tar.gz
 gpg2 --verify util-linux.tar.sign util-linux.tar
 popd
 
-
-mkdir "${STEP_OUTPUT_PATH}/ncurses"
-pushd "${STEP_OUTPUT_PATH}/ncurses"
-curl -L "https://ftp.gnu.org/pub/gnu/ncurses/ncurses-${NCURSES_VERSION}.tar.gz" > ncurses.tar.gz
-curl -L "https://ftp.gnu.org/pub/gnu/ncurses/ncurses-${NCURSES_VERSION}.tar.gz.sig" > ncurses.tar.gz.sig
-gpg --verify --keyring "${GNU_KEYRING_PATH}" ncurses.tar.gz.sig ncurses.tar.gz
-popd
+clear_public_keys
 
 
 mkdir "${STEP_OUTPUT_PATH}/libedit"
@@ -455,14 +482,6 @@ curl -L "https://thrysoee.dk/editline/libedit-${LIBEDIT_VERSION}.tar.gz" > libed
 # version we have to manually calculate its checksum and hardcode it there.
 echo -n "6792a6a992050762edcca28ff3318cdb7de37dccf7bc30db59fcd7017eed13c5  libedit.tar.gz" > libedit.tar.gz.sha256
 sha256sum -c libedit.tar.gz.sha256
-popd
-
-
-mkdir "${STEP_OUTPUT_PATH}/gdbm"
-pushd "${STEP_OUTPUT_PATH}/gdbm"
-curl -L "https://ftp.gnu.org/gnu/gdbm/gdbm-${GDBM_VERSION}.tar.gz" > gdbm.tar.gz
-curl -L "https://ftp.gnu.org/gnu/gdbm/gdbm-${GDBM_VERSION}.tar.gz.sig" > gdbm.tar.gz.sig
-gpg --verify --keyring "${GNU_KEYRING_PATH}" gdbm.tar.gz.sig gdbm.tar.gz
 popd
 
 
@@ -938,3 +957,5 @@ curl -L "https://www.openssl.org/source/old/1.1.1/openssl-${OPENSSL_VERSION}.tar
 curl -L "https://www.openssl.org/source/old/1.1.1/openssl-${OPENSSL_VERSION}.tar.gz.asc" > openssl.tar.gz.asc
 gpg --verify openssl.tar.gz.asc openssl.tar.gz
 popd
+
+clear_public_keys
