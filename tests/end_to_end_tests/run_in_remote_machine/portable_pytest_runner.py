@@ -6,10 +6,22 @@ from agent_build_refactored.tools.constants import SOURCE_ROOT
 from agent_build_refactored.tools.runner import Runner
 from agent_build_refactored.managed_packages.managed_packages_builders import PREPARE_TOOLSET_GLIBC_X86_64
 
+"""
+This module defines logic that allows to build single-file, standalone executable binary with pytest runner.
+This executable is used in ec2 and docker end to end tests to run those tests in completely clean enironment 
+without Python and other dependencies. 
+"""
+
 PORTABLE_RUNNER_NAME = "portable_runner_name"
 
 
 class PortablePytestRunnerBuilder(Runner):
+    """
+    Builder class that builds pytest runner executable by using PyInstaller.
+    """
+
+    # This builder has to run in docker with using this environment, since this environment
+    # already has PyInstaller and other required tools..
     BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
 
     def build(self):
@@ -39,8 +51,7 @@ class PortablePytestRunnerBuilder(Runner):
                 f"agent_build{os.pathsep}agent_build",
                 "--add-data",
                 f"agent_build_refactored{os.pathsep}agent_build_refactored",
-                "--hidden-import",
-                "paramiko",
+                # As an entry point we use this file itself because it also acts like a script which invokes pytest.
                 __file__
             ],
             cwd=SOURCE_ROOT
@@ -63,6 +74,7 @@ class PortablePytestRunnerBuilder(Runner):
 
 
 if __name__ == '__main__':
+    # We use this file as an entry point for the pytest runner.
     import pytest
 
     sys.path.append(str(SOURCE_ROOT))

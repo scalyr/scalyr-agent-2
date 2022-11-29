@@ -477,7 +477,7 @@ jobs:
             --token ${{ secrets.PACKAGE_CLOUD_TOKEN }} \
             --packages-dir /tmp/packages
 
-  clean-ec2-tests-prefix-list-entries:
+  clean-ec2-tests-objects:
     name: Remove ec2 test workflow prefix list entries
     if: ${{ always() }}
     needs:
@@ -500,7 +500,7 @@ jobs:
 
       - name: Cleanup old prefix lists for ec2 test security group.
         run: |
-          python3 tests/end_to_end_tests/run_in_remote_machine/cleanup_test_ec2_prefix_list_entries.py \
+          python3 tests/end_to_end_tests/run_in_remote_machine/cleanup_test_ec2_objects.py \
             --access-key "${{ secrets.AWS_DEV_ACCESS_KEY }}" \
             --secret-key "${{ secrets.AWS_DEV_SECRET_KEY }}" \
             --prefix-list-id "${{ secrets.AWS_SECURITY_GROUPS_NAMED_PREFIX_ID }}" \
