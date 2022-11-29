@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 Scalyr Inc.
+# Copyright 2014-2022 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,8 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ------------------------------------------------------------------------
-#
-# author: Imron Alston <imron@scalyr.com>
+# author: scalyr-cloudtech@scalyr.com
 
 from __future__ import unicode_literals
 from __future__ import absolute_import
@@ -23,7 +22,7 @@ from __future__ import absolute_import
 if False:
     from typing import List
 
-__author__ = "imron@scalyr.com"
+__author__ = "scalyr-cloudtech@scalyr.com"
 
 import time
 import sys
@@ -325,7 +324,7 @@ class TestSyslogHandler(syslog_monitor.SyslogHandler):
         assert (
             type(data) == six.text_type
         ), "SyslogHandler.handle function accepts only unicode strings."
-        return super(TestSyslogHandler, self).handle(data)
+        return super(TestSyslogHandler, self).handle(data, None)
 
 
 class SyslogMonitorConnectTest(SyslogMonitorTestCase):
@@ -863,7 +862,10 @@ class SyslogDefaultRequestParserTestCase(SyslogMonitorTestCase):
         max_buffer_size = 1024
 
         parser = SyslogRequestParser(
-            socket=mock_socket, max_buffer_size=max_buffer_size
+            socket=mock_socket,
+            socket_client_address=("127.0.0.1", 1234),
+            socket_server_address=("127.0.0.2", 5678),
+            max_buffer_size=max_buffer_size,
         )
         self.assertEqual(parser._remaining, None)
 
@@ -887,7 +889,10 @@ class SyslogDefaultRequestParserTestCase(SyslogMonitorTestCase):
         mock_msg_1 = b"<14>Dec 24 16:12:48 hosttest.example.com tag-0-0-17[2593]: Hey diddle diddle, The Cat and the Fiddle, The Cow jump'd over the Spoon\n"
 
         parser = SyslogRequestParser(
-            socket=mock_socket, max_buffer_size=max_buffer_size
+            socket=mock_socket,
+            socket_client_address=("127.0.0.1", 1234),
+            socket_server_address=("127.0.0.2", 5678),
+            max_buffer_size=max_buffer_size,
         )
         self.assertEqual(parser._remaining, None)
 
@@ -913,7 +918,10 @@ class SyslogDefaultRequestParserTestCase(SyslogMonitorTestCase):
         mock_data = mock_msg_1 + mock_msg_2 + mock_msg_3
 
         parser = SyslogBatchedRequestParser(
-            socket=mock_socket, max_buffer_size=max_buffer_size
+            socket=mock_socket,
+            socket_client_address=("127.0.0.1", 1234),
+            socket_server_address=("127.0.0.2", 5678),
+            max_buffer_size=max_buffer_size,
         )
         parser.process(mock_data, mock_handle_frame)
 
@@ -956,7 +964,10 @@ class SyslogDefaultRequestParserTestCase(SyslogMonitorTestCase):
         mock_msg_3_expected = b"<14>Dec 24 16:12:48 hosttest.example.com tag-3-0-17[2593]: Hey diddle diddle ~\x01, The Cat and the Fiddle, The Cow jump'd over the Spoon\n"
 
         parser = SyslogRequestParser(
-            socket=mock_socket, max_buffer_size=max_buffer_size
+            socket=mock_socket,
+            socket_client_address=("127.0.0.1", 1234),
+            socket_server_address=("127.0.0.2", 5678),
+            max_buffer_size=max_buffer_size,
         )
         parser.process(mock_data, mock_handle_frame)
 
@@ -995,7 +1006,12 @@ class SyslogTCPRequestParserTestCase(SyslogMonitorTestCase):
         mock_socket_recv.counter = 0
         mock_socket.recv = mock_socket_recv
 
-        parser = SyslogRequestParser(socket=mock_socket, max_buffer_size=64)
+        parser = SyslogRequestParser(
+            socket=mock_socket,
+            socket_client_address=("127.0.0.1", 1234),
+            socket_server_address=("127.0.0.2", 5678),
+            max_buffer_size=64,
+        )
         self.assertIsNone(parser.read())
         self.assertEqual(mock_socket_recv.counter, 1)
         self.assertIsNone(parser.read())
@@ -1018,7 +1034,12 @@ class SyslogTCPRequestParserTestCase(SyslogMonitorTestCase):
         mock_socket_recv.counter = 0
         mock_socket.recv = mock_socket_recv
 
-        parser = SyslogRequestParser(socket=mock_socket, max_buffer_size=64)
+        parser = SyslogRequestParser(
+            socket=mock_socket,
+            socket_client_address=("127.0.0.1", 1234),
+            socket_server_address=("127.0.0.2", 5678),
+            max_buffer_size=64,
+        )
         self.assertIsNone(parser.read())
         self.assertEqual(mock_socket_recv.counter, 1)
         self.assertIsNone(parser.read())
@@ -1035,7 +1056,10 @@ class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
         max_buffer_size = 1024
 
         parser = SyslogBatchedRequestParser(
-            socket=mock_socket, max_buffer_size=max_buffer_size
+            socket=mock_socket,
+            socket_client_address=("127.0.0.1", 1234),
+            socket_server_address=("127.0.0.2", 5678),
+            max_buffer_size=max_buffer_size,
         )
 
         self.assertEqual(mock_global_log.warning.call_count, 0)
@@ -1055,7 +1079,10 @@ class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
         mock_msg_1 = b"<14>Dec 24 16:12:48 hosttest.example.com tag-0-0-17[2593]: Hey diddle diddle, The Cat and the Fiddle, The Cow jump'd over the Spoon\n"
 
         parser = SyslogBatchedRequestParser(
-            socket=mock_socket, max_buffer_size=max_buffer_size
+            socket=mock_socket,
+            socket_client_address=("127.0.0.1", 1234),
+            socket_server_address=("127.0.0.2", 5678),
+            max_buffer_size=max_buffer_size,
         )
         parser.process(mock_msg_1, mock_handle_frame)
         self.assertEqual(mock_handle_frame.call_count, 1)
@@ -1077,7 +1104,10 @@ class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
         mock_data = mock_msg_1 + mock_msg_2 + mock_msg_3
 
         parser = SyslogBatchedRequestParser(
-            socket=mock_socket, max_buffer_size=max_buffer_size
+            socket=mock_socket,
+            socket_client_address=("127.0.0.1", 1234),
+            socket_server_address=("127.0.0.2", 5678),
+            max_buffer_size=max_buffer_size,
         )
         parser.process(mock_data, mock_handle_frame)
 
@@ -1104,7 +1134,10 @@ class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
         mock_data = mock_msg_1 + mock_msg_2 + mock_msg_3[: int(len(mock_msg_3) / 2)]
 
         parser = SyslogBatchedRequestParser(
-            socket=mock_socket, max_buffer_size=max_buffer_size
+            socket=mock_socket,
+            socket_client_address=("127.0.0.1", 1234),
+            socket_server_address=("127.0.0.2", 5678),
+            max_buffer_size=max_buffer_size,
         )
         parser.process(mock_data, mock_handle_frame)
 
@@ -1143,6 +1176,8 @@ class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
 
         parser = SyslogBatchedRequestParser(
             socket=mock_socket,
+            socket_client_address=("127.0.0.1", 1234),
+            socket_server_address=("127.0.0.2", 5678),
             max_buffer_size=max_buffer_size,
             incomplete_frame_timeout=1,
         )
@@ -1181,6 +1216,8 @@ class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
 
         parser = SyslogBatchedRequestParser(
             socket=mock_socket,
+            socket_client_address=("127.0.0.1", 1234),
+            socket_server_address=("127.0.0.2", 5678),
             max_buffer_size=max_buffer_size,
             message_delimiter="\000",
         )

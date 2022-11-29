@@ -1640,13 +1640,13 @@ class SyslogHandler(object):
 
         rv["hostname"] = parsed.hostname
 
-        mat = re.search("^(.+?)(\[\d+\])?:? ", parsed.message.decode("utf-8"))
+        mat = re.search(r"^(.+?)(\[[0-9]+\])?:? ", parsed.message.decode("utf-8"))
         if mat:
             rv["appname"] = mat.group(1)
 
         return rv
 
-    def handle(self, data, extra):  # type: (six.text_type) -> None
+    def handle(self, data, extra):  # type: (six.text_type, dict) -> None
         """
         Feed syslog messages to the appropriate loggers.
         """

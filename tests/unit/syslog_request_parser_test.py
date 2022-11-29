@@ -1,4 +1,4 @@
-# Copyright 2017 Scalyr Inc.
+# Copyright 2017-2022 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,13 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ------------------------------------------------------------------------
-#
-# author: Imron Alston <imron@scalyr.com>
+# author: scalyr-cloudtech@scalyr.com
 
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
-__author__ = "imron@scalyr.com"
+__author__ = "scalyr-cloudtech@scalyr.com"
 
 
 import unittest
@@ -38,7 +37,7 @@ class Handler(object):
 
 class SyslogRequestParserTestCase(ScalyrTestCase):
     def test_framed_messages(self):
-        parser = SyslogRequestParser(None, 32)
+        parser = SyslogRequestParser(None, None, None, 32)
         handler = Handler()
 
         parser.process(b"5 hello5 world", handler.handle)
@@ -48,7 +47,7 @@ class SyslogRequestParserTestCase(ScalyrTestCase):
         self.assertEqual("world", handler.values[1])
 
     def test_framed_message_incomplete(self):
-        parser = SyslogRequestParser(None, 32)
+        parser = SyslogRequestParser(None, None, None, 32)
         handler = Handler()
 
         parser.process(b"11 hello", handler.handle)
@@ -61,7 +60,7 @@ class SyslogRequestParserTestCase(ScalyrTestCase):
         self.assertEqual("hello world", handler.values[0])
 
     def test_framed_message_multiple_incomplete(self):
-        parser = SyslogRequestParser(None, 32)
+        parser = SyslogRequestParser(None, None, None, 32)
         handler = Handler()
 
         parser.process(b"11 hello", handler.handle)
@@ -79,14 +78,14 @@ class SyslogRequestParserTestCase(ScalyrTestCase):
         self.assertEqual("hello world", handler.values[0])
 
     def test_framed_message_invalid_frame_size(self):
-        parser = SyslogRequestParser(None, 32)
+        parser = SyslogRequestParser(None, None, None, 32)
         handler = Handler()
         self.assertRaises(
             ValueError, lambda: parser.process(b"1a1 hello", handler.handle)
         )
 
     def test_framed_message_exceeds_max_size(self):
-        parser = SyslogRequestParser(None, 11)
+        parser = SyslogRequestParser(None, None, None, 11)
         handler = Handler()
         parser.process(b"23 hello world h", handler.handle)
         parser.process(b"10 lo world .", handler.handle)
@@ -96,7 +95,7 @@ class SyslogRequestParserTestCase(ScalyrTestCase):
         self.assertEqual(" 10 lo world .", handler.values[1])
 
     def test_unframed_messages(self):
-        parser = SyslogRequestParser(None, 32)
+        parser = SyslogRequestParser(None, None, None, 32)
         handler = Handler()
         parser.process(b"hello\nworld\n", handler.handle)
 
@@ -105,7 +104,7 @@ class SyslogRequestParserTestCase(ScalyrTestCase):
         self.assertEqual("world", handler.values[1])
 
     def test_unframed_messages_incomplete(self):
-        parser = SyslogRequestParser(None, 32)
+        parser = SyslogRequestParser(None, None, None, 32)
         handler = Handler()
 
         parser.process(b"hello", handler.handle)
@@ -117,7 +116,7 @@ class SyslogRequestParserTestCase(ScalyrTestCase):
         self.assertEqual("hello world", handler.values[0])
 
     def test_unframed_message_exceeds_max_size(self):
-        parser = SyslogRequestParser(None, 13)
+        parser = SyslogRequestParser(None, None, None, 13)
         handler = Handler()
 
         parser.process(b"in my hand i have ", handler.handle)
