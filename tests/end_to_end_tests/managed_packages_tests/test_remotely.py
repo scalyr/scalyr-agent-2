@@ -13,8 +13,8 @@
 # limitations under the License.
 
 """
-THis special test module is responsible for running the 'managed_packages' tests in remote environment,
-for example ec2 intsance or docker container.
+THis special test module is responsible for running the 'managed_packages' tests in ф remote environment,
+for example ec2 instance or docker container.
 """
 
 import os
@@ -30,8 +30,15 @@ RUNS_REMOTELY = bool(os.environ.get("TEST_RUNS_REMOTELY"))
 
 
 @pytest.mark.skipif(RUNS_REMOTELY, reason="Should be skipped when already runs in a remote machine.")
-def test_remotely(distro, repo_dir, package_builder_name, package_builder, tmp_path, request):
-
+def test_remotely(
+        distro_name,
+        remote_machine_type,
+        repo_dir,
+        package_builder_name,
+        package_builder,
+        tmp_path,
+        request
+):
     pytest_runner_builder = PortablePytestRunnerBuilder()
     pytest_runner_builder.build()
 
@@ -40,13 +47,14 @@ def test_remotely(distro, repo_dir, package_builder_name, package_builder, tmp_p
         tf.add(repo_dir, arcname="/")
 
     run_test_remotely(
-        remote_distro_name=distro,
+        distro_name=distro_name,
+        remote_machine_type=remote_machine_type,
         command=[
             "tests/end_to_end_tests/managed_packages_tests",
             "--builder-name",
             package_builder_name,
             "--distro",
-            distro,
+            request.config.option.distro,
             "--packages-source-type",
             "repo",
             "--packages-source",

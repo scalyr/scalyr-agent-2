@@ -99,7 +99,6 @@ def test_dependency_packages(
         repo_dir
 ):
     # Verify structure of the package and make sure there's no any file outside it.
-
     package_type = package_builder.PACKAGE_TYPE
 
     _verify_package_subdirectories(

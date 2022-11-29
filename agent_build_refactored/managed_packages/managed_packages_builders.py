@@ -57,13 +57,12 @@ The structure of the mentioned packages has to guarantee that files of these pac
     files of local system Python interpreter. To achieve that, the dependency packages files are installed in their
     own 'sub-directories'
 
-    /usr/libe/scalyr-agent-2-dependencies
-    /usr/libexec/scalyr-agent-2-dependencies
-    /usr/shared/scalyr-agent-2-dependencies
-    /usr/include/scalyr-agent-2-dependencies
+    For now there are two subdirectories:
+        - /usr/libe/scalyr-agent-2-dependencies - for platform dependent files.
+        - /usr/shared/scalyr-agent-2-dependencies - for platform independent files.
 
     and agent from the 'scalyr-agent-2' package has to use the
-    '/usr/libexec/scalyr-agent-2-dependencies/scalyr-agent-2-python3' executable.
+    '/usr/lib/scalyr-agent-2-dependencies/bin/python3' executable.
 """
 
 # Name of the subdirectory of dependency packages.

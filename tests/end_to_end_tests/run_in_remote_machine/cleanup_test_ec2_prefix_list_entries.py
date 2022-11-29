@@ -10,6 +10,10 @@ from typing import Dict, List
 import boto3
 import botocore.exceptions
 
+"""
+This script is used by the Github Actions to cleanup the ec2 prefix list after ec2 ent to end tests.
+"""
+
 # This file can be executed as script. Add source root to the PYTHONPATH in order to be able to import
 # local packages. All such imports also have to be done after that.
 sys.path.append(str(pl.Path(__file__).parent.parent.parent.parent))
@@ -33,7 +37,16 @@ def _remove_entries(
         entries: List,
         prefix_list_id: str
 ):
+    """
+    Remove specified entries from prefix list.
+    :param client: boto3 client.
+    :param entries: List of entries to remove.
+    :param prefix_list_id: Prefix list ID.
+    :return:
+    """
     attempts = 10
+    # Since there may be multiple running ec2 tests, we have to add the retry
+    # logic to overcome the prefix list concurrent access issues.
     while True:
         try:
             version = get_prefix_list_version(
@@ -75,11 +88,15 @@ def main(
     entries_to_remove = {}
 
     current_time = time.time()
+
+    # Remove old prfix list entries.
     for entry in entries:
         timestamp = _parse_entry_timestamp(entry)
         if timestamp <= current_time - PREFIX_LIST_ENTRY_REMOVE_THRESHOLD:
             entries_to_remove[entry["Cidr"]] = entry
 
+    # If workflow provided, then we also remove entries that have matching workflow_id field in
+    # their Description field.
     if workflow_id:
         for entry in entries:
             description = _parse_entry_description(entry)

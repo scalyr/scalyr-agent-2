@@ -7,7 +7,7 @@ import time
 from typing import List, Dict, Optional
 
 from agent_build_refactored.tools.constants import Architecture
-from tests.end_to_end_tests.run_in_remote_machine.ec2_prefix_lists import add_current_ip_to_prefix_list, remove_prefix_list_entry
+from tests.end_to_end_tests.run_in_remote_machine.ec2_prefix_lists import add_current_ip_to_prefix_list
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +139,6 @@ def run_test_in_ec2_instance(
         ec2_image: EC2DistroImage,
         test_runner_path: pl.Path,
         command: List[str],
-        node_name_suffix: str,
         private_key_path: str,
         private_key_name: str,
         access_key: str,
@@ -181,7 +180,8 @@ def run_test_in_ec2_instance(
             driver=driver
         )
 
-        name = f"{INSTANCE_NAME_STRING}-{node_name_suffix}-{ec2_image.image_name}"
+        workflow_suffix = workflow_id or ""
+        name = f"{INSTANCE_NAME_STRING}-{workflow_suffix}-{ec2_image.image_name}"
 
         logger.info("Starting node provisioning ...")
 

@@ -2,10 +2,11 @@ import pathlib as pl
 import subprocess
 from typing import List, Dict, Type, Union
 
-from agent_build_refactored.tools.constants import Architecture, DockerPlatform
-from agent_build_refactored.managed_packages.managed_packages_builders import ManagedPackagesBuilder
+from agent_build_refactored.tools.constants import Architecture
 from tests.end_to_end_tests.run_in_remote_machine.ec2 import EC2DistroImage, run_test_in_ec2_instance, AwsSettings
 
+
+# Collection of remote machine distro specifications for end to end remote tests.
 DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
     "ubuntu2204": {
         "ec2": {
@@ -131,15 +132,28 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
 
 
 def run_test_remotely(
-        remote_distro_name: str,
+        distro_name: str,
+        remote_machine_type: str,
         command: List[str],
         architecture: Architecture,
         pytest_runner_path: pl.Path,
         test_options,
         file_mappings: Dict = None,
 ):
-    remote_machine_type, distro_name = remote_distro_name.split(":")
-
+    """
+    Run pytest tests in a remote machine, for example in ec2 or docker.
+    :param distro_name: Name of the pre-defined distros where remote test can run.
+    :param remote_machine_type: Type of the remote machine. Can be ec2 or docker.
+    :param command: pytest command to execute in the remote machine.
+    :param architecture: Architecture of the remote machine.
+    :param pytest_runner_path: Path to the  pytest executable. For now, it has to be
+        a pytest runner that was "frozen" into a single binary by PyInstaller.
+        This executable is convenient because we don't have to have any pre-installations
+        in remote machines.
+    :param test_options: Current test run command line options.
+    :param file_mappings: Dict where key is a file that has to be presented in the remote machine,
+        and value is the path in the remote machine.
+    """
     file_mappings = file_mappings or {}
 
     distro = DISTROS[distro_name][remote_machine_type]
@@ -167,7 +181,6 @@ def run_test_remotely(
             test_runner_path=pytest_runner_path,
             command=command,
             file_mappings=file_mappings,
-            node_name_suffix="arthur-test",
             access_key=test_options.aws_access_key,
             secret_key=test_options.aws_secret_key,
             private_key_path=test_options.aws_private_key_path,

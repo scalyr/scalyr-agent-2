@@ -1,30 +1,24 @@
 import json
 import random
-import re
 import time
 import logging
-from typing import List, Dict
+
+"""
+This module is responsible for manipulating AWS ec2 prefix lists.
+It's mostly used by the ent to end tests that we run in ec2 instances.
+"""
 
 logger = logging.getLogger(__name__)
 
-
 MAX_PREFIX_LIST_UPDATE_ATTEMPTS = 10
-PREFIX_LIST_ENTRY_REMOVE_THRESHOLD = 60 * 1  # 1 hour.
-
-
-def _search_for_old_entries(entries: List):
-    # Filter out old entries
-
-    result = []
-    for entry in entries:
-        timestamp = _parse_entry_timestamp(entry)
-        if timestamp <= PREFIX_LIST_ENTRY_REMOVE_THRESHOLD:
-            result.append(entry)
-
-    return result
 
 
 def get_prefix_list_version(client, prefix_list_id: str):
+    """
+    Get version of the prefix list.
+    :param client: ec2 boto3 client.
+    :param prefix_list_id: ID of the prefix list.
+    """
     resp = client.describe_managed_prefix_lists(
         Filters=[
             {
@@ -39,72 +33,21 @@ def get_prefix_list_version(client, prefix_list_id: str):
     return int(prefix_list["Version"])
 
 
-def _parse_entry_timestamp(entry: Dict):
-    return int(
-        re.search(r"Creation timestamp: (\d+)", entry["Description"]).group(1)
-    )
-
-
-def add_new_entry(
-        client,
-        cidr: str, prefix_list_id: str,
-        workflow_id: str = None
-
-):
-    version = get_prefix_list_version(
-        client=client,
-        prefix_list_id=prefix_list_id
-    )
-    client.modify_managed_prefix_list(
-        PrefixListId=prefix_list_id,
-        CurrentVersion=version,
-        AddEntries=[
-            {
-                'Cidr': cidr,
-                'Description': json.dumps({
-                    "time": int(time.time()),
-                    "workflow_id": workflow_id
-                })
-            },
-        ]
-    )
-
-
-def remove_prefix_list_entries(client, entries: List, prefix_list_id: str):
-    import botocore.exceptions
-
-    attempts = 10
-    while True:
-        try:
-            version = _get_prefix_list_version(
-                client=client,
-                prefix_list_id=prefix_list_id
-            )
-            client.modify_managed_prefix_list(
-                PrefixListId=prefix_list_id,
-                CurrentVersion=version,
-                RemoveEntries=[{"Cidr":e["Cidr"]} for e in entries]
-            )
-            break
-        except botocore.exceptions.ClientError as e:
-            if "The prefix list has the incorrect version number" in str(e):
-                continue
-
-            if "The request cannot be completed while the prefix" in str(e):
-                continue
-
-            if attempts == 0:
-                raise
-
-            attempts -= 1
-            time.sleep(1)
-
-
 def add_current_ip_to_prefix_list(
     client,
     prefix_list_id: str,
     workflow_id: str = None
 ):
+    """
+    Add new CIDR entry with current public IP in to the prefix list. We also additionally store json object in the
+        Description of the prefix list entry. This json object has required field called 'time' with timestamp
+        which is used by the cleanup script to remove old prefix lists.
+    :param client: ec2 boto3 client.
+    :param prefix_list_id: ID of the prefix list.
+    :param workflow_id: Optional filed to add to the json object that is stored in the Description
+        filed of the entry.
+    """
+
     import botocore.exceptions
     import requests
 
@@ -117,14 +60,28 @@ def add_current_ip_to_prefix_list(
 
     new_cidr = f'{public_ip}/32'
 
+    version = get_prefix_list_version(
+        client=client,
+        prefix_list_id=prefix_list_id
+    )
+
     attempts = 0
+    # Since there may be multiple running ec2 tests, we have to add the retry
+    # logic to overcome the prefix list concurrent access issues.
     while True:
         try:
-            add_new_entry(
-                client=client,
-                cidr=new_cidr,
-                prefix_list_id=prefix_list_id,
-                workflow_id=workflow_id
+            client.modify_managed_prefix_list(
+                PrefixListId=prefix_list_id,
+                CurrentVersion=version,
+                AddEntries=[
+                    {
+                        'Cidr': new_cidr,
+                        'Description': json.dumps({
+                            "time": int(time.time()),
+                            "workflow_id": workflow_id
+                        })
+                    },
+                ]
             )
             break
         except botocore.exceptions.ClientError as e:
@@ -137,16 +94,4 @@ def add_current_ip_to_prefix_list(
             time.sleep(random.randint(1, 5))
 
     return new_cidr
-
-
-def remove_prefix_list_entry(
-        client,
-        prefix_list_id: str,
-        cidr: str
-):
-    remove_prefix_list_entries(
-        client=client,
-        prefix_list_id=prefix_list_id,
-        entries=[{"Cidr": cidr}]
-    )
 

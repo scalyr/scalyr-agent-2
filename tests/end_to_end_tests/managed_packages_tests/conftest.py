@@ -15,9 +15,8 @@ import pytest
 
 from agent_build_refactored.tools.constants import SOURCE_ROOT
 from agent_build_refactored.tools.runner import Runner, RunnerMappedPath
-from agent_build_refactored.managed_packages.managed_packages_builders import PYTHON_PACKAGE_NAME, AGENT_LIBS_PACKAGE_NAME, DebManagedPackagesBuilderX86_64, RpmManagedPackagesBuilderx86_64, ALL_MANAGED_PACKAGE_BUILDERS, PREPARE_TOOLSET_GLIBC_X86_64
-from tests.end_to_end_tests.run_in_remote_machine.portable_pytest_runner import PortablePytestRunnerBuilder, PORTABLE_RUNNER_NAME
-from tests.end_to_end_tests.run_in_remote_machine.ec2 import AwsSettings
+from agent_build_refactored.managed_packages.managed_packages_builders import ALL_MANAGED_PACKAGE_BUILDERS, PREPARE_TOOLSET_GLIBC_X86_64
+from tests.end_to_end_tests.run_in_remote_machine import DISTROS
 
 
 def pytest_addoption(parser):
@@ -41,10 +40,19 @@ def pytest_addoption(parser):
         required=False
     )
 
+    all_distros = []
+
+    for distro_name, types in DISTROS.items():
+        for t in types:
+            all_distros.append(f"{t}:{distro_name}")
+
     parser.addoption(
         "--distro",
         dest="distro",
         required=True,
+        choices=all_distros,
+        help="Distribution to test. It has to have format <type>:<distro_name>, "
+             "for example: ec2:ubuntu2004, docker:centos6"
     )
 
     parser.addoption(
@@ -84,32 +92,44 @@ def pytest_addoption(parser):
     )
     parser.addoption(
         "--workflow-id",
-        required=False
+        required=False,
+        help="Identifier of the current workflow if it runs in CI/CD."
     )
 
 
 @pytest.fixture(scope="session")
 def package_builder_name(request):
+    """Name of the builder that build tested packages."""
     return request.config.option.builder_name
 
 
 @pytest.fixture(scope="session")
 def package_builder(package_builder_name):
+    """Builder class that builds tested packges."""
     return ALL_MANAGED_PACKAGE_BUILDERS[package_builder_name]
 
 
 @pytest.fixture(scope="session")
-def distro(request):
-    return request.config.option.distro
+def remote_machine_type(request):
+    """
+    Fixture with time of the remote machine where tests can run. For now that's ec2 or docker.
+    """
+    if ":" not in request.config.option.distro:
+        return None
+
+    return request.config.option.distro.split(":")[0]
 
 
 @pytest.fixture(scope="session")
-def distro_name(distro):
-    _, distro_name = distro.split(":")
-    return distro_name
+def distro_name(remote_machine_type, request):
+
+    if remote_machine_type is None:
+        return request.config.option.distro
+
+    return request.config.option.distro.split(":")[1]
 
 
-_APT_REPO_CONF = """
+_TEST_APT_REPO_CONF = """
 Origin: test_repo
 Label: test_repo
 Codename: trusty
@@ -153,7 +173,7 @@ class RepoBuilder(Runner):
             conf_path.mkdir(parents=True)
 
             conf_distributions_path = conf_path / "distributions"
-            conf_distributions_path.write_text(_APT_REPO_CONF)
+            conf_distributions_path.write_text(_TEST_APT_REPO_CONF)
 
             for package_path in packages_dir_path.glob(f"*.deb"):
 
@@ -208,10 +228,12 @@ class RepoBuilder(Runner):
 
 @pytest.fixture(scope="session")
 def repo_dir(package_builder_name, package_builder, request, tmp_path_factory):
-    """
-    Fixture that starts a web server that serves repo directory.
-    """
 
+    """
+    Fixture with directory where tested packages are stored.
+    Depending on provided tests arguments, it may a directory with ready repo, or just a directory
+    with packages. In the second case repo is built inplace.
+    """
     packages_dir = None
     repo_dir = None
 
@@ -228,6 +250,7 @@ def repo_dir(package_builder_name, package_builder, request, tmp_path_factory):
             raise Exception(f"Unknown package source type {packages_source_type}")
 
     if repo_dir:
+        # packages are already in for of repo.
         if repo_dir.is_file():
             with tarfile.open(repo_dir) as tf:
                 repo_dir = tmp_path_factory.mktemp("repo")
@@ -235,7 +258,10 @@ def repo_dir(package_builder_name, package_builder, request, tmp_path_factory):
 
         return repo_dir
 
+    # No repo provided, look for packages to build repo.
+
     if packages_dir is None:
+        # packages are also not provided, build the now.
         packages_dir = tmp_path_factory.mktemp("packages")
         builder_cls = ALL_MANAGED_PACKAGE_BUILDERS[package_builder_name]
         builder = builder_cls()
@@ -246,6 +272,7 @@ def repo_dir(package_builder_name, package_builder, request, tmp_path_factory):
             dirs_exist_ok=True
         )
 
+    # Build repo from packages.
     repo_builder = RepoBuilder()
     repo_builder.build(
         package_type=package_builder.PACKAGE_TYPE,
@@ -258,7 +285,9 @@ def repo_dir(package_builder_name, package_builder, request, tmp_path_factory):
 
 @pytest.fixture(scope="session")
 def repo_url(package_builder_name, package_builder, repo_dir, tmp_path_factory):
-
+    """
+    Fixture that starts a web server that serves repo directory.
+    """
     class Handler(http.server.SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, directory=repo_dir, **kwargs)
@@ -284,6 +313,10 @@ gpgcheck=0"""
 
 @pytest.fixture()
 def add_repo(package_builder, distro_name: str):
+    """
+    Fixture function that configures packages repository.
+    :return:
+    """
     if package_builder.PACKAGE_TYPE == "deb":
         def add(repo_url):
             repo_file_path = pl.Path("/etc/apt/sources.list.d/test.list")
@@ -323,10 +356,10 @@ def add_repo(package_builder, distro_name: str):
 
 
 def _call_yum(command: List, distro: str):
-
     env = {}
 
     if distro == "centos7":
+        # need additional library tweaking for tests that runs from the frozen pytest runner.
         env["LD_LIBRARY_PATH"] = "/lib64"
 
     subprocess.check_call(
@@ -341,6 +374,7 @@ def _call_apt(command: List[str], distro_name: str):
     }
 
     if distro_name in ["ubuntu1804", "ubuntu1604", "ubuntu1404"]:
+        # need additional library tweaking for tests that runs from the frozen pytest runner.
         env["PATH"] = f"/usr/sbin:/usr/local/sbin:/sbin:${os.environ['PATH']}"
 
     subprocess.check_call(
@@ -351,6 +385,12 @@ def _call_apt(command: List[str], distro_name: str):
 
 @pytest.fixture()
 def install_package(package_builder, distro_name):
+    """
+    Fixture function that install package from the repository.
+    :param package_builder: class of the package builder that build tested packages.
+    :param distro_name: Name of the tested distribution.
+    :return:
+    """
     if package_builder.PACKAGE_TYPE == "deb":
         def install(package_name: str):
             _call_apt(
