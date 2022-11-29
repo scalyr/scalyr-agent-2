@@ -80,7 +80,8 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
                 size_id="t2.small",
                 ssh_username="admin",
             )
-        }
+        },
+        "docker": "debian:10"
     },
     "centos8": {
         "ec2": {
@@ -91,6 +92,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
                 ssh_username="centos",
             )
         },
+        "docker": "centos:8"
     },
     "centos7": {
         "ec2": {
@@ -100,7 +102,8 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
                 size_id="t2.small",
                 ssh_username="centos",
             )
-        }
+        },
+        "docker": "centos:7"
     },
     "centos6": {
         "ec2": {
@@ -122,6 +125,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
                 ssh_username="ec2-user",
             )
         },
+        "docker": "amazonlinux:2"
     },
 }
 

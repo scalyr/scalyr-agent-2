@@ -302,6 +302,20 @@ def add_repo(package_builder, distro_name: str):
                     SOURCE_ROOT / "tests/end_to_end_tests/run_in_remote_machine/centos6.repo",
                     "/etc/yum.repos.d/CentOS-Base.repo"
                 )
+            elif distro_name == "centos8":
+                def replace_repo_to_vault(repo_file: pl.Path):
+                    repo_file.write_text(
+                        repo_file.read_text().replace("mirror.centos.org", "vault.centos.org")
+                    )
+                    repo_file.write_text(
+                        repo_file.read_text().replace("#baseurl", "baseurl")
+                    )
+                    repo_file.write_text(
+                        repo_file.read_text().replace("mirrorlist=", "#mirrorlist=")
+                    )
+
+                replace_repo_to_vault(pl.Path("/etc/yum.repos.d/CentOS-Linux-BaseOS.repo"))
+                replace_repo_to_vault(pl.Path("/etc/yum.repos.d/CentOS-Linux-AppStream.repo"))
     else:
         raise Exception(f"Unknown package type {package_builder.PACKAGE_TYPE}")
 

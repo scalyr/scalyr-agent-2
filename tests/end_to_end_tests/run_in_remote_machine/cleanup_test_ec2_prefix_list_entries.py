@@ -89,6 +89,7 @@ def main(
     if not entries_to_remove:
         return
 
+    print(f"Removing entries: {entries_to_remove}")
     _remove_entries(
         client=client,
         entries=list(entries_to_remove.values()),
