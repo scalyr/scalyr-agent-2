@@ -83,3 +83,24 @@ using ``-alpine`` tag name suffix (e.g. ``latest-alpine``).
 
 Since cross compilation in emulated environments (QEMU) is very slow and pre-built ARM musl wheels
 are not available, we don't bundle orjson and zstandard dependency in Alpine ARMv7 images.
+
+
+# Build agent Linux packages.
+
+To build agent package for Linux which is managed by OS's package manager run command:
+
+```
+python3 build_package_new_refactored.py <build_name> [--last-repo-python-package-file <python_package_file>] [--last-repo-agent-libs-package-file <agent_libs_file>]
+```
+
+Possible values for the 'build_name':
+    - deb-{amd64}
+    - rpm-{x86_64}
+
+It is important to note that along with the agent package itself, the dependency packages ``scalyr-agent-python3`` and 
+``scalyr-agent-libs`` are also built. Since those packages are updated less often than the agent package and if 
+they are already presented in the repository, then we can provide additional options ``--last-repo-python-package-file`` 
+and ``--last-repo-agent-libs-package-file`` to the command, so those existing dependency packages will be reused from 
+that repo.
+
+
