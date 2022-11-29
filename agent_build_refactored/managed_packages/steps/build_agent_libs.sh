@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Copyright 2014-2022 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,12 +26,11 @@
 
 set -e
 
+# shellcheck disable=SC1090
 source ~/.bashrc
 
 # Copy python interpreter, which is built by the previous step.
 cp -a "${BUILD_PYTHON}/python/." /
-
-/usr/lib/${SUBDIR_NAME}/bin/python3 -c 'import os; print(os.environ["LD_LIBRARY_PATH"])'
 
 # First install Rust, in order to be able to build some of required libraries.
 cd ~
@@ -46,12 +46,12 @@ REQUIREMENTS_FILES_PATH="${SOURCE_ROOT}/agent_build/requirement-files"
 #
 
 
-/usr/lib/${SUBDIR_NAME}/bin/python3 -m pip install --root "${STEP_OUTPUT_PATH}/dev_libs" -r "${SOURCE_ROOT}/dev-requirements.txt"
+"/usr/lib/${SUBDIR_NAME}/bin/python3" -m pip install --root "${STEP_OUTPUT_PATH}/dev_libs" -r "${SOURCE_ROOT}/dev-requirements.txt"
 
 #
 # Build agent libs.
 #
 
-/usr/lib/${SUBDIR_NAME}/bin/python3 -m pip install -v --force-reinstall --root "${STEP_OUTPUT_PATH}/agent_libs"  \
+"/usr/lib/${SUBDIR_NAME}/bin/python3" -m pip install -v --force-reinstall --root "${STEP_OUTPUT_PATH}/agent_libs"  \
   -r "${REQUIREMENTS_FILES_PATH}/main-requirements.txt" \
   -r "${REQUIREMENTS_FILES_PATH}/compression-requirements.txt"

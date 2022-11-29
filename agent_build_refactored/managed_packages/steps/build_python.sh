@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Copyright 2014-2022 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -44,6 +45,7 @@
 
 set -e
 
+# shellcheck disable=SC1090
 source ~/.bashrc
 
 mkdir /tmp/build-python
@@ -75,7 +77,7 @@ PACKAGE_INSTALL_EXEC_PREFIX="/usr/lib/${SUBDIR_NAME}"
 	--with-ensurepip=upgrade \
 	--with-suffix="-orig"
 
-	#		--enable-optimizations \
+#		--enable-optimizations \
 #	--with-lto \
 
 
@@ -111,12 +113,12 @@ cp -a "${SOURCE_ROOT}/agent_build_refactored/managed_packages/files/python3" "${
 PYTHON_EXEC_LIBS_PATH="${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib/python${PYTHON_SHORT_VERSION}"
 PYTHON_LIBS_PATH="${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/lib/python${PYTHON_SHORT_VERSION}"
 
-find ${PYTHON_EXEC_LIBS_PATH} -name "__pycache__" -type d -prune -exec rm -r {} \;
-find ${PYTHON_LIBS_PATH} -name "__pycache__" -type d -prune -exec rm -r {} \;
+find "${PYTHON_EXEC_LIBS_PATH}" -name "__pycache__" -type d -prune -exec rm -r {} \;
+find "${PYTHON_LIBS_PATH}" -name "__pycache__" -type d -prune -exec rm -r {} \;
 
-rm -r ${PYTHON_LIBS_PATH}/test
-rm -r ${PYTHON_LIBS_PATH}/config-${PYTHON_SHORT_VERSION}-x86_64-linux-gnu
-rm -r ${PYTHON_LIBS_PATH}/lib2to3
+rm -r "${PYTHON_LIBS_PATH}/test"
+rm -r "${PYTHON_LIBS_PATH}/config-${PYTHON_SHORT_VERSION}-x86_64-linux-gnu"
+rm -r "${PYTHON_LIBS_PATH}/lib2to3"
 
 
-cp -a ${BUILD_ROOT} "${STEP_OUTPUT_PATH}/python"
+cp -a "${BUILD_ROOT}" "${STEP_OUTPUT_PATH}/python"
