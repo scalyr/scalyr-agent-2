@@ -326,7 +326,7 @@ def _call_apt(command: List[str], distro_name: str):
         "DEBIAN_FRONTEND": "noninteractive"
     }
 
-    if distro_name == "ubuntu1804":
+    if distro_name == "ubuntu1804" or distro_name == "ubuntu1404":
         env["PATH"] = f"/usr/sbin:/usr/local/sbin:/sbin:${os.environ['PATH']}"
 
     subprocess.check_call(

@@ -26,6 +26,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
                 ssh_username="ubuntu"
             )
         },
+        "docker": "ubuntu:20.04"
     },
     "ubuntu1804": {
         "ec2": {
@@ -36,6 +37,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
                 ssh_username="ubuntu"
             )
         },
+        "docker": "ubuntu:18.04"
     },
     "ubuntu1604": {
         "ec2": {
@@ -46,6 +48,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
                 ssh_username="ubuntu",
             )
         },
+        "docker": "ubuntu:16.04"
     },
     "ubuntu1404": {
         "ec2": {
@@ -55,7 +58,8 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
                     size_id="t2.small",
                     ssh_username="ubuntu",
             )
-        }
+        },
+        "docker": "ubuntu:14.04"
     },
     "debian11": {
         "ec2": {
