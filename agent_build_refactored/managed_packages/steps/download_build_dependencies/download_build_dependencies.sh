@@ -147,7 +147,7 @@ clear_public_keys
 
 mkdir "${STEP_OUTPUT_PATH}/perl"
 pushd "${STEP_OUTPUT_PATH}/perl"
-curl -L  http://www.cpan.org/src/5.0/perl-${PERL_VERSION}.tar.gz > perl.tar.gz
+curl -L  "http://www.cpan.org/src/5.0/perl-${PERL_VERSION}.tar.gz" > perl.tar.gz
 
 # Public keys and signatures for perl source couldn't be found, so we just verify the checksum of the particular version.
 echo -n "e26085af8ac396f62add8a533c3a0ea8c8497d836f0689347ac5abd7b7a4e00a  perl.tar.gz" > perl.tar.gz.sha256
@@ -204,8 +204,8 @@ popd
 
 mkdir "${STEP_OUTPUT_PATH}/libtool"
 pushd "${STEP_OUTPUT_PATH}/libtool"
-curl -L http://ftp.gnu.org/gnu/libtool/libtool-${LIBTOOL_VERSION}.tar.gz > libtool.tar.gz
-curl -L http://ftp.gnu.org/gnu/libtool/libtool-${LIBTOOL_VERSION}.tar.gz.sig > libtool.tar.gz.sig
+curl -L "http://ftp.gnu.org/gnu/libtool/libtool-${LIBTOOL_VERSION}.tar.gz" > libtool.tar.gz
+curl -L "http://ftp.gnu.org/gnu/libtool/libtool-${LIBTOOL_VERSION}.tar.gz.sig" > libtool.tar.gz.sig
 gpg --verify --keyring "${GNU_KEYRING_PATH}" libtool.tar.gz.sig libtool.tar.gz
 popd
 

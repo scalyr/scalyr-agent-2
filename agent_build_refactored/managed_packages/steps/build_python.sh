@@ -45,6 +45,7 @@
 
 set -e
 
+# shellcheck disable=SC1090
 source ~/.bashrc
 
 mkdir /tmp/build-python
@@ -112,17 +113,17 @@ mv "${BUILD_ROOT}/${DATA_ROOT_DIR}/${SUBDIR_NAME}" "${FINAL_PACKAGE_ROOT}/${DATA
 mv "${BUILD_ROOT}/${INCLUDE_DIR}/${SUBDIR_NAME}" "${FINAL_PACKAGE_ROOT}/${INCLUDE_DIR}/${SUBDIR_NAME}"
 
 # Copy remaining files that have been created outside of sub-directories to those sub-directories.
-cp -ar ${BUILD_ROOT}/bin/. "${FINAL_PACKAGE_ROOT}/${BIN_DIR}/${SUBDIR_NAME}"
-cp -ar ${BUILD_ROOT}/lib/. "${FINAL_PACKAGE_ROOT}/${LIB_DIR}/${SUBDIR_NAME}"
-cp -ar ${BUILD_ROOT}/share/. "${FINAL_PACKAGE_ROOT}/${DATA_ROOT_DIR}/${SUBDIR_NAME}"
-cp -ar ${BUILD_ROOT}/include/. "${FINAL_PACKAGE_ROOT}/${INCLUDE_DIR}/${SUBDIR_NAME}"
+cp -ar "${BUILD_ROOT}"/bin/. "${FINAL_PACKAGE_ROOT}/${BIN_DIR}/${SUBDIR_NAME}"
+cp -ar "${BUILD_ROOT}"/lib/. "${FINAL_PACKAGE_ROOT}/${LIB_DIR}/${SUBDIR_NAME}"
+cp -ar "${BUILD_ROOT}"/share/. "${FINAL_PACKAGE_ROOT}/${DATA_ROOT_DIR}/${SUBDIR_NAME}"
+cp -ar "${BUILD_ROOT}"/include/. "${FINAL_PACKAGE_ROOT}/${INCLUDE_DIR}/${SUBDIR_NAME}"
 
 # Cleanup build root.
-rm -r ${BUILD_ROOT}/bin
-rm -r ${BUILD_ROOT}/libexec
-rm -r ${BUILD_ROOT}/lib
-rm -r ${BUILD_ROOT}/share
-rm -r ${BUILD_ROOT}/include
+rm -r "${BUILD_ROOT:?}/bin"
+rm -r "${BUILD_ROOT:?}/libexec"
+rm -r "${BUILD_ROOT:?}/lib"
+rm -r "${BUILD_ROOT:?}/share"
+rm -r "${BUILD_ROOT:?}/include"
 
 
 function die() {
@@ -133,7 +134,7 @@ function die() {
 
 # Check that there's nothing left in the original build root directory.
 BUILT_ROOT_CONTENT=$(find "${BUILD_ROOT}" -type f)
-test $( echo -n "${BUILT_ROOT_CONTENT}" | wc -l) = 0 || die "Some files are still remaining not copied to a final package folder. Files: ${BUILT_ROOT_CONTENT}"
+test "$( echo -n "${BUILT_ROOT_CONTENT}" | wc -l) = 0" || die "Some files are still remaining not copied to a final package folder. Files: ${BUILT_ROOT_CONTENT}"
 
 
 # Copy Python dependency shared libraries.
@@ -155,7 +156,7 @@ cp -a "${SOURCE_ROOT}/agent_build_refactored/managed_packages/files/scalyr-agent
 # Remove some of the files to reduce package size
 PYTHON_LIBS_PATH="${FINAL_PACKAGE_ROOT}/${LIB_DIR}/${SUBDIR_NAME}/python${PYTHON_SHORT_VERSION}"
 
-find ${PYTHON_LIBS_PATH} -name "__pycache__" -type d -prune -exec rm -r {} \;
-rm -r ${PYTHON_LIBS_PATH}/test
-rm -r ${PYTHON_LIBS_PATH}/config-${PYTHON_SHORT_VERSION}-x86_64-linux-gnu
-rm -r ${PYTHON_LIBS_PATH}/lib2to3
+find "${PYTHON_LIBS_PATH}" -name "__pycache__" -type d -prune -exec rm -r {} \;
+rm -r "${PYTHON_LIBS_PATH}/test"
+rm -r "${PYTHON_LIBS_PATH}/config-${PYTHON_SHORT_VERSION}-x86_64-linux-gnu"
+rm -r "${PYTHON_LIBS_PATH}/lib2to3"

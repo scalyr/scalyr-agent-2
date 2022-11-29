@@ -128,7 +128,8 @@ yum install -y scl-utils
 yum remove -y help2man m4 perl
 
 echo "source /opt/rh/devtoolset-7/enable" >> ~/.bashrc
-echo "export LD_LIBRARY_PATH="/usr/local/lib:/usr/local/lib64:\${LD_LIBRARY_PATH}"" >> ~/.bashrc
+# shellcheck disable=SC2016
+echo 'export LD_LIBRARY_PATH="/usr/local/lib:/usr/local/lib64:${LD_LIBRARY_PATH}"' >> ~/.bashrc
 
 yum clean all
 rm -rf /var/cache/yum

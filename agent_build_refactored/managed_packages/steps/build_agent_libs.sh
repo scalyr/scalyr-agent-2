@@ -26,6 +26,7 @@
 
 set -e
 
+# shellcheck disable=SC1090
 source ~/.bashrc
 
 # Copy python interpreter, which is built by the previous step.
@@ -47,7 +48,7 @@ DEV_LIBS_BUILD_ROOT="/tmp/dev-libs"
 #CFLAGS="-I/usr/include/${SUBDIR_NAME}/python${PYTHON_SHORT_VERSION}" \
 #  /usr/libexec/scalyr-agent-2-python3 -m pip install --root "${DEV_LIBS_BUILD_ROOT}" -r "${SOURCE_ROOT}/dev-requirements.txt"
 
-/usr/libexec/${SUBDIR_NAME}/scalyr-agent-2-python3 -m pip install --root "${DEV_LIBS_BUILD_ROOT}" -r "${SOURCE_ROOT}/dev-requirements.txt"
+/usr/libexec/"${SUBDIR_NAME}"/scalyr-agent-2-python3 -m pip install --root "${DEV_LIBS_BUILD_ROOT}" -r "${SOURCE_ROOT}/dev-requirements.txt"
 
 # Uncomment this in order to save dev libs files with original filesystem structure. May be useful for debugging.
 # cp -a "${DEV_LIBS_BUILD_ROOT}" "${STEP_OUTPUT_PATH}/dev_libs_original"
@@ -78,7 +79,7 @@ test "$(echo -n "${REMAINING_DEV_FILES}" | wc -l)" = "0" || die "There are still
 # Build agent libs.
 #
 AGENT_LIBS_BUILD_ROOT="/tmp/agent-libs"
-/usr/libexec/${SUBDIR_NAME}/scalyr-agent-2-python3 -m pip install -v --force-reinstall --root "${AGENT_LIBS_BUILD_ROOT}"  \
+/usr/libexec/"${SUBDIR_NAME}"/scalyr-agent-2-python3 -m pip install -v --force-reinstall --root "${AGENT_LIBS_BUILD_ROOT}"  \
   -r "${REQUIREMENTS_FILES_PATH}/main-requirements.txt" \
   -r "${REQUIREMENTS_FILES_PATH}/compression-requirements.txt"
 

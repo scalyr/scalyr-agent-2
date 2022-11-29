@@ -46,6 +46,7 @@
 
 set -e
 
+# shellcheck disable=SC1090
 source ~/.bashrc
 
 # NOTE: The order of installation is important.
@@ -223,7 +224,6 @@ popd
 
 mkdir /tmp/build-openssl
 pushd /tmp/build-openssl
-OPENSSL_VERSION_UNDERSCORED="${OPENSSL_VERSION//./_}"
 tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/openssl/openssl.tar.gz"
 pushd "openssl-${OPENSSL_VERSION}"
 ./Configure linux-x86_64 shared

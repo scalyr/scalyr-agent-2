@@ -33,18 +33,19 @@ set -e
 
 # Add new user which matches user of the host in order to
 # workaround files permission issues.
-groupadd -f -g ${USER_GID} mygroup
-useradd -m -g "${USER_GID}" -u ${USER_ID} -p root ${USER_NAME}
+groupadd -f -g "${USER_GID}" mygroup
+useradd -m -g "${USER_GID}" -u "${USER_ID}" -p root "${USER_NAME}"
 
+# shellcheck disable=SC1090
 source ~/.bashrc
 cp -a "${BUILD_PYTHON}/python/." /
 cp -a "${BUILD_AGENT_LIBS}/dev_libs/." /
 
-ln -s /usr/libexec/${SUBDIR_NAME}/scalyr-agent-2-python3 /usr/bin/python3
+ln -s "/usr/libexec/${SUBDIR_NAME}/scalyr-agent-2-python3" /usr/bin/python3
 
 apt update
 DEBIAN_FRONTEND=noninteractive apt install -y ruby ruby-dev rubygems build-essential rpm
-gem install fpm:${FPM_VERSION} package_cloud:${PACKAGECLOUD_VERSION}
+gem install "fpm:${FPM_VERSION}" "package_cloud:${PACKAGECLOUD_VERSION}"
 
 
 apt clean
