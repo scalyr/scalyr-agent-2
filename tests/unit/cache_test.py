@@ -12,12 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from scalyr_agent.builtin_monitors.windows_event_log_monitor import Cache
-from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase
+try:
+    from scalyr_agent.builtin_monitors.windows_event_log_monitor import Cache
+except:
+    Cache = None
 
+from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase, skipIf
+
+import sys
 import time
 
 
+@skipIf(sys.version_info < (3, 0, 0), "Skipping under Python 2")
 class CacheTest(BaseScalyrLogCaptureTestCase):
     def test_fixed_size(self):
         cache = Cache(3, 3600)
