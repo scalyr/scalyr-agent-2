@@ -832,9 +832,7 @@ class NewJsonApi(NewApi):
                 self._logger.info(
                     "placeholder param cache size = %d" % len(self._param_cache)
                 )
-                self._logger.info(
-                    "dll handle cache size = %d" % len(self._dll_cache)
-                )
+                self._logger.info("dll handle cache size = %d" % len(self._dll_cache))
 
         # Populate the record here with fields that would normally be added by the log formatter,
         # this avoids having to unmarshal and remarshal later in the log formatter.
