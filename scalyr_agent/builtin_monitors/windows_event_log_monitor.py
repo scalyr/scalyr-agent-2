@@ -830,10 +830,10 @@ class NewJsonApi(NewApi):
             if time.time() > self._next_cache_report:
                 self._next_cache_report = time.time() + self._cache_report_interval
                 self._logger.info(
-                    "placeholder param cache size = %d" % (len(self._param_cache),)
+                    "placeholder param cache size = %d" % len(self._param_cache)
                 )
                 self._logger.info(
-                    "dll handle cache size = %d" % (len(self._dll_cache),)
+                    "dll handle cache size = %d" % len(self._dll_cache)
                 )
 
         # Populate the record here with fields that would normally be added by the log formatter,

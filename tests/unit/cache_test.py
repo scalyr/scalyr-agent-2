@@ -41,37 +41,37 @@ class CacheTest(BaseScalyrLogCaptureTestCase):
         self.assertTrue("a" not in cache)
 
     def test_ttl_via_contains(self):
-        cache = Cache(1000, 1)
+        cache = Cache(1000, 0.001)
 
         cache["a"] = 1
         self.assertTrue("a" in cache)
 
-        time.sleep(1)
+        time.sleep(0.001)
         self.assertTrue("a" not in cache)
 
     def test_ttl_via_iter(self):
-        cache = Cache(1000, 1)
+        cache = Cache(1000, 0.001)
 
         cache["a"] = 1
         self.assertTrue("a" in cache)
 
-        time.sleep(1)
+        time.sleep(0.001)
         self.assertTrue(len([k for k in cache]) == 0)
 
     def test_ttl_via_values(self):
-        cache = Cache(1000, 1)
+        cache = Cache(1000, 0.001)
 
         cache["a"] = 1
         self.assertTrue("a" in cache)
 
-        time.sleep(1)
+        time.sleep(0.001)
         self.assertTrue(len([v for v in cache.values()]) == 0)
 
     def test_ttl_via_len(self):
-        cache = Cache(1000, 1)
+        cache = Cache(1000, 0.001)
 
         cache["a"] = 1
         self.assertTrue("a" in cache)
 
-        time.sleep(1)
+        time.sleep(0.001)
         self.assertTrue(len(cache) == 0)
