@@ -146,20 +146,24 @@ Log into DataSet and query [monitor = 'windows_process_metrics'](https://app.sca
 <a name="options"></a>
 ## Configuration Options
 
-| Property                     | Description | 
-| ---                          | --- | 
-| `module`                     | Always `scalyr_agent.builtin_monitors.windows_event_log_monitor` | 
-| `sources`                    | Optional (defaults to `Application, Security, System`). A comma separated list of sources to import events from. (Not valid for Vista and later; use `channels` instead.) | 
-| `event_types`                | Optional (defaults to `All`). A comma separated list of event types to import. Valid values are: `All`, `Error`, `Warning`, `Information`, `AuditSuccess`, and `AuditFailure`. (Not valid for Vista and later; use `channels` instead.) | 
-| `channels`                   | Optional (defaults to `[{"channel" : ["Application", "Security", "System"], "query": "*"}]`). A list of dict objects specifying a list of channels, and an XPath query for those channels. (Only available on Windows Vista and later.) | 
-| `maximum_records_per_source` | Optional (defaults to `10000`). Maximum number of records to read from the end of each log source per gather_sample. | 
-| `error_repeat_interval`      | Optional (defaults to `300`). Number of seconds to wait before logging similar errors in the event log. | 
-| `server_name`                | Optional (defaults to `localhost`). The remote server to import events from. | 
-| `remote_user`                | Optional (defaults to `none`). Username for authentication on the remote server. This option is only valid on Windows Vista and above. | 
-| `remote_password`            | Optional (defaults to `none`). Password to use for authentication on the remote server.  This option is only valid on Windows Vista and above. | 
-| `remote_domain`              | Optional (defaults to `none`). The domain for the remote user account. This option is only valid on Windows Vista and above. | 
-| `json`                       | Optional (defaults to `false`). Format events as json? Supports inclusion of all event fields. This option is only valid on Windows Vista and above. | 
-| `placeholder_render`         | Optional (defaults to `false`). Render %%n placeholders in event data?  This option is only valid on Windows Vista and above. | 
+| Property                       | Description | 
+| ---                            | --- | 
+| `module`                       | Always `scalyr_agent.builtin_monitors.windows_event_log_monitor` | 
+| `sources`                      | Optional (defaults to `Application, Security, System`). A comma separated list of sources to import events from. (Not valid for Vista and later; use `channels` instead.) | 
+| `event_types`                  | Optional (defaults to `All`). A comma separated list of event types to import. Valid values are: `All`, `Error`, `Warning`, `Information`, `AuditSuccess`, and `AuditFailure`. (Not valid for Vista and later; use `channels` instead.) | 
+| `channels`                     | Optional (defaults to `[{"channel" : ["Application", "Security", "System"], "query": "*"}]`). A list of dict objects specifying a list of channels, and an XPath query for those channels. (Only available on Windows Vista and later.) | 
+| `maximum_records_per_source`   | Optional (defaults to `10000`). Maximum number of records to read from the end of each log source per gather_sample. | 
+| `error_repeat_interval`        | Optional (defaults to `300`). Number of seconds to wait before logging similar errors in the event log. | 
+| `server_name`                  | Optional (defaults to `localhost`). The remote server to import events from. | 
+| `remote_user`                  | Optional (defaults to `none`). Username for authentication on the remote server. This option is only valid on Windows Vista and above. | 
+| `remote_password`              | Optional (defaults to `none`). Password to use for authentication on the remote server.  This option is only valid on Windows Vista and above. | 
+| `remote_domain`                | Optional (defaults to `none`). The domain for the remote user account. This option is only valid on Windows Vista and above. | 
+| `json`                         | Optional (defaults to `false`). Format events as json? Supports inclusion of all event fields. This option is only valid on Windows Vista and above. | 
+| `placeholder_render`           | Optional (defaults to `false`). Render %%n placeholders in event data? This option is only valid on Windows Vista and above. | 
+| `dll_handle_cache_size`        | Optional (defaults to `10`). DLL handle cache size, applicable only if `placeholder_render` is set. This option is only valid on Windows Vista and above. | 
+| `placeholder_param_cache_size` | Optional (defaults to `1000`). Placeholder parameter cache size, applicable only if `placeholder_render` is set. This option is only valid on Windows Vista and above. | 
+| `dll_handle_cache_ttl`         | Optional (defaults to `86400` ie 24 hours). DLL handle cache TTL, applicable only if `placeholder_render` is set. This option is only valid on Windows Vista and above. | 
+| `placeholder_param_cache_ttl`  | Optional (defaults to `86400` ie 24 hours). Placeholder parameter cache TLL, applicable only if `placeholder_render` is set. This option is only valid on Windows Vista and above. | 
 
 <a name="events"></a>
 ## Event Reference

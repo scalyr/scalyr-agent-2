@@ -156,10 +156,46 @@ define_config_option(
 define_config_option(
     __monitor__,
     "placeholder_render",
-    "Optional (defaults to `false`). Render %%n placeholders in event data?  "
-    "This option is only valid on Windows Vista and above.",
+    "Optional (defaults to `false`). Render %%n placeholders in event data? This option is only "
+    "valid on Windows Vista and above.",
     default=False,
     convert_to=bool,
+)
+
+define_config_option(
+    __monitor__,
+    "dll_handle_cache_size",
+    "Optional (defaults to `10`). DLL handle cache size, applicable only if `placeholder_render` "
+    "is set. This option is only valid on Windows Vista and above.",
+    default=10,
+    convert_to=int,
+)
+
+define_config_option(
+    __monitor__,
+    "placeholder_param_cache_size",
+    "Optional (defaults to `1000`). Placeholder parameter cache size, applicable only if "
+    "`placeholder_render` is set. This option is only valid on Windows Vista and above.",
+    default=1000,
+    convert_to=int,
+)
+
+define_config_option(
+    __monitor__,
+    "dll_handle_cache_ttl",
+    "Optional (defaults to `86400` ie 24 hours). DLL handle cache TTL, applicable only if "
+    "`placeholder_render` is set. This option is only valid on Windows Vista and above.",
+    default=86400,
+    convert_to=int,
+)
+
+define_config_option(
+    __monitor__,
+    "placeholder_param_cache_ttl",
+    "Optional (defaults to `86400` ie 24 hours). Placeholder parameter cache TLL, applicable only "
+    "if `placeholder_render` is set. This option is only valid on Windows Vista and above.",
+    default=86400,
+    convert_to=int,
 )
 
 define_log_field(__monitor__, "monitor", "Always ``windows_event_log_monitor``.")
@@ -738,8 +774,18 @@ class NewJsonApi(NewApi):
 
         self._placeholder_render = config.get("placeholder_render")
         if self._placeholder_render:
-            self._dll_cache = Cache(size=10)
-            self._param_cache = Cache(size=1000)
+            self._dll_cache = Cache(
+                size=config.get("dll_handle_cache_size"),
+                ttl=config.get("dll_handle_cache_ttl"),
+            )
+            self._param_cache = Cache(
+                size=config.get("placeholder_param_cache_size"),
+                ttl=config.get("placeholder_param_cache_ttl"),
+            )
+
+            self._cache_report_interval = 3600 * 12
+            self._next_cache_report = time.time() + self._cache_report_interval
+
             self._langid = win32api.MAKELANGID(
                 win32con.LANG_NEUTRAL, win32con.SUBLANG_NEUTRAL
             )
@@ -781,6 +827,12 @@ class NewJsonApi(NewApi):
         #      FormatMessage of https://github.com/mhammond/pywin32/blob/main/win32/Lib/win32evtlogutil.py
         if self._placeholder_render:
             event_json = self._replace_param_placeholders(event_json)
+            if time.time() > self._next_cache_report:
+                self._next_cache_report = time.time() + self._cache_report_interval
+                self._logger.info(
+                    "placeholder param cache size = %d" % len(self._param_cache)
+                )
+                self._logger.info("dll handle cache size = %d" % len(self._dll_cache))
 
         # Populate the record here with fields that would normally be added by the log formatter,
         # this avoids having to unmarshal and remarshal later in the log formatter.
@@ -838,6 +890,11 @@ class NewJsonApi(NewApi):
                     self._dll_cache[dll_key] = _DLL(channel, provider)
                 except Exception as e:
                     self._dll_cache[dll_key] = e
+                    self._logger.error(
+                        "win32api.LoadLibraryEx exception: %s" % six.text_type(e),
+                        limit_once_per_x_secs=self._error_repeat_interval,
+                        limit_key="win32api.LoadLibraryEx",
+                    )
                     return param
 
         try:
@@ -849,8 +906,13 @@ class NewJsonApi(NewApi):
                 None,
             )
             self._param_cache[param_key] = value.strip()
-        except:
+        except Exception as e:
             self._param_cache[param_key] = param
+            self._logger.error(
+                "win32api.FormatMessageW exception: %s" % six.text_type(e),
+                limit_once_per_x_secs=self._error_repeat_interval,
+                limit_key="win32api.FormatMessageW",
+            )
 
         return self._param_cache[param_key]
 
@@ -964,17 +1026,73 @@ class _DLL:
     def __del__(self):
         if self.handle:
             win32api.FreeLibrary(self.handle)
+            self.handle = None
 
 
 class Cache(collections.OrderedDict):
-    def __init__(self, size):
+    """
+    Fixed-size cache with entry TTL
+    """
+
+    def __init__(self, size, ttl):
         super().__init__()
         self.__size = size
+        self.__ttl = ttl
 
     def __setitem__(self, key, val):
         while len(self) >= self.__size:
             self.popitem(last=False)
-        super().__setitem__(key, val)
+        super().__setitem__(key, (val, time.time()))
+
+    def __getitem__(self, key):
+        # Intentionally not evicting entries due to ttl here.
+        # Expecting checks via __contains__ followed immediately by __getitem__
+        val, _ = super().__getitem__(key)
+        return val
+
+    def __contains__(self, key):
+        try:
+            _, added = super().__getitem__(key)
+        except KeyError:
+            return False
+
+        if time.time() > added + self.__ttl:
+            del self[key]
+            return False
+        return True
+
+    def __iter__(self):
+        active = []
+        expired = []
+        for key in super().__iter__():
+            _, added = super().__getitem__(key)
+
+            if time.time() > added + self.__ttl:
+                expired += [key]
+            else:
+                active += [key]
+
+        for key in expired:
+            del self[key]
+        return iter(active)
+
+    def values(self):
+        active_vals = []
+        expired_keys = []
+        for key in super().__iter__():
+            val, added = super().__getitem__(key)
+
+            if time.time() > added + self.__ttl:
+                expired_keys += [key]
+            else:
+                active_vals += [val]
+
+        for key in expired_keys:
+            del self[key]
+        return iter(active_vals)
+
+    def __len__(self):
+        return len(list(iter(self)))
 
 
 class WindowEventLogMonitor(ScalyrMonitor):
