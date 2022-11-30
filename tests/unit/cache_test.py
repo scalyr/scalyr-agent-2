@@ -17,36 +17,37 @@ from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase
 
 import time
 
+
 class CacheTest(BaseScalyrLogCaptureTestCase):
     def test_fixed_size(self):
         cache = Cache(3, 3600)
 
-        cache['a'] = 1
-        cache['b'] = 2
-        cache['c'] = 3
+        cache["a"] = 1
+        cache["b"] = 2
+        cache["c"] = 3
 
         self.assertTrue(len(cache) == 3)
-        self.assertTrue('a' in cache)
+        self.assertTrue("a" in cache)
 
-        cache['d'] = 4
+        cache["d"] = 4
 
         self.assertTrue(len(cache) == 3)
-        self.assertTrue('a' not in cache)
+        self.assertTrue("a" not in cache)
 
     def test_ttl_via_contains(self):
         cache = Cache(1000, 1)
 
-        cache['a'] = 1
-        self.assertTrue('a' in cache)
+        cache["a"] = 1
+        self.assertTrue("a" in cache)
 
         time.sleep(1)
-        self.assertTrue('a' not in cache)
+        self.assertTrue("a" not in cache)
 
     def test_ttl_via_iter(self):
         cache = Cache(1000, 1)
 
-        cache['a'] = 1
-        self.assertTrue('a' in cache)
+        cache["a"] = 1
+        self.assertTrue("a" in cache)
 
         time.sleep(1)
         self.assertTrue(len([k for k in cache]) == 0)
@@ -54,8 +55,8 @@ class CacheTest(BaseScalyrLogCaptureTestCase):
     def test_ttl_via_values(self):
         cache = Cache(1000, 1)
 
-        cache['a'] = 1
-        self.assertTrue('a' in cache)
+        cache["a"] = 1
+        self.assertTrue("a" in cache)
 
         time.sleep(1)
         self.assertTrue(len([v for v in cache.values()]) == 0)
@@ -63,8 +64,8 @@ class CacheTest(BaseScalyrLogCaptureTestCase):
     def test_ttl_via_len(self):
         cache = Cache(1000, 1)
 
-        cache['a'] = 1
-        self.assertTrue('a' in cache)
+        cache["a"] = 1
+        self.assertTrue("a" in cache)
 
         time.sleep(1)
         self.assertTrue(len(cache) == 0)

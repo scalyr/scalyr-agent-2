@@ -829,8 +829,12 @@ class NewJsonApi(NewApi):
             event_json = self._replace_param_placeholders(event_json)
             if time.time() > self._next_cache_report:
                 self._next_cache_report = time.time() + self._cache_report_interval
-                self._logger.info("placeholder param cache size = %d" % (len(self._param_cache),))
-                self._logger.info("dll handle cache size = %d" % (len(self._dll_cache),))
+                self._logger.info(
+                    "placeholder param cache size = %d" % (len(self._param_cache),)
+                )
+                self._logger.info(
+                    "dll handle cache size = %d" % (len(self._dll_cache),)
+                )
 
         # Populate the record here with fields that would normally be added by the log formatter,
         # this avoids having to unmarshal and remarshal later in the log formatter.
@@ -1028,9 +1032,9 @@ class _DLL:
 
 
 class Cache(collections.OrderedDict):
-    '''
+    """
     Fixed-size cache with entry TTL
-    '''
+    """
 
     def __init__(self, size, ttl):
         super().__init__()
