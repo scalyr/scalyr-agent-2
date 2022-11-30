@@ -228,7 +228,7 @@ def main():
                 "name": f"Pre-build: {pre_built_step_runner.REQUIRED_STEPS[0].name}",
                 "step-runner-fqdn": pre_built_step_runner.get_fully_qualified_name(),
                 "os": "ubuntu-20.04",
-                "python-version": "3.8.13",
+                "python-version": "3.11.0",
             }
         )
 

@@ -60,7 +60,7 @@ from agent_build_refactored.tools.runner import (
 log = logging.getLogger(__name__)
 
 # Python version that is used in docker images.
-IMAGES_PYTHON_VERSION = "3.8.13"
+IMAGES_PYTHON_VERSION = "3.11.0"
 
 _AGENT_REQUIREMENT_FILES_PATH = AGENT_BUILD_PATH / "requirement-files"
 _TEST_REQUIREMENTS_FILE_PATH = (
