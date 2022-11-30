@@ -892,6 +892,11 @@ class NewJsonApi(NewApi):
                     self._dll_cache[dll_key] = _DLL(channel, provider)
                 except Exception as e:
                     self._dll_cache[dll_key] = e
+                    self._logger.error(
+                        "win32api.LoadLibraryEx exception: %s" % six.text_type(e),
+                        limit_once_per_x_secs=self._error_repeat_interval,
+                        limit_key="win32api.LoadLibraryEx",
+                    )
                     return param
 
         try:
@@ -1018,11 +1023,6 @@ class _DLL:
             )
         except Exception as e:
             self.handle = None
-            self._logger.error(
-                "win32api.LoadLibraryEx exception: %s" % six.text_type(e),
-                limit_once_per_x_secs=self._error_repeat_interval,
-                limit_key="win32api.LoadLibraryEx",
-            )
             raise e
 
     def __del__(self):
