@@ -159,6 +159,7 @@ Log into DataSet and query [monitor = 'windows_process_metrics'](https://app.sca
 | `remote_password`            | Optional (defaults to `none`). Password to use for authentication on the remote server.  This option is only valid on Windows Vista and above. | 
 | `remote_domain`              | Optional (defaults to `none`). The domain for the remote user account. This option is only valid on Windows Vista and above. | 
 | `json`                       | Optional (defaults to `false`). Format events as json? Supports inclusion of all event fields. This option is only valid on Windows Vista and above. | 
+| `placeholder_render`         | Optional (defaults to `false`). Render %%n placeholders in event data?  This option is only valid on Windows Vista and above. | 
 
 <a name="events"></a>
 ## Event Reference

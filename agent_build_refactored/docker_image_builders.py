@@ -313,7 +313,8 @@ class ContainerImageBuilder(Runner):
         """
 
         # execute runner in order to execute all dependency steps.
-        self.run()
+
+        self.run_required()
 
         output_registry_dir_path = output_registry_dir and pl.Path(output_registry_dir)
         result_registry_data_root = output_registry_dir_path / "registry"

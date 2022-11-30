@@ -164,13 +164,13 @@ jobs:
           echo ""
 
       - name: Create scalyr-agent-2 daemonset
-        uses: ./.github/actions/install-k8s-agent-daemonset/
+        uses: ./.github/actions/install-k8s-agent/
         with:
           scalyr_server: "agent.scalyr.com"
           scalyr_api_key: "${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}"
           scalyr_cluster_name: "${K8S_CLUSTER_NAME}"
           scalyr_k8s_events_disable: "false"
-          daemonset_yaml_path: "tests/e2e/scalyr-agent-2-daemonset.yaml"
+          main_yaml_path: "tests/e2e/scalyr-agent-2-daemonset.yaml"
 
       - name: Verify data has been ingested
         timeout-minutes: 14
@@ -341,12 +341,12 @@ jobs:
           kubectl get pods -A
 
       - name: Create scalyr-agent-2 daemonset
-        uses: ./.github/actions/install-k8s-agent-daemonset/
+        uses: ./.github/actions/install-k8s-agent/
         with:
           scalyr_server: "agent.scalyr.com"
           scalyr_api_key: "${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}"
           scalyr_cluster_name: "${K8S_CLUSTER_NAME}"
-          daemonset_yaml_path: "tests/e2e/k8s_om_monitor/scalyr-agent-2-daemonset.yaml"
+          main_yaml_path: "tests/e2e/k8s_om_monitor/scalyr-agent-2-daemonset.yaml"
           # Monitor is not enabled by default yet since it's still in preview and testing phase so
           # we expliticly enable it here
           extra_yaml_paths: "tests/e2e/k8s_om_monitor/scalyr-agent-extra-config-configmap.yaml"

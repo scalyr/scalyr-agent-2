@@ -18,6 +18,11 @@ https://github.com/scalyr/scalyr-agent-2/blob/master/CHANGELOG.md.
   - `leader_node` has been removed
   - `check_labels` now checks pod labels (formerly node labels)
 
+* This release also updates the Kubernetes monitor to more accurately calculate used memory.
+
+  Formerly `docker.mem.usage` was equal to `memory_stats.usage` now it it equal to `memory_stats.usage` minus
+  `memory_stats.stats.cache` which represents file system cache usage.
+
 ## 2.1.21 "Ultramarine" - Jun 1, 2021
 
 * This is the last release that still supports Python 2.6. This version of the agent will emit a

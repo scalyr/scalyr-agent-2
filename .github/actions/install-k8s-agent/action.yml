@@ -1,5 +1,5 @@
 name: "Install Scalyr Agent"
-description: "Install Scalyr agent on K8s cluster as DaemonSet"
+description: "Install Scalyr agent on an K8s cluster as DaemonSet / Deployment"
 
 inputs:
   scalyr_server:
@@ -24,27 +24,51 @@ inputs:
     description: "Set to true to disable Kubernetes events monitor."
     required: false
     default: "true"
-  daemonset_yaml_path:
-    description: "Which Kubernetes resource YAML file with scalyr agent daemonset definition to use."
+  scalyr_k8s_report_k8s_metrics:
+    description: "Set to true to enable reporting k8s metrics as part of Kubernets Monitor."
+    required: false
+    default: "true"
+  scalyr_k8s_report_container_metrics:
+    description: "Set to true to enable reporting container metrics as part of Kubernets Monitor."
+    required: false
+    default: "true"
+  service_account_yaml_path:
+    description: "Path to the YAML file containing service account definition"
+    required: true
+    default: "k8s/no-kustomize/scalyr-service-account.yaml"
+  main_yaml_path:
+    description: "Path to the main agent DaemonSet or Deployment YAML file"
     required: true
     default: "k8s/no-kustomize/scalyr-agent-2.yaml"
   extra_yaml_paths:
     description: "Comma delimited list of any additional Kubernetes resource YAML files which should be applied before applying DaemonSet YAML."
     required: false
     default: ""
+  scalyr_k8s_cluster_name_prefix:
+    description: "Prefix for the cluster name."
+    required: false
+    default: "ci-agent-e2e-k8s-om"
+  pod_selector_app_name:
+    description: "Value for the metadata.labels.app for the agent DaemonSet / Deployment"
+    required: false
+    default: "scalyr-agent-2"
+  sleep_delay:
+    description: "How long to sleep (in seconds) after creating Kubernetes resources."
+    required: false
+    default: "60"
 
 runs:
   using: "composite"
   steps:
-    - name: Create scalyr-agent-2 daemonset
-      id: create-daemonset
+    - name: Create scalyr-agent-2 DaemonSet / Deployment
+      id: install-agent
       shell: bash
       run: |
         export K8S_NODE_NAME=$(kubectl get nodes -o jsonpath="{.items[0].metadata.name}")
         echo "K8S_NODE_NAME=${K8S_NODE_NAME}" >> ${GITHUB_ENV}
         echo "Using node name: ${K8S_NODE_NAME}"
 
-        export K8S_CLUSTER_NAME="ci-agent-e2e-k8s-om-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+        export K8S_CLUSTER_NAME="${{ inputs.scalyr_k8s_cluster_name_prefix }}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
         echo "K8S_CLUSTER_NAME=${K8S_CLUSTER_NAME}" >> ${GITHUB_ENV}
         echo "Using cluster name: ${K8S_CLUSTER_NAME}"
 
@@ -52,7 +76,7 @@ runs:
         kubectl create namespace scalyr
 
         # Create service account
-        kubectl apply -f k8s/no-kustomize/scalyr-service-account.yaml
+        kubectl apply -f ${{ inputs.service_account_yaml_path }}
 
         # Define api key
         kubectl create secret generic scalyr-api-key --namespace scalyr --from-literal=scalyr-api-key="${{ inputs.scalyr_api_key }}"
@@ -63,6 +87,8 @@ runs:
           --from-literal=SCALYR_K8S_EVENTS_DISABLE="${{ inputs.scalyr_k8s_events_disable }}" \
           --from-literal=SCALYR_K8S_VERIFY_API_QUERIES="${{ inputs.scalyr_verify_api_queries }}" \
           --from-literal=SCALYR_K8S_VERIFY_KUBELET_QUERIES="${{ inputs.scalyr_verify_k8s_queries }}" \
+          --from-literal=SCALYR_REPORT_K8S_METRICS="${{ inputs.scalyr_k8s_report_k8s_metrics }}" \
+          --from-literal=SCALYR_REPORT_CONTAINER_METRICS="${{ inputs.scalyr_k8s_report_container_metrics }}" \
           --from-literal=SCALYR_SERVER="${{ inputs.scalyr_server }}" \
           --from-literal=SCALYR_K8S_LEADER_CHECK_INTERVAL="5" \
           --from-literal=SCALYR_K8S_IGNORE_MASTER="false" \
@@ -80,16 +106,16 @@ runs:
           done
         fi
 
-        # Create daemonset
-        kubectl apply -f "${{ inputs.daemonset_yaml_path }}"
+        # Create DaemonSet or Deployment
+        kubectl apply -f "${{ inputs.main_yaml_path }}"
 
         # Give it some time to start up
-        sleep 60
+        echo "Sleeping ${{ inputs.sleep_delay }} seconds and giving agent some time to become ready..."
+        sleep ${{ inputs.sleep_delay }}
         kubectl -n scalyr get event
         kubectl -n scalyr get serviceaccount
         kubectl -n scalyr get pods
-
-        export SCALYR_AGENT_POD_NAME=$(kubectl get pod --namespace=scalyr --selector=app=scalyr-agent-2 -o jsonpath="{.items[0].metadata.name}")
+        export SCALYR_AGENT_POD_NAME=$(kubectl get pod --namespace=scalyr --selector=app=${{ inputs.pod_selector_app_name }} -o jsonpath="{.items[0].metadata.name}")
         echo "SCALYR_AGENT_POD_NAME=${SCALYR_AGENT_POD_NAME}" >> ${GITHUB_ENV}
         echo "Using scalyr agent pod name: ${SCALYR_AGENT_POD_NAME}"
 
