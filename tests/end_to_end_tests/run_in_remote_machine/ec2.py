@@ -33,19 +33,6 @@ class EC2DistroImage:
     ssh_username: str
 
 
-def get_env_throw_if_not_set(name, default_value=None):
-    # type: (str, Optional[str]) -> str
-    """
-    Return provided environment variable value and throw if it's not set.
-    """
-    value = os.environ.get(name, default_value)
-
-    if value is None:
-        raise ValueError(f"Environment variable '{name}' not set")
-
-    return value
-
-
 def destroy_node_and_cleanup(driver, node):
     """
     Destroy the provided node and cleanup any left over EBS volumes.

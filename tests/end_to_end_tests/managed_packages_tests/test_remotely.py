@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-THis special test module is responsible for running the 'managed_packages' tests in ф remote environment,
+This special test module is responsible for running the 'managed_packages' tests in a remote environment,
 for example ec2 instance or docker container.
 """
 

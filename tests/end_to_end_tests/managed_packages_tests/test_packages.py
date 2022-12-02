@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 This test module preforms end to end testing of the Linux agent package and its dependency packages. 
 Since we perform testing for multiple distributions, those tests are mainly run inside another remote machines, 
 such as ec2 instance or docker container. If needed, it can be run locally, but you have to be aware that those tests
-are changing system state and maust be aware of risks.
+are changing system state and must be aware of risks.
 """
 
 

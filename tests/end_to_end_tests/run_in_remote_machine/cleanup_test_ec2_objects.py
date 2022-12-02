@@ -135,6 +135,7 @@ def cleanup_old_prefix_list_entries(
 
 def cleanup_old_ect_test_instance(
         libcloud_ec2_driver,
+        workflow_id: str = None
 ):
     """
     Cleanup old ec2 test instances.
@@ -148,6 +149,11 @@ def cleanup_old_ect_test_instance(
 
     for node in nodes:
         if INSTANCE_NAME_STRING not in node.name:
+            continue
+
+        # Re remove instances which are created by the current workflow immediately.
+        if workflow_id in node.name:
+            nodes_to_delete.append(node)
             continue
 
         launch_time = node.extra.get("launch_time", None)
@@ -220,6 +226,7 @@ if __name__ == '__main__':
     )
 
     cleanup_old_ect_test_instance(
-        libcloud_ec2_driver=driver
+        libcloud_ec2_driver=driver,
+        workflow_id=args.workflow_id
     )
 
