@@ -21,6 +21,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
                 ssh_username="ubuntu",
             )
         },
+        "docker": "ubuntu:22.04"
     },
     "ubuntu2004": {
         "ec2": {

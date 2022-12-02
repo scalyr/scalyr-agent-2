@@ -34,9 +34,10 @@ RUNS_REMOTELY = bool(os.environ.get("TEST_RUNS_REMOTELY"))
 def test_remotely(
         distro_name,
         remote_machine_type,
-        repo_dir,
         package_builder_name,
         package_builder,
+        package_source_type,
+        package_source,
         tmp_path,
         request
 ):
@@ -44,9 +45,9 @@ def test_remotely(
     pytest_runner_builder = PortablePytestRunnerBuilder()
     pytest_runner_builder.build()
 
-    repo_dir_archive_path = tmp_path / "repo_dir.tar"
-    with tarfile.open(repo_dir_archive_path, "w") as tf:
-        tf.add(repo_dir, arcname="/")
+    packages_archive_path = tmp_path / "packages.tar"
+    with tarfile.open(packages_archive_path, "w") as tf:
+        tf.add(package_source, arcname="/")
 
     run_test_remotely(
         distro_name=distro_name,
@@ -58,14 +59,14 @@ def test_remotely(
             "--distro",
             request.config.option.distro,
             "--packages-source-type",
-            "repo",
+            package_source_type,
             "--packages-source",
-            "/tmp/repo-dir",
+            "/tmp/packages"
         ],
         architecture=package_builder.ARCHITECTURE,
         pytest_runner_path=pytest_runner_builder.result_runner_path,
         test_options=request.config.option,
         file_mappings={
-            str(repo_dir_archive_path): "/tmp/repo-dir"
+            str(packages_archive_path): "/tmp/packages"
         },
     )

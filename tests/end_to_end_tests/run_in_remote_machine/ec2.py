@@ -303,6 +303,10 @@ def add_current_ip_to_prefix_list(
     Add new CIDR entry with current public IP in to the prefix list. We also additionally store json object in the
         Description of the prefix list entry. This json object has required field called 'time' with timestamp
         which is used by the cleanup script to remove old prefix lists.
+
+    We have to add current IP to the prefix list in order to provide access for the runner to ec2 instances and have
+        to do it every time because there are too many IPs for the GitHub actions and AWS prefix lists can not store
+        so many.
     :param client: ec2 boto3 client.
     :param prefix_list_id: ID of the prefix list.
     :param workflow_id: Optional filed to add to the json object that is stored in the Description

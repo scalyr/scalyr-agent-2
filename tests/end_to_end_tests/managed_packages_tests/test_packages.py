@@ -18,6 +18,8 @@ import subprocess
 import logging
 from typing import List
 
+import pytest
+
 from agent_build_refactored.tools.constants import SOURCE_ROOT
 from agent_build_refactored.managed_packages.managed_packages_builders import PYTHON_PACKAGE_NAME, \
     AGENT_LIBS_PACKAGE_NAME, AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME
@@ -33,7 +35,7 @@ are changing system state and must be aware of risks.
 
 
 def _verify_package_subdirectories(
-        repo_dir: pl.Path,
+        package_path: pl.Path,
         package_type: str,
         package_name: str,
         output_dir: pl.Path,
@@ -48,17 +50,6 @@ def _verify_package_subdirectories(
     :param output_dir: Directory where to extract a package.
     :param expected_folders: List of paths that are expected to be in this package.
     """
-
-    if package_type == "deb":
-        package_dir_path = repo_dir / f"pool/main/s/{package_name}"
-    elif package_type == "rpm":
-        package_dir_path = repo_dir
-    else:
-        raise Exception(f"Unknown package type: {package_type}")
-
-    found = list(package_dir_path.rglob(f"{package_name}*.{package_type}"))
-    assert len(found) == 1
-    package_path = found[0]
 
     package_root = output_dir / package_name
     package_root.mkdir()
@@ -91,13 +82,18 @@ def _verify_package_subdirectories(
 def test_dependency_packages(
         package_builder,
         tmp_path,
-        repo_dir
+        package_source_type,
+        package_source,
+        python_package_path,
+        agent_libs_package_path
 ):
-    # Verify structure of the package and make sure there's no any file outside it.
+    if package_source_type != "dir":
+        pytest.skip("Only run when packages dir provided.")
+
     package_type = package_builder.PACKAGE_TYPE
 
     _verify_package_subdirectories(
-        repo_dir=repo_dir,
+        package_path=python_package_path,
         package_type=package_builder.PACKAGE_TYPE,
         package_name=PYTHON_PACKAGE_NAME,
         output_dir=tmp_path,
@@ -110,9 +106,9 @@ def test_dependency_packages(
         ]
     )
 
-    # Verify structure of the package and make sure there's no any file outside it.
+    # Verify structure of the agent_libs package and make sure there's no any file outside it.
     _verify_package_subdirectories(
-        repo_dir=repo_dir,
+        package_path=agent_libs_package_path,
         package_type=package_builder.PACKAGE_TYPE,
         package_name=AGENT_LIBS_PACKAGE_NAME,
         output_dir=tmp_path,
@@ -126,16 +122,41 @@ def test_dependency_packages(
     )
 
 
-def test_packages(
-        tmp_path,
-        add_repo,
-        install_package,
-        repo_url
+def _install_packages_from_files(
+        python_package_path,
+        agent_libs_package_path,
+        package_type: str,
+        install_type: str,
 ):
-    add_repo(repo_url=repo_url)
+    if package_type == "deb":
+        subprocess.check_call(
+            ["dpkg", "-i", str(python_package_path), str(agent_libs_package_path)]
+        )
+    elif package_type == "rpm":
+        subprocess.check_call(
+            ["rpm", "-i", str(python_package_path), str(agent_libs_package_path)],
+            env={"LD_LIBRARY_PATH": "/lib64"}
 
-    logger.info(f"Install package {AGENT_LIBS_PACKAGE_NAME}")
-    install_package(package_name=AGENT_LIBS_PACKAGE_NAME)
+        )
+    else:
+        raise Exception(f"Unknown package type: {package_type}")
+
+
+def test_packages(
+        package_builder,
+        package_source_type,
+        package_source,
+        python_package_path,
+        agent_libs_package_path,
+):
+
+    if package_source_type == "dir":
+        _install_packages_from_files(
+            python_package_path=python_package_path,
+            agent_libs_package_path=agent_libs_package_path,
+            package_type=package_builder.PACKAGE_TYPE,
+            install_type="install"
+        )
 
     logger.info("Execute simple sanity test script for the python interpreter and its libraries.")
     subprocess.check_call(
