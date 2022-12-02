@@ -26,7 +26,7 @@ from typing import List, Tuple, Optional, Dict, Type
 
 
 from agent_build_refactored.tools.runner import Runner, RunnerStep, ArtifactRunnerStep, RunnerMappedPath, EnvironmentRunnerStep, DockerImageSpec,GitHubActionsSettings
-from agent_build_refactored.tools.constants import SOURCE_ROOT, DockerPlatform
+from agent_build_refactored.tools.constants import SOURCE_ROOT, DockerPlatform, Architecture
 from agent_build_refactored.tools import check_call_with_log
 
 logger = logging.getLogger(__name__)
@@ -57,13 +57,12 @@ The structure of the mentioned packages has to guarantee that files of these pac
     files of local system Python interpreter. To achieve that, the dependency packages files are installed in their
     own 'sub-directories'
 
-    /usr/libe/scalyr-agent-2-dependencies
-    /usr/libexec/scalyr-agent-2-dependencies
-    /usr/shared/scalyr-agent-2-dependencies
-    /usr/include/scalyr-agent-2-dependencies
+    For now there are two subdirectories:
+        - /usr/libe/scalyr-agent-2-dependencies - for platform dependent files.
+        - /usr/shared/scalyr-agent-2-dependencies - for platform independent files.
 
     and agent from the 'scalyr-agent-2' package has to use the
-    '/usr/libexec/scalyr-agent-2-dependencies/scalyr-agent-2-python3' executable.
+    '/usr/lib/scalyr-agent-2-dependencies/bin/python3' executable.
 """
 
 # Name of the subdirectory of dependency packages.
@@ -92,7 +91,7 @@ class ManagedPackagesBuilder(Runner):
     PACKAGE_TYPE: str
 
     # package architecture, for example: amd64 for deb.
-    PACKAGE_ARCHITECTURE: str
+    ARCHITECTURE: Architecture
 
     # Instance of the step that builds filesystem for the python package.
     PYTHON_BUILD_STEP: ArtifactRunnerStep
@@ -105,7 +104,6 @@ class ManagedPackagesBuilder(Runner):
     # Version of a target distribution in the packagecloud.
     PACKAGECLOUD_DISTRO_VERSION: str
 
-
     @classmethod
     def get_all_required_steps(cls) -> List[RunnerStep]:
         steps = super(ManagedPackagesBuilder, cls).get_all_required_steps()
@@ -115,6 +113,15 @@ class ManagedPackagesBuilder(Runner):
             cls.AGENT_LIBS_BUILD_STEP
         ])
         return steps
+
+    @property
+    def package_arch(self) -> str:
+        if self.PACKAGE_TYPE == "deb":
+            return self.ARCHITECTURE.as_deb_package_arch
+        elif self.PACKAGE_TYPE == "rpm":
+            return self.ARCHITECTURE.as_rpm_package_arch
+        else:
+            raise ValueError(f"Unknown package type: {self.PACKAGE_TYPE}")
 
     @property
     def packages_output_path(self) -> pl.Path:
@@ -170,7 +177,7 @@ class ManagedPackagesBuilder(Runner):
                 # fmt: off
                 "fpm",
                 "-s", "dir",
-                "-a", self.PACKAGE_ARCHITECTURE,
+                "-a", self.package_arch,
                 "-t", self.PACKAGE_TYPE,
                 "-n", PYTHON_PACKAGE_NAME,
                 "--license", '"Apache 2.0"',
@@ -199,7 +206,7 @@ class ManagedPackagesBuilder(Runner):
             # fmt: off
             "fpm",
             "-s", "dir",
-            "-a", self.PACKAGE_ARCHITECTURE,
+            "-a", self.package_arch,
             "-t", self.PACKAGE_TYPE,
             "-n", AGENT_LIBS_PACKAGE_NAME,
             "--license", '"Apache 2.0"',
@@ -359,11 +366,11 @@ class ManagedPackagesBuilder(Runner):
             )
             if self.PACKAGE_TYPE == "deb":
                 found = list(self.packages_output_path.glob(
-                    f"{PYTHON_PACKAGE_NAME}_{final_python_version}_{self.PACKAGE_ARCHITECTURE}.{self.PACKAGE_TYPE}"
+                    f"{PYTHON_PACKAGE_NAME}_{final_python_version}_{self.package_arch}.{self.PACKAGE_TYPE}"
                 ))
             elif self.PACKAGE_TYPE == "rpm":
                 found = list(self.packages_output_path.glob(
-                    f"{PYTHON_PACKAGE_NAME}-{final_python_version}-1.{self.PACKAGE_ARCHITECTURE}.{self.PACKAGE_TYPE}"
+                    f"{PYTHON_PACKAGE_NAME}-{final_python_version}-1.{self.package_arch}.{self.PACKAGE_TYPE}"
                 ))
             else:
                 raise Exception(f"Unknown package type {self.PACKAGE_TYPE}")
@@ -400,11 +407,11 @@ class ManagedPackagesBuilder(Runner):
             )
             if self.PACKAGE_TYPE == "deb":
                 found = list(self.packages_output_path.glob(
-                    f"{AGENT_LIBS_PACKAGE_NAME}_{final_agent_libs_version}_{self.PACKAGE_ARCHITECTURE}.{self.PACKAGE_TYPE}"
+                    f"{AGENT_LIBS_PACKAGE_NAME}_{final_agent_libs_version}_{self.package_arch}.{self.PACKAGE_TYPE}"
                 ))
             elif self.PACKAGE_TYPE == "rpm":
                 found = list(self.packages_output_path.glob(
-                    f"{AGENT_LIBS_PACKAGE_NAME}-{final_agent_libs_version}-1.{self.PACKAGE_ARCHITECTURE}.{self.PACKAGE_TYPE}"
+                    f"{AGENT_LIBS_PACKAGE_NAME}-{final_agent_libs_version}-1.{self.package_arch}.{self.PACKAGE_TYPE}"
                 ))
             else:
                 raise Exception(f"Unknown package type {self.PACKAGE_TYPE}")
@@ -583,7 +590,7 @@ class ManagedPackagesBuilder(Runner):
             _, _, arch, _ = self._parser_package_file_parts(
                 package_file_name=p["filename"]
             )
-            if arch != self.PACKAGE_ARCHITECTURE:
+            if arch != self.package_arch:
                 continue
 
             filtered_packages.append(p)
@@ -880,7 +887,7 @@ def create_build_python_step(
         name="build_python",
         script_path="agent_build_refactored/managed_packages/steps/build_python.sh",
         tracked_files_globs=[
-            "agent_build_refactored/managed_packages/files/scalyr-agent-2-python3",
+            "agent_build_refactored/managed_packages/files/python3",
         ],
         base=base_step,
         environment_variables={
@@ -983,7 +990,7 @@ PREPARE_TOOLSET_GLIBC_X86_64 = EnvironmentRunnerStep(
 
 class DebManagedPackagesBuilderX86_64(ManagedPackagesBuilder):
     BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
-    PACKAGE_ARCHITECTURE = "amd64"
+    ARCHITECTURE = Architecture.X86_64
     PACKAGE_TYPE = "deb"
     PYTHON_BUILD_STEP = BUILD_PYTHON_GLIBC_X86_64
     AGENT_LIBS_BUILD_STEP = BUILD_AGENT_LIBS_GLIBC_X86_64
@@ -993,7 +1000,7 @@ class DebManagedPackagesBuilderX86_64(ManagedPackagesBuilder):
 
 class RpmManagedPackagesBuilderx86_64(ManagedPackagesBuilder):
     BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
-    PACKAGE_ARCHITECTURE = "x86_64"
+    ARCHITECTURE = Architecture.X86_64
     PACKAGE_TYPE = "rpm"
     PYTHON_BUILD_STEP = BUILD_PYTHON_GLIBC_X86_64
     AGENT_LIBS_BUILD_STEP = BUILD_AGENT_LIBS_GLIBC_X86_64
