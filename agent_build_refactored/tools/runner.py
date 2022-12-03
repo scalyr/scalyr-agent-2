@@ -64,7 +64,7 @@ def remove_directory_in_docker(path: pl.Path):
         pass
 
 
-def chmod_in_docker(path: pl.Path, user_id: int, group_id: int):
+def chown_in_docker(path: pl.Path, user_id: int, group_id: int):
     """
     Since we produce some artifacts inside docker containers, we may face difficulties with
     deleting the old ones because they may be created inside the container with the root user.
@@ -76,7 +76,7 @@ def chmod_in_docker(path: pl.Path, user_id: int, group_id: int):
 
     # In order to be able to remove the whole directory, we mount parent directory.
     with DockerContainer(
-        name="agent_build_step_trash_remover",
+        name="agent_build_chown_in_docker",
         image_name="ubuntu:22.04",
         mounts=[f"{path.parent}:/parent"],
         command=["chown", "-R", f"{user_id}:{group_id}", f"/parent/{path.name}"],
@@ -879,7 +879,7 @@ class Runner:
             *final_command_args
         ])
 
-        chmod_in_docker(
+        chown_in_docker(
             path=self.output_path,
             user_id=os.getuid(),
             group_id=os.getgid()
