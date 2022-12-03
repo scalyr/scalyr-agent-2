@@ -804,7 +804,6 @@ class Runner:
     def runs_in_docker(self) -> bool:
         return self.base_docker_image is not None and not IN_DOCKER
 
-
     def run_in_docker(
             self,
             command_args: List = None,
@@ -851,7 +850,7 @@ class Runner:
             "--platform",
             str(self.base_docker_image.platform),
             "--user",
-            f"{os.getuid()}:{os.getgid()}",
+            "root",
             self.base_docker_image.name,
             python_executable,
             "/tmp/source/agent_build_refactored/scripts/runner_helper.py",

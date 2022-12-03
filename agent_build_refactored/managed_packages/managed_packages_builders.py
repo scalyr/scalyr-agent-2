@@ -28,6 +28,7 @@ from typing import List, Tuple, Optional, Dict, Type
 from agent_build_refactored.tools.runner import Runner, RunnerStep, ArtifactRunnerStep, RunnerMappedPath, EnvironmentRunnerStep, DockerImageSpec,GitHubActionsSettings
 from agent_build_refactored.tools.constants import SOURCE_ROOT, DockerPlatform, Architecture
 from agent_build_refactored.tools import check_call_with_log
+from agent_build_refactored.prepare_agent_filesystem import build_linux_fhs_agent_files, add_config
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +74,8 @@ PYTHON_PACKAGE_NAME = "scalyr-agent-python3"
 
 # name of the dependency package with agent requirement libraries.
 AGENT_LIBS_PACKAGE_NAME = "scalyr-agent-libs"
+
+AGENT_PACKAGE_NAME = "scalyr-agent-2"
 
 
 EMBEDDED_PYTHON_VERSION = "3.11.0"
@@ -181,7 +184,7 @@ class ManagedPackagesBuilder(Runner):
                 "-t", self.PACKAGE_TYPE,
                 "-n", PYTHON_PACKAGE_NAME,
                 "--license", '"Apache 2.0"',
-                "--vendor", "Scalyr %s",
+                "--vendor", "Scalyr",
                 "--provides", "scalyr-agent-dependencies",
                 "--description", description,
                 "--depends", "bash >= 3.2",
@@ -210,7 +213,7 @@ class ManagedPackagesBuilder(Runner):
             "-t", self.PACKAGE_TYPE,
             "-n", AGENT_LIBS_PACKAGE_NAME,
             "--license", '"Apache 2.0"',
-            "--vendor", "Scalyr %s",
+            "--vendor", "Scalyr",
             "--provides", "scalyr-agent-2-dependencies",
             "--description", description,
             "--depends", "bash >= 3.2",
@@ -221,6 +224,92 @@ class ManagedPackagesBuilder(Runner):
             "--rpm-group", "root",
             # fmt: on
         ]
+
+    def _build_agent_package(
+            self,
+            agent_libs_package_version: str,
+    ):
+
+        agent_package_root = self.output_path / "agent_package_root"
+
+        build_linux_fhs_agent_files(
+            output_path=agent_package_root,
+            copy_agent_source=True
+        )
+
+        install_root_executable_path = agent_package_root / f"usr/share/{AGENT_PACKAGE_NAME}/bin/scalyr-agent-2"
+        install_root_executable_path.unlink()
+
+        # Add agent's executable script.
+        shutil.copy(
+            SOURCE_ROOT / "agent_build_refactored/managed_packages/files/scalyr-agent-2",
+            install_root_executable_path,
+        )
+
+        # Add config file
+        add_config(
+            SOURCE_ROOT / "config",
+            agent_package_root / "etc/scalyr-agent-2"
+        )
+
+        # Copy init.d folder.
+        shutil.copytree(
+            SOURCE_ROOT / "agent_build_refactored/managed_packages/files/init.d",
+            agent_package_root / "etc/init.d",
+            dirs_exist_ok=True
+        )
+
+        version = (SOURCE_ROOT / "VERSION").read_text().strip()
+
+        scriptlets_path = SOURCE_ROOT / "agent_build_refactored/managed_packages/install-scriptlets"
+
+        description = "Scalyr Agent 2 is the daemon process Scalyr customers run on their servers to collect metrics" \
+                      " and log files and transmit them to Scalyr."
+
+        subprocess.check_call(
+            [
+                # fmt: off
+                "fpm",
+                "-s", "dir",
+                "-a", self.package_arch,
+                "-t", self.PACKAGE_TYPE,
+                "-C", str(agent_package_root),
+                "-n" "scalyr-agent-2",
+                "-v", version,
+                "--iteration", "11032022",
+                "--license", "Apache 2.0",
+                "--vendor", "Scalyr",
+                "--provides", "scalyr-agent-2",
+                "--description", description,
+                "--depends", "bash >= 3.2",
+                "--depends", f"{AGENT_LIBS_PACKAGE_NAME} = {agent_libs_package_version}",
+                "--url", "https://www.scalyr.com",
+                "--deb-user", "root",
+                "--deb-group", "root",
+                "--rpm-user", "root",
+                "--rpm-group", "root",
+                #"--deb-changelog", "changelog-deb",
+                #"--rpm-changelog", "changelog-rpm",
+                "--after-install", scriptlets_path / "postinstall.sh",
+                "--before-remove", scriptlets_path / "preuninstall.sh",
+                "--deb-no-default-config-files",
+                "--no-deb-auto-config-files",
+                "--config-files", "/etc/scalyr-agent-2/agent.json",
+                "--directories", "/usr/share/scalyr-agent-2",
+                "--directories", "/var/lib/scalyr-agent-2",
+                "--directories", "/var/log/scalyr-agent-2",
+                "--rpm-use-file-permissions",
+                "--deb-use-file-permissions",
+                # NOTE: Sadly we can't use defattrdir since it breakes permissions for some other
+                # directories such as /etc/init.d and we need to handle that in postinst :/
+                # "  --rpm-auto-add-directories "
+                # "  --rpm-defattrfile 640"
+                # "  --rpm-defattrdir 751"
+                "--verbose",
+                # fmt: on
+            ],
+            cwd=str(self.packages_output_path)
+        )
 
     def _get_package_checksum(
             self,
@@ -386,7 +475,7 @@ class ManagedPackagesBuilder(Runner):
             )
             logger.info(f"Package {final_python_package_path.name} is reused from repo.")
 
-        # Do the same with the 'agent-libs' package.
+        # Do the same and build the 'agent-libs' package.
         final_agent_libs_package_path, final_agent_libs_version = self._get_final_package_path_and_version(
             package_name=AGENT_LIBS_PACKAGE_NAME,
             last_repo_package_file_path=last_repo_agent_libs_package_path
@@ -426,6 +515,11 @@ class ManagedPackagesBuilder(Runner):
                 self.packages_output_path
             )
             logger.info(f"Package {final_agent_libs_package_path.name} is reused from repo.")
+
+        # Build agent_package
+        self._build_agent_package(
+            agent_libs_package_version=final_agent_libs_version
+        )
 
         # Also write special json file which contain information about packages that have to be published.
         # We have to use it in order to skip the publishing of the packages that are reused and already in the repo.

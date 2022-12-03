@@ -123,18 +123,19 @@ def test_dependency_packages(
 
 
 def _install_packages_from_files(
-        python_package_path,
-        agent_libs_package_path,
+        python_package_path: pl.Path,
+        agent_libs_package_path: pl.Path,
+        agent_package_path: pl.Path,
         package_type: str,
         install_type: str,
 ):
     if package_type == "deb":
         subprocess.check_call(
-            ["dpkg", "-i", str(python_package_path), str(agent_libs_package_path)]
+            ["dpkg", "-i", str(python_package_path), str(agent_libs_package_path), str(agent_package_path)]
         )
     elif package_type == "rpm":
         subprocess.check_call(
-            ["rpm", "-i", str(python_package_path), str(agent_libs_package_path)],
+            ["rpm", "-i", str(python_package_path), str(agent_libs_package_path), str(agent_package_path)],
             env={"LD_LIBRARY_PATH": "/lib64"}
 
         )
@@ -148,12 +149,14 @@ def test_packages(
         package_source,
         python_package_path,
         agent_libs_package_path,
+        agent_package_path
 ):
 
     if package_source_type == "dir":
         _install_packages_from_files(
             python_package_path=python_package_path,
             agent_libs_package_path=agent_libs_package_path,
+            agent_package_path=agent_package_path,
             package_type=package_builder.PACKAGE_TYPE,
             install_type="install"
         )

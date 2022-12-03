@@ -15,7 +15,7 @@ import pytest
 
 from agent_build_refactored.tools.constants import SOURCE_ROOT
 from agent_build_refactored.tools.runner import Runner, RunnerMappedPath
-from agent_build_refactored.managed_packages.managed_packages_builders import ALL_MANAGED_PACKAGE_BUILDERS, PREPARE_TOOLSET_GLIBC_X86_64, PYTHON_PACKAGE_NAME, AGENT_LIBS_PACKAGE_NAME
+from agent_build_refactored.managed_packages.managed_packages_builders import ALL_MANAGED_PACKAGE_BUILDERS, PREPARE_TOOLSET_GLIBC_X86_64, PYTHON_PACKAGE_NAME, AGENT_LIBS_PACKAGE_NAME, AGENT_PACKAGE_NAME
 from tests.end_to_end_tests.run_in_remote_machine import DISTROS
 
 
@@ -184,6 +184,17 @@ def agent_libs_package_path(package_source_type, package_source, package_builder
 
     packages_dir = pl.Path(package_source)
     found = list(packages_dir.rglob(f"{AGENT_LIBS_PACKAGE_NAME}*.{package_builder.PACKAGE_TYPE}"))
+    assert len(found) == 1
+    return found[0]
+
+
+@pytest.fixture(scope="session")
+def agent_package_path(package_source_type, package_source, package_builder):
+    if package_source_type != "dir":
+        return None
+
+    packages_dir = pl.Path(package_source)
+    found = list(packages_dir.rglob(f"{AGENT_PACKAGE_NAME}*.{package_builder.PACKAGE_TYPE}"))
     assert len(found) == 1
     return found[0]
 

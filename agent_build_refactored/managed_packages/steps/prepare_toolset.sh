@@ -44,7 +44,7 @@ cp -a "${BUILD_AGENT_LIBS}/dev_libs/." /
 ln -s /usr/lib/${SUBDIR_NAME}/bin/python3 /usr/bin/python3
 
 apt update
-DEBIAN_FRONTEND=noninteractive apt install -y ruby ruby-dev rubygems build-essential rpm reprepro createrepo-c
+DEBIAN_FRONTEND=noninteractive apt install -y ruby ruby-dev rubygems build-essential rpm git
 gem install "fpm:${FPM_VERSION}" "package_cloud:${PACKAGECLOUD_VERSION}"
 
 
