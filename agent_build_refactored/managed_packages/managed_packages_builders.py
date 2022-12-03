@@ -867,6 +867,8 @@ class ManagedPackagesBuilder(Runner):
             )
 
             output_path = SOURCE_ROOT / "build"
+
+            os.system(f"ls -l {output_path}")
             if output_path.exists():
                 shutil.rmtree(output_path)
             shutil.copytree(
