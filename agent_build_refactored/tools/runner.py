@@ -851,7 +851,7 @@ class Runner:
             "--platform",
             str(self.base_docker_image.platform),
             "--user",
-            f"{os.getuid()}:{os.getgid()}",
+            "root",
             self.base_docker_image.name,
             python_executable,
             "/tmp/source/agent_build_refactored/scripts/runner_helper.py",

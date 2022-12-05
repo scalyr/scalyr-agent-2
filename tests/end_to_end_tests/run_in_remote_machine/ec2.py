@@ -37,10 +37,6 @@ def destroy_node_and_cleanup(driver, node):
     Destroy the provided node and cleanup any left over EBS volumes.
     """
 
-    from libcloud.compute.base import StorageVolumeState
-
-    volumes = driver.list_volumes(node=node)
-
     assert (
         INSTANCE_NAME_STRING in node.name
     ), "Refusing to delete node without %s in the name" % (INSTANCE_NAME_STRING)
@@ -61,21 +57,20 @@ def destroy_node_and_cleanup(driver, node):
         else:
             raise e
 
+    volumes = driver.list_volumes(node=node)
+
     assert len(volumes) <= 1
     print("Cleaning up any left-over EBS volumes for this node...")
 
     # Wait for the volumes to become detached from the node
     remaining_volumes = volumes[:]
 
-    timeout = time.time() + 20
+    timeout = time.time() + 100
     while remaining_volumes:
-        for volume in list(remaining_volumes):
-            if volume.state != StorageVolumeState.INUSE:
-                remaining_volumes.remove(volume)
-
         if time.time() >= timeout:
             raise TimeoutError("Could not wait for all volumes being detached")
         time.sleep(1)
+        remaining_volumes = driver.list_volumes(node=node)
 
     for volume in volumes:
         # Additional safety checks
@@ -188,7 +183,7 @@ def run_test_in_ec2_instance(
         deployment = MultiStepDeployment(add=file_deployment_steps)
 
         try:
-            node = driver.deploy_node(
+            return driver.deploy_node(
                 name=name,
                 image=image,
                 size=size,
@@ -204,15 +199,11 @@ def run_test_in_ec2_instance(
                 at_exit_func=destroy_node_and_cleanup,
             )
         except DeploymentError as e:
-            print("Deployment failed: %s" % (str(e)))
-            node = e.node
             stdout = getattr(e.original_error, "stdout", None)
             stderr = getattr(e.original_error, "stderr", None)
-            raise Exception(
+            logger.exception(
                 f"Deployment is not successful.\nStdout: {stdout}\nStderr: {stderr}"
             )
-
-        return node
 
     def run_command():
 
@@ -228,18 +219,19 @@ def run_test_in_ec2_instance(
 
         final_command = ["/tmp/test_runner", "-s", *command]
 
-        command_str = "".join(shlex.quote(str(final_command)))
+        command_str = shlex.join(final_command)  # pylint: disable=no-member
         stdin, stdout, stderr = ssh.exec_command(
             command=f"TEST_RUNS_REMOTELY=1 sudo -E {command_str} 2>&1",
         )
 
         print(f"stdout: {stdout.read().decode()}")
 
-        ssh.close()
+        return_code = stdout.channel.recv_exit_status()
 
+        ssh.close()
         assert (
-            stdout.channel.recv_exit_status() == 0
-        ), "Remote test execution has failed with."
+            return_code == 0
+        ), f"Remote test execution has failed with {return_code}"
 
     file_mappings = file_mappings or {}
     start_time = int(time.time())

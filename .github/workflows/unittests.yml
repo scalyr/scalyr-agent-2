@@ -64,7 +64,7 @@ jobs:
 
   unittests:
     name: Unittests - Python ${{ matrix.python-version }} - ${{ matrix.platform }}
-    runs-on: ${{ matrix.platform }}-latest
+    runs-on: ${{ matrix.platform }}-20.04
 
     needs: pre_job
     # NOTE: We always want to run job on master branch
@@ -143,7 +143,7 @@ jobs:
 
   standalone-smoketests:
     name: Standalone Smoketests - Python ${{ matrix.python-version }} - ${{ matrix.variant }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
 
     needs: pre_job
     # NOTE: We always want to run job on master branch
@@ -219,7 +219,7 @@ jobs:
 
   monitor-smoketests:
     name: Monitor Smoketests - Python ${{ matrix.python-version }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 10
 
     needs: pre_job

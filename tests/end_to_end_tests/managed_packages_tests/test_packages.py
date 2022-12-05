@@ -16,6 +16,7 @@ import pathlib as pl
 import shlex
 import subprocess
 import logging
+import textwrap
 from typing import List
 
 import pytest
@@ -61,9 +62,12 @@ def _verify_package_subdirectories(
         subprocess.check_call(["dpkg-deb", "-x", str(package_path), str(package_root)])
     elif package_type == "rpm":
         escaped_package_path = shlex.quote(str(package_path))
-        command = f"rpm2cpio {escaped_package_path} | cpio -idmv"
+        command = f"rpm2cpio {escaped_package_path} | cpio -idm"
         subprocess.check_call(
-            command, shell=True, cwd=package_root, env={"LD_LIBRARY_PATH": "/lib64"}
+            command,
+            shell=True,
+            cwd=package_root,
+            env={"LD_LIBRARY_PATH": "/lib64"},
         )
     else:
         raise Exception(f"Unknown package type {package_type}.")
@@ -87,11 +91,11 @@ def test_dependency_packages(
     package_builder,
     tmp_path,
     package_source_type,
-    package_source,
+    packages_repo_dir,
     python_package_path,
     agent_libs_package_path,
 ):
-    if package_source_type != "dir":
+    if package_source_type not in ["dir", "repo-tarball"]:
         pytest.skip("Only run when packages dir provided.")
 
     package_type = package_builder.PACKAGE_TYPE
@@ -130,40 +134,22 @@ def test_dependency_packages(
     )
 
 
-def _install_packages_from_files(
-    python_package_path,
-    agent_libs_package_path,
-    package_type: str,
-    install_type: str,
-):
-    if package_type == "deb":
-        subprocess.check_call(
-            ["dpkg", "-i", str(python_package_path), str(agent_libs_package_path)]
-        )
-    elif package_type == "rpm":
-        subprocess.check_call(
-            ["rpm", "-i", str(python_package_path), str(agent_libs_package_path)],
-            env={"LD_LIBRARY_PATH": "/lib64"},
-        )
-    else:
-        raise Exception(f"Unknown package type: {package_type}")
-
-
 def test_packages(
     package_builder,
-    package_source_type,
-    package_source,
-    python_package_path,
-    agent_libs_package_path,
+    repo_url,
+    repo_public_key,
+    distro_name,
 ):
-
-    if package_source_type == "dir":
-        _install_packages_from_files(
-            python_package_path=python_package_path,
-            agent_libs_package_path=agent_libs_package_path,
-            package_type=package_builder.PACKAGE_TYPE,
-            install_type="install",
-        )
+    _add_repo(
+        package_type=package_builder.PACKAGE_TYPE,
+        repo_url=repo_url,
+        repo_public_key=repo_public_key,
+        distro_name=distro_name,
+    )
+    _install_package(
+        package_type=package_builder.PACKAGE_TYPE,
+        package_name=AGENT_LIBS_PACKAGE_NAME,
+    )
 
     logger.info(
         "Execute simple sanity test script for the python interpreter and its libraries."
@@ -182,3 +168,95 @@ def test_packages(
     )
 
     # TODO: Add actual agent package testing here.
+
+
+def _add_repo(package_type: str, repo_url, repo_public_key: str, distro_name: str):
+    """
+    Add repo with tested packages.
+    :param package_type: Type of the package, e.g. deb, rpm.
+    :param repo_url: URL of a repo.
+    :param repo_public_key: Content of repo's public key.
+    :param distro_name: name of a tested distribution.
+    """
+
+    if package_type == "deb":
+        # Add repo's public key
+        repo_key_path = pl.Path("/etc/apt/trusted.gpg.d/test.asc")
+        repo_key_path.write_text(repo_public_key)
+
+        # Add repo for ubuntu 14 and 16 by using deprecated apt-key command.
+        if distro_name in ["ubuntu1404", "ubuntu1604"]:
+            subprocess.check_call(
+                ["apt-key", "add", str(repo_key_path)], env={"LD_LIBRARY_PATH": "/lib"}
+            )
+
+        # Add repo's config file.
+        repo_file_path = pl.Path("/etc/apt/sources.list.d/test.list")
+        repo_file_path.write_text(f"deb {repo_url} trusty main")
+        _call_apt(["update"])
+    elif package_type == "rpm":
+        # Add repo's public key
+        repo_key_path = pl.Path("/tmp/public_key")
+        repo_key_path.write_text(repo_public_key)
+
+        # Add repo's config file.
+        repo_file_path = pl.Path("/etc/yum.repos.d/test.repo")
+        repo_config = textwrap.dedent(
+            f"""
+            [test_repo]
+            name=test_repo
+            baseurl={repo_url}
+            enabled=1
+            gpgcheck=0
+            repo_gpgcheck=1
+            gpgkey=file://{repo_key_path}
+            """
+        )
+        repo_file_path.write_text(repo_config.format(repo_url=repo_url))
+
+        if distro_name == "centos8":
+            # For centos 8 we replace repo urls for vault.
+            for repo_name in ["BaseOS", "AppStream"]:
+                repo_file = pl.Path(f"/etc/yum.repos.d/CentOS-Linux-{repo_name}.repo")
+                content = repo_file.read_text()
+                content = content.replace("mirror.centos.org", "vault.centos.org")
+                content = content.replace("#baseurl", "baseurl")
+                content = content.replace("mirrorlist=", "#mirrorlist=")
+                repo_file.write_text(content)
+
+        elif distro_name == "centos6":
+            # for centos 6, we remove repo file for disabled repo, so it could use vault repo.
+            pl.Path("/etc/yum.repos.d/CentOS-Base.repo").unlink()
+
+
+def _install_package(
+    package_type: str,
+    package_name: str,
+):
+    """
+    Installs package from repo.
+    """
+    if package_type == "deb":
+        _call_apt(["install", "-y", package_name])
+    elif package_type == "rpm":
+        _call_yum(["install", "-y", package_name])
+    else:
+        raise Exception(f"Unknown package type: {package_type}")
+
+
+def _call_apt(command: List[str]):
+    """Run apt command"""
+    subprocess.check_call(
+        ["apt", *command],
+        # Since test may run in "frozen" pytest executable, add missing variables.
+        env={"LD_LIBRARY_PATH": "/lib", "PATH": "/usr/sbin:/sbin:/usr/bin:/bin"},
+    )
+
+
+def _call_yum(command: List[str]):
+    """Run yum command"""
+    subprocess.check_call(
+        ["yum", *command],
+        # Since test may run in "frozen" pytest executable, add missing variables.
+        env={"LD_LIBRARY_PATH": "/lib64"},
+    )

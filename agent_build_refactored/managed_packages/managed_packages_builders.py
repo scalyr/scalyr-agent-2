@@ -25,7 +25,7 @@ import pathlib as pl
 from typing import List, Tuple, Optional, Dict, Type
 
 
-from agent_build_refactored.tools.runner import Runner, RunnerStep, ArtifactRunnerStep, RunnerMappedPath, EnvironmentRunnerStep, DockerImageSpec,GitHubActionsSettings
+from agent_build_refactored.tools.runner import Runner, RunnerStep, ArtifactRunnerStep, RunnerMappedPath, EnvironmentRunnerStep, DockerImageSpec,GitHubActionsSettings, IN_DOCKER
 from agent_build_refactored.tools.constants import SOURCE_ROOT, DockerPlatform, Architecture
 from agent_build_refactored.tools import check_call_with_log
 
@@ -771,15 +771,15 @@ class ManagedPackagesBuilder(Runner):
                 last_repo_python_package_file=args.last_repo_python_package_file,
                 last_repo_agent_libs_package_file=args.last_repo_agent_libs_package_file,
             )
-
-            output_path = SOURCE_ROOT / "build"
-            if output_path.exists():
-                shutil.rmtree(output_path)
-            shutil.copytree(
-                builder.packages_output_path,
-                output_path,
-                dirs_exist_ok=True,
-            )
+            if not IN_DOCKER:
+                output_path = SOURCE_ROOT / "build"
+                if output_path.exists():
+                    shutil.rmtree(output_path)
+                shutil.copytree(
+                    builder.packages_output_path,
+                    output_path,
+                    dirs_exist_ok=True,
+                )
         elif args.command == "publish":
             builder.publish_packages_to_packagecloud(
                 packages_dir_path=pl.Path(args.packages_dir),
