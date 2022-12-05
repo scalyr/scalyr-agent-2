@@ -37,11 +37,11 @@ def _parse_entry_description(entry: Dict):
     return json.loads(entry["Description"])
 
 
-def _parse_entry_timestamp(entry: Dict):
+def _parse_entry_timestamp(entry: Dict) -> float:
     """
     Parse creation timestamp of the prefix list entry.
     """
-    return _parse_entry_description(entry)["time"]
+    return float(_parse_entry_description(entry)["time"])
 
 
 def _remove_entries(
@@ -108,7 +108,7 @@ def cleanup_old_prefix_list_entries(
 
     current_time = time.time()
 
-    # Remove old prfix list entries.
+    # Remove old prefix list entries.
     for entry in entries:
         timestamp = _parse_entry_timestamp(entry)
         if timestamp <= current_time - PREFIX_LIST_ENTRY_REMOVE_THRESHOLD:
@@ -133,7 +133,7 @@ def cleanup_old_prefix_list_entries(
     )
 
 
-def cleanup_old_ect_test_instance(
+def cleanup_old_ec2_test_instance(
         libcloud_ec2_driver,
         workflow_id: str = None
 ):
@@ -225,7 +225,7 @@ if __name__ == '__main__':
         workflow_id=args.workflow_id
     )
 
-    cleanup_old_ect_test_instance(
+    cleanup_old_ec2_test_instance(
         libcloud_ec2_driver=driver,
         workflow_id=args.workflow_id
     )

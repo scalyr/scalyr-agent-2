@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 # All the instances created by this script will use this string in the name.
 INSTANCE_NAME_STRING = "automated-agent-tests-"
-assert "-tests-" in INSTANCE_NAME_STRING
 
 MAX_PREFIX_LIST_UPDATE_ATTEMPTS = 20
 
@@ -37,6 +36,9 @@ def destroy_node_and_cleanup(driver, node):
     """
     Destroy the provided node and cleanup any left over EBS volumes.
     """
+
+    from libcloud.compute.base import StorageVolumeState
+
     volumes = driver.list_volumes(node=node)
 
     assert (
@@ -62,9 +64,18 @@ def destroy_node_and_cleanup(driver, node):
     assert len(volumes) <= 1
     print("Cleaning up any left-over EBS volumes for this node...")
 
-    # Give it some time for the volume to become detached from the node
-    if volumes:
-        time.sleep(10)
+    # Wait for the volumes to become detached from the node
+    remaining_volumes = volumes[:]
+
+    timeout = time.time() + 20
+    while remaining_volumes:
+        for volume in list(remaining_volumes):
+            if volume.state != StorageVolumeState.INUSE:
+                remaining_volumes.remove(volume)
+
+        if time.time() >= timeout:
+            raise TimeoutError("Could not wait for all volumes being detached")
+        time.sleep(1)
 
     for volume in volumes:
         # Additional safety checks
@@ -244,16 +255,17 @@ def run_test_in_ec2_instance(
         region=region
     )
 
+    # Add current public IP to security group's prefix list.
+    # We have to update that prefix list each time because there are to many GitHub actions public IPs, and
+    # it is not possible to whitelist all of them in the AWS prefix list.
+    # NOTE: Take in mind that you may want to remove that IP in order to prevent prefix list from reaching its
+    # size limit. For GitHub actions end-to-end tests we run a finalizer job that clears prefix list.
     boto_client = boto3.client(
         "ec2",
         aws_access_key_id=access_key,
         aws_secret_access_key=secret_key,
         region_name=region
     )
-
-    # Add current public IP to security group's prefix list.
-    # We have to update that prefix list each time because there are to many GitHub actions public IPs, and
-    # it is not possible to whitelist all of them in the AWS prefix list.
     add_current_ip_to_prefix_list(
         client=boto_client,
         prefix_list_id=security_groups_prefix_list_id,
@@ -273,6 +285,7 @@ def run_test_in_ec2_instance(
     duration = int(time.time()) - start_time
 
     print(f"Succeeded! Duration: {duration} seconds")
+
 
 def get_prefix_list_version(client, prefix_list_id: str):
     """
@@ -342,7 +355,7 @@ def add_current_ip_to_prefix_list(
                     {
                         'Cidr': new_cidr,
                         'Description': json.dumps({
-                            "time": int(time.time()),
+                            "time": time.time(),
                             "workflow_id": workflow_id
                         })
                     },

@@ -58,7 +58,7 @@ The structure of the mentioned packages has to guarantee that files of these pac
     own 'sub-directories'
 
     For now there are two subdirectories:
-        - /usr/libe/scalyr-agent-2-dependencies - for platform dependent files.
+        - /usr/lib/scalyr-agent-2-dependencies - for platform dependent files.
         - /usr/shared/scalyr-agent-2-dependencies - for platform independent files.
 
     and agent from the 'scalyr-agent-2' package has to use the
