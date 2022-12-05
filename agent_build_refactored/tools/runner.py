@@ -879,12 +879,6 @@ class Runner:
             *final_command_args
         ])
 
-        # chown_in_docker(
-        #     path=self.output_path,
-        #     user_id=os.getuid(),
-        #     group_id=os.getgid()
-        # )
-
     def run_required(self):
         """
         Function where Runner performs its main actions.

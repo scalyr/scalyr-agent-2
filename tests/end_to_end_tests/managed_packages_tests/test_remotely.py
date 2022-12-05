@@ -38,6 +38,10 @@ def test_remotely(
         package_builder,
         package_source_type,
         package_source,
+        scalyr_api_key,
+        scalyr_api_read_key,
+        scalyr_server,
+        test_session_suffix,
         tmp_path,
         request
 ):
@@ -61,7 +65,15 @@ def test_remotely(
             "--packages-source-type",
             package_source_type,
             "--packages-source",
-            "/tmp/packages"
+            "/tmp/packages",
+            "--scalyr-api-key",
+            scalyr_api_key,
+            "--scalyr-api-read-key",
+            scalyr_api_read_key,
+            "--scalyr-server",
+            scalyr_server,
+            "--test-session-suffix",
+            test_session_suffix,
         ],
         architecture=package_builder.ARCHITECTURE,
         pytest_runner_path=pytest_runner_builder.result_runner_path,
