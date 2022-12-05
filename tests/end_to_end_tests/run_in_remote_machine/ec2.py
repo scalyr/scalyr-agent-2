@@ -1,12 +1,11 @@
 import dataclasses
 import logging
-import os
 import pathlib as pl
 import shlex
 import time
 import random
 import json
-from typing import List, Dict, Optional
+from typing import List, Dict
 
 """
 This module defines main logic that is responsible for manipulating with ec2 instances to run end to end tests
@@ -26,6 +25,7 @@ class EC2DistroImage:
     """
     Simple specification of the ec2 AMI image.
     """
+
     image_id: str
     image_name: str
     size_id: str
@@ -42,7 +42,7 @@ def destroy_node_and_cleanup(driver, node):
     volumes = driver.list_volumes(node=node)
 
     assert (
-            INSTANCE_NAME_STRING in node.name
+        INSTANCE_NAME_STRING in node.name
     ), "Refusing to delete node without %s in the name" % (INSTANCE_NAME_STRING)
 
     print("")
@@ -132,20 +132,20 @@ def destroy_volume_with_retry(driver, volume, max_retries=12, retry_sleep_delay=
 
 
 def run_test_in_ec2_instance(
-        ec2_image: EC2DistroImage,
-        test_runner_path: pl.Path,
-        command: List[str],
-        private_key_path: str,
-        private_key_name: str,
-        access_key: str,
-        secret_key: str,
-        region: str,
-        security_group: str,
-        security_groups_prefix_list_id: str,
-        max_tries: int = 3,
-        deploy_overall_timeout: int = 100,
-        file_mappings: Dict = None,
-        workflow_id: str = None
+    ec2_image: EC2DistroImage,
+    test_runner_path: pl.Path,
+    command: List[str],
+    private_key_path: str,
+    private_key_name: str,
+    access_key: str,
+    secret_key: str,
+    region: str,
+    security_group: str,
+    security_groups_prefix_list_id: str,
+    max_tries: int = 3,
+    deploy_overall_timeout: int = 100,
+    file_mappings: Dict = None,
+    workflow_id: str = None,
 ):
     import paramiko
     from libcloud.compute.types import Provider
@@ -157,7 +157,7 @@ def run_test_in_ec2_instance(
         FileDeployment,
         MultiStepDeployment,
     )
-    import boto3
+    import boto3  # pylint: disable=import-error
 
     def prepare_node():
 
@@ -171,9 +171,7 @@ def run_test_in_ec2_instance(
             driver=driver,
         )
         image = NodeImage(
-            id=ec2_image.image_id,
-            name=ec2_image.image_name,
-            driver=driver
+            id=ec2_image.image_id, name=ec2_image.image_name, driver=driver
         )
 
         workflow_suffix = workflow_id or ""
@@ -181,13 +179,11 @@ def run_test_in_ec2_instance(
 
         logger.info("Starting node provisioning ...")
 
-        file_mappings[test_runner_path] = f"/tmp/test_runner"
+        file_mappings[test_runner_path] = "/tmp/test_runner"
 
         file_deployment_steps = []
         for source, dst in file_mappings.items():
-            file_deployment_steps.append(
-                FileDeployment(str(source), str(dst))
-            )
+            file_deployment_steps.append(FileDeployment(str(source), str(dst)))
 
         deployment = MultiStepDeployment(add=file_deployment_steps)
 
@@ -212,7 +208,9 @@ def run_test_in_ec2_instance(
             node = e.node
             stdout = getattr(e.original_error, "stdout", None)
             stderr = getattr(e.original_error, "stderr", None)
-            raise Exception(f"Deployment is not successful.\nStdout: {stdout}\nStderr: {stderr}")
+            raise Exception(
+                f"Deployment is not successful.\nStdout: {stdout}\nStderr: {stderr}"
+            )
 
         return node
 
@@ -225,16 +223,12 @@ def run_test_in_ec2_instance(
             hostname=node.public_ips[0],
             port=22,
             username=ec2_image.ssh_username,
-            key_filename=str(private_key_path)
+            key_filename=str(private_key_path),
         )
 
-        final_command = [
-            "/tmp/test_runner",
-            "-s",
-            *command
-        ]
+        final_command = ["/tmp/test_runner", "-s", *command]
 
-        command_str = shlex.join(final_command)
+        command_str = "".join(shlex.quote(str(final_command)))
         stdin, stdout, stderr = ssh.exec_command(
             command=f"TEST_RUNS_REMOTELY=1 sudo -E {command_str} 2>&1",
         )
@@ -243,17 +237,15 @@ def run_test_in_ec2_instance(
 
         ssh.close()
 
-        assert stdout.channel.recv_exit_status() == 0, "Remote test execution has failed with."
+        assert (
+            stdout.channel.recv_exit_status() == 0
+        ), "Remote test execution has failed with."
 
     file_mappings = file_mappings or {}
     start_time = int(time.time())
 
     driver_cls = get_driver(Provider.EC2)
-    driver = driver_cls(
-        access_key,
-        secret_key,
-        region=region
-    )
+    driver = driver_cls(access_key, secret_key, region=region)
 
     # Add current public IP to security group's prefix list.
     # We have to update that prefix list each time because there are to many GitHub actions public IPs, and
@@ -264,12 +256,12 @@ def run_test_in_ec2_instance(
         "ec2",
         aws_access_key_id=access_key,
         aws_secret_access_key=secret_key,
-        region_name=region
+        region_name=region,
     )
     add_current_ip_to_prefix_list(
         client=boto_client,
         prefix_list_id=security_groups_prefix_list_id,
-        workflow_id=workflow_id
+        workflow_id=workflow_id,
     )
 
     time.sleep(5)
@@ -295,23 +287,18 @@ def get_prefix_list_version(client, prefix_list_id: str):
     """
     resp = client.describe_managed_prefix_lists(
         Filters=[
-            {
-                "Name": "prefix-list-id",
-                "Values": [prefix_list_id]
-            },
+            {"Name": "prefix-list-id", "Values": [prefix_list_id]},
         ],
     )
     found = resp["PrefixLists"]
-    assert len(found) == 1, f"Number of found prefix lists has to be 1, got {len(found)}"
+    assert (
+        len(found) == 1
+    ), f"Number of found prefix lists has to be 1, got {len(found)}"
     prefix_list = found[0]
     return int(prefix_list["Version"])
 
 
-def add_current_ip_to_prefix_list(
-    client,
-    prefix_list_id: str,
-    workflow_id: str = None
-):
+def add_current_ip_to_prefix_list(client, prefix_list_id: str, workflow_id: str = None):
     """
     Add new CIDR entry with current public IP in to the prefix list. We also additionally store json object in the
         Description of the prefix list entry. This json object has required field called 'time' with timestamp
@@ -326,7 +313,7 @@ def add_current_ip_to_prefix_list(
         filed of the entry.
     """
 
-    import botocore.exceptions
+    import botocore.exceptions  # pylint: disable=import-error
     import requests
 
     # Get current public IP.
@@ -336,7 +323,7 @@ def add_current_ip_to_prefix_list(
 
     public_ip = resp.content.decode()
 
-    new_cidr = f'{public_ip}/32'
+    new_cidr = f"{public_ip}/32"
 
     attempts = 0
     # Since there may be multiple running ec2 tests, we have to add the retry
@@ -344,8 +331,7 @@ def add_current_ip_to_prefix_list(
     while True:
         try:
             version = get_prefix_list_version(
-                client=client,
-                prefix_list_id=prefix_list_id
+                client=client, prefix_list_id=prefix_list_id
             )
 
             client.modify_managed_prefix_list(
@@ -353,18 +339,19 @@ def add_current_ip_to_prefix_list(
                 CurrentVersion=version,
                 AddEntries=[
                     {
-                        'Cidr': new_cidr,
-                        'Description': json.dumps({
-                            "time": time.time(),
-                            "workflow_id": workflow_id
-                        })
+                        "Cidr": new_cidr,
+                        "Description": json.dumps(
+                            {"time": time.time(), "workflow_id": workflow_id}
+                        ),
                     },
-                ]
+                ],
             )
             break
         except botocore.exceptions.ClientError as e:
             if attempts >= MAX_PREFIX_LIST_UPDATE_ATTEMPTS:
-                logger.exception(f"Can not add new entry to the prefix list {prefix_list_id}")
+                logger.exception(
+                    f"Can not add new entry to the prefix list {prefix_list_id}"
+                )
                 raise e
 
             attempts += 1

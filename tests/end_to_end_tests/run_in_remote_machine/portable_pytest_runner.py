@@ -4,12 +4,14 @@ import sys
 
 from agent_build_refactored.tools.constants import SOURCE_ROOT
 from agent_build_refactored.tools.runner import Runner
-from agent_build_refactored.managed_packages.managed_packages_builders import PREPARE_TOOLSET_GLIBC_X86_64
+from agent_build_refactored.managed_packages.managed_packages_builders import (
+    PREPARE_TOOLSET_GLIBC_X86_64,
+)
 
 """
 This module defines logic that allows to build single-file, standalone executable binary with pytest runner.
-This executable is used in ec2 and docker end to end tests to run those tests in completely clean enironment 
-without Python and other dependencies. 
+This executable is used in ec2 and docker end to end tests to run those tests in completely clean environment
+without Python and other dependencies.
 """
 
 PORTABLE_RUNNER_NAME = "portable_runner_name"
@@ -52,16 +54,14 @@ class PortablePytestRunnerBuilder(Runner):
                 "--add-data",
                 f"agent_build_refactored{os.pathsep}agent_build_refactored",
                 # As an entry point we use this file itself because it also acts like a script which invokes pytest.
-                __file__
+                __file__,
             ],
-            cwd=SOURCE_ROOT
+            cwd=SOURCE_ROOT,
         )
 
     @property
     def result_runner_path(self):
         return self.output_path / "dist" / PORTABLE_RUNNER_NAME
-
-
 
     @classmethod
     def handle_command_line_arguments(
@@ -73,7 +73,7 @@ class PortablePytestRunnerBuilder(Runner):
         builder.build()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # We use this file as an entry point for the pytest runner.
     import pytest
 

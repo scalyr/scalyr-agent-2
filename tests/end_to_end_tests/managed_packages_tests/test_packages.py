@@ -21,25 +21,28 @@ from typing import List
 import pytest
 
 from agent_build_refactored.tools.constants import SOURCE_ROOT
-from agent_build_refactored.managed_packages.managed_packages_builders import PYTHON_PACKAGE_NAME, \
-    AGENT_LIBS_PACKAGE_NAME, AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME
+from agent_build_refactored.managed_packages.managed_packages_builders import (
+    PYTHON_PACKAGE_NAME,
+    AGENT_LIBS_PACKAGE_NAME,
+    AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME,
+)
 
 logger = logging.getLogger(__name__)
 
 """
-This test module preforms end to end testing of the Linux agent package and its dependency packages. 
-Since we perform testing for multiple distributions, those tests are mainly run inside another remote machines, 
+This test module preforms end to end testing of the Linux agent package and its dependency packages.
+Since we perform testing for multiple distributions, those tests are mainly run inside another remote machines,
 such as ec2 instance or docker container. If needed, it can be run locally, but you have to be aware that those tests
 are changing system state and must be aware of risks.
 """
 
 
 def _verify_package_subdirectories(
-        package_path: pl.Path,
-        package_type: str,
-        package_name: str,
-        output_dir: pl.Path,
-        expected_folders: List[str]
+    package_path: pl.Path,
+    package_type: str,
+    package_name: str,
+    output_dir: pl.Path,
+    expected_folders: List[str],
 ):
     """
     Verify structure if the agent's dependency packages.
@@ -55,15 +58,12 @@ def _verify_package_subdirectories(
     package_root.mkdir()
 
     if package_type == "deb":
-        subprocess.check_call([
-            "dpkg-deb", "-x", str(package_path), str(package_root)
-        ])
+        subprocess.check_call(["dpkg-deb", "-x", str(package_path), str(package_root)])
     elif package_type == "rpm":
         escaped_package_path = shlex.quote(str(package_path))
         command = f"rpm2cpio {escaped_package_path} | cpio -idmv"
         subprocess.check_call(
-            command, shell=True, cwd=package_root,
-            env={"LD_LIBRARY_PATH": "/lib64"}
+            command, shell=True, cwd=package_root, env={"LD_LIBRARY_PATH": "/lib64"}
         )
     else:
         raise Exception(f"Unknown package type {package_type}.")
@@ -73,19 +73,23 @@ def _verify_package_subdirectories(
     for expected in expected_folders:
         expected_path = package_root / expected
         for path in list(remaining_paths):
-            if str(path).startswith(str(expected_path)) or str(path) in str(expected_path):
+            if str(path).startswith(str(expected_path)) or str(path) in str(
+                expected_path
+            ):
                 remaining_paths.remove(path)
 
-    assert len(remaining_paths) == 0, "Something remains outside if the expected package structure."
+    assert (
+        len(remaining_paths) == 0
+    ), "Something remains outside if the expected package structure."
 
 
 def test_dependency_packages(
-        package_builder,
-        tmp_path,
-        package_source_type,
-        package_source,
-        python_package_path,
-        agent_libs_package_path
+    package_builder,
+    tmp_path,
+    package_source_type,
+    package_source,
+    python_package_path,
+    agent_libs_package_path,
 ):
     if package_source_type != "dir":
         pytest.skip("Only run when packages dir provided.")
@@ -102,8 +106,10 @@ def test_dependency_packages(
             f"usr/share/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/",
             # Depending on its type, a package also may install its own "metadata", so we have to take it into
             # account too.
-            f"usr/share/doc/{PYTHON_PACKAGE_NAME}/" if package_type == "deb" else "usr/lib/.build-id/"
-        ]
+            f"usr/share/doc/{PYTHON_PACKAGE_NAME}/"
+            if package_type == "deb"
+            else "usr/lib/.build-id/",
+        ],
     )
 
     # Verify structure of the agent_libs package and make sure there's no any file outside it.
@@ -117,16 +123,18 @@ def test_dependency_packages(
             f"usr/share/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/",
             # Depending on its type, a package also may install its own "metadata", so we have to take it into
             # account too.
-            f"usr/share/doc/{AGENT_LIBS_PACKAGE_NAME}/" if package_type == "deb" else "usr/lib/.build-id/"
-        ]
+            f"usr/share/doc/{AGENT_LIBS_PACKAGE_NAME}/"
+            if package_type == "deb"
+            else "usr/lib/.build-id/",
+        ],
     )
 
 
 def _install_packages_from_files(
-        python_package_path,
-        agent_libs_package_path,
-        package_type: str,
-        install_type: str,
+    python_package_path,
+    agent_libs_package_path,
+    package_type: str,
+    install_type: str,
 ):
     if package_type == "deb":
         subprocess.check_call(
@@ -135,19 +143,18 @@ def _install_packages_from_files(
     elif package_type == "rpm":
         subprocess.check_call(
             ["rpm", "-i", str(python_package_path), str(agent_libs_package_path)],
-            env={"LD_LIBRARY_PATH": "/lib64"}
-
+            env={"LD_LIBRARY_PATH": "/lib64"},
         )
     else:
         raise Exception(f"Unknown package type: {package_type}")
 
 
 def test_packages(
-        package_builder,
-        package_source_type,
-        package_source,
-        python_package_path,
-        agent_libs_package_path,
+    package_builder,
+    package_source_type,
+    package_source,
+    python_package_path,
+    agent_libs_package_path,
 ):
 
     if package_source_type == "dir":
@@ -155,14 +162,16 @@ def test_packages(
             python_package_path=python_package_path,
             agent_libs_package_path=agent_libs_package_path,
             package_type=package_builder.PACKAGE_TYPE,
-            install_type="install"
+            install_type="install",
         )
 
-    logger.info("Execute simple sanity test script for the python interpreter and its libraries.")
+    logger.info(
+        "Execute simple sanity test script for the python interpreter and its libraries."
+    )
     subprocess.check_call(
         [
             f"/usr/lib/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/bin/python3",
-            "tests/end_to_end_tests/managed_packages_tests/verify_python_interpreter.py"
+            "tests/end_to_end_tests/managed_packages_tests/verify_python_interpreter.py",
         ],
         env={
             # It's important to override the 'LD_LIBRARY_PATH' to be sure that libraries paths from the test runner

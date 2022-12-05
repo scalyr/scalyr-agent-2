@@ -24,7 +24,10 @@ import pathlib as pl
 import site
 
 from agent_build_refactored.tools.constants import SOURCE_ROOT
-from agent_build_refactored.managed_packages.managed_packages_builders import PYTHON_PACKAGE_SSL_VERSION, AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME as SUBDIR
+from agent_build_refactored.managed_packages.managed_packages_builders import (
+    PYTHON_PACKAGE_SSL_VERSION,
+    AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME as SUBDIR,
+)
 
 # Make sure that current interpreter prefixes are withing subdirectories.
 assert sys.prefix == f"/usr/share/{SUBDIR}"
@@ -45,31 +48,34 @@ assert set(site.getsitepackages()) == {
 
 # Verify that only previously checked prefixes are used in the Python paths.
 assert sys.path == [
-        str(pl.Path(__file__).parent),
-        str(SOURCE_ROOT),
-        f"{sys.prefix}/lib/python{PYTHON_MAJOR_VERSION}{PYTHON_MINOR_VERSION}.zip",
-        f"{sys.prefix}/lib/python{PYTHON_X_Y_VERSION}",
-        f"{sys.exec_prefix}/lib/python{PYTHON_X_Y_VERSION}/lib-dynload",
-        f"{sys.prefix}/lib/python{PYTHON_X_Y_VERSION}/site-packages",
-        f"{sys.exec_prefix}/lib/python{PYTHON_X_Y_VERSION}/site-packages",
-    ]
+    str(pl.Path(__file__).parent),
+    str(SOURCE_ROOT),
+    f"{sys.prefix}/lib/python{PYTHON_MAJOR_VERSION}{PYTHON_MINOR_VERSION}.zip",
+    f"{sys.prefix}/lib/python{PYTHON_X_Y_VERSION}",
+    f"{sys.exec_prefix}/lib/python{PYTHON_X_Y_VERSION}/lib-dynload",
+    f"{sys.prefix}/lib/python{PYTHON_X_Y_VERSION}/site-packages",
+    f"{sys.exec_prefix}/lib/python{PYTHON_X_Y_VERSION}/site-packages",
+]
 
 # Check that only libraries from the previously verified prefix are used.
 assert os.environ["LD_LIBRARY_PATH"] == f"{sys.exec_prefix}/lib"
 
-print(f"Check OpenSSL")
+print("Check OpenSSL")
 import ssl
+
 escaped_open_ssl_version = re.escape(PYTHON_PACKAGE_SSL_VERSION)
 assert re.match(
     rf"OpenSSL {escaped_open_ssl_version}\s+\d+ [A-Za-z]+ \d+", ssl.OPENSSL_VERSION
 ), f"Current version of OpenSSL does not match expected {PYTHON_PACKAGE_SSL_VERSION}"
 
 
-print(f"Check uuid")
+print("Check uuid")
 import uuid
-assert str(
-    uuid.uuid5(uuid.NAMESPACE_URL, "www.example.com")
-) == "b63cdfa4-3df9-568e-97ae-006c5b8fd652"
+
+assert (
+    str(uuid.uuid5(uuid.NAMESPACE_URL, "www.example.com"))
+    == "b63cdfa4-3df9-568e-97ae-006c5b8fd652"
+)
 
 
 compression_test_data = b"""\
@@ -81,62 +87,71 @@ Aliquam pharetra lacus non risus vehicula rutrum. Maecenas aliquam leo
 felis. Pellentesque semper nunc sit amet nibh ullamcorper, ac elementum
 dolor luctus. Curabitur lacinia mi ornare consectetur vestibulum."""
 
-print(f"Check bz2")
+print("Check bz2")
 import bz2
+
 compressed = bz2.compress(compression_test_data)
 uncompressed = bz2.decompress(compressed)
 assert uncompressed == compression_test_data
 
 
-print(f"Check zlib")
+print("Check zlib")
 import zlib
+
 compressed = zlib.compress(compression_test_data)
 uncompressed = zlib.decompress(compressed)
 assert uncompressed == compression_test_data
 
-print(f"Check lzma")
+print("Check lzma")
 import lzma
+
 compressed = lzma.compress(compression_test_data)
 uncompressed = lzma.decompress(compressed)
 assert uncompressed == compression_test_data
 
-print(f"Check ctypes")
+print("Check ctypes")
 from ctypes.util import find_library
+
 assert find_library("c") == "libc.so.6"
 
-print(f"Check orjson")
+print("Check orjson")
 import orjson
+
 data = orjson.dumps({"1": "2"})
 assert orjson.loads(data) == {"1": "2"}
 
-print(f"Check zstandard")
+print("Check zstandard")
 import zstandard
+
 compressed = zstandard.compress(compression_test_data)
 uncompressed = zstandard.decompress(compressed)
 assert uncompressed == compression_test_data
 
-print(f"Check lz4")
+print("Check lz4")
 import lz4.frame
+
 compressed = lz4.frame.compress(compression_test_data)
 uncompressed = lz4.frame.decompress(compressed)
 assert uncompressed == compression_test_data
 
-print(f"Check requests")
+print("Check requests")
 import requests
 
 with requests.Session() as s:
     resp = s.get("https://example.com")
 
-assert "This domain is for use in illustrative examples in documents." in resp.content.decode()
+assert (
+    "This domain is for use in illustrative examples in documents."
+    in resp.content.decode()
+)
 
 
 # Since we may run package tests with using "frozen" pytest runner, it is important to check
 # that the interpreter from tested package does not interfere with anything from that frozen test runner.
 # For example, we can try to import some library that is presented in test runner but not in the package.
 try:
-    import pytest
+    import pytest  # NOQA
+
     raise Exception("Pytest module must not be presented in the tested package.")
 except ModuleNotFoundError:
     pass
-
-
