@@ -3,7 +3,10 @@ import subprocess
 from typing import List, Dict
 
 from agent_build_refactored.tools.constants import Architecture
-from tests.end_to_end_tests.run_in_remote_machine.ec2 import EC2DistroImage, run_test_in_ec2_instance
+from tests.end_to_end_tests.run_in_remote_machine.ec2 import (
+    EC2DistroImage,
+    run_test_in_ec2_instance,
+)
 
 """
 This module defines logic that allows to run end to end tests inside remote machines such as ec2 instance or docker
@@ -21,7 +24,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
                 ssh_username="ubuntu",
             )
         },
-        "docker": "ubuntu:22.04"
+        "docker": "ubuntu:22.04",
     },
     "ubuntu2004": {
         "ec2": {
@@ -29,10 +32,10 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
                 image_id="ami-0149b2da6ceec4bb0",
                 image_name="Ubuntu Server 20.04 LTS (HVM), SSD Volume Type",
                 size_id="m1.small",
-                ssh_username="ubuntu"
+                ssh_username="ubuntu",
             )
         },
-        "docker": "ubuntu:20.04"
+        "docker": "ubuntu:20.04",
     },
     "ubuntu1804": {
         "ec2": {
@@ -40,32 +43,32 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
                 image_id="ami-07ebfd5b3428b6f4d",
                 image_name="Ubuntu Server 18.04 LTS (HVM), SSD Volume Type",
                 size_id="m1.small",
-                ssh_username="ubuntu"
+                ssh_username="ubuntu",
             )
         },
-        "docker": "ubuntu:18.04"
+        "docker": "ubuntu:18.04",
     },
     "ubuntu1604": {
         "ec2": {
-        Architecture.X86_64: EC2DistroImage(
+            Architecture.X86_64: EC2DistroImage(
                 image_id="ami-08bc77a2c7eb2b1da",
                 image_name="Ubuntu Server 16.04 LTS (HVM), SSD Volume Type",
                 size_id="m1.small",
                 ssh_username="ubuntu",
             )
         },
-        "docker": "ubuntu:16.04"
+        "docker": "ubuntu:16.04",
     },
     "ubuntu1404": {
         "ec2": {
             Architecture.X86_64: EC2DistroImage(
-                    image_id="ami-07957d39ebba800d5",
-                    image_name="Ubuntu Server 14.04 LTS (HVM)",
-                    size_id="t2.small",
-                    ssh_username="ubuntu",
+                image_id="ami-07957d39ebba800d5",
+                image_name="Ubuntu Server 14.04 LTS (HVM)",
+                size_id="t2.small",
+                ssh_username="ubuntu",
             )
         },
-        "docker": "ubuntu:14.04"
+        "docker": "ubuntu:14.04",
     },
     "debian11": {
         "ec2": {
@@ -76,7 +79,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
                 ssh_username="ubuntu",
             )
         },
-        "docker": "debian:11"
+        "docker": "debian:11",
     },
     "debian10": {
         "ec2": {
@@ -87,7 +90,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
                 ssh_username="admin",
             )
         },
-        "docker": "debian:10"
+        "docker": "debian:10",
     },
     "centos8": {
         "ec2": {
@@ -98,7 +101,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
                 ssh_username="centos",
             )
         },
-        "docker": "centos:8"
+        "docker": "centos:8",
     },
     "centos7": {
         "ec2": {
@@ -109,7 +112,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
                 ssh_username="centos",
             )
         },
-        "docker": "centos:7"
+        "docker": "centos:7",
     },
     "centos6": {
         "ec2": {
@@ -120,7 +123,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
                 ssh_username="root",
             )
         },
-        "docker": "centos:6"
+        "docker": "centos:6",
     },
     "amazonlinux2": {
         "ec2": {
@@ -131,19 +134,19 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
                 ssh_username="ec2-user",
             )
         },
-        "docker": "amazonlinux:2"
+        "docker": "amazonlinux:2",
     },
 }
 
 
 def run_test_remotely(
-        distro_name: str,
-        remote_machine_type: str,
-        command: List[str],
-        architecture: Architecture,
-        pytest_runner_path: pl.Path,
-        test_options,
-        file_mappings: Dict = None,
+    distro_name: str,
+    remote_machine_type: str,
+    command: List[str],
+    architecture: Architecture,
+    pytest_runner_path: pl.Path,
+    test_options,
+    file_mappings: Dict = None,
 ):
     """
     Run pytest tests in a remote machine, for example in ec2 or docker.
@@ -169,7 +172,9 @@ def run_test_remotely(
             dest = name.replace("--", "").replace("-", "_")
             value = getattr(test_options, dest)
             if value is None:
-                raise ValueError(f"Option '{name}' has to be provided with distro type 'ec2'.")
+                raise ValueError(
+                    f"Option '{name}' has to be provided with distro type 'ec2'."
+                )
 
         _validate_option("--aws-access-key")
         _validate_option("--aws-secret-key")
@@ -193,30 +198,29 @@ def run_test_remotely(
             region=test_options.aws_region,
             security_group=test_options.aws_security_group,
             security_groups_prefix_list_id=test_options.aws_security_groups_prefix_list_id,
-            workflow_id=test_options.workflow_id
+            workflow_id=test_options.workflow_id,
         )
     else:
         mount_options = []
 
         for source, dst in file_mappings.items():
-            mount_options.extend([
-                "-v",
-                f"{source}:{dst}"
-            ])
+            mount_options.extend(["-v", f"{source}:{dst}"])
 
-        subprocess.check_call([
-            "docker",
-            "run",
-            "-i",
-            "-v",
-            f"{pytest_runner_path}:/test_runner",
-            *mount_options,
-            "-e",
-            "TEST_RUNS_REMOTELY=1",
-            "--platform",
-            str(architecture.as_docker_platform),
-            distro,
-            "/test_runner",
-            "-s",
-            *command
-        ])
+        subprocess.check_call(
+            [
+                "docker",
+                "run",
+                "-i",
+                "-v",
+                f"{pytest_runner_path}:/test_runner",
+                *mount_options,
+                "-e",
+                "TEST_RUNS_REMOTELY=1",
+                "--platform",
+                str(architecture.as_docker_platform),
+                distro,
+                "/test_runner",
+                "-s",
+                *command,
+            ]
+        )

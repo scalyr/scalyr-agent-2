@@ -136,6 +136,7 @@ def _get_option_value(name: str, config: dict, arg_options, default=None):
 #         default=str(int(time.time())),
 #     )
 
+
 @pytest.fixture(scope="session")
 def scalyr_api_key(config_file, request):
     return request.config.option.scalyr_api_key
