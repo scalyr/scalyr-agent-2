@@ -5,3 +5,4 @@ pywin32==304
 orjson==3.6.7
 six==1.16.0
 xmltodict==0.13.0
+syslogmp==0.3; python_version >= '3.6'
