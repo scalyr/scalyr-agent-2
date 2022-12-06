@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ------------------------------------------------------------------------
-# author: scalyr-cloudtech@scalyr.com
+# author: scalyr@sentinelone.com
 
 from __future__ import unicode_literals
 from __future__ import absolute_import
@@ -20,7 +20,7 @@ from __future__ import absolute_import
 from __future__ import print_function
 from scalyr_agent import compat
 
-__author__ = "scalyr-cloudtech@scalyr.com"
+__author__ = "scalyr@sentinelone.com"
 
 import errno
 import glob
@@ -129,7 +129,8 @@ define_config_option(
     "Optional (defaults to `None`, overrides `message_log` when set). Template used to create log "
     "file paths to store syslog messages.  The variables $PROTO, $SRCIP, $DESTPORT, $HOSTNAME, "
     "$APPNAME will be substituted appropriately.  If the path is not absolute, then it is assumed "
-    "to be relative to the main Scalyr Agent log directory.",
+    "to be relative to the main Scalyr Agent log directory.  Note that this option is currently "
+    "only available via a Dockerized Scalyr Agent due to an external dependency.",
     convert_to=six.text_type,
     default=None,
 )
