@@ -156,7 +156,6 @@ def test_packages(
     agent_version,
     tmp_path,
 ):
-    pytest.skip("GGG")
     timeout_tracker = TimeoutTracker(200)
     _print_system_information()
     _prepare_environment(
