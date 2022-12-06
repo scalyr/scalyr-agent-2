@@ -79,7 +79,7 @@ jobs:
   # Jobs which performs basic sanity checks for the Kubernetes Monitor and Kubernetes Events Monitor
   k8s_kubernetes_monitor_tests:
     name: Kubernetes Monitors - k8s ${{ matrix.k8s_version.version }}-${{ matrix.k8s_version.runtime}}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 15
 
     needs: pre_job
@@ -254,7 +254,7 @@ jobs:
 
   k8s_open_metrics_monitor_tests:
     name: OpenMetrics Monitor - k8s ${{ matrix.k8s_version.version }}-${{ matrix.k8s_version.runtime}}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 15
 
     needs: pre_job
@@ -432,7 +432,7 @@ jobs:
           channel: '#eng-dataset-cloud-tech'
 
   k8s-smoketest:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
     steps:
@@ -491,7 +491,7 @@ jobs:
     name: Docker Smoketest - ${{ matrix.variant.log_mode }}
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     strategy:
       fail-fast: false
       matrix:
