@@ -195,8 +195,8 @@ jobs:
     name: Build managed package ${{ matrix.name }}
     needs:
       - pre_job
+    if: needs.pre_job.outputs.should_skip != 'true'
     runs-on: ${{ matrix.os }}
-
 
     strategy:
       # This job receives its matrix from the 'pre_job' job. The matrix itself is created by the .github/actions/init-job-matrices action.

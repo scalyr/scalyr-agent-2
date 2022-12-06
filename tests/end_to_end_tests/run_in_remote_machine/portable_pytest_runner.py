@@ -10,8 +10,8 @@ from agent_build_refactored.managed_packages.managed_packages_builders import (
 
 """
 This module defines logic that allows to build single-file, standalone executable binary with pytest runner.
-This executable is used in ec2 and docker end to end tests to run those tests in completely clean enironment 
-without Python and other dependencies. 
+This executable is used in ec2 and docker end to end tests to run those tests in completely clean environment
+without Python and other dependencies.
 """
 
 PORTABLE_RUNNER_NAME = "portable_runner_name"

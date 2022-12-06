@@ -1,12 +1,11 @@
 import dataclasses
 import logging
-import os
 import pathlib as pl
 import shlex
 import time
 import random
 import json
-from typing import List, Dict, Optional
+from typing import List, Dict
 
 """
 This module defines main logic that is responsible for manipulating with ec2 instances to run end to end tests
@@ -17,7 +16,6 @@ logger = logging.getLogger(__name__)
 
 # All the instances created by this script will use this string in the name.
 INSTANCE_NAME_STRING = "automated-agent-tests-"
-assert "-tests-" in INSTANCE_NAME_STRING
 
 MAX_PREFIX_LIST_UPDATE_ATTEMPTS = 20
 
@@ -38,7 +36,6 @@ def destroy_node_and_cleanup(driver, node):
     """
     Destroy the provided node and cleanup any left over EBS volumes.
     """
-    volumes = driver.list_volumes(node=node)
 
     assert (
         INSTANCE_NAME_STRING in node.name
@@ -60,12 +57,20 @@ def destroy_node_and_cleanup(driver, node):
         else:
             raise e
 
+    volumes = driver.list_volumes(node=node)
+
     assert len(volumes) <= 1
     print("Cleaning up any left-over EBS volumes for this node...")
 
-    # Give it some time for the volume to become detached from the node
-    if volumes:
-        time.sleep(10)
+    # Wait for the volumes to become detached from the node
+    remaining_volumes = volumes[:]
+
+    timeout = time.time() + 100
+    while remaining_volumes:
+        if time.time() >= timeout:
+            raise TimeoutError("Could not wait for all volumes being detached")
+        time.sleep(1)
+        remaining_volumes = driver.list_volumes(node=node)
 
     for volume in volumes:
         # Additional safety checks
@@ -147,7 +152,7 @@ def run_test_in_ec2_instance(
         FileDeployment,
         MultiStepDeployment,
     )
-    import boto3
+    import boto3  # pylint: disable=import-error
 
     def prepare_node():
 
@@ -169,7 +174,7 @@ def run_test_in_ec2_instance(
 
         logger.info("Starting node provisioning ...")
 
-        file_mappings[test_runner_path] = f"/tmp/test_runner"
+        file_mappings[test_runner_path] = "/tmp/test_runner"
 
         file_deployment_steps = []
         for source, dst in file_mappings.items():
@@ -178,7 +183,7 @@ def run_test_in_ec2_instance(
         deployment = MultiStepDeployment(add=file_deployment_steps)
 
         try:
-            node = driver.deploy_node(
+            return driver.deploy_node(
                 name=name,
                 image=image,
                 size=size,
@@ -194,15 +199,11 @@ def run_test_in_ec2_instance(
                 at_exit_func=destroy_node_and_cleanup,
             )
         except DeploymentError as e:
-            print("Deployment failed: %s" % (str(e)))
-            node = e.node
             stdout = getattr(e.original_error, "stdout", None)
             stderr = getattr(e.original_error, "stderr", None)
-            raise Exception(
+            logger.exception(
                 f"Deployment is not successful.\nStdout: {stdout}\nStderr: {stderr}"
             )
-
-        return node
 
     def run_command():
 
@@ -218,18 +219,17 @@ def run_test_in_ec2_instance(
 
         final_command = ["/tmp/test_runner", "-s", *command]
 
-        command_str = shlex.join(final_command)
+        command_str = shlex.join(final_command)  # pylint: disable=no-member
         stdin, stdout, stderr = ssh.exec_command(
             command=f"TEST_RUNS_REMOTELY=1 sudo -E {command_str} 2>&1",
         )
 
         print(f"stdout: {stdout.read().decode()}")
 
-        ssh.close()
+        return_code = stdout.channel.recv_exit_status()
 
-        assert (
-            stdout.channel.recv_exit_status() == 0
-        ), "Remote test execution has failed with."
+        ssh.close()
+        assert return_code == 0, f"Remote test execution has failed with {return_code}"
 
     file_mappings = file_mappings or {}
     start_time = int(time.time())
@@ -237,16 +237,17 @@ def run_test_in_ec2_instance(
     driver_cls = get_driver(Provider.EC2)
     driver = driver_cls(access_key, secret_key, region=region)
 
+    # Add current public IP to security group's prefix list.
+    # We have to update that prefix list each time because there are to many GitHub actions public IPs, and
+    # it is not possible to whitelist all of them in the AWS prefix list.
+    # NOTE: Take in mind that you may want to remove that IP in order to prevent prefix list from reaching its
+    # size limit. For GitHub actions end-to-end tests we run a finalizer job that clears prefix list.
     boto_client = boto3.client(
         "ec2",
         aws_access_key_id=access_key,
         aws_secret_access_key=secret_key,
         region_name=region,
     )
-
-    # Add current public IP to security group's prefix list.
-    # We have to update that prefix list each time because there are to many GitHub actions public IPs, and
-    # it is not possible to whitelist all of them in the AWS prefix list.
     add_current_ip_to_prefix_list(
         client=boto_client,
         prefix_list_id=security_groups_prefix_list_id,
@@ -302,7 +303,7 @@ def add_current_ip_to_prefix_list(client, prefix_list_id: str, workflow_id: str 
         filed of the entry.
     """
 
-    import botocore.exceptions
+    import botocore.exceptions  # pylint: disable=import-error
     import requests
 
     # Get current public IP.
@@ -330,7 +331,7 @@ def add_current_ip_to_prefix_list(client, prefix_list_id: str, workflow_id: str 
                     {
                         "Cidr": new_cidr,
                         "Description": json.dumps(
-                            {"time": int(time.time()), "workflow_id": workflow_id}
+                            {"time": time.time(), "workflow_id": workflow_id}
                         ),
                     },
                 ],

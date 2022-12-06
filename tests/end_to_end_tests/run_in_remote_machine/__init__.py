@@ -10,7 +10,7 @@ from tests.end_to_end_tests.run_in_remote_machine.ec2 import (
 
 """
 This module defines logic that allows to run end to end tests inside remote machines such as ec2 instance or docker
-container. 
+container.
 """
 
 # Collection of remote machine distro specifications for end to end remote tests.

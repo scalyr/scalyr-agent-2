@@ -25,9 +25,8 @@ import pathlib as pl
 from typing import List, Tuple, Optional, Dict, Type
 
 
-from agent_build_refactored.tools.runner import Runner, RunnerStep, ArtifactRunnerStep, RunnerMappedPath, EnvironmentRunnerStep, DockerImageSpec,GitHubActionsSettings
+from agent_build_refactored.tools.runner import Runner, RunnerStep, ArtifactRunnerStep, RunnerMappedPath, EnvironmentRunnerStep, DockerImageSpec,GitHubActionsSettings, IN_DOCKER
 from agent_build_refactored.tools.constants import SOURCE_ROOT, DockerPlatform, Architecture
-from agent_build_refactored.tools.steps_libs.constants import IN_DOCKER
 from agent_build_refactored.tools import check_call_with_log
 from agent_build_refactored.prepare_agent_filesystem import build_linux_fhs_agent_files, add_config
 
@@ -60,7 +59,7 @@ The structure of the mentioned packages has to guarantee that files of these pac
     own 'sub-directories'
 
     For now there are two subdirectories:
-        - /usr/libe/scalyr-agent-2-dependencies - for platform dependent files.
+        - /usr/lib/scalyr-agent-2-dependencies - for platform dependent files.
         - /usr/shared/scalyr-agent-2-dependencies - for platform independent files.
 
     and agent from the 'scalyr-agent-2' package has to use the
@@ -866,11 +865,8 @@ class ManagedPackagesBuilder(Runner):
                 last_repo_python_package_file=args.last_repo_python_package_file,
                 last_repo_agent_libs_package_file=args.last_repo_agent_libs_package_file,
             )
-
             if not IN_DOCKER:
                 output_path = SOURCE_ROOT / "build"
-
-                os.system(f"ls -l {output_path}")
                 if output_path.exists():
                     shutil.rmtree(output_path)
                 shutil.copytree(
@@ -878,7 +874,6 @@ class ManagedPackagesBuilder(Runner):
                     output_path,
                     dirs_exist_ok=True,
                 )
-
         elif args.command == "publish":
             builder.publish_packages_to_packagecloud(
                 packages_dir_path=pl.Path(args.packages_dir),
