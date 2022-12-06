@@ -38,6 +38,8 @@ from agent_build_refactored.docker_image_builders import (
     ALL_IMAGE_BUILDERS,
 )
 
+from agent_build_refactored.managed_packages.managed_packages_builders import ALL_MANAGED_PACKAGE_BUILDERS
+
 # We expect some info from the GitHub actions context to determine if the run is 'master-only' or not.
 GITHUB_EVENT_NAME = os.environ.get("GITHUB_EVENT_NAME", "")
 GITHUB_BASE_REF = os.environ.get("GITHUB_BASE_REF", "")
@@ -48,6 +50,7 @@ GITHUB_REF_NAME = os.environ.get("GITHUB_REF_NAME", "")
 # pull request against the 'master' branch.
 if GITHUB_EVENT_NAME == "pull_request" and GITHUB_BASE_REF == "master":
     master_run = True
+    to_publish = False
 # push to the 'master' branch
 elif (
     GITHUB_EVENT_NAME == "push"
@@ -55,6 +58,7 @@ elif (
     and GITHUB_REF_NAME == "master"
 ):
     master_run = True
+    to_publish = True
 
 # push to a "production" tag.
 elif GITHUB_EVENT_NAME == "push" and GITHUB_REF_TYPE == "tag":
@@ -62,9 +66,11 @@ elif GITHUB_EVENT_NAME == "push" and GITHUB_REF_TYPE == "tag":
     current_version = version_file_path.read_text().strip()
     if GITHUB_REF_NAME == f"v{current_version}":
         master_run = True
+        to_publish = True
 
 else:
     master_run = False
+    to_publish = False
 
 
 ALL_USED_RUNNERS = {
@@ -108,6 +114,69 @@ for step in _all_used_runner_steps.values():
     _pre_built_step_runners[step.id] = StepWrapperRunner
 
 
+def _get_managed_packages_build_matrix(
+        input_build_matrix: List
+):
+
+    # List of all runners that are used by this workflow run.
+    used_runners = []
+
+    # Generate a final agent image build job matrix and filter out job for non-limited run, if needed.
+    result_matrix = {"include": []}
+    for job in input_build_matrix:
+        is_master_run_only = job.get("master_run_only", True)
+
+        # If this is non-master run, skip jobs which are not supposed to be in it.
+        if is_master_run_only and not master_run:
+            continue
+
+        # Set default valued for some essential matrix values, if not specified.
+        if "os" not in job:
+            job["os"] = "ubuntu-20.04"
+        if "python-version" not in job:
+            job["python-version"] = IMAGES_PYTHON_VERSION
+
+        builder_name = job["name"]
+        builder = ALL_MANAGED_PACKAGE_BUILDERS[builder_name]
+        job["builder-fqdn"] = builder.get_fully_qualified_name()
+        result_matrix["include"].append(job)
+        used_runners.append(builder)
+
+    return result_matrix
+
+
+def _get_managed_packages_test_matrix(
+        input_test_matrix: List
+):
+
+    # List of all runners that are used by this workflow run.
+    used_runners = []
+
+    # Generate a final agent image build job matrix and filter out job for non-limited run, if needed.
+    result_matrix = {"include": []}
+    for job in input_test_matrix:
+        is_master_run_only = job.get("master_run_only", True)
+
+        # If this is non-master run, skip jobs which are not supposed to be in it.
+        if is_master_run_only and not master_run:
+            continue
+
+        # Set default valued for some essential matrix values, if not specified.
+        if "os" not in job:
+            job["os"] = "ubuntu-20.04"
+        if "python-version" not in job:
+            job["python-version"] = IMAGES_PYTHON_VERSION
+
+        builder_name = job["name"]
+        builder = ALL_MANAGED_PACKAGE_BUILDERS[builder_name]
+        job["builder-fqdn"] = builder.get_fully_qualified_name()
+        result_matrix["include"].append(job)
+        used_runners.append(builder)
+
+    return result_matrix
+
+
+
 def main():
     run_type_name = "master" if master_run else "non-master"
     print(
@@ -128,6 +197,19 @@ def main():
         dest="images_build_matrix_json_file",
         required=True,
         help="Path to a JSON file with images build job matrix."
+    )
+
+    parser.add_argument(
+        "--managed-packages-build-matrix-json-file",
+        dest="managed_packages_build_matrix_json_file",
+        required=True,
+        help="Path to a JSON file with managed packages build job matrix."
+    )
+    parser.add_argument(
+        "--managed-packages-test-matrix-json-file",
+        dest="managed_packages_test_matrix_json_file",
+        required=True,
+        help="Path to a JSON file with managed packages test job matrix."
     )
 
     args = parser.parse_args()
@@ -161,6 +243,24 @@ def main():
         result_images_build_matrix["include"].append(job)
         used_runners.append(builder)
 
+    managed_packages_build_matrix_json_file = pl.Path(
+        args.managed_packages_build_matrix_json_file
+    )
+    result_managed_packages_build_matrix = _get_managed_packages_build_matrix(
+        input_build_matrix=json.loads(
+            managed_packages_build_matrix_json_file.read_text()
+        )
+    )
+
+    managed_packages_test_matrix_json_file = pl.Path(
+        args.managed_packages_test_matrix_json_file
+    )
+    result_managed_packages_test_matrix = _get_managed_packages_test_matrix(
+        input_test_matrix=json.loads(
+            managed_packages_test_matrix_json_file.read_text()
+        )
+    )
+
     # Get pre-built steps that are used by this workflow and create matrix for a pre-built steps.
     pre_built_steps = _get_runners_all_pre_built_steps(
         runners=used_runners
@@ -178,12 +278,16 @@ def main():
             }
         )
 
-    all_matrices = {
+    result = {
         "agent_image_build_matrix": result_images_build_matrix,
-        "pre_build_steps_matrix": pre_build_steps_matrix
+        "agent_managed_packages_build_matrix": result_managed_packages_build_matrix,
+        "agent_managed_packages_test_matrix": result_managed_packages_test_matrix,
+        "pre_build_steps_matrix": pre_build_steps_matrix,
+        "is_master_run": master_run,
+        "to_publish": to_publish
     }
 
-    print(json.dumps(all_matrices))
+    print(json.dumps(result))
 
 
 if __name__ == "__main__":

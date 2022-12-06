@@ -13,10 +13,13 @@
 # limitations under the License.
 import dataclasses
 import enum
+import os
 import pathlib as pl
 
 SOURCE_ROOT = pl.Path(__file__).parent.parent.parent.absolute()
 AGENT_BUILD_PATH = SOURCE_ROOT / "agent_build"
+
+IN_CICD = bool(os.environ.get("AGENT_BUILD_IN_CICD"))
 
 
 @dataclasses.dataclass(frozen=True)
@@ -71,6 +74,21 @@ class Architecture(enum.Enum):
     @property
     def to_docker_build_triplet(self):
         return f"linux-{self.as_docker_platform}"
+
+    @property
+    def as_deb_package_arch(self):
+        mapping = {
+            Architecture.X86_64: "amd64"
+        }
+
+        return mapping[self]
+
+    @property
+    def as_rpm_package_arch(self):
+        mapping = {
+            Architecture.X86_64: "x86_64"
+        }
+        return mapping[self]
 
 
 _ARCHITECTURE_TO_DOCKER_PLATFORM = {
