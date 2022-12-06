@@ -20,6 +20,5 @@
 PYTHON_SUBDIR_NAME="scalyr-agent-2-dependencies"
 
 # Override some variables in order to run dependency Python interpreter correctly.
-export LD_LIBRARY_PATH="/usr/lib/${PYTHON_SUBDIR_NAME}"
-export PYTHONPATH="/usr/lib/${PYTHON_SUBDIR_NAME}/python3.11:/usr/lib/${PYTHON_SUBDIR_NAME}/python3.11/lib-dynload:/usr/lib/${PYTHON_SUBDIR_NAME}/python3.11/site-packages:${PYTHONPATH}"
-exec /usr/libexec/scalyr-agent-2-dependencies/python3 "$@"
+export LD_LIBRARY_PATH="/usr/lib/${PYTHON_SUBDIR_NAME}/lib"
+exec /usr/lib/scalyr-agent-2-dependencies/bin/python3-orig "$@"

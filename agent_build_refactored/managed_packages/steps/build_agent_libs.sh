@@ -44,60 +44,14 @@ REQUIREMENTS_FILES_PATH="${SOURCE_ROOT}/agent_build/requirement-files"
 #
 # Build dev libs.
 #
-DEV_LIBS_BUILD_ROOT="/tmp/dev-libs"
-#CFLAGS="-I/usr/include/${SUBDIR_NAME}/python${PYTHON_SHORT_VERSION}" \
-#  /usr/libexec/scalyr-agent-2-python3 -m pip install --root "${DEV_LIBS_BUILD_ROOT}" -r "${SOURCE_ROOT}/dev-requirements.txt"
 
-/usr/libexec/"${SUBDIR_NAME}"/scalyr-agent-2-python3 -m pip install --root "${DEV_LIBS_BUILD_ROOT}" -r "${SOURCE_ROOT}/dev-requirements.txt"
 
-# Uncomment this in order to save dev libs files with original filesystem structure. May be useful for debugging.
-# cp -a "${DEV_LIBS_BUILD_ROOT}" "${STEP_OUTPUT_PATH}/dev_libs_original"
-
-DEV_LIBS_ROOT="${STEP_OUTPUT_PATH}/dev_libs"
-
-# Also fix structure of the result filesystem, since pip also does not fully respect sub-directories and some files
-# are located outside of them.
-mkdir -p "${DEV_LIBS_ROOT}/usr/lib"
-mv "${DEV_LIBS_BUILD_ROOT}/usr/lib/${SUBDIR_NAME}" "${DEV_LIBS_ROOT}/usr/lib"
-cp -a "${DEV_LIBS_BUILD_ROOT}/usr/lib/python${PYTHON_SHORT_VERSION}"  "${DEV_LIBS_ROOT}/usr/lib/${SUBDIR_NAME}"
-rm -r "${DEV_LIBS_BUILD_ROOT}/usr/lib/python${PYTHON_SHORT_VERSION}"
-
-mkdir -p "${DEV_LIBS_ROOT}/usr/libexec"
-mv "${DEV_LIBS_BUILD_ROOT}/usr/bin" "${DEV_LIBS_ROOT}/usr/libexec/${SUBDIR_NAME}"
-
-function die() {
-    message=$1
-    >&2 echo "${message}"
-    exit 1
-}
-# Check if there are any files that have been left uncopied from the build root.
-REMAINING_DEV_FILES=$(find "${DEV_LIBS_BUILD_ROOT}" -type f)
-test "$(echo -n "${REMAINING_DEV_FILES}" | wc -l)" = "0" || die "There are still files that are remaining non-copied to a result dev libs directory. Files: '${REMAINING_DEV_FILES}'"
-
+"/usr/lib/${SUBDIR_NAME}/bin/python3" -m pip install --root "${STEP_OUTPUT_PATH}/dev_libs" -r "${SOURCE_ROOT}/dev-requirements.txt"
 
 #
 # Build agent libs.
 #
-AGENT_LIBS_BUILD_ROOT="/tmp/agent-libs"
-/usr/libexec/"${SUBDIR_NAME}"/scalyr-agent-2-python3 -m pip install -v --force-reinstall --root "${AGENT_LIBS_BUILD_ROOT}"  \
+
+"/usr/lib/${SUBDIR_NAME}/bin/python3" -m pip install -v --force-reinstall --root "${STEP_OUTPUT_PATH}/agent_libs"  \
   -r "${REQUIREMENTS_FILES_PATH}/main-requirements.txt" \
   -r "${REQUIREMENTS_FILES_PATH}/compression-requirements.txt"
-
-# Uncomment this in order to save agent libs files with original filesystem structure. May be useful for debugging.
-# cp -a "${AGENT_LIBS_BUILD_ROOT}" "${STEP_OUTPUT_PATH}/agent_libs_original"
-
-AGENT_LIBS_ROOT="${STEP_OUTPUT_PATH}/agent_libs"
-
-# Also fix structure of the result filesystem, since pip also does not fully respect sub-directories and some files
-# are located outside of them.
-mkdir -p "${AGENT_LIBS_ROOT}/usr/lib"
-mv "${AGENT_LIBS_BUILD_ROOT}/usr/lib/${SUBDIR_NAME}" "${AGENT_LIBS_ROOT}/usr/lib"
-cp -a "${AGENT_LIBS_BUILD_ROOT}/usr/lib/python${PYTHON_SHORT_VERSION}"  "${AGENT_LIBS_ROOT}/usr/lib/${SUBDIR_NAME}"
-rm -r "${AGENT_LIBS_BUILD_ROOT}/usr/lib/python${PYTHON_SHORT_VERSION}"
-
-mkdir -p "${AGENT_LIBS_ROOT}/usr/libexec"
-mv "${AGENT_LIBS_BUILD_ROOT}/usr/bin" "${AGENT_LIBS_ROOT}/usr/libexec/${SUBDIR_NAME}"
-
-# Check if there are any files that have been left uncopied from the build root.
-REMAINING_AGENT_FILES=$(find "${AGENT_LIBS_BUILD_ROOT}" -type f)
-test "$(echo -n "${REMAINING_AGENT_FILES}" | wc -l)" = "0" || die "There are still files that are remaining non-copied to a result agent libs directory. Files: '${REMAINING_AGENT_FILES}'"
