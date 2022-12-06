@@ -17,7 +17,6 @@ import pathlib as pl
 import shlex
 import subprocess
 import logging
-import textwrap
 import functools
 import time
 from typing import List, Dict
@@ -67,6 +66,7 @@ def _verify_package_subdirectories(
     package_root = output_dir / package_name
     package_root.mkdir()
 
+    # Extract package.
     if package_type == "deb":
         subprocess.check_call(["dpkg-deb", "-x", str(package_path), str(package_root)])
     elif package_type == "rpm":
@@ -99,13 +99,13 @@ def _verify_package_subdirectories(
 def test_dependency_packages(
     package_builder,
     tmp_path,
-    package_source_type,
-    packages_repo_dir,
+    distro_name,
     python_package_path,
     agent_libs_package_path,
 ):
-    if package_source_type not in ["dir", "repo-tarball"]:
-        pytest.skip("Only run when packages dir provided.")
+
+    if distro_name not in ["ubuntu2204", "amazonlinux2"]:
+        pytest.skip("No need to check on all distros.")
 
     package_type = package_builder.PACKAGE_TYPE
 
@@ -147,13 +147,7 @@ def test_packages(
     package_builder_name,
     package_builder,
     remote_machine_type,
-    package_source_type,
-    package_source,
-    python_package_path,
-    agent_libs_package_path,
-
-    repo_url,
-    repo_public_key,
+    convenience_script_path,
     distro_name,
     scalyr_api_key,
     scalyr_api_read_key,
@@ -162,22 +156,17 @@ def test_packages(
     agent_version,
     tmp_path,
 ):
+    pytest.skip("GGG")
     timeout_tracker = TimeoutTracker(200)
     _print_system_information()
-
-    if remote_machine_type == "docker":
-        _run_shell("apt update")
-        _run_shell("apt install -y ca-certificates")
-
-    _add_repo(
+    _prepare_environment(
         package_type=package_builder.PACKAGE_TYPE,
-        repo_url=repo_url,
-        repo_public_key=repo_public_key,
-        distro_name=distro_name,
+        remote_machine_type=remote_machine_type,
+        distro_name=distro_name
     )
-    _install_package(
-        package_type=package_builder.PACKAGE_TYPE,
-        package_name=AGENT_LIBS_PACKAGE_NAME,
+
+    _install_from_convenience_script(
+        script_path=convenience_script_path,
     )
 
     logger.info(
@@ -266,135 +255,6 @@ def test_packages(
     # TODO: Add actual agent package testing here.
 
 
-def _run_shell(command: str, return_output: bool = False, env=None):
-    env = env or {}
-    if return_output:
-        return subprocess.check_output(command, shell=True, env=env).decode().strip()
-
-    subprocess.check_call(command, shell=True, env=env)
-
-
-def _install_packages_from_files(
-    python_package_path: pl.Path,
-    agent_libs_package_path: pl.Path,
-    agent_package_path: pl.Path,
-    package_type: str,
-    install_type: str,
-):
-    if package_type == "deb":
-        subprocess.check_call(
-            [
-                "dpkg",
-                "-i",
-                str(python_package_path),
-                str(agent_libs_package_path),
-                str(agent_package_path),
-            ]
-        )
-    elif package_type == "rpm":
-        subprocess.check_call(
-            [
-                "rpm",
-                "-i",
-                str(python_package_path),
-                str(agent_libs_package_path),
-                str(agent_package_path),
-            ],
-            env={"LD_LIBRARY_PATH": "/lib64"},
-        )
-    # TODO: Add actual agent package testing here.
-
-
-def _add_repo(package_type: str, repo_url, repo_public_key: str, distro_name: str):
-    """
-    Add repo with tested packages.
-    :param package_type: Type of the package, e.g. deb, rpm.
-    :param repo_url: URL of a repo.
-    :param repo_public_key: Content of repo's public key.
-    :param distro_name: name of a tested distribution.
-    """
-
-    if package_type == "deb":
-        # Add repo's public key
-        repo_key_path = pl.Path("/etc/apt/trusted.gpg.d/test.asc")
-        repo_key_path.write_text(repo_public_key)
-
-        # Add repo for ubuntu 14 and 16 by using deprecated apt-key command.
-        if distro_name in ["ubuntu1404", "ubuntu1604"]:
-            subprocess.check_call(
-                ["apt-key", "add", str(repo_key_path)], env={"LD_LIBRARY_PATH": "/lib"}
-            )
-
-        # Add repo's config file.
-        repo_file_path = pl.Path("/etc/apt/sources.list.d/test.list")
-        repo_file_path.write_text(f"deb {repo_url} trusty main")
-        _call_apt(["update"])
-    elif package_type == "rpm":
-        # Add repo's public key
-        repo_key_path = pl.Path("/tmp/public_key")
-        repo_key_path.write_text(repo_public_key)
-
-        # Add repo's config file.
-        repo_file_path = pl.Path("/etc/yum.repos.d/test.repo")
-        repo_config = textwrap.dedent(
-            f"""
-            [test_repo]
-            name=test_repo
-            baseurl={repo_url}
-            enabled=1
-            gpgcheck=0
-            repo_gpgcheck=1
-            gpgkey=file://{repo_key_path}
-            """
-        )
-        repo_file_path.write_text(repo_config.format(repo_url=repo_url))
-
-        if distro_name == "centos8":
-            # For centos 8 we replace repo urls for vault.
-            for repo_name in ["BaseOS", "AppStream"]:
-                repo_file = pl.Path(f"/etc/yum.repos.d/CentOS-Linux-{repo_name}.repo")
-                content = repo_file.read_text()
-                content = content.replace("mirror.centos.org", "vault.centos.org")
-                content = content.replace("#baseurl", "baseurl")
-                content = content.replace("mirrorlist=", "#mirrorlist=")
-                repo_file.write_text(content)
-
-        elif distro_name == "centos6":
-            # for centos 6, we remove repo file for disabled repo, so it could use vault repo.
-            pl.Path("/etc/yum.repos.d/CentOS-Base.repo").unlink()
-
-
-def _install_package(
-    package_type: str,
-    package_name: str,
-):
-    """
-    Installs package from repo.
-    """
-    if package_type == "deb":
-        _call_apt(["install", "-y", package_name])
-    elif package_type == "rpm":
-        _call_yum(["install", "-y", package_name])
-    else:
-        raise Exception(f"Unknown package type: {package_type}")
-
-
-def _call_apt(command: List[str]):
-    """Run apt command"""
-    subprocess.check_call(
-        ["apt", *command],
-        # Since test may run in "frozen" pytest executable, add missing variables.
-        env={"LD_LIBRARY_PATH": "/lib", "PATH": "/usr/sbin:/sbin:/usr/bin:/bin"},
-    )
-
-
-def _call_yum(command: List[str]):
-    """Run yum command"""
-    subprocess.check_call(
-        ["yum", *command],
-        # Since test may run in "frozen" pytest executable, add missing variables.
-        env={"LD_LIBRARY_PATH": "/lib64"},
-    )
 def _verify_agent_package_ownership(package_root: pl.Path):
     agent_json_path = package_root / "etc/scalyr-agent-2/agent.json"
     assert (
@@ -557,18 +417,51 @@ def _perform_ssl_checks(
     _stop_agent_and_remove_logs_and_data(agent_commander)
 
 
-def _extract_package(package_path: pl.Path, output_path: pl.Path):
-    package_type = package_path.suffix
-    if package_type == ".deb":
-        subprocess.check_call(["dpkg-deb", "-x", str(package_path), str(output_path)])
-    elif package_type == ".rpm":
-        escaped_package_path = shlex.quote(str(package_path))
-        command = f"rpm2cpio {escaped_package_path} | cpio -idmv"
-        subprocess.check_call(
-            command, shell=True, cwd=output_path, env={"LD_LIBRARY_PATH": "/lib64"}
-        )
-    else:
-        raise Exception(f"Unknown package type {package_type}.")
+# Additional paths to add in case if tests run within "frozen" pytest executable.
+_ADDITIONAL_ENVIRONMENT = {
+    "LD_LIBRARY_PATH": "/lib",
+    "PATH": "/bin:/sbin:/usr/bin:/usr/sbin"
+}
+
+
+def _install_from_convenience_script(
+        script_path: pl.Path,
+):
+    """Install agent using convenience script."""
+    subprocess.check_call(
+        ["bash", str(script_path)],
+        env=_ADDITIONAL_ENVIRONMENT
+    )
+
+
+def _prepare_environment(
+        package_type: str,
+        remote_machine_type: str,
+        distro_name: str
+):
+    """
+    If needed, do some preparation before agent installation.
+    :return:
+    """
+    if remote_machine_type == "docker":
+        if package_type == "deb":
+            _run_shell("apt update")
+            _call_apt(
+                ["install", "-y", "ca-certificates"],
+            )
+
+    if distro_name == "centos6":
+        # for centos 6, we remove repo file for disabled repo, so it could use vault repo.
+        pl.Path("/etc/yum.repos.d/CentOS-Base.repo").unlink()
+    elif distro_name == "centos8":
+        # For centos 8 we replace repo urls for vault.
+        for repo_name in ["BaseOS", "AppStream"]:
+            repo_file = pl.Path(f"/etc/yum.repos.d/CentOS-Linux-{repo_name}.repo")
+            content = repo_file.read_text()
+            content = content.replace("mirror.centos.org", "vault.centos.org")
+            content = content.replace("#baseurl", "baseurl")
+            content = content.replace("mirrorlist=", "#mirrorlist=")
+            repo_file.write_text(content)
 
 
 def _clear_agent_dirs_and_print_log(agent_commander: AgentCommander):
@@ -615,3 +508,29 @@ System information
 """
 
     logger.info(output)
+
+
+def _run_shell(command: str, return_output: bool = False, env=None):
+    env = env or {}
+    if return_output:
+        return subprocess.check_output(command, shell=True, env=env).decode().strip()
+
+    subprocess.check_call(command, shell=True, env=env)
+
+
+def _call_apt(command: List[str]):
+    """Run apt command"""
+    subprocess.check_call(
+        ["apt", *command],
+        # Since test may run in "frozen" pytest executable, add missing variables.
+        env={"LD_LIBRARY_PATH": "/lib", "PATH": "/usr/sbin:/sbin:/usr/bin:/bin"},
+    )
+
+
+def _call_yum(command: List[str]):
+    """Run yum command"""
+    subprocess.check_call(
+        ["yum", *command],
+        # Since test may run in "frozen" pytest executable, add missing variables.
+        env={"LD_LIBRARY_PATH": "/lib64"},
+    )
