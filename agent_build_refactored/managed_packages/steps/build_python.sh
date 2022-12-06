@@ -53,11 +53,6 @@ pushd "cpython-${PYTHON_VERSION}"
 mkdir build
 pushd build
 
-BIN_DIR="libexec"
-LIB_DIR="lib"
-DATA_ROOT_DIR="share"
-INCLUDE_DIR="include"
-
 PACKAGE_INSTALL_PREFIX="/usr/share/${SUBDIR_NAME}"
 PACKAGE_INSTALL_EXEC_PREFIX="/usr/lib/${SUBDIR_NAME}"
 

@@ -36,7 +36,7 @@ source ~/.bashrc
 cp -a "${BUILD_PYTHON}/python/." /
 cp -a "${BUILD_AGENT_LIBS}/dev_libs/." /
 
-ln -s /usr/lib/${SUBDIR_NAME}/bin/python3 /usr/bin/python3
+ln -s "/usr/lib/${SUBDIR_NAME}/bin/python3" /usr/bin/python3
 
 apt update
 DEBIAN_FRONTEND=noninteractive apt install -y ruby ruby-dev rubygems build-essential rpm reprepro createrepo-c gnupg2

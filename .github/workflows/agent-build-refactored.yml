@@ -195,6 +195,7 @@ jobs:
     name: Build managed package ${{ matrix.name }}
     needs:
       - pre_job
+    if: needs.pre_job.outputs.should_skip != 'true'
     runs-on: ${{ matrix.os }}
 
 
