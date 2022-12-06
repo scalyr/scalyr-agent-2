@@ -93,11 +93,6 @@ def pytest_addoption(parser):
         required=False,
         help="ID of the prefix list of the security group. Required for testing in ec2 instances.",
     )
-    parser.addoption(
-        "--workflow-id",
-        required=False,
-        help="Identifier of the current workflow if it runs in CI/CD.",
-    )
 
 
 def pytest_collection_modifyitems(config, items):

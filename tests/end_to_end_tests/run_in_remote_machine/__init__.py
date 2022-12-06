@@ -198,7 +198,7 @@ def run_test_remotely(
             region=test_options.aws_region,
             security_group=test_options.aws_security_group,
             security_groups_prefix_list_id=test_options.aws_security_groups_prefix_list_id,
-            workflow_id=test_options.workflow_id,
+            workflow_id=test_options.test_session_suffix,
         )
     else:
         mount_options = []

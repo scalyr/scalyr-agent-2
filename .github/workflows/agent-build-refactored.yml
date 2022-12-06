@@ -419,7 +419,7 @@ jobs:
             --remote-machine-type ${{ matrix.remote-machine-type }} \
             --packages-source-type dir \
             --packages-source /tmp/packages \
-            --workflow-id ${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }} \
+            --test-session-suffix ${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }} \
             --aws-access-key "${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_AWS_ACCESS_KEY }}" \
             --aws-secret-key "${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_AWS_ACCESS_SECRET }}" \
             --aws-private-key-path "/tmp/private_key.pem" \
