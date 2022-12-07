@@ -48,6 +48,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Run
+        run: |
+          curl \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/ArthurKamalov/scalyr-agent-2/pulls
+
       - name: Install python
         uses: actions/setup-python@v4
         with:
@@ -480,7 +486,7 @@ jobs:
         with:
           runner-fqdn: ${{ matrix.builder-fqdn }}
 
-      - name: Publish '${{ matrix.name }}' packages
+      - name: Publish '${{ matrix.name }}' dev packages
         run: |
           python3 build_package_new_refactored.py ${{ matrix.name }} \
             publish \
@@ -488,6 +494,17 @@ jobs:
             --repo-name "${{ secrets.PACKAGE_CLOUD_INTERNAL_REPO }}" \
             --token ${{ secrets.PACKAGE_CLOUD_TOKEN }} \
             --packages-dir /tmp/packages
+
+      - name: Publish '${{ matrix.name }}' production packages
+        if: needs.pre_job.outputs.is_production == 'true'
+        run: |
+          python3 build_package_new_refactored.py ${{ matrix.name }} \
+            publish \
+            --user-name "${{ secrets.PACKAGE_CLOUD_USER }}" \
+            --repo-name "${{ secrets.PACKAGE_CLOUD_INTERNAL_REPO }}" \
+            --token ${{ secrets.PACKAGE_CLOUD_TOKEN }} \
+            --packages-dir /tmp/packages
+          
 
   clean-ec2-tests-objects:
     name: Remove ec2 test workflow prefix list entries
