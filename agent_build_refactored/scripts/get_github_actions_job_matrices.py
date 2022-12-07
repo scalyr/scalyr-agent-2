@@ -46,19 +46,33 @@ GITHUB_EVENT_NAME = os.environ.get("GITHUB_EVENT_NAME", "")
 GITHUB_BASE_REF = os.environ.get("GITHUB_BASE_REF", "")
 GITHUB_REF_TYPE = os.environ.get("GITHUB_REF_TYPE", "")
 GITHUB_REF_NAME = os.environ.get("GITHUB_REF_NAME", "")
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 GITHUB_SHA = os.environ.get("GITHUB_SHA", "")
 
 DEV_VERSION = f"{int(time.time())}-{GITHUB_SHA}"
 
+
+def is_branch_has_pull_requests():
+    import requests
+    with requests.Session() as s:
+        resp = s.get(
+            "https://api.github.com/repos/ArthurKamalov/scalyr-agent-2/pulls",
+            headers={
+                f"Authorization": f"Bearer {GITHUB_TOKEN}",
+            },
+            params={
+                "head": "ArthurKamalov:arthur/add-agent-package",
+                "base": "master"
+            }
+        )
+        resp.raise_for_status()
+
+    return len(resp.json()) > 0
+
+
 # We do a full, 'master' workflow run on:
-# pull request against the 'master' branch.
-if GITHUB_EVENT_NAME == "pull_request" and GITHUB_BASE_REF == "master":
-    master_run = True
-    to_publish = False
-    is_production = False
-    version = DEV_VERSION
 # push to the 'master' branch
-elif (
+if (
     GITHUB_EVENT_NAME == "push"
     and GITHUB_REF_TYPE == "branch"
     and GITHUB_REF_NAME == "master"
@@ -79,7 +93,7 @@ elif GITHUB_EVENT_NAME == "push" and GITHUB_REF_TYPE == "tag":
         version = GITHUB_REF_NAME
 
 else:
-    master_run = False
+    master_run = is_branch_has_pull_requests()
     to_publish = False
     is_production = False
     version = DEV_VERSION
