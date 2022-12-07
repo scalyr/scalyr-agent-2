@@ -157,7 +157,7 @@ def test_packages(
     agent_version,
     tmp_path,
 ):
-    timeout_tracker = TimeoutTracker(200)
+    timeout_tracker = TimeoutTracker(300)
     _print_system_information()
     _prepare_environment(
         package_type=package_builder.PACKAGE_TYPE,
