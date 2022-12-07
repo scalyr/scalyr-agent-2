@@ -237,7 +237,7 @@ class ManagedPackagesBuilder(Runner):
     def _build_agent_package(
             self,
             agent_libs_package_version: str,
-    ):
+    ) -> str:
 
         agent_package_root = self.output_path / "agent_package_root"
 
@@ -327,7 +327,7 @@ class ManagedPackagesBuilder(Runner):
 
         found = list(self.packages_output_path.glob(package_glob))
         assert len(found) == 1, f"Number of result agent packages has to be 1, got {len(found)}"
-        return found[0]
+        return found[0].name
 
     def _get_package_checksum(
             self,
