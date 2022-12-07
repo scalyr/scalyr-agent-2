@@ -1,7 +1,6 @@
 name: Agent Build Refactored
 
 on:
-  push:
   pull_request:
   schedule:
     - cron: '0 4 * * *'
