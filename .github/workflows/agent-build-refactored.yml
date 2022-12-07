@@ -20,7 +20,6 @@ jobs:
   pre_job:
     runs-on: ubuntu-20.04
     outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip }}
       is_master_run: ${{ steps.init-matrices.outputs.is_master_run }}
       to_publish: ${{ steps.init-matrices.outputs.to_publish }}
       is_production: ${{ steps.init-matrices.outputs.is_production }}
@@ -34,14 +33,6 @@ jobs:
 
 
     steps:
-      - id: skip_check
-        uses: fkirc/skip-duplicate-actions@f11521568414503656a5af807dc3018c012552c4 # v4.0.0
-        with:
-          cancel_others: 'true'
-          concurrent_skipping: 'same_content'
-          do_not_skip: '["workflow_dispatch", "schedule", "pull_request"]'
-          github_token: ${{ github.token }}
-
       - name: Checkout repository
         uses: actions/checkout@v3
 
@@ -98,7 +89,6 @@ jobs:
   # some of base images are built with using QEMU.
   pre-build-cached-step:
     name: ${{ matrix.name }}
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
     needs:
       - pre_job
 
@@ -195,7 +185,6 @@ jobs:
     name: Build managed package ${{ matrix.name }}
     needs:
       - pre_job
-    if: needs.pre_job.outputs.should_skip != 'true'
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -361,7 +350,6 @@ jobs:
 
   test_managed_packages:
     name: Test package on ${{ matrix.distro-name }}-${{ matrix.remote-machine-type }}, ${{ matrix.name }}
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     needs:
       - pre_job
       - build-managed-packages
