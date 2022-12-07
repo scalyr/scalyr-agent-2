@@ -220,7 +220,8 @@ def test_packages(
     agent_commander.agent_paths.agent_config_path.write_text(json.dumps(config))
 
     logger.info("Start agent")
-    agent_commander.start()
+
+    agent_commander.start(env=_ADDITIONAL_ENVIRONMENT)
 
     verify_agent_status(agent_version=agent_version, agent_commander=agent_commander)
 
