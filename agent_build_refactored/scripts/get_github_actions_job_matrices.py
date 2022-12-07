@@ -22,6 +22,7 @@ It also generates matrix for job that have to run a special pre-built steps.
 import argparse
 import json
 import os
+import subprocess
 import sys
 import pathlib as pl
 import time
@@ -53,21 +54,15 @@ DEV_VERSION = f"{int(time.time())}-{GITHUB_SHA}"
 
 
 def is_branch_has_pull_requests():
-    import requests
-    with requests.Session() as s:
-        resp = s.get(
-            "https://api.github.com/repos/ArthurKamalov/scalyr-agent-2/pulls",
-            headers={
-                f"Authorization": f"Bearer {GITHUB_TOKEN}",
-            },
-            params={
-                "head": "ArthurKamalov:arthur/add-agent-package",
-                "base": "master"
-            }
-        )
-        resp.raise_for_status()
 
-    return len(resp.json()) > 0
+    count = subprocess.check_output([
+        "curl",
+        "-H",
+        f"Authorization: Bearer {GITHUB_TOKEN}",
+        f"https://api.github.com/repos/ArthurKamalov/scalyr-agent-2/pulls?head=ArthurKamalov:{GITHUB_REF_NAME}&base=master",
+    ]).decode().strip()
+
+    return int(count) > 0
 
 
 # We do a full, 'master' workflow run on:
