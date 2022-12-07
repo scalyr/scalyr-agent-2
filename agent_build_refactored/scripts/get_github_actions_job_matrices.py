@@ -26,6 +26,7 @@ import subprocess
 import sys
 import pathlib as pl
 import time
+import re
 from typing import List, Type, Dict
 
 # This file can be executed as script. Add source root to the PYTHONPATH in order to be able to import
@@ -86,13 +87,16 @@ elif (
 
 # push to a "production" tag.
 elif GITHUB_EVENT_NAME == "push" and GITHUB_REF_TYPE == "tag":
-    version_file_path = SOURCE_ROOT / "VERSION"
-    current_version = version_file_path.read_text().strip()
-    if GITHUB_REF_NAME == f"v{current_version}":
-        master_run = True
-        to_publish = True
+    to_publish = True
+    master_run = True
+    m = re.match(r"^\d+\.\d+\.\d+$", GITHUB_REF_NAME)
+
+    if m:
         is_production = True
+        version = m.group()
+    else:
         version = GITHUB_REF_NAME
+        is_production = False
 
 else:
     master_run = is_branch_has_pull_requests()
