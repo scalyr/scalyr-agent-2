@@ -538,7 +538,7 @@ class ManagedPackagesBuilder(Runner):
         agent_package_path = self._build_agent_package(
             agent_libs_package_version=final_agent_libs_version
         )
-        packages_to_publish.append(agent_package_path)
+        packages_to_publish.append(str(agent_package_path))
 
         # Also write special json file which contain information about packages that have to be published.
         # We have to use it in order to skip the publishing of the packages that are reused and already in the repo.
