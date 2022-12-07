@@ -5,6 +5,7 @@ import shlex
 import time
 import random
 import json
+import sys
 from typing import List, Dict
 
 """
@@ -225,15 +226,15 @@ def run_test_in_ec2_instance(
             command=f"TEST_RUNS_REMOTELY=1 sudo -E {command_str} 2>&1",
         )
 
-        print(f"stdout: {stdout.read().decode()}")
+        logger.info(f"stdout: {stdout.read().decode()}")
 
         return_code = stdout.channel.recv_exit_status()
 
         ssh.close()
 
         if return_code != 0:
-            logger.error("Remote test execution has failed with {return_code}")
-        exit(return_code)
+            logger.error(f"Remote test execution has failed with {return_code}")
+        sys.exit(return_code)
 
     file_mappings = file_mappings or {}
     start_time = int(time.time())
