@@ -5,7 +5,10 @@ import shlex
 import time
 import random
 import json
+import sys
 from typing import List, Dict
+
+import pytest
 
 """
 This module defines main logic that is responsible for manipulating with ec2 instances to run end to end tests
@@ -204,6 +207,7 @@ def run_test_in_ec2_instance(
             logger.exception(
                 f"Deployment is not successful.\nStdout: {stdout}\nStderr: {stderr}"
             )
+            raise
 
     def run_command():
 
@@ -224,12 +228,15 @@ def run_test_in_ec2_instance(
             command=f"TEST_RUNS_REMOTELY=1 sudo -E {command_str} 2>&1",
         )
 
-        print(f"stdout: {stdout.read().decode()}")
+        logger.info(f"stdout: {stdout.read().decode()}")
 
         return_code = stdout.channel.recv_exit_status()
 
         ssh.close()
-        assert return_code == 0, f"Remote test execution has failed with {return_code}"
+
+        if return_code != 0:
+            logger.error(f"Remote test execution has failed with {return_code}")
+            pytest.exit(return_code)
 
     file_mappings = file_mappings or {}
     start_time = int(time.time())
