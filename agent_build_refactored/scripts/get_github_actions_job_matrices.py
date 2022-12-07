@@ -62,6 +62,7 @@ def is_branch_has_pull_requests():
         f"https://api.github.com/repos/ArthurKamalov/scalyr-agent-2/pulls?head=ArthurKamalov:{GITHUB_REF_NAME}&base=master",
     ]).decode().strip()
 
+    print(count, file=sys.stderr)
     return int(count) > 0
 
 
