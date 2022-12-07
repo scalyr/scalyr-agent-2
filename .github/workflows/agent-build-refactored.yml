@@ -50,9 +50,9 @@ jobs:
 
       - name: Run
         run: |
-          curl \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            https://api.github.com/repos/ArthurKamalov/scalyr-agent-2/pulls
+          curl -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/ArthurKamalov/scalyr-agent-2/pulls?head=ArthurKamalov:arthur/add-agent-package&base=master" \
+            | jq '. | length'
 
       - name: Install python
         uses: actions/setup-python@v4
