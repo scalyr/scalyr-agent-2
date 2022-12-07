@@ -319,9 +319,9 @@ class ManagedPackagesBuilder(Runner):
             cwd=str(self.packages_output_path)
         )
         if self.PACKAGE_TYPE == "deb":
-            package_glob = f"{AGENT_LIBS_PACKAGE_NAME}_{version}_{self.agent_package_arch}.{self.PACKAGE_TYPE}"
+            package_glob = f"{AGENT_PACKAGE_NAME}_{version}_{self.agent_package_arch}.{self.PACKAGE_TYPE}"
         elif self.PACKAGE_TYPE == "rpm":
-            package_glob = f"{AGENT_LIBS_PACKAGE_NAME}-{version}-1.{self.agent_package_arch}.{self.PACKAGE_TYPE}"
+            package_glob = f"{AGENT_PACKAGE_NAME}-{version}-1.{self.agent_package_arch}.{self.PACKAGE_TYPE}"
         else:
             raise Exception(f"Unknown package type {self.PACKAGE_TYPE}")
 
