@@ -50,7 +50,7 @@ GITHUB_REF_NAME = os.environ.get("GITHUB_REF_NAME", "")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 GITHUB_SHA = os.environ.get("GITHUB_SHA", "")
 
-DEV_VERSION = f"{int(time.time())}-{GITHUB_SHA}"
+DEV_VERSION = f"{int(time.time())}+{GITHUB_SHA}"
 
 
 def is_branch_has_pull_requests():
