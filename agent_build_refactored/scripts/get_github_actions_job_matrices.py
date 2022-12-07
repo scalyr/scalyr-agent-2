@@ -67,6 +67,12 @@ def is_branch_has_pull_requests():
 
 
 # We do a full, 'master' workflow run on:
+# pull request against the 'master' branch.
+if GITHUB_EVENT_NAME == "pull_request" and GITHUB_BASE_REF == "master":
+    master_run = True
+    to_publish = False
+    is_production = False
+    version = DEV_VERSION
 # push to the 'master' branch
 if (
     GITHUB_EVENT_NAME == "push"
