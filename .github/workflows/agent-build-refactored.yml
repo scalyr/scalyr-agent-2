@@ -1,7 +1,11 @@
 name: Agent Build Refactored
 
 on:
+  push:
   pull_request:
+    types: [ opened ]
+    branches:
+      - 'master'
   schedule:
     - cron: '0 4 * * *'
 
