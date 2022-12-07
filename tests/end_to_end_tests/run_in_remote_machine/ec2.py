@@ -308,8 +308,17 @@ def add_current_ip_to_prefix_list(client, prefix_list_id: str, workflow_id: str 
 
     # Get current public IP.
     with requests.Session() as s:
-        resp = s.get("https://api.ipify.org")
-        resp.raise_for_status()
+        attempts = 10
+        while True:
+            try:
+                resp = s.get("https://api.ipify.org")
+                resp.raise_for_status()
+                break
+            except requests.HTTPError:
+                if attempts == 0:
+                    raise
+                attempts -= 1
+                time.sleep(1)
 
     public_ip = resp.content.decode()
 
