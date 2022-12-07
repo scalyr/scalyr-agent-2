@@ -71,7 +71,7 @@ def test_remotely(
             "--test-session-suffix",
             test_session_suffix,
         ],
-        architecture=package_builder.ARCHITECTURE,
+        architecture=package_builder.DEPENDENCY_PACKAGES_ARCHITECTURE,
         pytest_runner_path=pytest_runner_builder.result_runner_path,
         test_options=request.config.option,
         file_mappings={str(packages_archive_path): "/tmp/packages.tar"},

@@ -78,7 +78,8 @@ class Architecture(enum.Enum):
     @property
     def as_deb_package_arch(self):
         mapping = {
-            Architecture.X86_64: "amd64"
+            Architecture.X86_64: "amd64",
+            Architecture.UNKNOWN: "all"
         }
 
         return mapping[self]
@@ -86,7 +87,8 @@ class Architecture(enum.Enum):
     @property
     def as_rpm_package_arch(self):
         mapping = {
-            Architecture.X86_64: "x86_64"
+            Architecture.X86_64: "x86_64",
+            Architecture.UNKNOWN: "noarch"
         }
         return mapping[self]
 

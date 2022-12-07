@@ -94,7 +94,7 @@ class ManagedPackagesBuilder(Runner):
     PACKAGE_TYPE: str
 
     # package architecture, for example: amd64 for deb.
-    ARCHITECTURE: Architecture
+    DEPENDENCY_PACKAGES_ARCHITECTURE: Architecture
 
     # Instance of the step that builds filesystem for the python package.
     PYTHON_BUILD_STEP: ArtifactRunnerStep
@@ -118,11 +118,20 @@ class ManagedPackagesBuilder(Runner):
         return steps
 
     @property
-    def package_arch(self) -> str:
+    def dependency_packages_arch(self) -> str:
         if self.PACKAGE_TYPE == "deb":
-            return self.ARCHITECTURE.as_deb_package_arch
+            return self.DEPENDENCY_PACKAGES_ARCHITECTURE.as_deb_package_arch
         elif self.PACKAGE_TYPE == "rpm":
-            return self.ARCHITECTURE.as_rpm_package_arch
+            return self.DEPENDENCY_PACKAGES_ARCHITECTURE.as_rpm_package_arch
+        else:
+            raise ValueError(f"Unknown package type: {self.PACKAGE_TYPE}")
+
+    @property
+    def agent_package_arch(self) -> str:
+        if self.PACKAGE_TYPE == "deb":
+            return Architecture.UNKNOWN.as_deb_package_arch
+        elif self.PACKAGE_TYPE == "rpm":
+            return Architecture.UNKNOWN.as_rpm_package_arch
         else:
             raise ValueError(f"Unknown package type: {self.PACKAGE_TYPE}")
 
@@ -180,7 +189,7 @@ class ManagedPackagesBuilder(Runner):
                 # fmt: off
                 "fpm",
                 "-s", "dir",
-                "-a", self.package_arch,
+                "-a", self.dependency_packages_arch,
                 "-t", self.PACKAGE_TYPE,
                 "-n", PYTHON_PACKAGE_NAME,
                 "--license", '"Apache 2.0"',
@@ -209,7 +218,7 @@ class ManagedPackagesBuilder(Runner):
             # fmt: off
             "fpm",
             "-s", "dir",
-            "-a", self.package_arch,
+            "-a", self.dependency_packages_arch,
             "-t", self.PACKAGE_TYPE,
             "-n", AGENT_LIBS_PACKAGE_NAME,
             "--license", '"Apache 2.0"',
@@ -271,8 +280,7 @@ class ManagedPackagesBuilder(Runner):
                 # fmt: off
                 "fpm",
                 "-s", "dir",
-                #"-a", self.package_arch,
-                "-a", "noarch",
+                "-a", self.agent_package_arch,
                 "-t", self.PACKAGE_TYPE,
                 "-C", str(agent_package_root),
                 "-n" "scalyr-agent-2",
@@ -310,6 +318,16 @@ class ManagedPackagesBuilder(Runner):
             ],
             cwd=str(self.packages_output_path)
         )
+        if self.PACKAGE_TYPE == "deb":
+            package_glob = f"{AGENT_LIBS_PACKAGE_NAME}_{version}_{self.agent_package_arch}.{self.PACKAGE_TYPE}"
+        elif self.PACKAGE_TYPE == "rpm":
+            package_glob = f"{AGENT_LIBS_PACKAGE_NAME}-{version}-1.{self.agent_package_arch}.{self.PACKAGE_TYPE}"
+        else:
+            raise Exception(f"Unknown package type {self.PACKAGE_TYPE}")
+
+        found = list(self.packages_output_path.glob(package_glob))
+        assert len(found) == 1, f"Number of result agent packages has to be 1, got {len(found)}"
+        return found[0]
 
     def _get_package_checksum(
             self,
@@ -455,11 +473,11 @@ class ManagedPackagesBuilder(Runner):
             )
             if self.PACKAGE_TYPE == "deb":
                 found = list(self.packages_output_path.glob(
-                    f"{PYTHON_PACKAGE_NAME}_{final_python_version}_{self.package_arch}.{self.PACKAGE_TYPE}"
+                    f"{PYTHON_PACKAGE_NAME}_{final_python_version}_{self.dependency_packages_arch}.{self.PACKAGE_TYPE}"
                 ))
             elif self.PACKAGE_TYPE == "rpm":
                 found = list(self.packages_output_path.glob(
-                    f"{PYTHON_PACKAGE_NAME}-{final_python_version}-1.{self.package_arch}.{self.PACKAGE_TYPE}"
+                    f"{PYTHON_PACKAGE_NAME}-{final_python_version}-1.{self.dependency_packages_arch}.{self.PACKAGE_TYPE}"
                 ))
             else:
                 raise Exception(f"Unknown package type {self.PACKAGE_TYPE}")
@@ -496,11 +514,11 @@ class ManagedPackagesBuilder(Runner):
             )
             if self.PACKAGE_TYPE == "deb":
                 found = list(self.packages_output_path.glob(
-                    f"{AGENT_LIBS_PACKAGE_NAME}_{final_agent_libs_version}_{self.package_arch}.{self.PACKAGE_TYPE}"
+                    f"{AGENT_LIBS_PACKAGE_NAME}_{final_agent_libs_version}_{self.dependency_packages_arch}.{self.PACKAGE_TYPE}"
                 ))
             elif self.PACKAGE_TYPE == "rpm":
                 found = list(self.packages_output_path.glob(
-                    f"{AGENT_LIBS_PACKAGE_NAME}-{final_agent_libs_version}-1.{self.package_arch}.{self.PACKAGE_TYPE}"
+                    f"{AGENT_LIBS_PACKAGE_NAME}-{final_agent_libs_version}-1.{self.dependency_packages_arch}.{self.PACKAGE_TYPE}"
                 ))
             else:
                 raise Exception(f"Unknown package type {self.PACKAGE_TYPE}")
@@ -517,9 +535,10 @@ class ManagedPackagesBuilder(Runner):
             logger.info(f"Package {final_agent_libs_package_path.name} is reused from repo.")
 
         # Build agent_package
-        self._build_agent_package(
+        agent_package_path = self._build_agent_package(
             agent_libs_package_version=final_agent_libs_version
         )
+        packages_to_publish.append(agent_package_path)
 
         # Also write special json file which contain information about packages that have to be published.
         # We have to use it in order to skip the publishing of the packages that are reused and already in the repo.
@@ -684,7 +703,7 @@ class ManagedPackagesBuilder(Runner):
             _, _, arch, _ = self._parser_package_file_parts(
                 package_file_name=p["filename"]
             )
-            if arch != self.package_arch:
+            if arch != self.dependency_packages_arch:
                 continue
 
             filtered_packages.append(p)
@@ -1084,7 +1103,7 @@ PREPARE_TOOLSET_GLIBC_X86_64 = EnvironmentRunnerStep(
 
 class DebManagedPackagesBuilderX86_64(ManagedPackagesBuilder):
     BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
-    ARCHITECTURE = Architecture.X86_64
+    DEPENDENCY_PACKAGES_ARCHITECTURE = Architecture.X86_64
     PACKAGE_TYPE = "deb"
     PYTHON_BUILD_STEP = BUILD_PYTHON_GLIBC_X86_64
     AGENT_LIBS_BUILD_STEP = BUILD_AGENT_LIBS_GLIBC_X86_64
@@ -1094,7 +1113,7 @@ class DebManagedPackagesBuilderX86_64(ManagedPackagesBuilder):
 
 class RpmManagedPackagesBuilderx86_64(ManagedPackagesBuilder):
     BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
-    ARCHITECTURE = Architecture.X86_64
+    DEPENDECY_PACKAGES_ARCHITECTURE = Architecture.X86_64
     PACKAGE_TYPE = "rpm"
     PYTHON_BUILD_STEP = BUILD_PYTHON_GLIBC_X86_64
     AGENT_LIBS_BUILD_STEP = BUILD_AGENT_LIBS_GLIBC_X86_64
