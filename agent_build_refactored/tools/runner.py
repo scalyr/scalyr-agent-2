@@ -64,6 +64,27 @@ def remove_directory_in_docker(path: pl.Path):
         pass
 
 
+def chown_in_docker(path: pl.Path, user_id: int, group_id: int):
+    """
+    Since we produce some artifacts inside docker containers, we may face difficulties with
+    deleting the old ones because they may be created inside the container with the root user.
+    The workaround for that to delegate that deletion to a docker container as well.
+    """
+
+    if IN_DOCKER:
+        return
+
+    # In order to be able to remove the whole directory, we mount parent directory.
+    with DockerContainer(
+        name="agent_build_chown_in_docker",
+        image_name="ubuntu:22.04",
+        mounts=[f"{path.parent}:/parent"],
+        command=["chown", "-R", f"{user_id}:{group_id}", f"/parent/{path.name}"],
+        detached=False,
+    ):
+        pass
+
+
 @dataclasses.dataclass
 class DockerImageSpec:
     """Simple data class which represents combination of the image name and docker platform."""
@@ -804,7 +825,6 @@ class Runner:
     def runs_in_docker(self) -> bool:
         return self.base_docker_image is not None and not IN_DOCKER
 
-
     def run_in_docker(
             self,
             command_args: List = None,
@@ -831,7 +851,7 @@ class Runner:
 
             mount_args.extend([
                 "-v",
-                f"{arg.path}:{in_docker_path}:z"
+                f"{arg.path}:{in_docker_path}"
             ])
             final_command_args.append(str(in_docker_path))
 
@@ -846,7 +866,7 @@ class Runner:
             "-i",
             *mount_args,
             "-v",
-            f"{SOURCE_ROOT}:/tmp/source:z",
+            f"{SOURCE_ROOT}:/tmp/source",
             *env_args,
             "--platform",
             str(self.base_docker_image.platform),

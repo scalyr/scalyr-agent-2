@@ -24,6 +24,7 @@ import json
 import os
 import sys
 import pathlib as pl
+import time
 from typing import List, Type, Dict
 
 # This file can be executed as script. Add source root to the PYTHONPATH in order to be able to import
@@ -45,12 +46,17 @@ GITHUB_EVENT_NAME = os.environ.get("GITHUB_EVENT_NAME", "")
 GITHUB_BASE_REF = os.environ.get("GITHUB_BASE_REF", "")
 GITHUB_REF_TYPE = os.environ.get("GITHUB_REF_TYPE", "")
 GITHUB_REF_NAME = os.environ.get("GITHUB_REF_NAME", "")
+GITHUB_SHA = os.environ.get("GITHUB_SHA", "")
+
+DEV_VERSION = f"{int(time.time())}-{GITHUB_SHA}"
 
 # We do a full, 'master' workflow run on:
 # pull request against the 'master' branch.
 if GITHUB_EVENT_NAME == "pull_request" and GITHUB_BASE_REF == "master":
     master_run = True
     to_publish = False
+    is_production = False
+    version = DEV_VERSION
 # push to the 'master' branch
 elif (
     GITHUB_EVENT_NAME == "push"
@@ -59,6 +65,8 @@ elif (
 ):
     master_run = True
     to_publish = True
+    is_production = False
+    version = DEV_VERSION
 
 # push to a "production" tag.
 elif GITHUB_EVENT_NAME == "push" and GITHUB_REF_TYPE == "tag":
@@ -67,10 +75,14 @@ elif GITHUB_EVENT_NAME == "push" and GITHUB_REF_TYPE == "tag":
     if GITHUB_REF_NAME == f"v{current_version}":
         master_run = True
         to_publish = True
+        is_production = True
+        version = GITHUB_REF_NAME
 
 else:
     master_run = False
     to_publish = False
+    is_production = False
+    version = DEV_VERSION
 
 
 ALL_USED_RUNNERS = {
@@ -284,7 +296,9 @@ def main():
         "agent_managed_packages_test_matrix": result_managed_packages_test_matrix,
         "pre_build_steps_matrix": pre_build_steps_matrix,
         "is_master_run": master_run,
-        "to_publish": to_publish
+        "to_publish": to_publish,
+        "is_production": is_production,
+        "version": version
     }
 
     print(json.dumps(result))

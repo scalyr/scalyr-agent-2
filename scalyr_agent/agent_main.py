@@ -2519,6 +2519,7 @@ if __name__ == "__main__":
             options.config_filename, options.command, options
         )
     except Exception as mainExcept:
+        raise
         print(six.text_type(mainExcept), file=sys.stderr)
         sys.exit(1)
 
