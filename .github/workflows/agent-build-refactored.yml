@@ -436,6 +436,7 @@ jobs:
     needs:
       - pre_job
       - build-managed-packages
+      - test_managed_packages
       #- pre-build-cached-step
     runs-on: ${{ matrix.os }}
 
