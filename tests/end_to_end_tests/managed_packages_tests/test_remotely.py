@@ -16,7 +16,7 @@
 This special test module is responsible for running the 'managed_packages' tests in a remote environment,
 for example ec2 instance or docker container.
 """
-
+import logging
 import tarfile
 
 
@@ -68,9 +68,9 @@ def test_remotely(
             "--test-session-suffix",
             test_session_suffix,
         ]
-
-    print("!!!")
-    print(c)
+    logger = logging.getLogger(__name__)
+    logger.info("!!!")
+    logger.info(str(c))
 
     run_test_remotely(
         distro_name=distro_name,
