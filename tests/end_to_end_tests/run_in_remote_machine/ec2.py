@@ -204,6 +204,7 @@ def run_test_in_ec2_instance(
             logger.exception(
                 f"Deployment is not successful.\nStdout: {stdout}\nStderr: {stderr}"
             )
+            raise
 
     def run_command():
 
