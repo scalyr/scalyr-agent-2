@@ -229,7 +229,10 @@ def run_test_in_ec2_instance(
         return_code = stdout.channel.recv_exit_status()
 
         ssh.close()
-        assert return_code == 0, f"Remote test execution has failed with {return_code}"
+
+        if return_code != 0:
+            logger.error("Remote test execution has failed with {return_code}")
+        exit(return_code)
 
     file_mappings = file_mappings or {}
     start_time = int(time.time())
