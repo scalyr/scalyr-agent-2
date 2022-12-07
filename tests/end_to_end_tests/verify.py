@@ -350,7 +350,11 @@ def verify_logs(
     )
 
 
-def verify_agent_status(agent_version: str, agent_commander: AgentCommander):
+def verify_agent_status(
+        agent_version: str,
+        agent_commander: AgentCommander,
+        #timeout_tracker: TimeoutTracker
+):
     """
     Perform basic verification of the agent output.
     """
@@ -358,6 +362,8 @@ def verify_agent_status(agent_version: str, agent_commander: AgentCommander):
     log.info("Verifying agent status output")
     # Verify text status
     string_status = agent_commander.get_status()
+    print("!!!")
+    print(string_status)
 
     assert "agent.log" in string_status
     if platform.system() == "Linux":
