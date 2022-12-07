@@ -55,15 +55,15 @@ DEV_VERSION = f"{int(time.time())}-{GITHUB_SHA}"
 
 def is_branch_has_pull_requests():
 
-    count = subprocess.check_output([
+    data = subprocess.check_output([
         "curl",
         "-H",
         f"Authorization: Bearer {GITHUB_TOKEN}",
         f"https://api.github.com/repos/ArthurKamalov/scalyr-agent-2/pulls?head=ArthurKamalov:{GITHUB_REF_NAME}&base=master",
     ]).decode().strip()
 
-    print(count, file=sys.stderr)
-    return int(count) > 0
+    pull_requests = json.loads(data)
+    return len(pull_requests) > 0
 
 
 # We do a full, 'master' workflow run on:
