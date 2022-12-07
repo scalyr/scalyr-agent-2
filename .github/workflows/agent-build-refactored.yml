@@ -362,7 +362,7 @@ jobs:
           retention-days: 1
 
   test_managed_packages:
-    name: Test package on ${{ matrix.distro-name }}, ${{ matrix.name }}
+    name: Test package on ${{ matrix.distro-name }}-${{ matrix.remote-machine-type }}, ${{ matrix.name }}
     if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     needs:
       - pre_job
