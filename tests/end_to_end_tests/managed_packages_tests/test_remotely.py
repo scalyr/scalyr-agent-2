@@ -47,7 +47,10 @@ def test_remotely(
     with tarfile.open(packages_archive_path, "w") as tf:
         tf.add(server_root, arcname="/")
 
-    c = [
+    run_test_remotely(
+        distro_name=distro_name,
+        remote_machine_type=remote_machine_type,
+        command=[
             "tests/end_to_end_tests/managed_packages_tests",
             "--builder-name",
             package_builder_name,
@@ -67,15 +70,7 @@ def test_remotely(
             scalyr_server,
             "--test-session-suffix",
             test_session_suffix,
-        ]
-    logger = logging.getLogger(__name__)
-    logger.info("!!!")
-    logger.info(str(c))
-
-    run_test_remotely(
-        distro_name=distro_name,
-        remote_machine_type=remote_machine_type,
-        command=c,
+        ],
         architecture=package_builder.ARCHITECTURE,
         pytest_runner_path=pytest_runner_builder.result_runner_path,
         test_options=request.config.option,

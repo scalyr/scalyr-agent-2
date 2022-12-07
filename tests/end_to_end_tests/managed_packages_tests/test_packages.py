@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import json
+import os
 import pathlib as pl
 import shlex
 import subprocess
@@ -443,7 +444,7 @@ def _prepare_environment(
     If needed, do some preparation before agent installation.
     :return:
     """
-    if remote_machine_type == "docker":
+    if "TEST_RUNS_IN_DOCKER" in os.environ:
         if package_type == "deb":
             _run_shell("apt update")
             _call_apt(
@@ -451,6 +452,9 @@ def _prepare_environment(
             )
             if "debian" in distro_name:
                 _call_apt(["install", "-y", "procps"])
+        elif package_type == "rpm":
+            if distro_name == "amazonlinux2":
+                _call_yum(["install", "-y", "procps"])
 
     if distro_name == "centos6":
         # for centos 6, we remove repo file for disabled repo, so it could use vault repo.

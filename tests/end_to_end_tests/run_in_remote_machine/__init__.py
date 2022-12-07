@@ -216,6 +216,8 @@ def run_test_remotely(
                 *mount_options,
                 "-e",
                 "TEST_RUNS_REMOTELY=1",
+                "-e",
+                "TEST_RUNS_IN_DOCKER=1",
                 "--platform",
                 str(architecture.as_docker_platform),
                 distro,
