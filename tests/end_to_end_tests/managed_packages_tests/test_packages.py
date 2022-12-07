@@ -221,7 +221,7 @@ def test_packages(
 
     logger.info("Start agent")
 
-    agent_commander.start(env=_ADDITIONAL_ENVIRONMENT)
+    agent_commander.start()
 
     verify_agent_status(agent_version=agent_version, agent_commander=agent_commander)
 
@@ -449,6 +449,8 @@ def _prepare_environment(
             _call_apt(
                 ["install", "-y", "ca-certificates"],
             )
+            if "debian" in distro_name:
+                _call_apt(["install", "-y", "procps"])
 
     if distro_name == "centos6":
         # for centos 6, we remove repo file for disabled repo, so it could use vault repo.

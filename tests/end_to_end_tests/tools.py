@@ -17,7 +17,7 @@ import json
 import pathlib as pl
 import subprocess
 import time
-from typing import List, Union, Dict
+from typing import List, Union
 
 
 @dataclasses.dataclass
@@ -82,12 +82,12 @@ class AgentCommander:
         )
         return output
 
-    def start(self, no_fork: bool = False, env: Dict = None):
+    def start(self, no_fork: bool = False):
         cmd = ["start"]
         if no_fork:
             cmd.append("--no-fork")
 
-        self._check_call_command(cmd, env=env)
+        self._check_call_command(cmd)
 
     def get_status(self) -> str:
         return self._check_output_command(["status", "-v"]).decode()
