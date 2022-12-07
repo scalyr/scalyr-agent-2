@@ -26,6 +26,8 @@ jobs:
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
       is_master_run: ${{ steps.init-matrices.outputs.is_master_run }}
       to_publish: ${{ steps.init-matrices.outputs.to_publish }}
+      is_production: ${{ steps.init-matrices.outputs.is_production }}
+      version: ${{ steps.init-matrices.outputs.version }}
       # The following outputs will be used by the other jobs below as their strategy matrices.
       pre_build_steps_matrix_json: ${{ steps.init-matrices.outputs.pre_build_steps_matrix_json }}
       agent_image_build_matrix_json: ${{ steps.init-matrices.outputs.agent_image_build_matrix_json }}
@@ -340,6 +342,10 @@ jobs:
       # to reuse them instead of building if they are not changed.
       - name: Build managed package with builder '${{ matrix.name }}'
         run: |
+            
+            echo "Changing build version to ${{ needs.pre_job.outputs.version }}"
+            echo "${{ needs.pre_job.outputs.version }}" > VERSION
+          
             echo "${{ steps.download_python.outputs.last_repo_python_package_path }}"
             echo "${{ steps.download_agent_libs.outputs.last_repo_agent_libs_package_path }}"
             python3 build_package_new_refactored.py ${{ matrix.name }} \

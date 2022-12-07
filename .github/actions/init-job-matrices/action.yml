@@ -33,6 +33,12 @@ outputs:
   to_publish:
     description: "Boolean flag that indicates (if true) that the build artifacts have to be published because the workflow runs in master branch or a 'production' tag."
     value: ${{ steps.get-job-matrices.outputs.to_publish }}
+  is_production:
+    description: "Boolean flag that indicates (if true) that the build artifacts have to be also published as a production artifacts."
+    value: ${{ steps.get-job-matrices.outputs.is_production }}
+  version:
+    description: "Version that has to be assigned for build artifacts."
+    value: ${{ steps.get-job-matrices.outputs.version }}
 
 runs:
   using: "composite"
@@ -73,6 +79,8 @@ runs:
         echo "agent_managed_packages_test_matrix_json=$(cat /tmp/final_matrices.json | jq -c '.agent_managed_packages_test_matrix')" >> $GITHUB_OUTPUT
         echo "is_master_run=$(cat /tmp/final_matrices.json | jq -c '.is_master_run')" >> $GITHUB_OUTPUT
         echo "to_publish=$(cat /tmp/final_matrices.json | jq -c '.to_publish')" >> $GITHUB_OUTPUT
+        echo "is_production=$(cat /tmp/final_matrices.json | jq -c '.is_production')" >> $GITHUB_OUTPUT
+        echo "version=$(cat /tmp/final_matrices.json | jq -c '.version')" >> $GITHUB_OUTPUT
 
     - name: Print job matrices
       shell: bash
@@ -83,6 +91,12 @@ runs:
         
         echo -n "Is to publish: "
         echo '${{ steps.get-job-matrices.outputs.to_publish }}' | jq --color-output
+        
+        echo -n "Is production: "
+        echo '${{ steps.get-job-matrices.outputs.is_production }}' | jq --color-output
+        
+        echo -n "Version: "
+        echo '${{ steps.get-job-matrices.outputs.version }}' | jq --color-output
 
         echo "Image pre-build steps job matrix: "
         echo '${{ steps.get-job-matrices.outputs.pre_build_steps_matrix_json }}' | jq --color-output
