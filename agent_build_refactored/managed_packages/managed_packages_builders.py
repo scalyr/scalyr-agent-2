@@ -325,6 +325,9 @@ class ManagedPackagesBuilder(Runner):
         else:
             raise Exception(f"Unknown package type {self.PACKAGE_TYPE}")
 
+        print(package_glob)
+        print(list(self.packages_output_path.iterdir()))
+
         found = list(self.packages_output_path.glob(package_glob))
         assert len(found) == 1, f"Number of result agent packages has to be 1, got {len(found)}"
         return found[0]
