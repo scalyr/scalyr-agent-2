@@ -95,8 +95,8 @@ elif GITHUB_EVENT_NAME == "push" and GITHUB_REF_TYPE == "tag":
         is_production = True
         version = m.group()
     else:
-        version = GITHUB_REF_NAME
         is_production = False
+        version = f"{int(time.time())}+{GITHUB_REF_NAME}"
 
 else:
     master_run = is_branch_has_pull_requests()
