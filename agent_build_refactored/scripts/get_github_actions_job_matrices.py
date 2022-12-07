@@ -22,6 +22,7 @@ It also generates matrix for job that have to run a special pre-built steps.
 import argparse
 import json
 import os
+import subprocess
 import sys
 import pathlib as pl
 import time
@@ -46,9 +47,24 @@ GITHUB_EVENT_NAME = os.environ.get("GITHUB_EVENT_NAME", "")
 GITHUB_BASE_REF = os.environ.get("GITHUB_BASE_REF", "")
 GITHUB_REF_TYPE = os.environ.get("GITHUB_REF_TYPE", "")
 GITHUB_REF_NAME = os.environ.get("GITHUB_REF_NAME", "")
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 GITHUB_SHA = os.environ.get("GITHUB_SHA", "")
 
 DEV_VERSION = f"{int(time.time())}-{GITHUB_SHA}"
+
+
+def is_branch_has_pull_requests():
+
+    data = subprocess.check_output([
+        "curl",
+        "-H",
+        f"Authorization: Bearer {GITHUB_TOKEN}",
+        f"https://api.github.com/repos/ArthurKamalov/scalyr-agent-2/pulls?head=ArthurKamalov:{GITHUB_REF_NAME}&base=master",
+    ]).decode().strip()
+
+    pull_requests = json.loads(data)
+    return len(pull_requests) > 0
+
 
 # We do a full, 'master' workflow run on:
 # pull request against the 'master' branch.
@@ -79,7 +95,7 @@ elif GITHUB_EVENT_NAME == "push" and GITHUB_REF_TYPE == "tag":
         version = GITHUB_REF_NAME
 
 else:
-    master_run = False
+    master_run = is_branch_has_pull_requests()
     to_publish = False
     is_production = False
     version = DEV_VERSION

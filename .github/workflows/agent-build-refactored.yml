@@ -3,8 +3,9 @@ name: Agent Build Refactored
 on:
   push:
   pull_request:
+    types: [ opened ]
     branches:
-      - master
+      - 'master'
   schedule:
     - cron: '0 4 * * *'
 
@@ -23,7 +24,6 @@ jobs:
   pre_job:
     runs-on: ubuntu-20.04
     outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip }}
       is_master_run: ${{ steps.init-matrices.outputs.is_master_run }}
       to_publish: ${{ steps.init-matrices.outputs.to_publish }}
       is_production: ${{ steps.init-matrices.outputs.is_production }}
@@ -37,14 +37,6 @@ jobs:
 
 
     steps:
-      - id: skip_check
-        uses: fkirc/skip-duplicate-actions@f11521568414503656a5af807dc3018c012552c4 # v4.0.0
-        with:
-          cancel_others: 'true'
-          concurrent_skipping: 'same_content'
-          do_not_skip: '["workflow_dispatch", "schedule", "pull_request"]'
-          github_token: ${{ github.token }}
-
       - name: Checkout repository
         uses: actions/checkout@v3
 
@@ -57,6 +49,7 @@ jobs:
         uses: ./.github/actions/init-job-matrices
         id: init-matrices
         with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
           # In this action we define all our job matrices. It filters out jobs that must not be executed if
           # workflow run is not from the 'master' branch or from PR to the 'master' branch.
@@ -82,17 +75,17 @@ jobs:
 
           managed-packages-to-test: |
             [
-              { "name": "deb-amd64",  "distro-name": "ubuntu2204",    "remote-machine-type": "ec2",    "master_run_only": false },
-              { "name": "deb-amd64",  "distro-name": "ubuntu2004",    "remote-machine-type": "ec2",    "master_run_only": false },
-              { "name": "deb-amd64",  "distro-name": "ubuntu1804",    "remote-machine-type": "ec2",    "master_run_only": false },
-              { "name": "deb-amd64",  "distro-name": "ubuntu1604",    "remote-machine-type": "ec2",    "master_run_only": false },
-              { "name": "deb-amd64",  "distro-name": "ubuntu1404",    "remote-machine-type": "docker", "master_run_only": false },
+              { "name": "deb-amd64",  "distro-name": "ubuntu2204",    "remote-machine-type": "ec2",    "master_run_only": true },
+              { "name": "deb-amd64",  "distro-name": "ubuntu2004",    "remote-machine-type": "ec2",    "master_run_only": true },
+              { "name": "deb-amd64",  "distro-name": "ubuntu1804",    "remote-machine-type": "ec2",    "master_run_only": true },
+              { "name": "deb-amd64",  "distro-name": "ubuntu1604",    "remote-machine-type": "ec2",    "master_run_only": true },
+              { "name": "deb-amd64",  "distro-name": "ubuntu1404",    "remote-machine-type": "docker", "master_run_only": true },
               { "name": "deb-amd64",  "distro-name": "debian10",      "remote-machine-type": "ec2",    "master_run_only": false },
               { "name": "deb-amd64",  "distro-name": "debian11",      "remote-machine-type": "docker", "master_run_only": false },
-              { "name": "rpm-x86_64", "distro-name": "centos8",       "remote-machine-type": "docker", "master_run_only": false },
-              { "name": "rpm-x86_64", "distro-name": "centos7",       "remote-machine-type": "ec2",    "master_run_only": false },
-              { "name": "rpm-x86_64", "distro-name": "centos6",       "remote-machine-type": "docker", "master_run_only": false },
-              { "name": "rpm-x86_64", "distro-name": "amazonlinux2",  "remote-machine-type": "ec2",    "master_run_only": false }
+              { "name": "rpm-x86_64", "distro-name": "centos8",       "remote-machine-type": "docker", "master_run_only": true },
+              { "name": "rpm-x86_64", "distro-name": "centos7",       "remote-machine-type": "ec2",    "master_run_only": true },
+              { "name": "rpm-x86_64", "distro-name": "centos6",       "remote-machine-type": "docker", "master_run_only": true },
+              { "name": "rpm-x86_64", "distro-name": "amazonlinux2",  "remote-machine-type": "ec2",    "master_run_only": true }
             ]
 
   # This job pre-executes and caches Runner steps that has to be executed in a separate job.
@@ -100,7 +93,6 @@ jobs:
   # some of base images are built with using QEMU.
   pre-build-cached-step:
     name: ${{ matrix.name }}
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
     needs:
       - pre_job
 
@@ -197,7 +189,6 @@ jobs:
     name: Build managed package ${{ matrix.name }}
     needs:
       - pre_job
-    if: needs.pre_job.outputs.should_skip != 'true'
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -363,7 +354,6 @@ jobs:
 
   test_managed_packages:
     name: Test package on ${{ matrix.distro-name }}-${{ matrix.remote-machine-type }}, ${{ matrix.name }}
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     needs:
       - pre_job
       - build-managed-packages
@@ -480,7 +470,7 @@ jobs:
         with:
           runner-fqdn: ${{ matrix.builder-fqdn }}
 
-      - name: Publish '${{ matrix.name }}' packages
+      - name: Publish '${{ matrix.name }}' dev packages
         run: |
           python3 build_package_new_refactored.py ${{ matrix.name }} \
             publish \
@@ -488,6 +478,17 @@ jobs:
             --repo-name "${{ secrets.PACKAGE_CLOUD_INTERNAL_REPO }}" \
             --token ${{ secrets.PACKAGE_CLOUD_TOKEN }} \
             --packages-dir /tmp/packages
+
+      - name: Publish '${{ matrix.name }}' production packages
+        if: needs.pre_job.outputs.is_production == 'true'
+        run: |
+          python3 build_package_new_refactored.py ${{ matrix.name }} \
+            publish \
+            --user-name "${{ secrets.PACKAGE_CLOUD_USER }}" \
+            --repo-name "${{ secrets.PACKAGE_CLOUD_INTERNAL_REPO }}" \
+            --token ${{ secrets.PACKAGE_CLOUD_TOKEN }} \
+            --packages-dir /tmp/packages
+          
 
   clean-ec2-tests-objects:
     name: Remove ec2 test workflow prefix list entries
