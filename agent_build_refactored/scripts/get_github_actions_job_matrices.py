@@ -81,6 +81,8 @@ elif GITHUB_EVENT_NAME == "push" and GITHUB_REF_TYPE == "tag":
 else:
     master_run = False
     to_publish = False
+    is_production = False
+    version = DEV_VERSION
 
 
 ALL_USED_RUNNERS = {
