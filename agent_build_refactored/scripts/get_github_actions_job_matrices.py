@@ -74,7 +74,7 @@ if GITHUB_EVENT_NAME == "pull_request" and GITHUB_BASE_REF == "master":
     is_production = False
     version = DEV_VERSION
 # push to the 'master' branch
-if (
+elif (
     GITHUB_EVENT_NAME == "push"
     and GITHUB_REF_TYPE == "branch"
     and GITHUB_REF_NAME == "master"
