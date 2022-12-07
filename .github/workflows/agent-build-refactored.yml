@@ -45,12 +45,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Run
-        run: |
-          curl -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/ArthurKamalov/scalyr-agent-2/pulls?head=ArthurKamalov:arthur/add-agent-package&base=master" \
-            | jq '. | length'
-
       - name: Install python
         uses: actions/setup-python@v4
         with:
@@ -60,6 +54,7 @@ jobs:
         uses: ./.github/actions/init-job-matrices
         id: init-matrices
         with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
           # In this action we define all our job matrices. It filters out jobs that must not be executed if
           # workflow run is not from the 'master' branch or from PR to the 'master' branch.
