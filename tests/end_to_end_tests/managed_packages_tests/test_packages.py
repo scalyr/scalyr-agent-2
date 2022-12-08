@@ -165,9 +165,21 @@ def test_packages(
         distro_name=distro_name
     )
 
-    _install_from_convenience_script(
-        script_path=convenience_script_path,
-    )
+    try:
+        _install_from_convenience_script(
+            script_path=convenience_script_path,
+        )
+    except subprocess.CalledProcessError:
+        install_log_path = pl.Path("scalyr_install.log")
+        if install_log_path.exists():
+            logger.error(
+                f"Install log:\n{install_log_path.read_text()}\n"
+            )
+
+        logger.exception(
+            f"Install script has failed."
+        )
+        raise
 
     logger.info(
         "Execute simple sanity test script for the python interpreter and its libraries."
