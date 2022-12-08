@@ -56,36 +56,37 @@ runs:
         GITHUB_REF_TYPE: ${{ github.ref_type }}
         GITHUB_REF_NAME: ${{ github.ref_name }}
         GITHUB_TOKEN: ${{ inputs.github_token }}
+        DEFAULT_OS: ubuntu-20.04
+        DEFAULT_PYTHON_VERSION: 3.8.13
       run: |
         set -e
         
-        cat <<EOT >> /tmp/images-build-matrix.json
+        python3 agent_build_refactored/scripts/get_workflow_info.py > /tmp/workflow_info.json
+        IS_MASTER_RUN="$(cat /tmp/workflow_info.json | jq -c '.is_master_run')"
+        echo "is_master_run=${IS_MASTER_RUN}" >> $GITHUB_OUTPUT
+        echo "to_publish=$(cat /tmp/workflow_info.json | jq -c '.to_publish')" >> $GITHUB_OUTPUT
+        echo "is_production=$(cat /tmp/workflow_info.json | jq -c '.is_production')" >> $GITHUB_OUTPUT
+        echo "version=$(cat /tmp/workflow_info.json | jq -c '.version')" >> $GITHUB_OUTPUT
+        
+        mkdir -p /tmp/matrices
+        
+        cat <<EOT | python3 agent_build_refactored/scripts/filter_matrix_jobs.py --is-master-run "${IS_MASTER_RUN}" > /tmp/matrices/agent_image_build_matrix.json
         ${{ inputs.images-to-build }}
         EOT
+        echo "agent_image_build_matrix_json=$(cat /tmp/matrices/agent_image_build_matrix.json)" >> $GITHUB_OUTPUT
         
-        cat <<EOT >> /tmp/managed-packages-build-matrix.json
+        cat <<EOT | python3 agent_build_refactored/scripts/filter_matrix_jobs.py --is-master-run "${IS_MASTER_RUN}" > /tmp/matrices/agent_managed_packages_build_matrix.json
         ${{ inputs.managed-packages-to-build }}
         EOT
+        echo "agent_managed_packages_build_matrix_json=$(cat /tmp/matrices/agent_managed_packages_build_matrix.json)" >> $GITHUB_OUTPUT
         
-        cat <<EOT >> /tmp/managed-packages-test-matrix.json
+        cat <<EOT | python3 agent_build_refactored/scripts/filter_matrix_jobs.py --is-master-run "${IS_MASTER_RUN}" > /tmp/matrices/agent_managed_packages_test_matrix.json
         ${{ inputs.managed-packages-to-test }}
         EOT
+        echo "agent_managed_packages_test_matrix_json=$(cat /tmp/matrices/agent_managed_packages_test_matrix.json)" >> $GITHUB_OUTPUT
         
-        python3 agent_build_refactored/scripts/get_github_actions_job_matrices.py \
-          --images-build-matrix-json-file /tmp/images-build-matrix.json \
-          --managed-packages-build-matrix-json-file /tmp/managed-packages-build-matrix.json \
-          --managed-packages-test-matrix-json-file /tmp/managed-packages-test-matrix.json \
-          > /tmp/final_matrices.json
-
-
-        echo "pre_build_steps_matrix_json=$(cat /tmp/final_matrices.json | jq -c '.pre_build_steps_matrix')" >> $GITHUB_OUTPUT
-        echo "agent_image_build_matrix_json=$(cat /tmp/final_matrices.json | jq -c '.agent_image_build_matrix')" >> $GITHUB_OUTPUT
-        echo "agent_managed_packages_build_matrix_json=$(cat /tmp/final_matrices.json | jq -c '.agent_managed_packages_build_matrix')" >> $GITHUB_OUTPUT
-        echo "agent_managed_packages_test_matrix_json=$(cat /tmp/final_matrices.json | jq -c '.agent_managed_packages_test_matrix')" >> $GITHUB_OUTPUT
-        echo "is_master_run=$(cat /tmp/final_matrices.json | jq -c '.is_master_run')" >> $GITHUB_OUTPUT
-        echo "to_publish=$(cat /tmp/final_matrices.json | jq -c '.to_publish')" >> $GITHUB_OUTPUT
-        echo "is_production=$(cat /tmp/final_matrices.json | jq -c '.is_production')" >> $GITHUB_OUTPUT
-        echo "version=$(cat /tmp/final_matrices.json | jq -c '.version')" >> $GITHUB_OUTPUT
+        echo "pre_build_steps_matrix_json=$(python3 agent_build_refactored/scripts/get_steps_to_prebuilt_matrix.py --matrices_path /tmp/matrices)" >> $GITHUB_OUTPUT
+        
 
     - name: Print job matrices
       shell: bash

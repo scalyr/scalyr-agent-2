@@ -2,6 +2,10 @@ name: Agent Build Refactored
 
 on:
   push:
+  pull_request:
+    types: [ opened ]
+    branches:
+      - 'master'
   schedule:
     - cron: '0 4 * * *'
 
@@ -146,6 +150,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          fetch-depth: '0'
 
       - name: Install python
         uses: actions/setup-python@v4
@@ -420,7 +426,7 @@ jobs:
             --aws-access-key "${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_AWS_ACCESS_KEY }}" \
             --aws-secret-key "${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_AWS_ACCESS_SECRET }}" \
             --aws-private-key-path "/tmp/private_key.pem" \
-            --aws-private-key-name "arthur-dev3"  \
+            --aws-private-key-name "scalyr_agent_github_actions_tests"  \
             --aws-region "us-east-1" \
             --aws-security-group "github-actions-remote-access" \
             --aws-security-groups-prefix-list-id "${{ secrets.AWS_SECURITY_GROUPS_NAMED_PREFIX_ID }}"
@@ -432,6 +438,7 @@ jobs:
     needs:
       - pre_job
       - build-managed-packages
+      - test_managed_packages
       #- pre-build-cached-step
     runs-on: ${{ matrix.os }}
 
@@ -466,22 +473,22 @@ jobs:
         with:
           runner-fqdn: ${{ matrix.builder-fqdn }}
 
-      - name: Publish '${{ matrix.name }}' dev packages
+      - name: Publish '${{ matrix.name }}' to dev packages
         run: |
           python3 build_package_new_refactored.py ${{ matrix.name }} \
             publish \
             --user-name "${{ secrets.PACKAGE_CLOUD_USER }}" \
-            --repo-name "${{ secrets.PACKAGE_CLOUD_INTERNAL_REPO }}" \
+            --repo-name DataSetAgentInternal \
             --token ${{ secrets.PACKAGE_CLOUD_TOKEN }} \
             --packages-dir /tmp/packages
 
-      - name: Publish '${{ matrix.name }}' production packages
+      - name: Publish '${{ matrix.name }}' to production packages
         if: needs.pre_job.outputs.is_production == 'true'
         run: |
           python3 build_package_new_refactored.py ${{ matrix.name }} \
             publish \
             --user-name "${{ secrets.PACKAGE_CLOUD_USER }}" \
-            --repo-name "${{ secrets.PACKAGE_CLOUD_INTERNAL_REPO }}" \
+            --repo-name DataSetAgent \
             --token ${{ secrets.PACKAGE_CLOUD_TOKEN }} \
             --packages-dir /tmp/packages
           
