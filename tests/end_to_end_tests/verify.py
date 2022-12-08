@@ -304,7 +304,7 @@ def verify_logs(
 
         if not resp:
             log.info(f"Retry in {_QUERY_RETRY_DELAY} sec.")
-            time.sleep(_QUERY_RETRY_DELAY)
+            timeout_tracker.sleep(_QUERY_RETRY_DELAY, "Can't query for data from Scalyr.")
             continue
 
         events = resp["matches"]

@@ -68,12 +68,9 @@ def is_branch_has_pull_requests():
 
 def determine_last_prod_version():
 
-    subprocess.check_call(
-        [
+    subprocess.check_call([
             "git", "fetch", "--unshallow", "--tags"
-        ],
-        stdout=subprocess.DEVNULL,
-    )
+    ])
     output = subprocess.check_output([
         "git", "--no-pager", "tag", "-l"
     ]).decode()
