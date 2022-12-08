@@ -5,6 +5,8 @@ import sys
 
 # This file can be executed as script. Add source root to the PYTHONPATH in order to be able to import
 # local packages. All such imports also have to be done after that.
+import time
+
 sys.path.append(str(pl.Path(__file__).parent.parent.parent))
 
 from agent_build_refactored.tools.constants import SOURCE_ROOT
@@ -38,6 +40,8 @@ if __name__ == '__main__':
     for matrix_file in matrices_path.glob("*.json"):
         print("!!!!")
         print(matrix_file.read_text())
+        time.sleep(1)
+        raise Exception(matrix_file.read_text())
         matrix = json.loads(matrix_file.read_text())
         for job in matrix["include"]:
             builder_name = job["name"]
