@@ -14,7 +14,7 @@ def main():
     )
 
     args = parser.parse_args()
-    raise Exception(args.args.is_master_run)
+    raise Exception(args.is_master_run)
     matrix = json.loads(sys.stdin.read())
 
     is_master_run = args.is_master_run == "true"
