@@ -71,8 +71,8 @@ def determine_last_prod_version():
         "git", "--no-pager", "tag", "-l"
     ]).decode()
 
-    print("111")
     print(output)
+    raise Exception(output)
 
     production_tags = []
     for tag in output.splitlines():
