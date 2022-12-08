@@ -367,8 +367,10 @@ def verify_agent_status(
 
     assert "agent.log" in string_status
     if platform.system() == "Linux":
-        assert "linux_system_metrics" in string_status
-        assert "linux_process_metrics" in string_status
+        message = f"Can not find linux system metrics monitor is agent's status. Status: {string_status}"
+        assert "linux_system_metrics" in string_status, message
+        message = f"Can not find linux process metrics monitor is agent's status. Status: {string_status}"
+        assert "linux_process_metrics" in string_status, message
 
     # Verify json status
     json_status = agent_commander.get_status_json()
