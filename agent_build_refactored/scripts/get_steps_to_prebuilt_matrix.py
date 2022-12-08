@@ -1,4 +1,5 @@
 import argparse
+import collections
 import json
 import os
 import pathlib as pl
@@ -30,25 +31,14 @@ MATRICES_PATH = pl.Path(os.environ["MATRICES_PATH"])
 
 used_builders = []
 
-for matrix_file in MATRICES_PATH.glob("*.json"):
-    matrix = json.loads(matrix_file.read_text())
-    for job in matrix["include"]:
-        builder_name = job["name"]
-        builder_cls = ALL_USED_BUILDERS[builder_name]
-        used_builders.append(builder_cls)
-
-result_matrix = {"include": []}
-
-existing_runners = {}
-for runner_cls in used_builders:
+existing_runners = collections.defaultdict(dict)
+for name, runner_cls in ALL_USED_BUILDERS.items():
     for step in runner_cls.get_all_cacheable_steps():
         if not step.github_actions_settings.pre_build_in_separate_job:
             continue
 
-        if step.id in existing_runners:
+        if step.id in existing_runners[name]:
             continue
-
-        existing_runners[step.id] = step
 
         # Create "dummy" Runner for each runner step that has to be pre-built, this dummy runner will be executed
         # by its fqdn to run the step.
@@ -62,15 +52,29 @@ for runner_cls in used_builders:
             class_name_suffix=step.id,
         )
 
-        result_matrix["include"].append(
-            {
-                "name": f"Pre-build: {StepWrapperRunner.REQUIRED_STEPS[0].name}",
-                "step-runner-fqdn": StepWrapperRunner.get_fully_qualified_name(),
-                "os": "ubuntu-20.04",
-                "python-version": "3.8.13",
-            }
-        )
+        existing_runners[name][step.id] = StepWrapperRunner
 
 
 if __name__ == '__main__':
+
+    result_matrix = {"include": []}
+
+    for matrix_file in MATRICES_PATH.glob("*.json"):
+        matrix = json.loads(matrix_file.read_text())
+        for job in matrix["include"]:
+            builder_name = job["name"]
+
+            if builder_name not in existing_runners:
+                continue
+
+            for runner in existing_runners[builder_name]:
+                result_matrix["include"].append(
+                    {
+                        "name": f"Pre-build: {runner.REQUIRED_STEPS[0].name}",
+                        "step-runner-fqdn": runner.get_fully_qualified_name(),
+                        "os": "ubuntu-20.04",
+                        "python-version": "3.8.13",
+                    }
+                )
+
     print(json.dumps(result_matrix))
