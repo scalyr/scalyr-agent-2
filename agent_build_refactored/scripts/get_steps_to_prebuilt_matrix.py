@@ -72,6 +72,8 @@ if __name__ == '__main__':
             for runner in builders_to_prebuilt_runners[builder_name]:
                 pre_built_runners[runner.get_fully_qualified_name()] = runner
 
+    raise Exception(str(pre_built_runners))
+
     for fqdn, runner in pre_built_runners.items():
         result_matrix["include"].append(
             {
