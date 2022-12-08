@@ -128,109 +128,6 @@ else:
     version = DEV_VERSION
 
 
-ALL_USED_RUNNERS = {
-    **ALL_IMAGE_BUILDERS
-}
-
-
-def _get_runners_all_pre_built_steps(runners: List[Type[Runner]]) -> Dict[str, RunnerStep]:
-    """
-    Get collection of all RunnerSteps that are used by the Runners from the given list.
-    :return: Dict with all used RunnerSteps. Step ID - key, step - value.
-    """
-    _all_runner_steps = {}
-    for runner_cls in runners:
-        for step in runner_cls.get_all_cacheable_steps():
-            if not step.github_actions_settings.pre_build_in_separate_job:
-                continue
-            _all_runner_steps[step.id] = step
-    return _all_runner_steps
-
-
-# Search for all steps that are used by given runners.
-_all_used_runner_steps = _get_runners_all_pre_built_steps(
-    runners=list(ALL_USED_RUNNERS.values())
-)
-
-# Create runner for each found pre-built step.
-_pre_built_step_runners = {}
-for step in _all_used_runner_steps.values():
-    # Create "dummy" Runner for each runner step that has to be pre-built, this dummy runner will be executed
-    # by its fqdn to run the step.
-    class StepWrapperRunner(Runner):
-        REQUIRED_STEPS = [step]
-
-    # Since this runner class is created dynamically we have to generate a constant fqdn for it.
-    StepWrapperRunner.assign_fully_qualified_name(
-        class_name="pre-built-",
-        module_name=__name__,
-        class_name_suffix=step.id,
-    )
-    _pre_built_step_runners[step.id] = StepWrapperRunner
-
-
-def _get_managed_packages_build_matrix(
-        input_build_matrix: List
-):
-
-    # List of all runners that are used by this workflow run.
-    used_runners = []
-
-    # Generate a final agent image build job matrix and filter out job for non-limited run, if needed.
-    result_matrix = {"include": []}
-    for job in input_build_matrix:
-        is_master_run_only = job.get("master_run_only", True)
-
-        # If this is non-master run, skip jobs which are not supposed to be in it.
-        if is_master_run_only and not master_run:
-            continue
-
-        # Set default valued for some essential matrix values, if not specified.
-        if "os" not in job:
-            job["os"] = "ubuntu-20.04"
-        if "python-version" not in job:
-            job["python-version"] = IMAGES_PYTHON_VERSION
-
-        builder_name = job["name"]
-        builder = ALL_MANAGED_PACKAGE_BUILDERS[builder_name]
-        job["builder-fqdn"] = builder.get_fully_qualified_name()
-        result_matrix["include"].append(job)
-        used_runners.append(builder)
-
-    return result_matrix
-
-
-def _get_managed_packages_test_matrix(
-        input_test_matrix: List
-):
-
-    # List of all runners that are used by this workflow run.
-    used_runners = []
-
-    # Generate a final agent image build job matrix and filter out job for non-limited run, if needed.
-    result_matrix = {"include": []}
-    for job in input_test_matrix:
-        is_master_run_only = job.get("master_run_only", True)
-
-        # If this is non-master run, skip jobs which are not supposed to be in it.
-        if is_master_run_only and not master_run:
-            continue
-
-        # Set default valued for some essential matrix values, if not specified.
-        if "os" not in job:
-            job["os"] = "ubuntu-20.04"
-        if "python-version" not in job:
-            job["python-version"] = IMAGES_PYTHON_VERSION
-
-        builder_name = job["name"]
-        builder = ALL_MANAGED_PACKAGE_BUILDERS[builder_name]
-        job["builder-fqdn"] = builder.get_fully_qualified_name()
-        result_matrix["include"].append(job)
-        used_runners.append(builder)
-
-    return result_matrix
-
-
 def main():
     run_type_name = "master" if master_run else "non-master"
     print(
@@ -246,10 +143,6 @@ def main():
     )
 
     result = {
-        "agent_image_build_matrix": result_images_build_matrix,
-        "agent_managed_packages_build_matrix": result_managed_packages_build_matrix,
-        "agent_managed_packages_test_matrix": result_managed_packages_test_matrix,
-        "pre_build_steps_matrix": pre_build_steps_matrix,
         "is_master_run": master_run,
         "to_publish": to_publish,
         "is_production": is_production,
