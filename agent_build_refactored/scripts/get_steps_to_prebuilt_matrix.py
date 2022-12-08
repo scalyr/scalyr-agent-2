@@ -1,6 +1,7 @@
 import argparse
 import json
 import pathlib as pl
+import sys
 
 # This file can be executed as script. Add source root to the PYTHONPATH in order to be able to import
 # local packages. All such imports also have to be done after that.
