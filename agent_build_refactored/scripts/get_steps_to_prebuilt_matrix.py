@@ -30,7 +30,7 @@ ALL_USED_BUILDERS = {
 used_builders = []
 
 existing_runners = {}
-builders_to_prebuilt_runners = collections.defaultdict(list)
+builders_to_prebuilt_runners = collections.defaultdict(dict)
 for name, runner_cls in ALL_USED_BUILDERS.items():
     for step in runner_cls.get_all_cacheable_steps():
         if not step.github_actions_settings.pre_build_in_separate_job:
@@ -51,9 +51,8 @@ for name, runner_cls in ALL_USED_BUILDERS.items():
             )
             existing_runners[step.id] = StepWrapperRunner
 
-        builders_to_prebuilt_runners[name].append(
-            StepWrapperRunner.get_fully_qualified_name()
-        )
+        fqdn = StepWrapperRunner.get_fully_qualified_name()
+        builders_to_prebuilt_runners[name][fqdn] = StepWrapperRunner
 
 
 if __name__ == '__main__':
@@ -73,10 +72,8 @@ if __name__ == '__main__':
         for job in matrix["include"]:
             builder_name = job["name"]
 
-            for runner in builders_to_prebuilt_runners[builder_name]:
-                pre_built_runners[runner.get_fully_qualified_name()] = runner
-
-    raise Exception(str(pre_built_runners))
+            for runner_fqdn, runner in builders_to_prebuilt_runners[builder_name].items():
+                pre_built_runners[runner_fqdn] = runner
 
     for fqdn, runner in pre_built_runners.items():
         result_matrix["include"].append(
