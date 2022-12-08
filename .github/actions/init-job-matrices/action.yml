@@ -61,6 +61,8 @@ runs:
       run: |
         set -e
         
+        mkdir -p /tmp/matrices
+        
         cat <<EOT | python3 agent_build_refactored/scripts/filter_matrix_jobs.py --is-master-run "true" >> /tmp/matrices/agent_managed_packages_build_matrix.json
         ${{ inputs.managed-packages-to-build }}
         EOT
