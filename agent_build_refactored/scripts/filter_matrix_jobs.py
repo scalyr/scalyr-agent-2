@@ -15,6 +15,9 @@ def main():
 
     args = parser.parse_args()
 
+    ss = input()
+
+    raise Exception(ss)
     matrix = json.loads(input())
 
     is_master_run = args.is_master_run == "true"
