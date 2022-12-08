@@ -66,15 +66,13 @@ runs:
         cat <<EOT | python3 agent_build_refactored/scripts/filter_matrix_jobs.py --is-master-run "true" > /tmp/matrices/agent_managed_packages_build_matrix.json
         ${{ inputs.managed-packages-to-build }}
         EOT
-        echo -n "agent_managed_packages_build_matrix_json=$(cat /tmp/matrices/agent_managed_packages_build_matrix.json)" >> $GITHUB_OUTPUT
-        
-        echo "#####"
-        cat /tmp/matrices/agent_managed_packages_build_matrix.json
+        echo "agent_managed_packages_build_matrix_json=$(cat /tmp/matrices/agent_managed_packages_build_matrix.json)" >> $GITHUB_OUTPUT
         
         
         python3 agent_build_refactored/scripts/get_steps_to_prebuilt_matrix.py --matrices-path /tmp/matrices >> /tmp/pre_build_steps_matrix.json
-        echo -n "pre_build_steps_matrix_json=$(cat /tmp/matrices/pre_build_steps_matrix.json)" >> $GITHUB_OUTPUT
+        echo "pre_build_steps_matrix_json=$(cat /tmp/matrices/pre_build_steps_matrix.json)" >> $GITHUB_OUTPUT
         
+        cat $GITHUB_OUTPUT
         exit 0
         
         echo -n "pre_build_steps_matrix_json=" >> $GITHUB_OUTPUT
