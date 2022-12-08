@@ -62,7 +62,7 @@ runs:
         set -e
         
         echo -n "pre_build_steps_matrix_json=" >> $GITHUB_OUTPUT
-        cat <<EOT | python3 agent_build_refactored/scripts/filter_matrix_jobs.py >> $GITHUB_OUTPUT
+        cat <<EOT | python3 agent_build_refactored/scripts/filter_matrix_jobs.py --is-master-run "true" >> $GITHUB_OUTPUT
         ${{ inputs.images-to-build }}
         EOT
         
