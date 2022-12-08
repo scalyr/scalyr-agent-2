@@ -41,7 +41,7 @@ if __name__ == '__main__':
         print("!!!!")
         print(matrix_file.read_text())
         time.sleep(1)
-        raise Exception(matrix_file.read_text())
+        raise Exception(matrix_file)
         matrix = json.loads(matrix_file.read_text())
         for job in matrix["include"]:
             builder_name = job["name"]
