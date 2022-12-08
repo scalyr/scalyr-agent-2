@@ -56,6 +56,8 @@ runs:
         GITHUB_REF_TYPE: ${{ github.ref_type }}
         GITHUB_REF_NAME: ${{ github.ref_name }}
         GITHUB_TOKEN: ${{ inputs.github_token }}
+        DEFAULT_OS: ubuntu:20.04
+        DEFAULT_PYTHON: 3.8.13
       run: |
         set -e
         
