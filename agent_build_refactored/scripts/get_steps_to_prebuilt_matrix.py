@@ -7,25 +7,11 @@ import sys
 
 # This file can be executed as script. Add source root to the PYTHONPATH in order to be able to import
 # local packages. All such imports also have to be done after that.
-import time
-
 sys.path.append(str(pl.Path(__file__).parent.parent.parent))
 
-from agent_build_refactored.tools.constants import SOURCE_ROOT
-from agent_build_refactored.tools.runner import Runner, RunnerStep
-from agent_build_refactored.docker_image_builders import IMAGES_PYTHON_VERSION
+from agent_build_refactored.tools.runner import Runner
 
-from agent_build_refactored.docker_image_builders import (
-    ALL_IMAGE_BUILDERS,
-)
-
-from agent_build_refactored.managed_packages.managed_packages_builders import ALL_MANAGED_PACKAGE_BUILDERS
-
-
-ALL_USED_BUILDERS = {
-    **ALL_IMAGE_BUILDERS,
-    **ALL_MANAGED_PACKAGE_BUILDERS
-}
+from agent_build_refactored import ALL_USED_BUILDERS
 
 used_builders = []
 
@@ -56,6 +42,9 @@ for name, runner_cls in ALL_USED_BUILDERS.items():
 
 
 if __name__ == '__main__':
+    DEFAULT_OS = os.environ["DEFAULT_OS"]
+    DEFAULT_PYTHON_VERSION = os.environ["DEFAULT_PYTHON_VERSION"]
+
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--matrices_path",
@@ -80,8 +69,8 @@ if __name__ == '__main__':
             {
                 "name": f"Pre-build: {runner.REQUIRED_STEPS[0].name}",
                 "step-runner-fqdn": fqdn,
-                "os": "ubuntu-20.04",
-                "python-version": "3.8.13",
+                "os": DEFAULT_OS,
+                "python-version": DEFAULT_PYTHON_VERSION,
             }
         )
 

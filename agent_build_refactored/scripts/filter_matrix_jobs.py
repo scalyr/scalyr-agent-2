@@ -2,9 +2,17 @@ import argparse
 import json
 import os
 import sys
+import pathlib as pl
+
+# This file can be executed as script. Add source root to the PYTHONPATH in order to be able to import
+# local packages. All such imports also have to be done after that.
+sys.path.append(str(pl.Path(__file__).parent.parent.parent))
+
+from agent_build_refactored import ALL_USED_BUILDERS
 
 DEFAULT_OS = os.environ["DEFAULT_OS"]
 DEFAULT_PYTHON_VERSION = os.environ["DEFAULT_PYTHON_VERSION"]
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -34,6 +42,10 @@ def main():
             job["os"] = DEFAULT_OS
         if "python-version" not in job:
             job["python-version"] = DEFAULT_PYTHON_VERSION
+
+        builder_name = job["name"]
+        builder = ALL_USED_BUILDERS[builder_name]
+        job["builder-fqdn"] = builder.get_fully_qualified_name()
 
         result_matrix["include"].append(job)
 
