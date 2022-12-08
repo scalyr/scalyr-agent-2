@@ -73,4 +73,4 @@ for runner_cls in used_builders:
 
 
 if __name__ == '__main__':
-    print(result_matrix)
+    print(json.dumps(result_matrix))
