@@ -15,7 +15,7 @@ def main():
 
     args = parser.parse_args()
 
-    ss = input()
+    ss = sys.stdin.read()
 
     raise Exception(ss)
     matrix = json.loads(input())
