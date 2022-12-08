@@ -52,8 +52,6 @@ Usage $0 [options] where options are:
                            can be a bit hard to read.
     --version              Specifies the version number of the scalyr-agent-2
                            package to install, rather than the latest.
-    --use-bootstrap-packages
-                           Install the bootstrap packages which install repositories with final agent packages.
 
 EOF
 }
@@ -66,22 +64,6 @@ function die() {
 function die_install() {
   echo "Install failed: $1";
   exit 1;
-}
-
-# Extracts the tarball in the script (whose filename is in $1).
-# It will leave the tarball in $TMPDIR.
-function extract_tarball() {
-  line_start=`awk '/^# TARFILE_FOLLOWS:/ { print NR + 1; exit 0; }' $1`
-  tail -n+$line_start $1 > $TMPDIR/packages.tar;
-}
-
-# Extracts and untars the tarball in the script (whose filename is in
-# $1).  It will leave the packages in $TMPDIR.
-function untar_tarball() {
-  extract_tarball "$1" &&
-    tar --directory $TMPDIR -oxf $TMPDIR/packages.tar &&
-    rm $TMPDIR/packages.tar ||
-    return;
 }
 
 # Executes the specified command in $1, sending the stderr and stdout to
@@ -165,14 +147,6 @@ while (( $# > 0)); do
       print_usage;
       exit 0;;
 
-    --extract-packages)
-      echo "Extracting...";
-      untar_tarball $0 || die "Failed to extract packages";
-      cp $TMPDIR/*.rpm ./ || die "Failed to copy rpm to current directory";
-      cp $TMPDIR/*.deb ./ ||
-        die "Failed to copy Debian package to current directory";
-      exit 0;;
-
     --force-apt)
       REPO_TYPE="apt";
       shift;;
@@ -210,10 +184,6 @@ while (( $# > 0)); do
     --version)
       VERSION="$2"
       shift;
-      shift;;
-
-    --use-bootstrap-packages)
-      USE_BOOTSTRAP_PACKAGES=true;
       shift;;
 
     *)
@@ -279,16 +249,6 @@ function print_detected_yum_package_manager() {
   sleep 2
 }
 
-function print_detected_yum_package_manager_el5() {
-  CALLER_ID=$1
-
-  lecho "  Determined system uses yum for package management. (el5) (caller_id=${CALLER_ID})";
-  lecho " If you think automatic detection was wrong, you can abort the script (CTRL+C) and re-run it with --force-apt / --force-alt-yum flag"
-
-  # We sleep to give user a chance to abort the script before proceeding
-  sleep 2
-}
-
 function print_detected_apt_package_manager() {
   CALLER_ID=$1
 
@@ -318,18 +278,8 @@ lecho "Installing scalyr-agent-2:";
 
 if [ -z "$REPO_TYPE" ]; then
   if [ -f /etc/redhat-release ]; then
-    if [ -n "`grep \"CentOS release 5\" /etc/redhat-release`" ]; then
-      print_detected_yum_package_manager_el5 "1"
-      REPO_TYPE="alt-yum";
-    elif [ -n "`grep \"Red Hat Enterprise Linux Server release 5\" /etc/redhat-release`" ]; then
-      print_detected_yum_package_manager_el5 "2"
-      REPO_TYPE="alt-yum";
-      # use configuration packages with old RHEL releases
-      USE_BOOTSTRAP_PACKAGES=true
-    else
-      print_detected_yum_package_manager "3"
-      REPO_TYPE="yum";
-    fi
+    print_detected_yum_package_manager "3"
+    REPO_TYPE="yum";
   elif command -v yum > /dev/null 2>&1 && command -v apt-get > /dev/null 2>&1; then
     # If both commands are installed we use some additional heuristics to
     # detect if this is a debian or red hat based distro.
@@ -361,28 +311,8 @@ if [ -z "$REPO_TYPE" ]; then
   fi
 elif [[ $REPO_TYPE == "apt" ]]; then
   lecho "  Configuring to use apt-get for package installs.";
-elif [[ $REPO_TYPE == "yum" ]]; then
-  lecho "  Configuring to use yum for package installs.";
 else
-  lecho "  Configuring to use yum for package installs. (el5)";
-fi
-
-if $USE_BOOTSTRAP_PACKAGES; then
-  lecho "  Extracting configuration packages from downloaded script.";
-  untar_tarball $0 || die_install "Failed to extract packages";
-  # The bootstrap rpm name will be something like
-  # scalyr-repo-bootstrap-1.2-1.noarch.rpm,
-  # scalyr-repo-bootstrap-1.2-1.internal.noarch.rpm
-  # scalyr-repo-bootstrap-1.2-1.beta.noarch.rpm
-  bootstrap_rpm=`ls $TMPDIR/*bootstrap*-1.[nib]*.rpm`
-fi
-
-# If we are using the alternate yum repository, then just change around
-# which files we are going to be installing so that we can reuse the
-# same code down below.
-if [[ $REPO_TYPE == "alt-yum" ]]; then
-  bootstrap_rpm=`ls $TMPDIR/*bootstrap*-1.alt*.rpm`
-  REPO_TYPE="yum"
+  lecho "  Configuring to use yum for package installs.";
 fi
 
 if [[ $REPO_TYPE == "yum" ]]; then
