@@ -27,6 +27,7 @@ import sys
 import pathlib as pl
 import time
 import re
+from distutils.version import StrictVersion
 from typing import List, Type, Dict
 
 # This file can be executed as script. Add source root to the PYTHONPATH in order to be able to import
@@ -51,8 +52,6 @@ GITHUB_REF_NAME = os.environ.get("GITHUB_REF_NAME", "")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 GITHUB_SHA = os.environ.get("GITHUB_SHA", "")
 
-DEV_VERSION = f"{int(time.time())}+{GITHUB_SHA}"
-
 
 def is_branch_has_pull_requests():
 
@@ -66,6 +65,26 @@ def is_branch_has_pull_requests():
     pull_requests = json.loads(data)
     return len(pull_requests) > 0
 
+
+def determine_last_prod_version():
+    output = subprocess.check_output([
+        "git", "--no-pager", "tag", "-l"
+    ]).decode()
+
+    production_tags = []
+    for tag in output.splitlines():
+        m = re.search(r"^v(\d+\.\d+\.\d+)$", tag)
+        if m is None:
+            continue
+
+        production_tags.append(m.group(1))
+
+    last_version = sorted(production_tags, key=StrictVersion)[-1]
+    return f"v{last_version}"
+
+
+PROD_VERSION = determine_last_prod_version()
+DEV_VERSION = f"{PROD_VERSION}.{int(time.time())}.{GITHUB_SHA}"
 
 # We do a full, 'master' workflow run on:
 # pull request against the 'master' branch.
@@ -89,14 +108,14 @@ elif (
 elif GITHUB_EVENT_NAME == "push" and GITHUB_REF_TYPE == "tag":
     to_publish = True
     master_run = True
-    m = re.match(r"^\d+\.\d+\.\d+$", GITHUB_REF_NAME)
+    m = re.match(r"^v\d+\.\d+\.\d+$", GITHUB_REF_NAME)
 
     if m:
         is_production = True
-        version = m.group()
+        version = GITHUB_REF_NAME
     else:
         is_production = False
-        version = f"{int(time.time())}+{GITHUB_REF_NAME}"
+        version = f"{PROD_VERSION}.{int(time.time())}.{GITHUB_REF_NAME}"
 
 else:
     master_run = is_branch_has_pull_requests()
