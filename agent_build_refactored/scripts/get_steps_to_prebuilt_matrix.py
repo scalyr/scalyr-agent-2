@@ -57,15 +57,19 @@ for name, runner_cls in ALL_USED_BUILDERS.items():
 
 
 if __name__ == '__main__':
-
-    MATRICES_PATH = pl.Path(os.environ["MATRICES_PATH"])
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--matrices_path",
+        required=True
+    )
+    args = parser.parse_args()
+    matrices_path = pl.Path(args.matrices_path)
 
     result_matrix = {"include": []}
 
     pre_built_runners = {}
-    for matrix_file in MATRICES_PATH.glob("*.json"):
+    for matrix_file in matrices_path.glob("*.json"):
         matrix = json.loads(matrix_file.read_text())
-        raise Exceptionstr(matrix)
         for job in matrix["include"]:
             builder_name = job["name"]
 
