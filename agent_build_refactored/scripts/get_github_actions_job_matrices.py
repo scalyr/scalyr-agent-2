@@ -86,6 +86,7 @@ def determine_last_prod_version():
     return f"v{last_version}"
 
 
+
 PROD_VERSION = determine_last_prod_version()
 DEV_VERSION = f"{PROD_VERSION}.{int(time.time())}.{GITHUB_SHA}"
 
