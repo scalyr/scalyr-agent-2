@@ -25,7 +25,7 @@ import pathlib as pl
 
 # This file can be executed as script. Add source root to the PYTHONPATH in order to be able to import
 # local packages. All such imports also have to be done after that.
-sys.path.append(str(pl.Path(__file__).parent.parent.parent.parent))
+sys.path.append(str(pl.Path(__file__).parent.parent.parent))
 
 from agent_build_refactored import ALL_USED_BUILDERS
 
