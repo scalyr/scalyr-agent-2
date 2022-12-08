@@ -478,7 +478,7 @@ jobs:
           python3 build_package_new_refactored.py ${{ matrix.name }} \
             publish \
             --user-name "${{ secrets.PACKAGE_CLOUD_USER }}" \
-            --repo-name DataSetAgent \
+            --repo-name DataSetAgentInternal \
             --token ${{ secrets.PACKAGE_CLOUD_TOKEN }} \
             --packages-dir /tmp/packages
 
@@ -488,7 +488,7 @@ jobs:
           python3 build_package_new_refactored.py ${{ matrix.name }} \
             publish \
             --user-name "${{ secrets.PACKAGE_CLOUD_USER }}" \
-            --repo-name DataSetAgentInternal \
+            --repo-name DataSetAgent \
             --token ${{ secrets.PACKAGE_CLOUD_TOKEN }} \
             --packages-dir /tmp/packages
           
