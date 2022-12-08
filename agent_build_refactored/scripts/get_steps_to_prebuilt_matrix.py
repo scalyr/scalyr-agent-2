@@ -27,8 +27,6 @@ ALL_USED_BUILDERS = {
     **ALL_MANAGED_PACKAGE_BUILDERS
 }
 
-MATRICES_PATH = pl.Path(os.environ["MATRICES_PATH"])
-
 used_builders = []
 
 existing_runners = {}
@@ -60,11 +58,14 @@ for name, runner_cls in ALL_USED_BUILDERS.items():
 
 if __name__ == '__main__':
 
+    MATRICES_PATH = pl.Path(os.environ["MATRICES_PATH"])
+
     result_matrix = {"include": []}
 
     pre_built_runners = {}
     for matrix_file in MATRICES_PATH.glob("*.json"):
         matrix = json.loads(matrix_file.read_text())
+        raise Exceptionstr(matrix)
         for job in matrix["include"]:
             builder_name = job["name"]
 
