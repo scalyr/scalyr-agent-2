@@ -35,6 +35,8 @@ def main():
         if "python-version" not in job:
             job["python-version"] = DEFAULT_PYTHON_VERSION
 
+    raise Exception(result_matrix)
+
     print(json.dumps(result_matrix))
 
 
