@@ -71,6 +71,9 @@ def determine_last_prod_version():
         "git", "--no-pager", "tag", "-l"
     ]).decode()
 
+    print("111")
+    print(output)
+
     production_tags = []
     for tag in output.splitlines():
         m = re.search(r"^v(\d+\.\d+\.\d+)$", tag)
