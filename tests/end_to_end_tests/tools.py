@@ -16,7 +16,8 @@ import dataclasses
 import json
 import pathlib as pl
 import subprocess
-from typing import List
+import time
+from typing import List, Union
 
 
 @dataclasses.dataclass
@@ -116,3 +117,38 @@ class AgentCommander:
 
     def stop(self):
         self._check_call_command(["stop"])
+
+
+class TimeoutTracker:
+    """
+    Simple abstraction that keeps tracking time and can be used to timeout test cases.
+    """
+
+    def __init__(self, timeout_time: Union[int, float]):
+        self._global_timeout_time = time.time() + timeout_time
+
+        self._local_timeout_time = None
+        self._message = None
+
+    def __call__(self, timeout: Union[float, int], message: str = None):
+        """
+        This should be used together with context manager to set the 'sleep' method track the 'local' timeout
+            which has to be tracked within that context manager.
+        """
+        self._local_timeout_time = time.time() + timeout
+        self._message = message
+        return self
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._local_timeout_time = None
+
+    def sleep(self, delay: Union[float, int], message: str = None):
+        timeout_time = self._local_timeout_time or self._global_timeout_time
+
+        message = message or self._message or "Timeout has occurred."
+        if time.time() + delay >= timeout_time:
+            raise TimeoutError(message)
+        time.sleep(delay)
