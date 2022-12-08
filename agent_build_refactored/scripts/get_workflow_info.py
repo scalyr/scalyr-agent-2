@@ -68,9 +68,12 @@ def is_branch_has_pull_requests():
 
 def determine_last_prod_version():
 
-    subprocess.check_call([
-        "git", "fetch", "--unshallow", "--tags"
-    ])
+    subprocess.check_call(
+        [
+            "git", "fetch", "--unshallow", "--tags"
+        ],
+        stdout=subprocess.DEVNULL,
+    )
     output = subprocess.check_output([
         "git", "--no-pager", "tag", "-l"
     ]).decode()
@@ -84,7 +87,7 @@ def determine_last_prod_version():
         production_tags.append(m.group(1))
 
     last_version = sorted(production_tags, key=StrictVersion)[-1]
-    return f"v{last_version}"
+    return last_version
 
 
 PROD_VERSION = determine_last_prod_version()
@@ -112,11 +115,10 @@ elif (
 elif GITHUB_EVENT_NAME == "push" and GITHUB_REF_TYPE == "tag":
     to_publish = True
     master_run = True
-    m = re.match(r"^v\d+\.\d+\.\d+$", GITHUB_REF_NAME)
-
+    m = re.match(r"^v(\d+\.\d+\.\d+)$", GITHUB_REF_NAME)
     if m:
         is_production = True
-        version = GITHUB_REF_NAME
+        version = m.group(1)
     else:
         is_production = False
         version = f"{PROD_VERSION}.{int(time.time())}.{GITHUB_REF_NAME}"
