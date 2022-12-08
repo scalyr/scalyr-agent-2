@@ -37,8 +37,6 @@ def main():
 
         result_matrix["include"].append(job)
 
-    raise Exception(result_matrix)
-
     print(json.dumps(result_matrix))
 
 
