@@ -38,10 +38,6 @@ if __name__ == '__main__':
     used_builders = []
 
     for matrix_file in matrices_path.glob("*.json"):
-        print("!!!!")
-        print(matrix_file.read_text())
-        time.sleep(1)
-        raise Exception(matrix_file)
         matrix = json.loads(matrix_file.read_text())
         for job in matrix["include"]:
             builder_name = job["name"]
