@@ -292,6 +292,7 @@ def verify_logs(
         "Verify that previously written counter messages have been uploaded to server."
     )
     while True:
+        timeout_tracker.sleep(_QUERY_RETRY_DELAY, "Could not fetch data from Scalyr.")
         resp = ScalyrQueryRequest(
             server_address=scalyr_server,
             read_api_key=scalyr_api_read_key,
@@ -304,7 +305,6 @@ def verify_logs(
 
         if not resp:
             log.info(f"Retry in {_QUERY_RETRY_DELAY} sec.")
-            time.sleep(_QUERY_RETRY_DELAY)
             continue
 
         events = resp["matches"]
@@ -367,8 +367,10 @@ def verify_agent_status(
 
     assert "agent.log" in string_status
     if platform.system() == "Linux":
-        assert "linux_system_metrics" in string_status
-        assert "linux_process_metrics" in string_status
+        message = f"Can not find linux system metrics monitor is agent's status. Status: {string_status}"
+        assert "linux_system_metrics" in string_status, message
+        message = f"Can not find linux process metrics monitor is agent's status. Status: {string_status}"
+        assert "linux_process_metrics" in string_status, message
 
     # Verify json status
     json_status = agent_commander.get_status_json()
