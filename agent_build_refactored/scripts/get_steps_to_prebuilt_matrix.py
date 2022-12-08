@@ -45,10 +45,17 @@ if __name__ == '__main__':
             used_builders.append(builder_cls)
 
     result_matrix = {"include": []}
+
+    existing_runners = {}
     for runner_cls in used_builders:
         for step in runner_cls.get_all_cacheable_steps():
             if not step.github_actions_settings.pre_build_in_separate_job:
                 continue
+
+            if step.id in existing_runners:
+                continue
+
+            existing_runners[step.id] = step
 
             # Create "dummy" Runner for each runner step that has to be pre-built, this dummy runner will be executed
             # by its fqdn to run the step.
