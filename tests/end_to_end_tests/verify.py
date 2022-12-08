@@ -292,6 +292,7 @@ def verify_logs(
         "Verify that previously written counter messages have been uploaded to server."
     )
     while True:
+        timeout_tracker.sleep(_QUERY_RETRY_DELAY, "Could not fetch data from Scalyr.")
         resp = ScalyrQueryRequest(
             server_address=scalyr_server,
             read_api_key=scalyr_api_read_key,
@@ -304,7 +305,6 @@ def verify_logs(
 
         if not resp:
             log.info(f"Retry in {_QUERY_RETRY_DELAY} sec.")
-            timeout_tracker.sleep(_QUERY_RETRY_DELAY, "Can't query for data from Scalyr.")
             continue
 
         events = resp["matches"]
