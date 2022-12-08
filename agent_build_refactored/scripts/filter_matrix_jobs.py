@@ -14,7 +14,6 @@ def main():
     )
 
     args = parser.parse_args()
-    raise Exception(args.is_master_run)
     matrix = json.loads(sys.stdin.read())
 
     is_master_run = args.is_master_run == "true"
@@ -35,6 +34,8 @@ def main():
             job["os"] = DEFAULT_OS
         if "python-version" not in job:
             job["python-version"] = DEFAULT_PYTHON_VERSION
+
+        result_matrix["include"].append(job)
 
     raise Exception(result_matrix)
 
