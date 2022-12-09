@@ -898,10 +898,11 @@ class PodProcessor(_K8sProcessor):
                 break
 
             if controller.parent_kind not in _OBJECT_ENDPOINTS:
-                global_log.log(
-                    scalyr_logging.DEBUG_LEVEL_1,
+                global_log.warn(
                     "parent of controller %s is not standard k8s object (got=%s), ignoring"
                     % (controller.name, controller.parent_kind),
+                    limit_once_per_x_secs=300,
+                    limit_key="k8s_controller_ownership_resolve",
                 )
                 break
 
