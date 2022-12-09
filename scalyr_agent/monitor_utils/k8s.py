@@ -7,6 +7,7 @@ import os
 import random
 import re
 import warnings
+from logging import WARNING
 from string import Template
 import sys
 import threading
@@ -898,7 +899,8 @@ class PodProcessor(_K8sProcessor):
                 break
 
             if controller.parent_kind not in _OBJECT_ENDPOINTS:
-                global_log.warn(
+                global_log.log(
+                    WARNING,
                     "parent of controller %s is not standard k8s object (got=%s), ignoring"
                     % (controller.name, controller.parent_kind),
                     limit_once_per_x_secs=3600,
