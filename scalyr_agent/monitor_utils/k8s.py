@@ -103,6 +103,13 @@ _OBJECT_ENDPOINTS = {
         "list": Template("/apis/apps/v1/namespaces/${namespace}/statefulsets"),
         "list-all": "/apis/apps/v1/statefulsets",
     },
+    "Rollout": {
+        "single": Template(
+            "/apis/argoproj.io/v1alpha1/namespaces/${namespace}/rollouts/${name}"
+        ),
+        "list": Template("/apis/argoproj.io/v1alpha1/namespaces/${namespace}/rollouts"),
+        "list-all": "/apis/argoproj.io/v1alpha1/rollouts",
+    },
 }
 
 # Template for an older kubelet endpoint that we may want to fall back to if the new one is unavailable due to an
