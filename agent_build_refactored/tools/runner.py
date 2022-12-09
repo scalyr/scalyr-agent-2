@@ -745,7 +745,8 @@ class Runner:
         module_path = pl.Path(sys.modules[cls.__module__].__file__)
         module_rel_path = module_path.relative_to(SOURCE_ROOT)
 
-        module_fqdn = str(module_rel_path).strip(".py").replace(os.sep, ".")
+        module_without_ext = module_rel_path.parent / module_rel_path.stem
+        module_fqdn = str(module_without_ext).replace(os.sep, ".")
         return f"{module_fqdn}.{cls.__qualname__}"
 
     @classmethod
@@ -850,7 +851,7 @@ class Runner:
             "--platform",
             str(self.base_docker_image.platform),
             "--user",
-            f"{os.getuid()}:{os.getgid()}",
+            "root",
             self.base_docker_image.name,
             python_executable,
             "/tmp/source/agent_build_refactored/scripts/runner_helper.py",

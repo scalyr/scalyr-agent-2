@@ -75,6 +75,21 @@ class Architecture(enum.Enum):
     def to_docker_build_triplet(self):
         return f"linux-{self.as_docker_platform}"
 
+    @property
+    def as_deb_package_arch(self):
+        mapping = {
+            Architecture.X86_64: "amd64"
+        }
+
+        return mapping[self]
+
+    @property
+    def as_rpm_package_arch(self):
+        mapping = {
+            Architecture.X86_64: "x86_64"
+        }
+        return mapping[self]
+
 
 _ARCHITECTURE_TO_DOCKER_PLATFORM = {
     Architecture.X86_64: DockerPlatform.AMD64,

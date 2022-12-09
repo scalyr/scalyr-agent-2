@@ -30,7 +30,7 @@ jobs:
           github_token: ${{ github.token }}
 
   tox-lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     needs: pre_job
     steps:
       - name: Checkout Repository
@@ -46,7 +46,7 @@ jobs:
         uses: actions/setup-python@v4
         id: setup-python
         with:
-          python-version: 3.6
+          python-version: 3.6.15
 
       - name: Install tox
         env:
