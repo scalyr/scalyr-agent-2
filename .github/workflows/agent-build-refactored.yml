@@ -3,8 +3,10 @@ name: Agent Build Refactored
 on:
   push:
   pull_request:
+    # Trigger only for opened pull request. Other has to be handled by the 'push' event
+    types: [ opened ]
     branches:
-      - master
+      - 'master'
   schedule:
     - cron: '0 4 * * *'
 
@@ -23,9 +25,10 @@ jobs:
   pre_job:
     runs-on: ubuntu-20.04
     outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip }}
       is_master_run: ${{ steps.init-matrices.outputs.is_master_run }}
       to_publish: ${{ steps.init-matrices.outputs.to_publish }}
+      is_production: ${{ steps.init-matrices.outputs.is_production }}
+      version: ${{ steps.init-matrices.outputs.version }}
       # The following outputs will be used by the other jobs below as their strategy matrices.
       pre_build_steps_matrix_json: ${{ steps.init-matrices.outputs.pre_build_steps_matrix_json }}
       agent_image_build_matrix_json: ${{ steps.init-matrices.outputs.agent_image_build_matrix_json }}
@@ -35,14 +38,6 @@ jobs:
 
 
     steps:
-      - id: skip_check
-        uses: fkirc/skip-duplicate-actions@f11521568414503656a5af807dc3018c012552c4 # v4.0.0
-        with:
-          cancel_others: 'true'
-          concurrent_skipping: 'same_content'
-          do_not_skip: '["workflow_dispatch", "schedule", "pull_request"]'
-          github_token: ${{ github.token }}
-
       - name: Checkout repository
         uses: actions/checkout@v3
 
@@ -55,6 +50,7 @@ jobs:
         uses: ./.github/actions/init-job-matrices
         id: init-matrices
         with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
           # In this action we define all our job matrices. It filters out jobs that must not be executed if
           # workflow run is not from the 'master' branch or from PR to the 'master' branch.
@@ -80,17 +76,17 @@ jobs:
 
           managed-packages-to-test: |
             [
-              { "name": "deb-amd64", "distro": "ec2:ubuntu2204", "master_run_only": false },
-              { "name": "deb-amd64", "distro": "ec2:ubuntu2004",  "master_run_only": false },
-              { "name": "deb-amd64", "distro": "ec2:ubuntu1804",  "master_run_only": false },
-              { "name": "deb-amd64", "distro": "ec2:ubuntu1604",  "master_run_only": false },
-              { "name": "deb-amd64", "distro": "docker:ubuntu1404",  "master_run_only": false },
-              { "name": "deb-amd64", "distro": "ec2:debian10",  "master_run_only": false },
-              { "name": "deb-amd64", "distro": "docker:debian11",  "master_run_only": false },
-              { "name": "rpm-x86_64", "distro": "docker:centos8",  "master_run_only": false },
-              { "name": "rpm-x86_64", "distro": "ec2:centos7",  "master_run_only": false },
-              { "name": "rpm-x86_64", "distro": "docker:centos6",  "master_run_only": false },
-              { "name": "rpm-x86_64", "distro": "ec2:amazonlinux2",  "master_run_only": false }
+              { "name": "deb-amd64",  "distro-name": "ubuntu2204",    "remote-machine-type": "ec2",    "master_run_only": false },
+              { "name": "deb-amd64",  "distro-name": "ubuntu2004",    "remote-machine-type": "ec2",    "master_run_only": false },
+              { "name": "deb-amd64",  "distro-name": "ubuntu1804",    "remote-machine-type": "ec2",    "master_run_only": false },
+              { "name": "deb-amd64",  "distro-name": "ubuntu1604",    "remote-machine-type": "ec2",    "master_run_only": false },
+              { "name": "deb-amd64",  "distro-name": "ubuntu1404",    "remote-machine-type": "docker", "master_run_only": false },
+              { "name": "deb-amd64",  "distro-name": "debian10",      "remote-machine-type": "ec2",    "master_run_only": false },
+              { "name": "deb-amd64",  "distro-name": "debian11",      "remote-machine-type": "docker", "master_run_only": false },
+              { "name": "rpm-x86_64", "distro-name": "centos8",       "remote-machine-type": "docker", "master_run_only": false },
+              { "name": "rpm-x86_64", "distro-name": "centos7",       "remote-machine-type": "ec2",    "master_run_only": false },
+              { "name": "rpm-x86_64", "distro-name": "centos6",       "remote-machine-type": "docker", "master_run_only": false },
+              { "name": "rpm-x86_64", "distro-name": "amazonlinux2",  "remote-machine-type": "ec2",    "master_run_only": false }
             ]
 
   # This job pre-executes and caches Runner steps that has to be executed in a separate job.
@@ -98,7 +94,6 @@ jobs:
   # some of base images are built with using QEMU.
   pre-build-cached-step:
     name: ${{ matrix.name }}
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
     needs:
       - pre_job
 
@@ -156,6 +151,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          # Need to deep copy the repo to look for tags.
+          fetch-depth: '0'
 
       - name: Install python
         uses: actions/setup-python@v4
@@ -195,9 +193,7 @@ jobs:
     name: Build managed package ${{ matrix.name }}
     needs:
       - pre_job
-    if: needs.pre_job.outputs.should_skip != 'true'
     runs-on: ${{ matrix.os }}
-
 
     strategy:
       # This job receives its matrix from the 'pre_job' job. The matrix itself is created by the .github/actions/init-job-matrices action.
@@ -341,6 +337,10 @@ jobs:
       # to reuse them instead of building if they are not changed.
       - name: Build managed package with builder '${{ matrix.name }}'
         run: |
+            
+            echo "Changing build version to ${{ needs.pre_job.outputs.version }}"
+            echo "${{ needs.pre_job.outputs.version }}" > VERSION
+          
             echo "${{ steps.download_python.outputs.last_repo_python_package_path }}"
             echo "${{ steps.download_agent_libs.outputs.last_repo_agent_libs_package_path }}"
             python3 build_package_new_refactored.py ${{ matrix.name }} \
@@ -357,8 +357,7 @@ jobs:
           retention-days: 1
 
   test_managed_packages:
-    name: Test package on ${{ matrix.distro }}, ${{ matrix.name }}
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
+    name: Test package on ${{ matrix.distro-name }}-${{ matrix.remote-machine-type }}, ${{ matrix.name }}
     needs:
       - pre_job
       - build-managed-packages
@@ -410,16 +409,22 @@ jobs:
       - name: Test '${{ matrix.name }}' packages
         run: |
           
+          echo "Changing build version to ${{ needs.pre_job.outputs.version }}"
+          echo "${{ needs.pre_job.outputs.version }}" > VERSION
+          
           echo "${{ secrets.AWS_DEV_US_EAST_1_KEYPAIR_NAME }}" > /tmp/private_key.pem
           chmod 600 /tmp/private_key.pem
           
-          python3 -m pytest tests/end_to_end_tests/managed_packages_tests/test_remotely.py \
+          python3 -m pytest tests/end_to_end_tests/managed_packages_tests \
             -s \
             --builder-name ${{ matrix.name }} \
-            --distro ${{ matrix.distro }} \
+            --distro-name ${{ matrix.distro-name }} \
+            --remote-machine-type ${{ matrix.remote-machine-type }} \
             --packages-source-type dir \
             --packages-source /tmp/packages \
-            --workflow-id ${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }} \
+            --scalyr-api-key ${{ secrets.SCALYR_API_KEY }} \
+            --scalyr-api-read-key ${{ secrets.SCALYR_READ_API_KEY }} \
+            --test-session-suffix ${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }} \
             --aws-access-key "${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_AWS_ACCESS_KEY }}" \
             --aws-secret-key "${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_AWS_ACCESS_SECRET }}" \
             --aws-private-key-path "/tmp/private_key.pem" \
@@ -435,6 +440,7 @@ jobs:
     needs:
       - pre_job
       - build-managed-packages
+      - test_managed_packages
       #- pre-build-cached-step
     runs-on: ${{ matrix.os }}
 
@@ -469,14 +475,25 @@ jobs:
         with:
           runner-fqdn: ${{ matrix.builder-fqdn }}
 
-      - name: Publish '${{ matrix.name }}' packages
+      - name: Publish '${{ matrix.name }}' to dev packages
         run: |
           python3 build_package_new_refactored.py ${{ matrix.name }} \
             publish \
             --user-name "${{ secrets.PACKAGE_CLOUD_USER }}" \
-            --repo-name "${{ secrets.PACKAGE_CLOUD_INTERNAL_REPO }}" \
+            --repo-name DataSetAgentInternal \
             --token ${{ secrets.PACKAGE_CLOUD_TOKEN }} \
             --packages-dir /tmp/packages
+
+      - name: Publish '${{ matrix.name }}' to production packages
+        if: needs.pre_job.outputs.is_production == 'true'
+        run: |
+          python3 build_package_new_refactored.py ${{ matrix.name }} \
+            publish \
+            --user-name "${{ secrets.PACKAGE_CLOUD_USER }}" \
+            --repo-name DataSetAgent \
+            --token ${{ secrets.PACKAGE_CLOUD_TOKEN }} \
+            --packages-dir /tmp/packages
+          
 
   clean-ec2-tests-objects:
     name: Remove ec2 test workflow prefix list entries

@@ -37,7 +37,7 @@ import os
 from typing import List, Type, Dict
 
 from agent_build_refactored.prepare_agent_filesystem import (
-    build_linux_lfs_agent_files,
+    build_linux_fhs_agent_files,
     add_config,
 )
 from agent_build_refactored.tools.constants import (
@@ -259,8 +259,8 @@ class ContainerImageBuilder(Runner):
             shutil.rmtree(package_root_path)
         package_root_path.mkdir(parents=True)
 
-        # Build 'LFS-structured' filesystem.
-        build_linux_lfs_agent_files(
+        # Build 'FHS-structured' filesystem.
+        build_linux_fhs_agent_files(
             copy_agent_source=True,
             output_path=package_root_path,
         )

@@ -21,7 +21,6 @@ some common options and fixtures such as Scalyr credentials etc.
 import json
 import os
 import pathlib as pl
-import time
 
 import pytest
 from _pytest.runner import pytest_runtest_protocol as orig_pytest_runtest_protocol
@@ -106,35 +105,22 @@ def _get_option_value(name: str, config: dict, arg_options, default=None):
 
 @pytest.fixture(scope="session")
 def scalyr_api_key(config_file, request):
-    return _get_option_value(
-        name="scalyr_api_key", config=config_file, arg_options=request.config.option
-    )
+    return request.config.option.scalyr_api_key
 
 
 @pytest.fixture(scope="session")
-def scalyr_api_read_key(config_file, request):
-    return _get_option_value(
-        name="scalyr_api_read_key",
-        config=config_file,
-        arg_options=request.config.option,
-    )
+def scalyr_api_read_key(request):
+    return request.config.option.scalyr_api_read_key
 
 
 @pytest.fixture(scope="session")
-def scalyr_server(config_file, request):
-    return _get_option_value(
-        name="scalyr_server", config=config_file, arg_options=request.config.option
-    )
+def scalyr_server(request):
+    return request.config.option.scalyr_server
 
 
 @pytest.fixture(scope="session")
-def test_session_suffix(request, config_file):
-    return _get_option_value(
-        name="test_session_suffix",
-        config=config_file,
-        arg_options=request.config.option,
-        default=str(int(time.time())),
-    )
+def test_session_suffix(request):
+    return request.config.option.test_session_suffix
 
 
 @pytest.fixture(scope="session")
