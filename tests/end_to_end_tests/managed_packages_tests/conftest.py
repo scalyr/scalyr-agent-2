@@ -198,10 +198,9 @@ class RepoBuilder(Runner):
             .decode()
         )
 
-        repo_public_key = subprocess.check_output(
+        subprocess.check_call(
             ["gpg2", "--armor", "--export", sign_key_id, "--output", str(repo_public_key_file)]
-        ).decode()
-        repo_public_key_file.write_text(repo_public_key)
+        )
 
         if package_type == "deb":
             # Create deb repository using 'reprepro'.

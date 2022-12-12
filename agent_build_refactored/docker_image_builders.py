@@ -259,7 +259,7 @@ class ContainerImageBuilder(Runner):
             shutil.rmtree(package_root_path)
         package_root_path.mkdir(parents=True)
 
-        # Build 'HFS-structured' filesystem.
+        # Build 'FHS-structured' filesystem.
         build_linux_fhs_agent_files(
             copy_agent_source=True,
             output_path=package_root_path,

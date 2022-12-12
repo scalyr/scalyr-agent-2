@@ -48,6 +48,7 @@ def is_branch_has_pull_requests() -> bool:
     """
     data = subprocess.check_output([
         "curl",
+        "-s",
         "-H",
         f"Authorization: Bearer {GITHUB_TOKEN}",
         f"https://api.github.com/repos/ArthurKamalov/scalyr-agent-2/pulls?head=ArthurKamalov:{GITHUB_REF_NAME}&base=master",
