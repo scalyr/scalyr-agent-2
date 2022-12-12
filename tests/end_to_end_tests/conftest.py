@@ -21,7 +21,6 @@ some common options and fixtures such as Scalyr credentials etc.
 import json
 import os
 import pathlib as pl
-import time
 
 import pytest
 from _pytest.runner import pytest_runtest_protocol as orig_pytest_runtest_protocol

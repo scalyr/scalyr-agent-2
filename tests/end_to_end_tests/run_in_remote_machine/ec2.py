@@ -232,7 +232,9 @@ def run_test_in_ec2_instance(
         ssh.close()
 
         if return_code != 0:
-            raise Exception(f"Remote execution of test in ec2 instance has failed and returned {return_code}.")
+            raise Exception(
+                f"Remote execution of test in ec2 instance has failed and returned {return_code}."
+            )
 
     file_mappings = file_mappings or {}
     start_time = int(time.time())

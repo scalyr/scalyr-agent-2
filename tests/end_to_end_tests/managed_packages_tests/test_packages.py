@@ -153,7 +153,7 @@ def test_packages(
     _prepare_environment(
         package_type=package_builder.PACKAGE_TYPE,
         remote_machine_type=remote_machine_type,
-        distro_name=distro_name
+        distro_name=distro_name,
     )
 
     logger.info("Install agent from install script.")
@@ -164,13 +164,9 @@ def test_packages(
     except subprocess.CalledProcessError:
         install_log_path = pl.Path("scalyr_install.log")
         if install_log_path.exists():
-            logger.error(
-                f"Install log:\n{install_log_path.read_text()}\n"
-            )
+            logger.error(f"Install log:\n{install_log_path.read_text()}\n")
 
-        logger.exception(
-            f"Install script has failed."
-        )
+        logger.exception("Install script has failed.")
         raise
 
     logger.info(
@@ -258,11 +254,7 @@ def test_packages(
     # TODO: Add actual agent package testing here.
 
 
-def test_agent_package_config_ownership(
-        package_builder,
-        agent_package_path,
-        tmp_path
-):
+def test_agent_package_config_ownership(package_builder, agent_package_path, tmp_path):
     """
     Test ownership and permissions of the config files.
     """
@@ -271,7 +263,7 @@ def test_agent_package_config_ownership(
     _extract_package(
         package_type=package_builder.PACKAGE_TYPE,
         package_path=agent_package_path,
-        output_path=tmp_path
+        output_path=tmp_path,
     )
 
     agent_etc_path = tmp_path / "etc/scalyr-agent-2"
@@ -325,6 +317,7 @@ def _perform_ssl_checks(
     """
     Perform various checks of the ssl connection.
     """
+
     def _add_config(config):
         agent_paths.agent_config_path.write_text(json.dumps(config))
 
@@ -462,25 +455,18 @@ def _perform_ssl_checks(
 # Additional paths to add in case if tests run within "frozen" pytest executable.
 _ADDITIONAL_ENVIRONMENT = {
     "LD_LIBRARY_PATH": "/lib",
-    "PATH": "/bin:/sbin:/usr/bin:/usr/sbin"
+    "PATH": "/bin:/sbin:/usr/bin:/usr/sbin",
 }
 
 
 def _install_from_convenience_script(
-        script_path: pl.Path,
+    script_path: pl.Path,
 ):
     """Install agent using convenience script."""
-    subprocess.check_call(
-        ["bash", str(script_path)],
-        env=_ADDITIONAL_ENVIRONMENT
-    )
+    subprocess.check_call(["bash", str(script_path)], env=_ADDITIONAL_ENVIRONMENT)
 
 
-def _prepare_environment(
-        package_type: str,
-        remote_machine_type: str,
-        distro_name: str
-):
+def _prepare_environment(package_type: str, remote_machine_type: str, distro_name: str):
     """
     If needed, do some preparation before agent installation.
     :return:
@@ -557,11 +543,7 @@ System information
     logger.info(output)
 
 
-def _extract_package(
-        package_type: str,
-        package_path: pl.Path,
-        output_path: pl.Path
-):
+def _extract_package(package_type: str, package_path: pl.Path, output_path: pl.Path):
     if package_type == "deb":
         subprocess.check_call(["dpkg-deb", "-x", str(package_path), str(output_path)])
     elif package_type == "rpm":

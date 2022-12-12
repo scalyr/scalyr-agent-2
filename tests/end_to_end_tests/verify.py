@@ -351,9 +351,9 @@ def verify_logs(
 
 
 def verify_agent_status(
-        agent_version: str,
-        agent_commander: AgentCommander,
-        #timeout_tracker: TimeoutTracker
+    agent_version: str,
+    agent_commander: AgentCommander,
+    # timeout_tracker: TimeoutTracker
 ):
     """
     Perform basic verification of the agent output.

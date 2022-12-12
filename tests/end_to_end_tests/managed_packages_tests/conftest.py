@@ -18,9 +18,11 @@ from agent_build_refactored.managed_packages.managed_packages_builders import (
     PREPARE_TOOLSET_GLIBC_X86_64,
     PYTHON_PACKAGE_NAME,
     AGENT_LIBS_PACKAGE_NAME,
-    AGENT_PACKAGE_NAME
+    AGENT_PACKAGE_NAME,
 )
-from agent_build_refactored.managed_packages.convenience_install_script.builder import ConvenienceScriptBuilder
+from agent_build_refactored.managed_packages.convenience_install_script.builder import (
+    ConvenienceScriptBuilder,
+)
 from tests.end_to_end_tests.run_in_remote_machine import DISTROS
 
 
@@ -47,8 +49,8 @@ def pytest_addoption(parser):
         "--remote-machine-type",
         required=True,
         choices=["ec2", "docker", "local"],
-        help="Type of the remote machine for the test. For 'ec2' - run in AWS ec2 instance," \
-             "'docker' - run in docker container, 'local', run locally."
+        help="Type of the remote machine for the test. For 'ec2' - run in AWS ec2 instance,"
+        "'docker' - run in docker container, 'local', run locally.",
     )
 
     parser.addoption(
@@ -199,7 +201,14 @@ class RepoBuilder(Runner):
         )
 
         subprocess.check_call(
-            ["gpg2", "--armor", "--export", sign_key_id, "--output", str(repo_public_key_file)]
+            [
+                "gpg2",
+                "--armor",
+                "--export",
+                sign_key_id,
+                "--output",
+                str(repo_public_key_file),
+            ]
         )
 
         if package_type == "deb":
@@ -307,11 +316,7 @@ def server_root(request, tmp_path_factory, package_builder):
         repo_builder.build(
             package_type=package_builder.PACKAGE_TYPE, packages_dir_path=packages_dir
         )
-        shutil.copytree(
-            repo_builder.output_path,
-            server_root,
-            dirs_exist_ok=True
-        )
+        shutil.copytree(repo_builder.output_path, server_root, dirs_exist_ok=True)
 
     return server_root
 
