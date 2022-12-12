@@ -359,6 +359,7 @@ else
 
   APT_VERSION=$(dpkg -s apt | grep Version | cut -d ":" -f 2 | tr -d " ")
 
+  # shellcheck disable=SC2072
   if [[ "$APT_VERSION" < "1.1" ]]; then
     # For systems with old apt version we add key to trusted keys.
     PUBLIC_KEY_PATH="/etc/apt/trusted.gpg.d/scalyr.gpg"

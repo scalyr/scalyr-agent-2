@@ -203,11 +203,11 @@ class RepoBuilder(Runner):
         subprocess.check_call(
             [
                 "gpg2",
+                "--output",
+                str(repo_public_key_file),
                 "--armor",
                 "--export",
                 sign_key_id,
-                "--output",
-                str(repo_public_key_file),
             ]
         )
 
