@@ -26,7 +26,7 @@ from typing import List
 
 import pytest
 
-from tests.end_to_end_tests.tools import AgentPaths
+from tests.end_to_end_tests.tools import AgentPaths, TimeoutTracker
 from tests.end_to_end_tests.verify import (
     verify_logs,
     write_counter_messages_to_test_log,
@@ -161,7 +161,6 @@ def dump_log(agent_paths, server_host):
         log.info(agent_paths.agent_log_path.read_text())
 
 
-@pytest.mark.timeout(200)
 def test_basic(
     scalyr_api_key,
     scalyr_server,
@@ -178,6 +177,8 @@ def test_basic(
     those messages are reached the Scalyr server.
     """
     upload_test_log_path = agent_paths.logs_dir / "test.log"
+
+    timeout_tracker = TimeoutTracker(200)
 
     default_config["logs"] = [
         {"path": str(upload_test_log_path), "attributes": {"parser": "json"}}
@@ -198,6 +199,7 @@ def test_basic(
             f"$serverHost=='{server_host}'",
         ],
         counter_getter=lambda e: e["attributes"]["count"],
+        timeout_tracker=timeout_tracker,
         write_counter_messages=functools.partial(
             write_counter_messages_to_test_log,
             upload_test_log_path=upload_test_log_path,
