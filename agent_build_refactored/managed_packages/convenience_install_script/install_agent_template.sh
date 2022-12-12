@@ -79,9 +79,9 @@ function run_command() {
   if [ -n "$VERBOSE" ]; then
     $1 || $die_func "$err_msg";
   else
-    echo "**** Running command \"$1\" ******"  >> $COMMAND_LOG 2>&1;
-    $1 >> $COMMAND_LOG 2>&1 || $die_func "$err_msg";
-    echo "**** Finished command \"$1\" ******"  >> $COMMAND_LOG 2>&1;
+    echo "**** Running command \"$1\" ******"  >> "$COMMAND_LOG" 2>&1;
+    $1 >> "$COMMAND_LOG" 2>&1 || $die_func "$err_msg";
+    echo "**** Finished command \"$1\" ******"  >> "$COMMAND_LOG" 2>&1;
   fi
 }
 
@@ -92,7 +92,7 @@ function lecho() {
     echo "$1";
   else
     echo "$1";
-    echo "$1" >> $COMMAND_LOG 2>&1;
+    echo "$1" >> "$COMMAND_LOG" 2>&1;
   fi
 }
 
@@ -101,7 +101,7 @@ function lecho() {
 # error message that would normally be printed out.
 function check_for_https_error() {
   apt_install_command="sudo apt-get install -y --force-yes apt-transport-https ca-certificates"
-  if grep -q "/usr/lib/apt/methods/https could not be found" $COMMAND_LOG; then
+  if grep -q "/usr/lib/apt/methods/https could not be found" "$COMMAND_LOG"; then
     echo ""
     echo "** Failed because apt-transport-https is not installed. **"
     echo "  Please execute \"$apt_install_command\" and rerun script."
@@ -112,7 +112,7 @@ function check_for_https_error() {
 }
 
 TMPDIR=`mktemp -d`;
-trap "rm -rf $TMPDIR" EXIT;
+trap 'rm -rf $TMPDIR' EXIT;
 
 # The repository we will install the agent against.  Either yum, apt, or
 # yum-alt.
@@ -134,9 +134,6 @@ SCALYR_SERVER=
 
 REPOSITORY_URL="{ % REPLACE_REPOSITORY_URL % }"
 PUBLIC_KEY_URL="{ % REPLACE_PUBLIC_KEY_URL % }"
-
-
-USE_BOOTSTRAP_PACKAGES=false
 
 # Handle the options
 while (( $# > 0)); do
@@ -194,7 +191,7 @@ done
 fail() {
   # Check for error which indicates suitable Python interpreter is not
   # installed on the system and print a more user-friendly error
-  if grep -q "Suitable Python interpreter not found" ${COMMAND_LOG}; then
+  if grep -q "Suitable Python interpreter not found" "${COMMAND_LOG}"; then
     echo ""
     echo "** Failed because suitable Python interpreter is not found. **"
     echo "Please install suitable interpreter and rerun the script."
@@ -424,8 +421,8 @@ fi
 
 rm -f "$COMMAND_LOG" ||
   die "Install succeeded but could not delete tmp log: $COMMAND_LOG";
-rm -rf "$TMP_DIR" ||
-  die "Install succeeded but could not delete tmp directory: $TMP_DIR";
+rm -rf "$TMPDIR" ||
+  die "Install succeeded but could not delete tmp directory: $TMPDIR";
 
 # Reset the signal:
 trap EXIT;
