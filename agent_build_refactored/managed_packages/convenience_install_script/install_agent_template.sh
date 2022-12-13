@@ -184,7 +184,6 @@ while (( $# > 0)); do
 
     *)
       die "Unrecognized option: $1";
-      break;;
   esac
 done
 
@@ -267,7 +266,7 @@ if [ -z "$VERBOSE" ]; then
   # Add in extra message to be printed at EXIT to remind folks the should look
   # in the command log.  We should remove this trap down below if the
   # installation is successful.
-  trap "fail" EXIT;
+  trap fail EXIT;
 fi
 
 lecho "Installing scalyr-agent-2:";
@@ -345,7 +344,7 @@ else
   run_command "dpkg -r scalyr-repo-bootstrap";
 
   # update repository and install tools that may be needed.
-  run_command "apt-get -y update";
+  run_command "apt-get -y update" check_for_https_error;
 
   echo "Install required dependencies."
   export DEBIAN_FRONTEND=noninteractive
