@@ -904,7 +904,9 @@ class PodProcessor(_K8sProcessor):
                     "parent of controller %s is not standard k8s object (got=%s), ignoring"
                     % (controller.name, controller.parent_kind),
                     limit_once_per_x_secs=3600,
-                    limit_key="k8s_unfamiliar_controller_kind_{}".format(controller.parent_kind),
+                    limit_key="k8s_unfamiliar_controller_kind_{}".format(
+                        controller.parent_kind
+                    ),
                 )
                 break
 
