@@ -104,6 +104,9 @@ _OBJECT_ENDPOINTS = {
         "list": Template("/apis/apps/v1/namespaces/${namespace}/statefulsets"),
         "list-all": "/apis/apps/v1/statefulsets",
     },
+    # This is for Argo-Rollout enabled clusters. Hopefully this code is
+    # replaced with something more appropriate before Rollouts are moved out of
+    # alpha.
     "Rollout": {
         "single": Template(
             "/apis/argoproj.io/v1alpha1/namespaces/${namespace}/rollouts/${name}"
