@@ -425,5 +425,3 @@ rm -rf "$TMPDIR" ||
 
 # Reset the signal:
 trap EXIT;
-
-exit 0;
