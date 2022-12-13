@@ -17,12 +17,14 @@ import os
 import platform
 import re
 import time
+import json
+import pathlib as pl
 from urllib.parse import quote_plus, urlencode
 from typing import Callable, List, Any
 
 import requests
 
-from tests.end_to_end_tests.tools import AgentCommander
+from tests.end_to_end_tests.tools import AgentCommander, TimeoutTracker
 
 
 log = logging.getLogger(__name__)
@@ -57,7 +59,36 @@ def preprocess_agent_log_messages(content: str):
     return messages
 
 
-def check_agent_log_for_errors(content: str):
+def check_agent_log_for_errors(
+    content: str, ignore_predicates: List[Callable[[str, List[str]], bool]] = None
+):
+    """
+    Checks content of the agent log for errors.
+    :param content: String with content of the log.
+    :param ignore_predicates: List of callables where each accepts error message line and following traceback (if exists)
+        and returns True whether this message has to be ignored, so the overall check will not fail.
+    """
+
+    ignore_predicates = ignore_predicates or []
+
+    def skip_temp_hostname_resolution_error(message, additional_lines):
+        if (
+            '[error="client/connectionFailed"] Failed to connect to "https://agent.scalyr.com" due to errno=-3.'
+            not in message
+        ):
+            return False
+        for additional_line in additional_lines:
+            if "socket.gaierror: [Errno -3] Try again" in additional_line:
+                return True
+            if (
+                "socket.gaierror: [Errno -3] Temporary failure in name resolution"
+                in additional_line
+            ):
+                return True
+
+        return False
+
+    ignore_predicates.append(skip_temp_hostname_resolution_error)
 
     messages = preprocess_agent_log_messages(content=content)
     error_line_pattern = re.compile(rf"{AGENT_LOG_LINE_TIMESTAMP} (ERROR|CRITICAL) .*")
@@ -70,24 +101,15 @@ def check_agent_log_for_errors(content: str):
 
             to_fail = True
 
-            # There is an issue with dns resolution on GitHub actions side, so we skip some of the error messages.
-            connection_error_mgs = '[error="client/connectionFailed"] Failed to connect to "https://agent.scalyr.com" due to errno=-3.'
-
-            if connection_error_mgs in messages:
-                # If the traceback that follows after error message contains particular error message,
-                # then we are ok with that.
-                errors_to_ignore = [
-                    "socket.gaierror: [Errno -3] Try again",
-                    "socket.gaierror: [Errno -3] Temporary failure in name resolution",
-                ]
-                for error_to_ignore in errors_to_ignore:
-                    if error_to_ignore in additional_lines:
-                        to_fail = False
-                        log.info(f"Ignored error: {whole_error}")
-                        break
+            for predicate in ignore_predicates:
+                if predicate(message, additional_lines):
+                    to_fail = False
+                    log.info(f"Ignored error: {whole_error}")
+                    break
 
             if to_fail:
-                raise AssertionError(f"Agent log container error: {whole_error}")
+                log.info(content)
+                raise AssertionError(f"Agent log error: {whole_error}")
 
 
 def check_requests_stats_in_agent_log(content: str) -> bool:
@@ -105,7 +127,6 @@ def check_requests_stats_in_agent_log(content: str) -> bool:
         )
 
         if m:
-            log.info("Requests stats message has been found. Verify that stats...")
             # Also do a final check for a valid request stats.
             md = m.groupdict()
             requests_sent = int(md["requests_sent"])
@@ -192,14 +213,30 @@ TEST_LOG_MESSAGE_COUNT = 1000
 _QUERY_RETRY_DELAY = 10
 
 
+def write_counter_messages_to_test_log(upload_test_log_path: pl.Path):
+    """
+    Write special counter messages to a test log file. Those messages then will be queried from Scalyr to verify
+    that they all were successfully ingested.
+    """
+    with upload_test_log_path.open("a") as test_log_write_file:
+        for i in range(TEST_LOG_MESSAGE_COUNT):
+            data = {"count": i}
+            data_json = json.dumps(data)
+            test_log_write_file.write(data_json)
+            test_log_write_file.write("\n")
+            test_log_write_file.flush()
+
+
 def verify_logs(
     scalyr_api_read_key: str,
     scalyr_server: str,
     get_agent_log_content: Callable[[], str],
     counters_verification_query_filters: List[str],
     counter_getter: Callable[[Any], int],
+    timeout_tracker: TimeoutTracker,
     write_counter_messages: Callable[[], None] = None,
     verify_ssl: bool = True,
+    ignore_agent_errors_predicates: List[Callable[[str, List[str]], bool]] = None,
 ):
     """
     Do a basic verifications on agent log file.
@@ -211,8 +248,12 @@ def verify_logs(
     :param counters_verification_query_filters:  List of Scalyr query language filters which are required to fetch
         messages that are ingested by the 'write_counter_messages'
     :param counter_getter: Function which should return counter from the ingested message.
+    :param timeout_tracker: Instance of the TimeoutTracker.
     :param write_counter_messages: Function that writes counter messages to upload the to Scalyr.
         Can be None, for example for the kubernetes image test, where writer pod is already started.
+    :param verify_ssl: Verify that agent connected with ssl enabled.
+    :param ignore_agent_errors_predicates: List of callables where each accepts error message line and following traceback
+        (if exists) and returns True whether this message has to be ignored, so the overall check will not fail.
     """
     if write_counter_messages:
         log.info("Write test log file messages.")
@@ -229,16 +270,29 @@ def verify_logs(
             "Server certificate validation has been disabled" not in agent_log_content
         )
 
-    check_agent_log_for_errors(content=agent_log_content)
+    first_check_agent_log_content = agent_log_content
+    if not first_check_agent_log_content.endswith("\n"):
+        # Get only complete lines.
+        first_check_agent_log_content = first_check_agent_log_content.rsplit(
+            os.linesep, 1
+        )[0]
+    check_agent_log_for_errors(
+        content=first_check_agent_log_content,
+        ignore_predicates=ignore_agent_errors_predicates,
+    )
 
-    log.info("Wait for agent log requests stats.")
-    while not check_requests_stats_in_agent_log(content=get_agent_log_content()):
-        time.sleep(1)
+    log.info("Wait for agent log requests stats...")
+
+    with timeout_tracker(80, "Can not wait more for requests stats."):
+        while not check_requests_stats_in_agent_log(content=get_agent_log_content()):
+            log.info("   Request stats haven't been found yet, retry...")
+            timeout_tracker.sleep(10)
 
     log.info(
-        "Verify that previously written test log file content has been uploaded to server."
+        "Verify that previously written counter messages have been uploaded to server."
     )
     while True:
+        timeout_tracker.sleep(_QUERY_RETRY_DELAY, "Could not fetch data from Scalyr.")
         resp = ScalyrQueryRequest(
             server_address=scalyr_server,
             read_api_key=scalyr_api_read_key,
@@ -251,7 +305,6 @@ def verify_logs(
 
         if not resp:
             log.info(f"Retry in {_QUERY_RETRY_DELAY} sec.")
-            time.sleep(_QUERY_RETRY_DELAY)
             continue
 
         events = resp["matches"]
@@ -287,10 +340,21 @@ def verify_logs(
         break
 
     # Do a final error check for agent log.
-    check_agent_log_for_errors(content=get_agent_log_content())
+    # We also replace agent log part from the first check, so it will check only new lines.
+    second_check_agent_log_content = get_agent_log_content().replace(
+        first_check_agent_log_content, ""
+    )
+    check_agent_log_for_errors(
+        content=second_check_agent_log_content,
+        ignore_predicates=ignore_agent_errors_predicates,
+    )
 
 
-def verify_agent_status(agent_version: str, agent_commander: AgentCommander):
+def verify_agent_status(
+    agent_version: str,
+    agent_commander: AgentCommander,
+    # timeout_tracker: TimeoutTracker
+):
     """
     Perform basic verification of the agent output.
     """
@@ -298,11 +362,15 @@ def verify_agent_status(agent_version: str, agent_commander: AgentCommander):
     log.info("Verifying agent status output")
     # Verify text status
     string_status = agent_commander.get_status()
+    print("!!!")
+    print(string_status)
 
     assert "agent.log" in string_status
     if platform.system() == "Linux":
-        assert "linux_system_metrics" in string_status
-        assert "linux_process_metrics" in string_status
+        message = f"Can not find linux system metrics monitor is agent's status. Status: {string_status}"
+        assert "linux_system_metrics" in string_status, message
+        message = f"Can not find linux process metrics monitor is agent's status. Status: {string_status}"
+        assert "linux_process_metrics" in string_status, message
 
     # Verify json status
     json_status = agent_commander.get_status_json()

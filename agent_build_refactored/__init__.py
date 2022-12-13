@@ -18,6 +18,8 @@ from agent_build_refactored.tools.runner import (
     GitHubActionsSettings,
 )
 from agent_build_refactored.tools.constants import SOURCE_ROOT, AGENT_BUILD_PATH
+from agent_build_refactored.docker_image_builders import ALL_IMAGE_BUILDERS
+from agent_build_refactored.managed_packages.managed_packages_builders import ALL_MANAGED_PACKAGE_BUILDERS
 
 
 # Step that runs small script which installs requirements for the test/dev environment.
@@ -31,3 +33,9 @@ INSTALL_TEST_REQUIREMENT_STEP = EnvironmentRunnerStep(
 
 class BuildTestEnvironment(Runner):
     BASE_ENVIRONMENT = INSTALL_TEST_REQUIREMENT_STEP
+
+
+ALL_USED_BUILDERS = {
+    **ALL_IMAGE_BUILDERS,
+    **ALL_MANAGED_PACKAGE_BUILDERS
+}
