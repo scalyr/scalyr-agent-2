@@ -99,6 +99,8 @@ function lecho() {
 # Helper method invoked to check to see if an install failed because apt-transport-https is not installed
 # (some Debian distros have a separate package for using HTTPS for downloading packages).  $1 contains the
 # error message that would normally be printed out.
+
+# shellcheck disable=SC2317
 function check_for_https_error() {
   apt_install_command="sudo apt-get install -y --force-yes apt-transport-https ca-certificates"
   if grep -q "/usr/lib/apt/methods/https could not be found" "$COMMAND_LOG"; then
@@ -187,7 +189,10 @@ while (( $# > 0)); do
   esac
 done
 
-fail() {
+function foo() {
+
+# shellcheck disable=SC2317
+}fail() {
   # Check for error which indicates suitable Python interpreter is not
   # installed on the system and print a more user-friendly error
   if grep -q "Suitable Python interpreter not found" "${COMMAND_LOG}"; then
