@@ -1244,7 +1244,7 @@ class SyslogHandler(object):
         self.__syslog_expire_log = config.get("expire_log")
         self.__syslog_loggers = {}
         self.__syslog_parser = config.get("parser")
-        self.__syslog_attributes = config.get("attributes") or {}
+        self.__syslog_attributes = JsonObject(config.get("attributes") or {})
 
         if docker_logging:
             self._docker_options = docker_options
@@ -1578,9 +1578,12 @@ class SyslogHandler(object):
                     flush_delay=self.__flush_delay,
                 )
 
+                attribs = self.__syslog_attributes.copy()
+                attribs.update({k.lower(): v for k, v in extra.items() if v is not None})
+
                 log_config = {
                     "parser": self.__syslog_parser,
-                    "attributes": self.__syslog_attributes,
+                    "attributes": attribs,
                     "path": path,
                 }
 
