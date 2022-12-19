@@ -804,7 +804,6 @@ class Runner:
     def runs_in_docker(self) -> bool:
         return self.base_docker_image is not None and not IN_DOCKER
 
-
     def run_in_docker(
             self,
             command_args: List = None,
@@ -831,7 +830,7 @@ class Runner:
 
             mount_args.extend([
                 "-v",
-                f"{arg.path}:{in_docker_path}:z"
+                f"{arg.path}:{in_docker_path}"
             ])
             final_command_args.append(str(in_docker_path))
 
@@ -846,7 +845,7 @@ class Runner:
             "-i",
             *mount_args,
             "-v",
-            f"{SOURCE_ROOT}:/tmp/source:z",
+            f"{SOURCE_ROOT}:/tmp/source",
             *env_args,
             "--platform",
             str(self.base_docker_image.platform),

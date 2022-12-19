@@ -161,7 +161,7 @@ def add_config(
     agent_d_path.mkdir(exist_ok=True)
     # NOTE: We in intentionally set this permission bit for agent.d directory to make sure it's not
     # readable by others.
-    agent_d_path.chmod(int("741", 8))
+    agent_d_path.chmod(int("751", 8))
 
     # Also iterate through all files in the agent.d and set appropriate permissions.
     for child_path in agent_d_path.iterdir():
@@ -344,14 +344,14 @@ def build_linux_agent_files(
         shutil.copy2(SOURCE_ROOT / "docker" / f, misc_path / f)
 
 
-def build_linux_lfs_agent_files(
+def build_linux_fhs_agent_files(
     output_path: pl.Path,
     version: str = None,
     frozen_binary_path: pl.Path = None,
     copy_agent_source: bool = False,
 ):
     """
-    Adapt agent's Linux based files for LFS based packages such DEB,RPM or for the filesystems for our docker images.
+    Adapt agent's Linux based files for FHS based packages such DEB,RPM or for the filesystems for our docker images.
         In opposite, it is expected that a frozen binaries will be placed instead of source code later.
     :param output_path: Output path for the root of the agent's base files.
     :param version: Version string to assign to the future package, uses version from the VERSION file if None.

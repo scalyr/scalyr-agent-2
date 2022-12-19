@@ -26,10 +26,10 @@ from typing import List
 
 import pytest
 
-from tests.end_to_end_tests.tools import AgentPaths
+from tests.end_to_end_tests.tools import AgentPaths, TimeoutTracker
 from tests.end_to_end_tests.verify import (
     verify_logs,
-    TEST_LOG_MESSAGE_COUNT,
+    write_counter_messages_to_test_log,
     verify_agent_status,
 )
 from agent_build.tools.constants import SOURCE_ROOT
@@ -161,21 +161,6 @@ def dump_log(agent_paths, server_host):
         log.info(agent_paths.agent_log_path.read_text())
 
 
-def _write_counter_messages_to_test_log(upload_test_log_path: pl.Path):
-    """
-    Write special counter messages to a test log file. Those messages then will be queried from Scalyr to verify
-    that they all were successfully ingested.
-    """
-    with upload_test_log_path.open("a") as test_log_write_file:
-        for i in range(TEST_LOG_MESSAGE_COUNT):
-            data = {"count": i}
-            data_json = json.dumps(data)
-            test_log_write_file.write(data_json)
-            test_log_write_file.write("\n")
-            test_log_write_file.flush()
-
-
-@pytest.mark.timeout(200)
 def test_basic(
     scalyr_api_key,
     scalyr_server,
@@ -193,6 +178,8 @@ def test_basic(
     """
     upload_test_log_path = agent_paths.logs_dir / "test.log"
 
+    timeout_tracker = TimeoutTracker(200)
+
     default_config["logs"] = [
         {"path": str(upload_test_log_path), "attributes": {"parser": "json"}}
     ]
@@ -208,11 +195,13 @@ def test_basic(
         scalyr_server=scalyr_server,
         get_agent_log_content=agent_paths.agent_log_path.read_text,
         counters_verification_query_filters=[
-            f"$logfile=='{upload_test_log_path}'" f"$serverHost=='{server_host}'",
+            f"$logfile=='{upload_test_log_path}'",
+            f"$serverHost=='{server_host}'",
         ],
         counter_getter=lambda e: e["attributes"]["count"],
+        timeout_tracker=timeout_tracker,
         write_counter_messages=functools.partial(
-            _write_counter_messages_to_test_log,
+            write_counter_messages_to_test_log,
             upload_test_log_path=upload_test_log_path,
         ),
         verify_ssl=False,

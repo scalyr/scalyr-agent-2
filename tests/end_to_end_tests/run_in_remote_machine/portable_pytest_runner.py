@@ -53,6 +53,8 @@ class PortablePytestRunnerBuilder(Runner):
                 f"agent_build{os.pathsep}agent_build",
                 "--add-data",
                 f"agent_build_refactored{os.pathsep}agent_build_refactored",
+                "--add-data",
+                f"VERSION{os.pathsep}.",
                 # As an entry point we use this file itself because it also acts like a script which invokes pytest.
                 __file__,
             ],

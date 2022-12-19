@@ -3226,8 +3226,20 @@ class ContainerChecker(object):
                     rename_vars["deployment_name"] = controller.name
                     rename_vars["controller_name"] = controller.name
                     if self.__include_controller_info:
+                        # The following attributes are translated into server
+                        # fields, and the names are translated into the
+                        # following usable names once ingested.
+                        #
+                        # `_k8s_dn` is the controller/deployment name, and the
+                        # key for this value is based upon the value in the
+                        # field `_k8s_ck`
                         container_attributes["_k8s_dn"] = controller.name
+                        # `_k8s_dl` is translated to `k8s-labels`
                         container_attributes["_k8s_dl"] = controller.flat_labels
+                        # `_k8s_ck` is translated into the field key for
+                        # `_k8s_dn`. Here are some examples: `k8s-deployment`,
+                        # `k8s-daemon-set`, `k8s-stateful-set`, etc. If the
+                        # kind is unrecognized, it will be `k8s-controller`
                         container_attributes["_k8s_ck"] = controller.kind
 
                 # get the annotations of this pod as a dict.

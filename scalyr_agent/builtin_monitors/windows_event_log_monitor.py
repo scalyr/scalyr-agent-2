@@ -880,6 +880,8 @@ class NewJsonApi(NewApi):
 
             found = False
             for dll in self._dll_cache.values():
+                if not isinstance(dll, _DLL):
+                    continue
                 if dll.path == dllpath:
                     self._dll_cache[dll_key] = dll
                     found = True

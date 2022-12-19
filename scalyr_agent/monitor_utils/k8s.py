@@ -7,6 +7,7 @@ import os
 import random
 import re
 import warnings
+from logging import WARNING
 from string import Template
 import sys
 import threading
@@ -102,6 +103,16 @@ _OBJECT_ENDPOINTS = {
         ),
         "list": Template("/apis/apps/v1/namespaces/${namespace}/statefulsets"),
         "list-all": "/apis/apps/v1/statefulsets",
+    },
+    # This is for Argo-Rollout enabled clusters. Hopefully this code is
+    # replaced with something more appropriate before Rollouts are moved out of
+    # alpha.
+    "Rollout": {
+        "single": Template(
+            "/apis/argoproj.io/v1alpha1/namespaces/${namespace}/rollouts/${name}"
+        ),
+        "list": Template("/apis/argoproj.io/v1alpha1/namespaces/${namespace}/rollouts"),
+        "list-all": "/apis/argoproj.io/v1alpha1/rollouts",
     },
 }
 
@@ -892,9 +903,13 @@ class PodProcessor(_K8sProcessor):
 
             if controller.parent_kind not in _OBJECT_ENDPOINTS:
                 global_log.log(
-                    scalyr_logging.DEBUG_LEVEL_1,
+                    WARNING,
                     "parent of controller %s is not standard k8s object (got=%s), ignoring"
                     % (controller.name, controller.parent_kind),
+                    limit_once_per_x_secs=3600,
+                    limit_key="k8s_unfamiliar_controller_kind_{}".format(
+                        controller.parent_kind
+                    ),
                 )
                 break
 

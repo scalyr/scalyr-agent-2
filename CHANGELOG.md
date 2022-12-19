@@ -1,6 +1,14 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.39 "Hroderich" - December 15, 2022
+<!---
+Packaged by Dominic LoBue <dominicl@sentinelone.com> on Dec 15, 2022 00:00 -0800
+--->
+
+Kubernetes:
+* Support ``Rollout`` controllers from argo-rollouts as a source of server metadata with which to annotate events.
+
 ## 2.1.38 "Zaotune" - December 1, 2022
 <!---
 Packaged by Joseph Makar <joseph.makar@sentinelone.com> on Dec 1, 2022 00:00 -0800
