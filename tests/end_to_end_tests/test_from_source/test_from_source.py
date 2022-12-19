@@ -191,7 +191,7 @@ def test_basic(
     verify_agent_status(
         agent_version=agent_version,
         agent_commander=agent_commander,
-        timeout_tracker=timeout_tracker
+        timeout_tracker=timeout_tracker,
     )
 
     verify_logs(

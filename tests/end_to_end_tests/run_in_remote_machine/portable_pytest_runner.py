@@ -26,7 +26,7 @@ from agent_build_refactored.tools.constants import SOURCE_ROOT, Architecture
 from agent_build_refactored.tools.runner import Runner
 from agent_build_refactored.managed_packages.managed_packages_builders import (
     PREPARE_TOOLSET_GLIBC_X86_64,
-    PREPARE_TOOLSET_GLIBC_ARM64
+    PREPARE_TOOLSET_GLIBC_ARM64,
 )
 
 PORTABLE_RUNNER_NAME = "portable_runner"
@@ -100,7 +100,7 @@ class PortablePytestRunnerBuilderARM64(PortablePytestRunnerBuilder):
 
 PORTABLE_PYTEST_RUNNER_BUILDERS = {
     Architecture.X86_64: PortablePytestRunnerBuilderX86_64,
-    Architecture.ARM64: PortablePytestRunnerBuilderARM64
+    Architecture.ARM64: PortablePytestRunnerBuilderARM64,
 }
 
 

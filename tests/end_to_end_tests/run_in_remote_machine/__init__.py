@@ -23,7 +23,7 @@ import subprocess
 from typing import List, Dict
 
 from agent_build_refactored.tools.constants import Architecture
-from agent_build_refactored.tools.build_in_ec2 import create_ec2_instance_node, run_ssh_command_on_node, AWSSettings, EC2DistroImage
+from agent_build_refactored.tools.run_in_ec2.constants import EC2DistroImage
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +34,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
             Architecture.X86_64: EC2DistroImage(
                 image_id="ami-09d56f8956ab235b3",
                 image_name="Ubuntu Server 22.04 (HVM), SSD Volume Type",
+                short_name="ubuntu2204",
                 size_id="m1.small",
                 ssh_username="ubuntu",
             )
@@ -45,6 +46,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
             Architecture.X86_64: EC2DistroImage(
                 image_id="ami-0149b2da6ceec4bb0",
                 image_name="Ubuntu Server 20.04 LTS (HVM), SSD Volume Type",
+                short_name="ubuntu2004",
                 size_id="m1.small",
                 ssh_username="ubuntu",
             )
@@ -56,6 +58,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
             Architecture.X86_64: EC2DistroImage(
                 image_id="ami-07ebfd5b3428b6f4d",
                 image_name="Ubuntu Server 18.04 LTS (HVM), SSD Volume Type",
+                short_name="ubuntu1804",
                 size_id="m1.small",
                 ssh_username="ubuntu",
             )
@@ -67,6 +70,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
             Architecture.X86_64: EC2DistroImage(
                 image_id="ami-08bc77a2c7eb2b1da",
                 image_name="Ubuntu Server 16.04 LTS (HVM), SSD Volume Type",
+                short_name="ubuntu1604",
                 size_id="m1.small",
                 ssh_username="ubuntu",
             )
@@ -78,6 +82,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
             Architecture.X86_64: EC2DistroImage(
                 image_id="ami-07957d39ebba800d5",
                 image_name="Ubuntu Server 14.04 LTS (HVM)",
+                short_name="ubuntu1404",
                 size_id="t2.small",
                 ssh_username="ubuntu",
             )
@@ -89,6 +94,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
             Architecture.X86_64: EC2DistroImage(
                 image_id="ami-09a41e26df464c548",
                 image_name="Debian 11 (HVM), SSD Volume Type",
+                short_name="debian11",
                 size_id="t2.small",
                 ssh_username="ubuntu",
             )
@@ -100,6 +106,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
             Architecture.X86_64: EC2DistroImage(
                 image_id="ami-0b9a611a02047d3b1",
                 image_name="Debian 10 Buster",
+                short_name="debian10",
                 size_id="t2.small",
                 ssh_username="admin",
             )
@@ -111,6 +118,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
             Architecture.X86_64: EC2DistroImage(
                 image_id="ami-01ca03df4a6012157",
                 image_name="CentOS 8 (x86_64) - with Updates HVM",
+                short_name="centos8",
                 size_id="t2.small",
                 ssh_username="centos",
             )
@@ -122,6 +130,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
             Architecture.X86_64: EC2DistroImage(
                 image_id="ami-0affd4508a5d2481b",
                 image_name="CentOS 7 (x86_64) - with Updates HVM",
+                short_name="centos7",
                 size_id="t2.small",
                 ssh_username="centos",
             )
@@ -133,6 +142,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
             Architecture.X86_64: EC2DistroImage(
                 image_id="ami-03a941394ec9849de",
                 image_name="CentOS 6 (x86_64) - with Updates HVM",
+                short_name="centos7",
                 size_id="t2.small",
                 ssh_username="root",
             )
@@ -144,6 +154,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
             Architecture.X86_64: EC2DistroImage(
                 image_id="ami-09d95fab7fff3776c",
                 image_name="Amazon Linux 2 AMI (HVM), SSD Volume Type",
+                short_name="amazonlinux2",
                 size_id="t2.small",
                 ssh_username="ec2-user",
             )
@@ -182,32 +193,42 @@ def run_test_remotely(
 
     if remote_machine_type == "ec2":
 
+        from agent_build_refactored.tools.run_in_ec2.boto3_tools import (
+            create_and_deploy_ec2_instance,
+            ssh_run_command,
+            create_ssh_connection,
+            AWSSettings,
+        )
+
         distro_image = distro[architecture]
 
         file_mappings = file_mappings or {}
         file_mappings[pytest_runner_path] = "/tmp/test_runner"
 
         aws_settings = AWSSettings.create_from_env()
+        boto3_session = aws_settings.create_boto3_session()
 
-        node = create_ec2_instance_node(
+        instance = create_and_deploy_ec2_instance(
+            boto3_session=boto3_session,
             ec2_image=distro_image,
+            name_prefix=distro_image.short_name,
             aws_settings=aws_settings,
-            file_mappings=file_mappings,
+            files_to_upload=file_mappings,
         )
 
-        final_command = [
-            "/tmp/test_runner",
-            "-s",
-            *command
-        ]
+        final_command = ["/tmp/test_runner", "-s", *command]
 
-        run_ssh_command_on_node(
-            command=final_command,
-            node=node,
-            ssh_username=distro_image.ssh_username,
-            private_key_path=aws_settings.private_key_path,
-            as_root=True
-        )
+        try:
+            ssh = create_ssh_connection(
+                instance.public_ip_address,
+                username=distro_image.ssh_username,
+                private_key_path=aws_settings.private_key_path,
+            )
+
+            ssh_run_command(ssh_connection=ssh, command=final_command, run_as_root=True)
+        finally:
+            logger.info("Terminating EC2 instance.")
+            instance.terminate()
     else:
         mount_options = []
 
@@ -222,10 +243,6 @@ def run_test_remotely(
                 "-v",
                 f"{pytest_runner_path}:/test_runner",
                 *mount_options,
-                "-e",
-                "TEST_RUNS_REMOTELY=1",
-                "-e",
-                "TEST_RUNS_IN_DOCKER=1",
                 "--platform",
                 str(architecture.as_docker_platform.value),
                 distro,

@@ -134,7 +134,7 @@ sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plu
 
 sudo usermod -aG docker $USER
 
-# Since some commands that run though SSH may require long some time to be completed, modify SSH server config to send
+# Since some commands that run though SSH may require some time to be completed, modify SSH server config to send
 # keep alive messages to prevent SSH connection from closing.
 echo "ClientAliveInterval 60" | sudo tee -a /etc/ssh/sshd_config
 sudo systemctl restart ssh.service

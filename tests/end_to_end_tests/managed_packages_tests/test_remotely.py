@@ -23,7 +23,7 @@ import pytest
 
 from tests.end_to_end_tests.run_in_remote_machine import run_test_remotely
 from tests.end_to_end_tests.run_in_remote_machine.portable_pytest_runner import (
-    PORTABLE_PYTEST_RUNNER_BUILDERS
+    PORTABLE_PYTEST_RUNNER_BUILDERS,
 )
 
 
@@ -41,7 +41,6 @@ def test_remotely(
     scalyr_server,
     test_session_suffix,
     tmp_path,
-    request,
 ):
 
     arch = package_builder.DEPENDENCY_PACKAGES_ARCHITECTURE
@@ -62,9 +61,10 @@ def test_remotely(
                 "--builder-name",
                 package_builder_name,
                 "--distro-name",
-                request.config.option.distro_name,
+                distro_name,
                 "--remote-machine-type",
-                "local",
+                remote_machine_type,
+                "--runs-locally",
                 "--packages-source-type",
                 "repo-tarball",
                 "--packages-source",

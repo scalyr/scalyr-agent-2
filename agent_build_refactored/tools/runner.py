@@ -19,6 +19,7 @@ import hashlib
 import json
 import os
 import pathlib as pl
+import shlex
 import shutil
 import logging
 import inspect
@@ -36,7 +37,8 @@ from agent_build_refactored.tools import (
     IN_DOCKER,
     IN_CICD,
 )
-from agent_build_refactored.tools.build_in_ec2 import EC2DistroImage, create_ec2_instance_node, AWSSettings, destroy_node_and_cleanup
+
+from agent_build_refactored.tools.run_in_ec2.constants import EC2DistroImage
 
 logger = logging.getLogger(__name__)
 
@@ -478,14 +480,15 @@ class RunnerStep:
         for env_var_name, env_var_val in env_variables_to_pass.items():
             env_options.extend(["-e", f"{env_var_name}={env_var_val}"])
 
-        base_output_directory = self._base_step.get_output_directory(work_dir=work_dir)
-        image_path = base_output_directory / self._base_docker_image.name
-        # Load base image.
-        _load_image(
-            image_name=self._base_docker_image.name,
-            image_path=image_path,
-            remote_docker_host=remote_docker_host
-        )
+        if self._base_step is not None:
+            base_output_directory = self._base_step.get_output_directory(work_dir=work_dir)
+            image_path = base_output_directory / self._base_docker_image.name
+            # Load base image.
+            _load_image(
+                image_name=self._base_docker_image.name,
+                image_path=image_path,
+                remote_docker_host=remote_docker_host
+            )
 
         run_docker_command(["rm", "-f", self._step_container_name], remote_docker_host=remote_docker_host)
 
@@ -563,36 +566,6 @@ class RunnerStep:
                 ],
                 remote_docker_host=remote_docker_host
             )
-
-    # def _prepare_base_image(self, work_dir: pl.Path, remote_docker_host: str = None):
-    #     """
-    #     Prepare base image for step that runs inside docker.
-    #     """
-    #     if self._base_step is None:
-    #         return
-    #
-    #     output_bytes = run_docker_command(
-    #         ["images", "-q", self._base_docker_image.name],
-    #         remote_docker_host=remote_docker_host,
-    #         return_output=True
-    #     )
-    #     output = output_bytes.decode().strip()
-    #
-    #     if output:
-    #         logger.info(f"Image {self._base_docker_image.name} is already in docker.")
-    #         return
-    #
-    #     output_directory = self._base_step.get_output_directory(work_dir=work_dir)
-    #     image_path = output_directory / self._base_docker_image.name
-    #
-    #     logger.info(f"Loading image {self._base_docker_image.name} from file {image_path}.")
-    #
-    #     if remote_docker_host:
-    #         logger.info("    Loading to remote host, it may take some time.")
-    #     run_docker_command(
-    #         ["load", "-i", str(image_path)],
-    #         remote_docker_host=remote_docker_host
-    #     )
 
     def _get_command_args(self, cache_directory: pl.Path, output_directory: pl.Path):
         """
@@ -999,7 +972,8 @@ class Runner:
         :param steps: List of steps to run.
         :param work_dir: Path to directory where all results are stored.
         """
-        existing_ec2_builder_nodes = {}
+        existing_ec2_hosts = {}
+        existing_ec2_instances = []
         known_hosts_file = pl.Path.home() / ".ssh/known_hosts"
 
         def get_remote_docker_host_for_step(step: RunnerStep) -> Optional[str]:
@@ -1007,6 +981,9 @@ class Runner:
             Get host name of the remote docker engine where step has to be executed.
             If step is not configured to run in remote docker engine, then return None.
             """
+
+            from agent_build_refactored.tools.run_in_ec2.boto3_tools import create_and_deploy_ec2_instance, AWSSettings
+
             if not step.github_actions_settings.run_in_remote_docker:
                 return None
 
@@ -1017,26 +994,28 @@ class Runner:
                 return None
 
             # Try to find already created node if it is created by previous steps.
-            node = existing_ec2_builder_nodes.get(step.architecture)
+            remote_docker_host = existing_ec2_hosts.get(step.architecture)
 
-            if node is not None:
-                return node
+            if remote_docker_host is not None:
+                return remote_docker_host
 
             # Create new remote docker engine EC2 node.
             aws_settings = AWSSettings.create_from_env()
 
-            deployment_script_path = SOURCE_ROOT / "agent_build_refactored/tools/build_in_ec2/add_docker_host.sh"
-            deployment_script_content = deployment_script_path.read_text()
+            deployment_script_path = SOURCE_ROOT / "agent_build_refactored/tools/run_in_ec2/deploy_docker_in_ec2_instance.sh"
 
-            node = create_ec2_instance_node(
+            boto3_session = aws_settings.create_boto3_session()
+
+            instance = create_and_deploy_ec2_instance(
+                boto3_session=boto3_session,
                 aws_settings=aws_settings,
+                name_prefix="remote_docker",
                 ec2_image=ec2_image,
-                deployment_script_content=deployment_script_content,
+                root_volume_size=32,
+                deployment_script=deployment_script_path
             )
 
-            existing_ec2_builder_nodes[step.architecture] = node
-
-            node_ip = node.public_ips[0]
+            instance_ip = instance.public_ip_address
 
             # We also have to add IP of the newly created server to known_hosts file.
             # Since we use remote docker engine by specifying the "DOCKER_HOST" env. variable,
@@ -1046,14 +1025,17 @@ class Runner:
                 [
                     "ssh-keyscan",
                     "-H",
-                    node_ip,
+                    instance_ip,
                 ],
             ).decode()
 
             known_hosts_file_content = f"{known_hosts_file_backup}\n{new_known_host}"
             known_hosts_file.write_text(known_hosts_file_content)
 
-            return f"ssh://{ec2_image.ssh_username}@{node.public_ips[0]}"
+            existing_ec2_instances.append(instance)
+            remote_docker_host = f"ssh://{ec2_image.ssh_username}@{instance_ip}"
+            existing_ec2_hosts[step.architecture] = remote_docker_host
+            return remote_docker_host
 
         known_hosts_file.parent.mkdir(parents=True, exist_ok=True)
         if known_hosts_file.exists():
@@ -1068,13 +1050,9 @@ class Runner:
             known_hosts_file.write_text(known_hosts_file_backup)
 
             # Cleanup and destroy created instances.
-            if existing_ec2_builder_nodes:
-                ec2_driver = AWSSettings.create_from_env().create_libcloud_ec2_driver()
-                for n in existing_ec2_builder_nodes.values():
-                    destroy_node_and_cleanup(
-                        driver=ec2_driver,
-                        node=n
-                    )
+            if existing_ec2_instances:
+                for ins in existing_ec2_instances:
+                    ins.terminate()
 
     @classmethod
     def _get_command_line_functions(cls):
@@ -1143,10 +1121,12 @@ class Runner:
         pass
 
 
+# Collection of EC2 AMI images that are used for creating instances with remote docker engine.
 DOCKER_EC2_BUILDERS = {
     Architecture.ARM64: EC2DistroImage(
         image_id="ami-0e2b332e63c56bcb5",
         image_name="Ubuntu Server 22.04 LTS (HVM), SSD Volume Type",
+        short_name="ubuntu2204_ARM",
         size_id="c7g.medium",
         ssh_username="ubuntu"
     )

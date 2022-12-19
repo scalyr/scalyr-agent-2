@@ -35,10 +35,6 @@ inputs:
     description: "EC2 private key path to run (if needed) some steps in docker that is in EC2."
     required: false
 
-#  aws_public_key_path:
-#    description: "EC2 public key path to run (if needed) some steps in docker that is in EC2."
-#    required: false
-
   aws_security_group:
     description: "EC2 security group name to run (if needed) some steps in docker that is in EC2."
     required: false

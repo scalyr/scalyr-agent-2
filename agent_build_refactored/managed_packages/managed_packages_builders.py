@@ -1186,6 +1186,11 @@ PREPARE_TOOLSET_GLIBC_ARM64 = create_prepare_toolset_step(
     run_in_remote_docker=True
 )
 
+PREPARE_TOOLSET_STEPS = {
+    Architecture.X86_64: PREPARE_TOOLSET_GLIBC_X86_64,
+    Architecture.ARM64: PREPARE_TOOLSET_GLIBC_ARM64
+}
+
 
 class DebManagedPackagesBuilderX86_64(ManagedPackagesBuilder):
     BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
