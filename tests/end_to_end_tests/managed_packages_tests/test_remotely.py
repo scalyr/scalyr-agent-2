@@ -23,7 +23,7 @@ import pytest
 
 from tests.end_to_end_tests.run_in_remote_machine import run_test_remotely
 from tests.end_to_end_tests.run_in_remote_machine.portable_pytest_runner import (
-    PortablePytestRunnerBuilder,
+    PORTABLE_PYTEST_RUNNER_BUILDERS
 )
 
 
@@ -44,7 +44,9 @@ def test_remotely(
     request,
 ):
 
-    pytest_runner_builder = PortablePytestRunnerBuilder()
+    arch = package_builder.DEPENDENCY_PACKAGES_ARCHITECTURE
+    pytest_runner_builder_cls = PORTABLE_PYTEST_RUNNER_BUILDERS[arch]
+    pytest_runner_builder = pytest_runner_builder_cls()
     pytest_runner_builder.build()
 
     packages_archive_path = tmp_path / "packages.tar"
@@ -78,7 +80,6 @@ def test_remotely(
             ],
             architecture=package_builder.DEPENDENCY_PACKAGES_ARCHITECTURE,
             pytest_runner_path=pytest_runner_builder.result_runner_path,
-            test_options=request.config.option,
             file_mappings={str(packages_archive_path): "/tmp/packages.tar"},
         )
     except Exception:

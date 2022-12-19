@@ -19,6 +19,7 @@ const path = require('path')
 const child_process = require('child_process')
 const buffer = require('buffer')
 const readline = require('readline')
+const process = require('process')
 
 
 async function checkAndGetCache(
@@ -141,10 +142,12 @@ async function executeRunner() {
 
     // Execute runner's steps. Also provide cache directory, if there are some found caches, then the step
     // has to reuse them.
+    const env = JSON.parse(JSON.stringify(process.env));
+    env["AWS_ENV_VARS_PREFIX"] = "INPUT_"
     child_process.execFileSync(
         "python3",
         [runner_helper_script_path, runnerFQDN, "--run-all-cacheable-steps"],
-        {stdio: 'inherit'}
+        {stdio: 'inherit', env: env}
     );
 
     // Run through the cache folder and save any cached directory within, that is not yet cached.

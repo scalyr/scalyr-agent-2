@@ -1,17 +1,31 @@
+# Copyright 2014-2022 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+This module defines logic that allows to run end-to-end tests inside remote machines such as ec2 instance or docker
+container.
+"""
+
+import logging
 import pathlib as pl
 import subprocess
 from typing import List, Dict
 
 from agent_build_refactored.tools.constants import Architecture
-from tests.end_to_end_tests.run_in_remote_machine.ec2 import (
-    EC2DistroImage,
-    run_test_in_ec2_instance,
-)
+from agent_build_refactored.tools.build_in_ec2 import create_ec2_instance_node, run_ssh_command_on_node, AWSSettings, EC2DistroImage
 
-"""
-This module defines logic that allows to run end to end tests inside remote machines such as ec2 instance or docker
-container.
-"""
+logger = logging.getLogger(__name__)
 
 # Collection of remote machine distro specifications for end to end remote tests.
 DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
@@ -145,7 +159,6 @@ def run_test_remotely(
     command: List[str],
     architecture: Architecture,
     pytest_runner_path: pl.Path,
-    test_options,
     file_mappings: Dict = None,
 ):
     """
@@ -162,43 +175,38 @@ def run_test_remotely(
     :param file_mappings: Dict where key is a file that has to be presented in the remote machine,
         and value is the path in the remote machine.
     """
+
     file_mappings = file_mappings or {}
 
     distro = DISTROS[distro_name][remote_machine_type]
 
     if remote_machine_type == "ec2":
 
-        def _validate_option(name: str):
-            dest = name.replace("--", "").replace("-", "_")
-            value = getattr(test_options, dest)
-            if value is None:
-                raise ValueError(
-                    f"Option '{name}' has to be provided with distro type 'ec2'."
-                )
-
-        _validate_option("--aws-access-key")
-        _validate_option("--aws-secret-key")
-        _validate_option("--aws-private-key-path")
-        _validate_option("--aws-private-key-name")
-        _validate_option("--aws-region")
-        _validate_option("--aws-security-group")
-        _validate_option("--aws-security-groups-prefix-list-id")
-
         distro_image = distro[architecture]
 
-        run_test_in_ec2_instance(
+        file_mappings = file_mappings or {}
+        file_mappings[pytest_runner_path] = "/tmp/test_runner"
+
+        aws_settings = AWSSettings.create_from_env()
+
+        node = create_ec2_instance_node(
             ec2_image=distro_image,
-            test_runner_path=pytest_runner_path,
-            command=command,
+            aws_settings=aws_settings,
             file_mappings=file_mappings,
-            access_key=test_options.aws_access_key,
-            secret_key=test_options.aws_secret_key,
-            private_key_path=test_options.aws_private_key_path,
-            private_key_name=test_options.aws_private_key_name,
-            region=test_options.aws_region,
-            security_group=test_options.aws_security_group,
-            security_groups_prefix_list_id=test_options.aws_security_groups_prefix_list_id,
-            workflow_id=test_options.test_session_suffix,
+        )
+
+        final_command = [
+            "/tmp/test_runner",
+            "-s",
+            *command
+        ]
+
+        run_ssh_command_on_node(
+            command=final_command,
+            node=node,
+            ssh_username=distro_image.ssh_username,
+            private_key_path=aws_settings.private_key_path,
+            as_root=True
         )
     else:
         mount_options = []
@@ -219,7 +227,7 @@ def run_test_remotely(
                 "-e",
                 "TEST_RUNS_IN_DOCKER=1",
                 "--platform",
-                str(architecture.as_docker_platform),
+                str(architecture.as_docker_platform.value),
                 distro,
                 "/test_runner",
                 "-s",

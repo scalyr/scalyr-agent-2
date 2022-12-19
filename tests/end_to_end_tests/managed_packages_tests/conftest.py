@@ -61,42 +61,6 @@ def pytest_addoption(parser):
         help="Distribution to test.",
     )
 
-    parser.addoption(
-        "--aws-access-key",
-        required=False,
-        help="ID of an access key of an AWS account. Required for testing in ec2 instances.",
-    )
-    parser.addoption(
-        "--aws-secret-key",
-        required=False,
-        help="Secret key of an AWS account. Required for testing in ec2 instances.",
-    )
-    parser.addoption(
-        "--aws-private-key-path",
-        required=False,
-        help="Path to a private key file. Required for testing in ec2 instances.",
-    )
-    parser.addoption(
-        "--aws-private-key-name",
-        required=False,
-        help="Name to a private key file. Required for testing in ec2 instances.",
-    )
-    parser.addoption(
-        "--aws-region",
-        required=False,
-        help="Name of a AWS region. Required for testing in ec2 instances.",
-    )
-    parser.addoption(
-        "--aws-security-group",
-        required=False,
-        help="Name of an AWS security group. Required for testing in ec2 instances.",
-    )
-    parser.addoption(
-        "--aws-security-groups-prefix-list-id",
-        required=False,
-        help="ID of the prefix list of the security group. Required for testing in ec2 instances.",
-    )
-
 
 def pytest_collection_modifyitems(config, items):
     """
@@ -153,18 +117,6 @@ class RepoBuilder(Runner):
     This runner class is responsible for creating deb/rpm repositories from provided packages.
     The result repo is used as a mock repository for testing.
     """
-
-    APT_REPO_CONF = textwrap.dedent(
-        """
-        Origin: test_repo
-        Label: test_repo
-        Codename: trusty
-        Architectures: amd64 source
-        Components: main
-        Description: example repo
-        SignWith: test@test.com
-        """
-    )
 
     BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
 
@@ -223,7 +175,7 @@ class RepoBuilder(Runner):
                 Origin: test_repo
                 Label: test_repo
                 Codename: scalyr
-                Architectures: amd64 source
+                Architectures: amd64 arm64 source
                 Components: main
                 Description: example repo
                 SignWith: {sign_key_id}

@@ -148,7 +148,7 @@ def test_packages(
     agent_version,
     tmp_path,
 ):
-    timeout_tracker = TimeoutTracker(300)
+    timeout_tracker = TimeoutTracker(400)
     _print_system_information()
     _prepare_environment(
         package_type=package_builder.PACKAGE_TYPE,
@@ -221,7 +221,11 @@ def test_packages(
 
     agent_commander.start()
 
-    verify_agent_status(agent_version=agent_version, agent_commander=agent_commander)
+    verify_agent_status(
+        agent_version=agent_version,
+        agent_commander=agent_commander,
+        timeout_tracker=timeout_tracker
+    )
 
     logger.info("Verify agent log uploads.")
     verify_logs(

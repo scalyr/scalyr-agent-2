@@ -188,7 +188,11 @@ def test_basic(
 
     agent_commander.start()
 
-    verify_agent_status(agent_version=agent_version, agent_commander=agent_commander)
+    verify_agent_status(
+        agent_version=agent_version,
+        agent_commander=agent_commander,
+        timeout_tracker=timeout_tracker
+    )
 
     verify_logs(
         scalyr_api_read_key=scalyr_api_read_key,
