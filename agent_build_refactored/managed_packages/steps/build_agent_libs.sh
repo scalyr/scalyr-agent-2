@@ -35,7 +35,7 @@ cp -a "${BUILD_PYTHON}/python/." /
 # First install Rust, in order to be able to build some of required libraries.
 cd ~
 export PATH="/usr/local/bin:/root/.cargo/bin:${PATH}"
-export PKG_CONFIG_PATH="/usr/local/lib64/pkgconfig:${PKG_CONFIG_PATH}"
+export PKG_CONFIG_PATH="/usr/local/lib64/pkgconfig:/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH}"
 curl --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain "${RUST_VERSION}"
 cargo install cargo-update -v
 

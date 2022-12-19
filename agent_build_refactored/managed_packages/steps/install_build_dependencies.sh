@@ -226,7 +226,7 @@ mkdir /tmp/build-openssl
 pushd /tmp/build-openssl
 tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/openssl/openssl.tar.gz"
 pushd "openssl-${OPENSSL_VERSION}"
-./Configure linux-x86_64 shared
+./Configure "${OPENSSL_CONFIGURE_PLATFORM}" shared
 make -j "$(nproc)"
 make install_sw
 popd
