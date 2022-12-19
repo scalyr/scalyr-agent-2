@@ -1579,7 +1579,9 @@ class SyslogHandler(object):
                 )
 
                 attribs = self.__syslog_attributes.copy()
-                attribs.update({k.lower(): v for k, v in extra.items() if v is not None})
+                attribs.update(
+                    {k.lower(): v for k, v in extra.items() if v is not None}
+                )
 
                 log_config = {
                     "parser": self.__syslog_parser,
