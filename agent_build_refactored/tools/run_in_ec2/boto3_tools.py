@@ -86,8 +86,6 @@ class AWSSettings:
         )
 
     def create_boto3_session(self):
-        import boto3
-
         return boto3.session.Session(
             aws_access_key_id=self.access_key,
             aws_secret_access_key=self.secret_key,
@@ -170,7 +168,7 @@ def create_and_deploy_ec2_instance(
                 command=deployment_command
             )
 
-        ssh.close()
+    ssh.close()
 
     return instance
 
@@ -263,7 +261,7 @@ def create_ec2_instance(
             logger.info(f"    {e}")
             logger.info(f"    Retry...")
             attempts -= 1
-            time.sleep(random.randint(5, 10))
+            time.sleep(random.randint(10, 20))
 
     try:
         instance = instances[0]

@@ -1113,12 +1113,12 @@ INSTALL_BUILD_DEPENDENCIES_GLIBC_ARM64 = create_build_dependencies_step(
 # Create step that builds Python interpreter.
 BUILD_PYTHON_GLIBC_X86_64 = create_build_python_step(
     base_step=INSTALL_BUILD_DEPENDENCIES_GLIBC_X86_64,
-    libssl_dir="lib64"
+    libssl_dir="/usr/local/lib64"
 )
 
 BUILD_PYTHON_GLIBC_ARM64 = create_build_python_step(
     base_step=INSTALL_BUILD_DEPENDENCIES_GLIBC_ARM64,
-    libssl_dir="lib",
+    libssl_dir="/usr/local/lib",
     run_in_remote_docker=True
 )
 
