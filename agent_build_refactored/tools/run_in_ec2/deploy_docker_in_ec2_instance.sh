@@ -132,7 +132,7 @@ sudo chmod a+r /etc/apt/keyrings/docker.gpg
 sudo apt-get update
 sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin qemu-user-static
 
-sudo usermod -aG docker $USER
+sudo usermod -aG docker "$USER"
 
 # Since some commands that run though SSH may require some time to be completed, modify SSH server config to send
 # keep alive messages to prevent SSH connection from closing.
