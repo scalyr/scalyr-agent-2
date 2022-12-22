@@ -190,22 +190,37 @@ class RepoBuilder(Runner):
                 """
                 )
             )
+            subprocess.run('aptly repo create -distribution="scalyr" scalyr', shell=True)
 
             for package_path in packages_dir_path.glob("*.deb"):
-                subprocess.check_call(
-                    [
-                        "reprepro",
-                        "-b",
-                        str(repo_path),
-                        "includedeb",
-                        "scalyr",
-                        str(package_path),
-                    ]
-                )
+                subprocess.run(f"aptly repo add scalyr {package_path}", shell=True)
+                # subprocess.check_call(
+                #     [
+                #         "reprepro",
+                #         "-b",
+                #         str(repo_path),
+                #         "includedeb",
+                #         "scalyr",
+                #         str(package_path),
+                #     ]
+                # )
+
+            from agent_build_refactored.tools.constants import SOURCE_ROOT
+            p = SOURCE_ROOT / "scalyr-agent-2_2.1.38_all.deb"
+            subprocess.run(f"aptly repo add scalyr {p}", shell=True)
+
+            subprocess.run(f'aptly publish repo -distribution="scalyr" -gpg-key="{sign_key_id}" scalyr', shell=True)
+
+            shutil.copytree(
+                pl.Path.home() / ".aptly/public",
+                repo_path,
+                dirs_exist_ok=True
+            )
 
         elif package_type == "rpm":
             # Create rpm repository using 'createrepo_c'.
             for package_path in packages_dir_path.glob("*.rpm"):
+
                 shutil.copy(package_path, repo_path)
             subprocess.check_call(["createrepo_c", str(repo_path)])
 

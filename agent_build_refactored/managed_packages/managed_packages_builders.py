@@ -11,8 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
+import abc
 import hashlib
 import json
 import logging
@@ -336,11 +335,9 @@ class ManagedPackagesBuilder(Runner):
         """
         Get checksum of the package. We try to take into account every possible variable
             that may affect the result package.
-
         For now, those are:
             - checksum of the step that produces files for package.
             - command line arguments that are used to build the package.
-
         :param package_name:
         :return:
         """
@@ -412,7 +409,6 @@ class ManagedPackagesBuilder(Runner):
     ):
         """
         Build needed packages.
-
         :param last_repo_python_package_file: Path to the python package file. If specified, then the python
             dependency package from this path will be reused instead of building a new one.
         :param last_repo_agent_libs_package_file: Path to the agent libs package file. If specified, then the agent-libs
@@ -928,6 +924,503 @@ class ManagedPackagesBuilder(Runner):
             exit(1)
 
 
+# class AgentDependencyPackageBuilder(Runner):
+#     """
+#     Builder class that is responsible for the building of the Linux agent deb and rpm packages that are managed by package
+#         managers such as apt and yum.
+#     """
+#
+#     # type of the package, aka 'deb' or 'rpm'
+#     PACKAGE_TYPE: str
+#
+#     PACKAGE_NAME: str
+#
+#     ARCHITECTURE: Architecture
+#
+#     @classmethod
+#     def get_base_environment(cls):
+#         return PREPARE_TOOLSET_STEPS[cls.get_architecture()]
+#
+#     @classmethod
+#     @abc.abstractmethod
+#     def get_architecture(cls) -> Architecture:
+#         pass
+#
+#     @classmethod
+#     @abc.abstractmethod
+#     def _get_package_type(cls) -> str:
+#         pass
+#
+#     @classmethod
+#     def get_package_format_arch(cls) -> str:
+#
+#         package_type = cls._get_package_type()
+#         if package_type == "deb":
+#             return cls.get_architecture().as_deb_package_arch
+#         elif package_type == "rpm":
+#             return cls.get_architecture().as_rpm_package_arch
+#         else:
+#             raise ValueError(f"Unknown package type: {cls.PACKAGE_TYPE}")
+#
+#
+# class PythonDependencyPackageBuilder(AgentDependencyPackageBuilder):
+#     ARCHITECTURE: Architecture
+#     PACKAGE_NAME: str
+#     PACKAGE_TYPE: str
+#
+#     # @classmethod
+#     # def get_all_required_steps(cls) -> List[RunnerStep]:
+#     #     return [cls._get_build_python_step()]
+#     #
+#     # @classmethod
+#     # def _get_package_type(cls) -> str:
+#     #     return cls.PACKAGE_TYPE
+#     #
+#     # @classmethod
+#     # def get_architecture(cls) -> Architecture:
+#     #     return cls.ARCHITECTURE
+#     #
+#     # @classmethod
+#     # def _get_base_environment(cls):
+#     #     return PREPARE_TOOLSET_STEPS[cls.get_architecture()]
+#
+#     # @classmethod
+#     # def _get_package_build_cmd_args(cls) -> List[str]:
+#     #     """
+#     #     Returns list of arguments for the command that builds python package.
+#     #     """
+#     #
+#     #     description = "Dependency package which provides Python interpreter which is used by the agent from the " \
+#     #                   "'scalyr-agent-2 package'"
+#     #
+#     #     return [
+#     #             # fmt: off
+#     #             "fpm",
+#     #             "-s", "dir",
+#     #             "-a", cls.get_package_format_arch(),
+#     #             "-t", cls.PACKAGE_TYPE,
+#     #             "-n", PYTHON_PACKAGE_NAME,
+#     #             "--license", '"Apache 2.0"',
+#     #             "--vendor", "Scalyr",
+#     #             "--provides", "scalyr-agent-dependencies",
+#     #             "--description", description,
+#     #             "--depends", "bash >= 3.2",
+#     #             "--url", "https://www.scalyr.com",
+#     #             "--deb-user", "root",
+#     #             "--deb-group", "root",
+#     #             "--rpm-user", "root",
+#     #             "--rpm-group", "root",
+#     #             # fmt: on
+#     #         ]
+#
+#     # @classmethod
+#     # def _get_build_python_step(cls):
+#     #     return _BUILD_PYTHON_STEPS[cls.get_architecture()]
+#
+#     # @classmethod
+#     # def get_package_checksum(cls):
+#     #     sha256 = hashlib.sha256()
+#     #     sha256.update(cls._get_build_python_step().checksum.encode())
+#     #
+#     #     # Add arguments that are used to build package.
+#     #     for arg in cls._get_package_build_cmd_args():
+#     #         sha256.update(arg.encode())
+#     #
+#     #     return sha256.hexdigest()
+#
+#     # def build_package(self, stable_version_file: str = None):
+#     #     self.run_required()
+#     #
+#     #     version = _get_dependency_package_version_to_use(
+#     #         checksum=_ALL_PYTHON_PACKAGES_CHECKSUM,
+#     #         package_name=PYTHON_PACKAGE_NAME,
+#     #         stable_versions_file_path=stable_version_file
+#     #     )
+#     #
+#     #     package_root = self._get_build_python_step().get_output_directory(work_dir=self.work_dir) / "python"
+#     #
+#     #     check_call_with_log(
+#     #         [
+#     #             *self._get_package_build_cmd_args(),
+#     #             "-v", version,
+#     #             "-C", str(package_root),
+#     #             "--verbose"
+#     #         ],
+#     #         cwd=str(self.output_path)
+#     #     )
+#     #
+#     #     return version
+
+
+class AgentDependenciesBuilder(Runner):
+    PACKAGE_TYPE: str
+    ARCHITECTURE: Architecture
+
+    @classmethod
+    def get_all_required_steps(cls) -> List[RunnerStep]:
+        steps = super(AgentDependenciesBuilder, cls).get_all_required_steps()
+        steps.extend([
+            cls._get_build_python_step(),
+            cls._get_build_agent_libs_step()
+        ])
+        return steps
+
+    @classmethod
+    def get_base_environment(cls):
+        return PREPARE_TOOLSET_STEPS[cls.ARCHITECTURE]
+
+    @classmethod
+    def _get_package_type(cls) -> str:
+        return cls.PACKAGE_TYPE
+
+    @classmethod
+    def get_architecture(cls) -> Architecture:
+        return cls.ARCHITECTURE
+
+    @classmethod
+    def _get_build_python_step(cls):
+        return _BUILD_PYTHON_STEPS[cls.get_architecture()]
+
+    @classmethod
+    def _get_build_agent_libs_step(cls) -> ArtifactRunnerStep:
+        return _BUILD_AGENT_LIBS_STEPS[cls.get_architecture()]
+
+    @classmethod
+    def get_python_package_checksum(cls):
+        sha256 = hashlib.sha256()
+        sha256.update(cls._get_build_python_step().checksum.encode())
+
+        # Add arguments that are used to build package.
+        for arg in cls._get_package_build_cmd_args():
+            sha256.update(arg.encode())
+
+        return sha256.hexdigest()
+
+    @classmethod
+    def get_package_checksum(cls):
+        sha256 = hashlib.sha256()
+        sha256.update(_ALL_PYTHON_PACKAGES_CHECKSUM.encode())
+        sha256.update(cls._get_build_agent_libs_step().checksum.encode())
+        # Add arguments that are used to build package.
+        for arg in cls._get_package_build_cmd_args():
+            sha256.update(arg.encode())
+
+        return sha256.hexdigest()
+
+    @classmethod
+    def _get_package_format_arch(cls) -> str:
+        if cls.PACKAGE_TYPE == "deb":
+            return cls.ARCHITECTURE.as_deb_package_arch
+        elif cls.PACKAGE_TYPE == "rpm":
+            return cls.ARCHITECTURE.as_rpm_package_arch
+        else:
+            raise ValueError(f"Unknown package type: {cls.PACKAGE_TYPE}")
+
+    @classmethod
+    def _get_python_package_build_cmd_args(cls) -> List[str]:
+        """
+        Returns list of arguments for the command that builds python package.
+        """
+
+        description = "Dependency package which provides Python interpreter which is used by the agent from the " \
+                      "'scalyr-agent-2 package'"
+
+        return [
+                # fmt: off
+                "fpm",
+                "-s", "dir",
+                "-a", cls._get_package_format_arch(),
+                "-t", cls.PACKAGE_TYPE,
+                "-n", PYTHON_PACKAGE_NAME,
+                "--license", '"Apache 2.0"',
+                "--vendor", "Scalyr",
+                "--provides", "scalyr-agent-dependencies",
+                "--description", description,
+                "--depends", "bash >= 3.2",
+                "--url", "https://www.scalyr.com",
+                "--deb-user", "root",
+                "--deb-group", "root",
+                "--rpm-user", "root",
+                "--rpm-group", "root",
+                # fmt: on
+            ]
+
+    @classmethod
+    def _get_package_build_cmd_args(cls) -> List[str]:
+        """
+        Returns list of arguments for command that build agent-libs package.
+        """
+
+        description = "Dependency package which provides Python requirement libraries which are used by the agent " \
+                      "from the 'scalyr-agent-2 package'"
+
+        return [
+            # fmt: off
+            "fpm",
+            "-s", "dir",
+            "-a", cls._get_package_format_arch(),
+            "-t", cls.PACKAGE_TYPE,
+            "-n", AGENT_LIBS_PACKAGE_NAME,
+            "--license", '"Apache 2.0"',
+            "--vendor", "Scalyr",
+            "--provides", "scalyr-agent-2-dependencies",
+            "--description", description,
+            "--depends", "bash >= 3.2",
+            "--url", "https://www.scalyr.com",
+            "--deb-user", "root",
+            "--deb-group", "root",
+            "--rpm-user", "root",
+            "--rpm-group", "root",
+            # fmt: on
+        ]
+
+    def _build_python_package(self, stable_version_file: str = None):
+
+        version = _get_dependency_package_version_to_use(
+            checksum=_ALL_PYTHON_PACKAGES_CHECKSUM,
+            package_name=PYTHON_PACKAGE_NAME,
+            stable_versions_file_path=stable_version_file
+        )
+
+        package_root = self._get_build_python_step().get_output_directory(work_dir=self.work_dir) / "python"
+
+        check_call_with_log(
+            [
+                *self._get_python_package_build_cmd_args(),
+                "-v", version,
+                "-C", str(package_root),
+                "--verbose"
+            ],
+            cwd=str(self.output_path)
+        )
+
+        return version
+
+    def build_package(self, stable_versions_file: str = None):
+        self.run_required()
+
+        if self.runs_in_docker:
+            args = ["build"]
+            if stable_versions_file:
+                args.extend([
+                    "--stable-versions-file", RunnerMappedPath(stable_versions_file)
+                ])
+            self.run_in_docker(
+                command_args=args
+            )
+            return
+
+        version = _get_dependency_package_version_to_use(
+            checksum=_ALL_AGENT_LIBS_PACKAGES_CHECKSUM,
+            package_name=AGENT_LIBS_PACKAGE_NAME,
+            stable_versions_file_path=stable_versions_file
+        )
+
+        python_version = self._build_python_package(stable_version_file=stable_versions_file)
+
+        package_root = self._get_build_agent_libs_step().get_output_directory(work_dir=self.work_dir) / "python"
+
+        check_call_with_log(
+            [
+                *self._get_package_build_cmd_args(),
+                "-v", version,
+                "-C", str(package_root),
+                "--depends", f"scalyr-agent-python3 = {python_version}",
+                "--verbose"
+            ],
+            cwd=str(self.output_path)
+        )
+        return version
+
+    @classmethod
+    def add_command_line_arguments(cls, parser: argparse.ArgumentParser):
+        super(AgentDependenciesBuilder, cls).add_command_line_arguments(parser)
+
+        parser.add_argument("build")
+
+        parser.add_argument(
+            "--stable_versions-file",
+            required=False
+        )
+
+    @classmethod
+    def handle_command_line_arguments(
+            cls,
+            args,
+    ):
+        super(AgentDependenciesBuilder, cls).handle_command_line_arguments(args=args)
+
+        work_dir = pl.Path(args.work_dir)
+
+        builder = cls(work_dir=work_dir)
+
+        builder.build_package(
+            stable_versions_file=args.stable_versions_file
+        )
+        if not IN_DOCKER:
+            output_path = SOURCE_ROOT / "build"
+            if output_path.exists():
+                shutil.rmtree(output_path)
+            shutil.copytree(
+                builder.output_path,
+                output_path,
+                dirs_exist_ok=True,
+            )
+
+
+class AgentPackageBuilder(Runner):
+    PACKAGE_TYPE: str
+
+    def build(
+            self,
+            stable_versions_file: str = None
+    ):
+
+        self.run_required()
+
+        if self.runs_in_docker:
+            args = ["build"]
+            if stable_versions_file:
+                args.extend([
+                    "--stable-versions-file", RunnerMappedPath(stable_versions_file)
+                ])
+            self.run_in_docker(
+                command_args=args
+            )
+            return
+
+        agent_libs_package_version = _get_dependency_package_version_to_use(
+            checksum=_ALL_AGENT_LIBS_PACKAGES_CHECKSUM,
+            package_name=AGENT_LIBS_PACKAGE_NAME,
+            stable_versions_file_path=stable_versions_file
+        )
+
+        agent_package_root = self.output_path / "agent_package_root"
+
+        build_linux_fhs_agent_files(
+            output_path=agent_package_root,
+            copy_agent_source=True
+        )
+
+        install_root_executable_path = agent_package_root / f"usr/share/{AGENT_PACKAGE_NAME}/bin/scalyr-agent-2"
+        install_root_executable_path.unlink()
+
+        # Add agent's executable script.
+        shutil.copy(
+            SOURCE_ROOT / "agent_build_refactored/managed_packages/files/scalyr-agent-2",
+            install_root_executable_path,
+        )
+
+        # Add config file
+        add_config(
+            SOURCE_ROOT / "config",
+            agent_package_root / "etc/scalyr-agent-2"
+        )
+
+        # Copy init.d folder.
+        shutil.copytree(
+            SOURCE_ROOT / "agent_build_refactored/managed_packages/files/init.d",
+            agent_package_root / "etc/init.d",
+            dirs_exist_ok=True
+        )
+
+        version = (SOURCE_ROOT / "VERSION").read_text().strip()
+
+        scriptlets_path = SOURCE_ROOT / "agent_build_refactored/managed_packages/install-scriptlets"
+
+        description = "Scalyr Agent 2 is the daemon process Scalyr customers run on their servers to collect metrics" \
+                      " and log files and transmit them to Scalyr."
+
+        subprocess.check_call(
+            [
+                # fmt: off
+                "fpm",
+                "-s", "dir",
+                "-a", "all",
+                "-t", self.PACKAGE_TYPE,
+                "-C", str(agent_package_root),
+                "-n" "scalyr-agent-2",
+                "-v", version,
+                "--license", "Apache 2.0",
+                "--vendor", "Scalyr",
+                "--provides", "scalyr-agent-2",
+                "--description", description,
+                "--depends", "bash >= 3.2",
+                "--depends", f"{AGENT_LIBS_PACKAGE_NAME} = {agent_libs_package_version}",
+                "--url", "https://www.scalyr.com",
+                "--deb-user", "root",
+                "--deb-group", "root",
+                "--rpm-user", "root",
+                "--rpm-group", "root",
+                #"--deb-changelog", "changelog-deb",
+                #"--rpm-changelog", "changelog-rpm",
+                "--after-install", scriptlets_path / "postinstall.sh",
+                "--before-remove", scriptlets_path / "preuninstall.sh",
+                "--deb-no-default-config-files",
+                "--no-deb-auto-config-files",
+                "--config-files", "/etc/scalyr-agent-2/agent.json",
+                "--directories", "/usr/share/scalyr-agent-2",
+                "--directories", "/var/lib/scalyr-agent-2",
+                "--directories", "/var/log/scalyr-agent-2",
+                "--rpm-use-file-permissions",
+                "--deb-use-file-permissions",
+                # NOTE: Sadly we can't use defattrdir since it breakes permissions for some other
+                # directories such as /etc/init.d and we need to handle that in postinst :/
+                # "  --rpm-auto-add-directories "
+                # "  --rpm-defattrfile 640"
+                # "  --rpm-defattrdir 751"
+                "--verbose",
+                # fmt: on
+            ],
+            cwd=str(self.output_path)
+        )
+        if self.PACKAGE_TYPE == "deb":
+            package_glob = f"{AGENT_PACKAGE_NAME}_{version}_all.{self.PACKAGE_TYPE}"
+        elif self.PACKAGE_TYPE == "rpm":
+            package_glob = f"{AGENT_PACKAGE_NAME}-{version}-1.noarch.{self.PACKAGE_TYPE}"
+        else:
+            raise Exception(f"Unknown package type {self.PACKAGE_TYPE}")
+
+        found = list(self.output_path.glob(package_glob))
+        assert len(found) == 1, f"Number of result agent packages has to be 1, got {len(found)}"
+        return found[0].name
+
+    @classmethod
+    def add_command_line_arguments(cls, parser: argparse.ArgumentParser):
+        super(AgentPackageBuilder, cls).add_command_line_arguments(parser)
+
+        parser.add_argument("build")
+
+        parser.add_argument(
+            "--stable_versions-file",
+            required=False
+        )
+
+    @classmethod
+    def handle_command_line_arguments(
+            cls,
+            args,
+    ):
+        super(AgentPackageBuilder, cls).handle_command_line_arguments(args=args)
+
+        work_dir = pl.Path(args.work_dir)
+
+        builder = cls(work_dir=work_dir)
+
+        builder.build(
+            stable_versions_file=args.stable_versions_file
+        )
+        if not IN_DOCKER:
+            output_path = SOURCE_ROOT / "build"
+            if output_path.exists():
+                shutil.rmtree(output_path)
+            shutil.copytree(
+                builder.output_path,
+                output_path,
+                dirs_exist_ok=True,
+            )
+
+
 def create_build_dependencies_step(
         base_image: EnvironmentRunnerStep,
         run_in_remote_docker: bool = False
@@ -1122,6 +1615,11 @@ BUILD_PYTHON_GLIBC_ARM64 = create_build_python_step(
     run_in_remote_docker=True
 )
 
+_BUILD_PYTHON_STEPS = {
+    Architecture.X86_64: BUILD_PYTHON_GLIBC_X86_64,
+    Architecture.ARM64: BUILD_PYTHON_GLIBC_ARM64
+}
+
 # Create step that builds agent requirement libs.
 BUILD_AGENT_LIBS_GLIBC_X86_64 = create_build_agent_libs_step(
     base_step=INSTALL_BUILD_DEPENDENCIES_GLIBC_X86_64,
@@ -1132,6 +1630,11 @@ BUILD_AGENT_LIBS_GLIBC_ARM64 = create_build_agent_libs_step(
     build_python_step=BUILD_PYTHON_GLIBC_ARM64,
     run_in_remote_docker=True
 )
+
+_BUILD_AGENT_LIBS_STEPS = {
+    Architecture.X86_64: BUILD_PYTHON_GLIBC_X86_64,
+    Architecture.ARM64: BUILD_PYTHON_GLIBC_ARM64
+}
 
 
 def create_prepare_toolset_step(
@@ -1191,50 +1694,195 @@ PREPARE_TOOLSET_STEPS = {
     Architecture.ARM64: PREPARE_TOOLSET_GLIBC_ARM64
 }
 
+# class DebPythonBuilder(PythonDependencyPackageBuilder):
+#     PACKAGE_TYPE = "deb"
+#
+#
+# class RpmDebPythonBuilder(PythonDependencyPackageBuilder):
+#     PACKAGE_TYPE = "rpm"
+#
+#
+# class DebPythonBuilderAMD64(DebPythonBuilder):
+#     ARCHITECTURE = Architecture.X86_64
+#
+#
+# class DebPythonBuilderARM64(DebPythonBuilder):
+#     ARCHITECTURE = Architecture.ARM64
+#
+#
+# class RpmPythonBuilderX8664(RpmDebPythonBuilder):
+#     ARCHITECTURE = Architecture.X86_64
+#
+#
+# class RpmPythonBuilderAARCH64(RpmDebPythonBuilder):
+#     ARCHITECTURE = Architecture.ARM64
+#
+#
+# _ALL_PYTHON_BUILDERS = [
+#     DebPythonBuilderAMD64,
+#     DebPythonBuilderARM64,
+#     RpmPythonBuilderX8664,
+#     RpmPythonBuilderAARCH64
+# ]
+#
 
-class DebManagedPackagesBuilderX86_64(ManagedPackagesBuilder):
-    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
-    DEPENDENCY_PACKAGES_ARCHITECTURE = Architecture.X86_64
+
+class DebAgentDependenciesBuilderAMD64(AgentDependenciesBuilder):
+    ARCHITECTURE = Architecture.X86_64
     PACKAGE_TYPE = "deb"
-    PYTHON_BUILD_STEP = BUILD_PYTHON_GLIBC_X86_64
-    AGENT_LIBS_BUILD_STEP = BUILD_AGENT_LIBS_GLIBC_X86_64
-    PACKAGECLOUD_DISTRO = "any"
-    PACKAGECLOUD_DISTRO_VERSION = "any"
 
 
-class DebManagedPackagesBuilderARM64(ManagedPackagesBuilder):
-    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_ARM64
-    DEPENDENCY_PACKAGES_ARCHITECTURE = Architecture.ARM64
+class DebAgentDependenciesBuilderARM64(AgentDependenciesBuilder):
+    ARCHITECTURE = Architecture.ARM64
     PACKAGE_TYPE = "deb"
-    PYTHON_BUILD_STEP = BUILD_PYTHON_GLIBC_ARM64
-    AGENT_LIBS_BUILD_STEP = BUILD_AGENT_LIBS_GLIBC_ARM64
-    PACKAGECLOUD_DISTRO = "any"
-    PACKAGECLOUD_DISTRO_VERSION = "any"
 
 
-class RpmManagedPackagesBuilderx86_64(ManagedPackagesBuilder):
-    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
-    DEPENDENCY_PACKAGES_ARCHITECTURE = Architecture.X86_64
+class RpmAgentDependenciesBuilderX8664(AgentDependenciesBuilder):
+    ARCHITECTURE = Architecture.X86_64
     PACKAGE_TYPE = "rpm"
-    PYTHON_BUILD_STEP = BUILD_PYTHON_GLIBC_X86_64
-    AGENT_LIBS_BUILD_STEP = BUILD_AGENT_LIBS_GLIBC_X86_64
-    PACKAGECLOUD_DISTRO = "rpm_any"
-    PACKAGECLOUD_DISTRO_VERSION = "rpm_any"
 
 
-class RpmManagedPackagesBuilderAarch64(ManagedPackagesBuilder):
-    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_ARM64
-    DEPENDENCY_PACKAGES_ARCHITECTURE = Architecture.ARM64
+class RpmAgentDependenciesBuilderAARCH64(AgentDependenciesBuilder):
+    ARCHITECTURE = Architecture.ARM64
     PACKAGE_TYPE = "rpm"
-    PYTHON_BUILD_STEP = BUILD_PYTHON_GLIBC_ARM64
-    AGENT_LIBS_BUILD_STEP = BUILD_AGENT_LIBS_GLIBC_ARM64
-    PACKAGECLOUD_DISTRO = "rpm_any"
-    PACKAGECLOUD_DISTRO_VERSION = "rpm_any"
 
 
-ALL_MANAGED_PACKAGE_BUILDERS: Dict[str, Type[ManagedPackagesBuilder]] = {
-    "deb-amd64": DebManagedPackagesBuilderX86_64,
-    "deb-arm64": DebManagedPackagesBuilderARM64,
-    "rpm-x86_64": RpmManagedPackagesBuilderx86_64,
-    "rpm-aarch64": RpmManagedPackagesBuilderAarch64
+_ALL_AGENT_LIBS_PACKAGE_BUILDERS: Dict[str, Type[AgentDependenciesBuilder]] = {
+    "deb-amd64": DebAgentDependenciesBuilderAMD64,
+    "deb-arm64": DebAgentDependenciesBuilderARM64,
+    "rpm-x86_64": RpmAgentDependenciesBuilderX8664,
+    "rpm-aarch64": RpmAgentDependenciesBuilderAARCH64,
 }
+
+def _calculate_all_python_packages_checksum():
+    sha256 = hashlib.sha256()
+    for builder_name in sorted(_ALL_AGENT_LIBS_PACKAGE_BUILDERS.keys()):
+        builder_cls = _ALL_AGENT_LIBS_PACKAGE_BUILDERS[builder_name]
+        sha256.update(builder_cls.get_python_package_checksum().encode())
+
+    return sha256.hexdigest()
+
+_ALL_PYTHON_PACKAGES_CHECKSUM = _calculate_all_python_packages_checksum()
+
+def _calculate_all_agent_libs_packages_checksum():
+    sha256 = hashlib.sha256()
+    for builder_name in sorted(_ALL_AGENT_LIBS_PACKAGE_BUILDERS.keys()):
+        builder_cls = _ALL_AGENT_LIBS_PACKAGE_BUILDERS[builder_name]
+        sha256.update(builder_cls.get_package_checksum().encode())
+
+    return sha256.hexdigest()
+
+
+_ALL_AGENT_LIBS_PACKAGES_CHECKSUM = _calculate_all_agent_libs_packages_checksum()
+
+
+def _get_dependency_package_version_to_use(checksum: str, package_name: str, stable_versions_file_path: str = None):
+    stable_version = None
+    if stable_versions_file_path:
+        versions = json.loads(pl.Path(stable_versions_file_path).read_text())
+        stable_version = versions[package_name]
+
+    if not stable_version:
+        stable_version = "0+0"
+
+    stable_iteration, stable_checksum = _parse_package_version_parts(version=stable_version)
+
+    if checksum == stable_checksum:
+        return stable_version
+    else:
+        new_iteration = stable_iteration + 1
+        return f"{new_iteration}+{checksum}"
+
+
+def _parse_package_version_parts(version: str) -> Tuple[int, str]:
+    """
+    Deconstructs package version string and return tuple with version's iteration and checksum parts.
+    """
+    iteration, checksum = version.split("+")
+    return int(iteration), checksum
+
+
+
+class DebAgentBuilder(AgentPackageBuilder):
+    PACKAGE_TYPE = "deb"
+
+class RpmAgentBuilder(AgentPackageBuilder):
+    PACKAGE_TYPE = "rpm"
+
+
+ALL_MANAGED_PACKAGE_BUILDERS: Dict[str, Type[Runner]] = {
+    **_ALL_AGENT_LIBS_PACKAGE_BUILDERS,
+    "deb-agent": DebAgentBuilder,
+    "rpm-agent": RpmAgentBuilder,
+}
+
+
+
+
+
+# ALL_MANAGED_PACKAGE_BUILDERS: Dict[str, Type[ManagedPackagesDependenciesBuilder]] = {
+#     "deb-amd64": DebManagedPackagesDependenciesBuilderX86_64,
+#     "deb-arm64": DebManagedPackagesDependenciesBuilderARM64,
+#     "deb-all": DebManagedPackagesDependenciesBuilderARM64,
+#     "rpm-x86_64": RpmManagedPackagesDependenciesBuilderx86_64,
+#     "rpm-aarch64": RpmManagedPackagesDependenciesBuilderAarch64
+# }
+
+
+#
+# class DebManagedPackagesDependenciesBuilderX86_64(ManagedPackagesDependenciesBuilder):
+#     BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
+#     DEPENDENCY_PACKAGES_ARCHITECTURE = Architecture.X86_64
+#     PACKAGE_TYPE = "deb"
+#     PYTHON_BUILD_STEP = BUILD_PYTHON_GLIBC_X86_64
+#     AGENT_LIBS_BUILD_STEP = BUILD_AGENT_LIBS_GLIBC_X86_64
+#     PACKAGECLOUD_DISTRO = "any"
+#     PACKAGECLOUD_DISTRO_VERSION = "any"
+#
+#
+# class DebManagedPackagesDependenciesBuilderARM64(ManagedPackagesDependenciesBuilder):
+#     BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_ARM64
+#     DEPENDENCY_PACKAGES_ARCHITECTURE = Architecture.ARM64
+#     PACKAGE_TYPE = "deb"
+#     PYTHON_BUILD_STEP = BUILD_PYTHON_GLIBC_ARM64
+#     AGENT_LIBS_BUILD_STEP = BUILD_AGENT_LIBS_GLIBC_ARM64
+#     PACKAGECLOUD_DISTRO = "any"
+#     PACKAGECLOUD_DISTRO_VERSION = "any"
+#
+#
+# class DebManagedPackagesDependenciesBuilderAll(ManagedPackagesDependenciesBuilder):
+#     BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
+#     DEPENDENCY_PACKAGES_ARCHITECTURE = Architecture.UNKNOWN
+#     PACKAGE_TYPE = "deb"
+#     PACKAGECLOUD_DISTRO = "any"
+#     PACKAGECLOUD_DISTRO_VERSION = "any"
+#
+#
+# class RpmManagedPackagesDependenciesBuilderx86_64(ManagedPackagesDependenciesBuilder):
+#     BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
+#     DEPENDENCY_PACKAGES_ARCHITECTURE = Architecture.X86_64
+#     PACKAGE_TYPE = "rpm"
+#     PYTHON_BUILD_STEP = BUILD_PYTHON_GLIBC_X86_64
+#     AGENT_LIBS_BUILD_STEP = BUILD_AGENT_LIBS_GLIBC_X86_64
+#     PACKAGECLOUD_DISTRO = "rpm_any"
+#     PACKAGECLOUD_DISTRO_VERSION = "rpm_any"
+#
+#
+# class RpmManagedPackagesDependenciesBuilderAarch64(ManagedPackagesDependenciesBuilder):
+#     BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_ARM64
+#     DEPENDENCY_PACKAGES_ARCHITECTURE = Architecture.ARM64
+#     PACKAGE_TYPE = "rpm"
+#     PYTHON_BUILD_STEP = BUILD_PYTHON_GLIBC_ARM64
+#     AGENT_LIBS_BUILD_STEP = BUILD_AGENT_LIBS_GLIBC_ARM64
+#     PACKAGECLOUD_DISTRO = "rpm_any"
+#     PACKAGECLOUD_DISTRO_VERSION = "rpm_any"
+#
+#
+# ALL_MANAGED_PACKAGE_BUILDERS: Dict[str, Type[ManagedPackagesDependenciesBuilder]] = {
+#     "deb-amd64": DebManagedPackagesDependenciesBuilderX86_64,
+#     "deb-arm64": DebManagedPackagesDependenciesBuilderARM64,
+#     "deb-all": DebManagedPackagesDependenciesBuilderARM64,
+#     "rpm-x86_64": RpmManagedPackagesDependenciesBuilderx86_64,
+#     "rpm-aarch64": RpmManagedPackagesDependenciesBuilderAarch64
+# }
+

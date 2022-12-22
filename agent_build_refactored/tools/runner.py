@@ -732,14 +732,6 @@ class Runner:
         in order to perform its own work.
     """
 
-    # List of Runner steps which are required by this Runner. All steps which are meant to be cached by GitHub Actions
-    # have to be specified here.
-    REQUIRED_STEPS: List[RunnerStep] = []
-
-    # List of other Runner classes that are required by this one. As with previous, runners, which steps have to be
-    # cached by GitHub Actions, have to be specified here.
-    REQUIRED_RUNNERS_CLASSES: List[Type["Runner"]] = []
-
     # Base environment step. Runner runs on top of it. Can be a docker image, so the Runner will be executed in
     # container.
     BASE_ENVIRONMENT: Union[EnvironmentRunnerStep, str] = None
@@ -750,7 +742,6 @@ class Runner:
     def __init__(
         self,
         work_dir: pl.Path = None,
-        required_steps: List[RunnerStep] = None
     ):
         """
         :param work_dir: Path to the directory where Runner will store its results and intermediate data.
@@ -758,19 +749,23 @@ class Runner:
             the `REQUIRED_STEPS` class attribute is used.
         """
 
-        self.base_environment = type(self).BASE_ENVIRONMENT
-        self.required_steps = required_steps or type(self).REQUIRED_STEPS[:]
-        self.required_runners = {}
+        self.base_environment = type(self).get_base_environment()
 
         self.work_dir = pl.Path(work_dir or SOURCE_ROOT / "agent_build_output")
         output_name = type(self).get_fully_qualified_name().replace(".", "_")
         self.output_path = self.work_dir / "runner_outputs" / output_name
 
-        self._input_values = {}
+    @classmethod
+    def get_base_environment(cls):
+        return cls.BASE_ENVIRONMENT
+
+    @classmethod
+    def get_all_required_runners(cls) -> List[Type['Runner']]:
+        return []
 
     @classmethod
     def get_all_required_steps(cls) -> List[RunnerStep]:
-        return cls.REQUIRED_STEPS[:]
+        return []
 
     @classmethod
     def get_all_cacheable_steps(cls) -> List[RunnerStep]:
@@ -779,13 +774,13 @@ class Runner:
         """
         result = []
 
-        if cls.BASE_ENVIRONMENT:
-            result.extend(cls.BASE_ENVIRONMENT.get_all_cacheable_steps())
+        if cls.get_base_environment():
+            result.extend(cls.get_base_environment().get_all_cacheable_steps())
 
         for req_step in cls.get_all_required_steps():
             result.extend(req_step.get_all_cacheable_steps())
 
-        for runner_clas in cls.REQUIRED_RUNNERS_CLASSES:
+        for runner_clas in cls.get_all_required_runners():
             result.extend(runner_clas.get_all_cacheable_steps())
 
         # Filter all identical steps
@@ -945,10 +940,8 @@ class Runner:
                 self.get_all_required_steps()
             )
 
-            if self.required_runners:
-                steps_to_run.extend(
-                    self.required_runners
-                )
+            for runner in self.get_all_required_runners():
+                steps_to_run.extend(runner.get_all_required_steps())
 
         self._run_steps(
             steps=steps_to_run,

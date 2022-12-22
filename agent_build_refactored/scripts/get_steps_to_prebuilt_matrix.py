@@ -24,12 +24,13 @@ import json
 import os
 import pathlib as pl
 import sys
+from typing import List
 
 # This file can be executed as script. Add source root to the PYTHONPATH in order to be able to import
 # local packages. All such imports also have to be done after that.
 sys.path.append(str(pl.Path(__file__).parent.parent.parent))
 
-from agent_build_refactored.tools.runner import Runner
+from agent_build_refactored.tools.runner import Runner, RunnerStep
 
 from agent_build_refactored import ALL_USED_BUILDERS
 
@@ -47,7 +48,9 @@ for name, runner_cls in ALL_USED_BUILDERS.items():
             # Create "dummy" Runner for each runner step that has to be pre-built, this dummy runner will be executed
             # by its fqdn to run the step.
             class StepWrapperRunner(Runner):
-                REQUIRED_STEPS = [step]
+                @classmethod
+                def get_all_required_steps(cls) -> List[RunnerStep]:
+                    return [step]
 
             # Since this runner class is created dynamically we have to generate a constant fqdn for it.
             StepWrapperRunner.assign_fully_qualified_name(
@@ -89,7 +92,7 @@ if __name__ == '__main__':
     for fqdn, runner in pre_built_runners.items():
         result_matrix["include"].append(
             {
-                "name": f"Pre-build: {runner.REQUIRED_STEPS[0].name}",
+                "name": f"Pre-build: {runner.get_all_required_steps()[0].name}",
                 "step-runner-fqdn": fqdn,
                 "os": DEFAULT_OS,
                 "python-version": DEFAULT_PYTHON_VERSION,

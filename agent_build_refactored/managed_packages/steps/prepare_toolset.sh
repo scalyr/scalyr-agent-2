@@ -45,4 +45,8 @@ gem install "fpm:${FPM_VERSION}" "package_cloud:${PACKAGECLOUD_VERSION}"
 # Generate keypair to sign and verify test repos for packages.
 gpg --batch --passphrase '' --quick-gen-key test default default
 
+apt-key adv --keyserver keyserver.ubuntu.com --recv-keys A0546A43624A8331
+apt-get update
+apt-get install aptly
+
 apt clean
