@@ -295,7 +295,7 @@ def server_root(request, tmp_path_factory, package_builder):
         if request.config.option.packages_source is None:
             # Build packages now.
             builder = package_builder()
-            builder.build_packages()
+            builder.build()
             packages_dir = builder.output_path / "packages"
         else:
             packages_dir = pl.Path(request.config.option.packages_source)

@@ -21,7 +21,7 @@ import subprocess
 import argparse
 import os
 import pathlib as pl
-from typing import List, Tuple, Optional, Dict, Type
+from typing import List, Tuple, Optional, Dict, Type, Union
 
 
 from agent_build_refactored.tools.runner import Runner, RunnerStep, ArtifactRunnerStep, RunnerMappedPath, EnvironmentRunnerStep, DockerImageSpec,GitHubActionsSettings, IN_DOCKER
@@ -1694,38 +1694,6 @@ PREPARE_TOOLSET_STEPS = {
     Architecture.ARM64: PREPARE_TOOLSET_GLIBC_ARM64
 }
 
-# class DebPythonBuilder(PythonDependencyPackageBuilder):
-#     PACKAGE_TYPE = "deb"
-#
-#
-# class RpmDebPythonBuilder(PythonDependencyPackageBuilder):
-#     PACKAGE_TYPE = "rpm"
-#
-#
-# class DebPythonBuilderAMD64(DebPythonBuilder):
-#     ARCHITECTURE = Architecture.X86_64
-#
-#
-# class DebPythonBuilderARM64(DebPythonBuilder):
-#     ARCHITECTURE = Architecture.ARM64
-#
-#
-# class RpmPythonBuilderX8664(RpmDebPythonBuilder):
-#     ARCHITECTURE = Architecture.X86_64
-#
-#
-# class RpmPythonBuilderAARCH64(RpmDebPythonBuilder):
-#     ARCHITECTURE = Architecture.ARM64
-#
-#
-# _ALL_PYTHON_BUILDERS = [
-#     DebPythonBuilderAMD64,
-#     DebPythonBuilderARM64,
-#     RpmPythonBuilderX8664,
-#     RpmPythonBuilderAARCH64
-# ]
-#
-
 
 class DebAgentDependenciesBuilderAMD64(AgentDependenciesBuilder):
     ARCHITECTURE = Architecture.X86_64
@@ -1754,6 +1722,7 @@ _ALL_AGENT_LIBS_PACKAGE_BUILDERS: Dict[str, Type[AgentDependenciesBuilder]] = {
     "rpm-aarch64": RpmAgentDependenciesBuilderAARCH64,
 }
 
+
 def _calculate_all_python_packages_checksum():
     sha256 = hashlib.sha256()
     for builder_name in sorted(_ALL_AGENT_LIBS_PACKAGE_BUILDERS.keys()):
@@ -1762,7 +1731,9 @@ def _calculate_all_python_packages_checksum():
 
     return sha256.hexdigest()
 
+
 _ALL_PYTHON_PACKAGES_CHECKSUM = _calculate_all_python_packages_checksum()
+
 
 def _calculate_all_agent_libs_packages_checksum():
     sha256 = hashlib.sha256()
@@ -1802,15 +1773,17 @@ def _parse_package_version_parts(version: str) -> Tuple[int, str]:
     return int(iteration), checksum
 
 
-
 class DebAgentBuilder(AgentPackageBuilder):
+    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
     PACKAGE_TYPE = "deb"
 
+
 class RpmAgentBuilder(AgentPackageBuilder):
+    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
     PACKAGE_TYPE = "rpm"
 
 
-ALL_MANAGED_PACKAGE_BUILDERS: Dict[str, Type[Runner]] = {
+ALL_MANAGED_PACKAGE_BUILDERS: Dict[str, Type[AgentDependenciesBuilder, AgentPackageBuilder]] = {
     **_ALL_AGENT_LIBS_PACKAGE_BUILDERS,
     "deb-agent": DebAgentBuilder,
     "rpm-agent": RpmAgentBuilder,
