@@ -1,17 +1,31 @@
+# Copyright 2014-2022 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+This module defines logic that allows to run end-to-end tests inside remote machines such as ec2 instance or docker
+container.
+"""
+
+import logging
 import pathlib as pl
 import subprocess
 from typing import List, Dict
 
 from agent_build_refactored.tools.constants import Architecture
-from tests.end_to_end_tests.run_in_remote_machine.ec2 import (
-    EC2DistroImage,
-    run_test_in_ec2_instance,
-)
+from agent_build_refactored.tools.run_in_ec2.constants import EC2DistroImage
 
-"""
-This module defines logic that allows to run end to end tests inside remote machines such as ec2 instance or docker
-container.
-"""
+logger = logging.getLogger(__name__)
 
 # Collection of remote machine distro specifications for end to end remote tests.
 DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
@@ -20,6 +34,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
             Architecture.X86_64: EC2DistroImage(
                 image_id="ami-09d56f8956ab235b3",
                 image_name="Ubuntu Server 22.04 (HVM), SSD Volume Type",
+                short_name="ubuntu2204",
                 size_id="m1.small",
                 ssh_username="ubuntu",
             )
@@ -31,6 +46,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
             Architecture.X86_64: EC2DistroImage(
                 image_id="ami-0149b2da6ceec4bb0",
                 image_name="Ubuntu Server 20.04 LTS (HVM), SSD Volume Type",
+                short_name="ubuntu2004",
                 size_id="m1.small",
                 ssh_username="ubuntu",
             )
@@ -42,6 +58,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
             Architecture.X86_64: EC2DistroImage(
                 image_id="ami-07ebfd5b3428b6f4d",
                 image_name="Ubuntu Server 18.04 LTS (HVM), SSD Volume Type",
+                short_name="ubuntu1804",
                 size_id="m1.small",
                 ssh_username="ubuntu",
             )
@@ -53,6 +70,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
             Architecture.X86_64: EC2DistroImage(
                 image_id="ami-08bc77a2c7eb2b1da",
                 image_name="Ubuntu Server 16.04 LTS (HVM), SSD Volume Type",
+                short_name="ubuntu1604",
                 size_id="m1.small",
                 ssh_username="ubuntu",
             )
@@ -64,6 +82,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
             Architecture.X86_64: EC2DistroImage(
                 image_id="ami-07957d39ebba800d5",
                 image_name="Ubuntu Server 14.04 LTS (HVM)",
+                short_name="ubuntu1404",
                 size_id="t2.small",
                 ssh_username="ubuntu",
             )
@@ -75,6 +94,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
             Architecture.X86_64: EC2DistroImage(
                 image_id="ami-09a41e26df464c548",
                 image_name="Debian 11 (HVM), SSD Volume Type",
+                short_name="debian11",
                 size_id="t2.small",
                 ssh_username="ubuntu",
             )
@@ -86,6 +106,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
             Architecture.X86_64: EC2DistroImage(
                 image_id="ami-0b9a611a02047d3b1",
                 image_name="Debian 10 Buster",
+                short_name="debian10",
                 size_id="t2.small",
                 ssh_username="admin",
             )
@@ -97,6 +118,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
             Architecture.X86_64: EC2DistroImage(
                 image_id="ami-01ca03df4a6012157",
                 image_name="CentOS 8 (x86_64) - with Updates HVM",
+                short_name="centos8",
                 size_id="t2.small",
                 ssh_username="centos",
             )
@@ -108,6 +130,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
             Architecture.X86_64: EC2DistroImage(
                 image_id="ami-0affd4508a5d2481b",
                 image_name="CentOS 7 (x86_64) - with Updates HVM",
+                short_name="centos7",
                 size_id="t2.small",
                 ssh_username="centos",
             )
@@ -119,6 +142,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
             Architecture.X86_64: EC2DistroImage(
                 image_id="ami-03a941394ec9849de",
                 image_name="CentOS 6 (x86_64) - with Updates HVM",
+                short_name="centos7",
                 size_id="t2.small",
                 ssh_username="root",
             )
@@ -130,6 +154,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
             Architecture.X86_64: EC2DistroImage(
                 image_id="ami-09d95fab7fff3776c",
                 image_name="Amazon Linux 2 AMI (HVM), SSD Volume Type",
+                short_name="amazonlinux2",
                 size_id="t2.small",
                 ssh_username="ec2-user",
             )
@@ -145,7 +170,6 @@ def run_test_remotely(
     command: List[str],
     architecture: Architecture,
     pytest_runner_path: pl.Path,
-    test_options,
     file_mappings: Dict = None,
 ):
     """
@@ -162,44 +186,49 @@ def run_test_remotely(
     :param file_mappings: Dict where key is a file that has to be presented in the remote machine,
         and value is the path in the remote machine.
     """
+
     file_mappings = file_mappings or {}
 
     distro = DISTROS[distro_name][remote_machine_type]
 
     if remote_machine_type == "ec2":
 
-        def _validate_option(name: str):
-            dest = name.replace("--", "").replace("-", "_")
-            value = getattr(test_options, dest)
-            if value is None:
-                raise ValueError(
-                    f"Option '{name}' has to be provided with distro type 'ec2'."
-                )
-
-        _validate_option("--aws-access-key")
-        _validate_option("--aws-secret-key")
-        _validate_option("--aws-private-key-path")
-        _validate_option("--aws-private-key-name")
-        _validate_option("--aws-region")
-        _validate_option("--aws-security-group")
-        _validate_option("--aws-security-groups-prefix-list-id")
+        from agent_build_refactored.tools.run_in_ec2.boto3_tools import (
+            create_and_deploy_ec2_instance,
+            ssh_run_command,
+            create_ssh_connection,
+            AWSSettings,
+        )
 
         distro_image = distro[architecture]
 
-        run_test_in_ec2_instance(
+        file_mappings = file_mappings or {}
+        file_mappings[pytest_runner_path] = "/tmp/test_runner"
+
+        aws_settings = AWSSettings.create_from_env()
+        boto3_session = aws_settings.create_boto3_session()
+
+        instance = create_and_deploy_ec2_instance(
+            boto3_session=boto3_session,
             ec2_image=distro_image,
-            test_runner_path=pytest_runner_path,
-            command=command,
-            file_mappings=file_mappings,
-            access_key=test_options.aws_access_key,
-            secret_key=test_options.aws_secret_key,
-            private_key_path=test_options.aws_private_key_path,
-            private_key_name=test_options.aws_private_key_name,
-            region=test_options.aws_region,
-            security_group=test_options.aws_security_group,
-            security_groups_prefix_list_id=test_options.aws_security_groups_prefix_list_id,
-            workflow_id=test_options.test_session_suffix,
+            name_prefix=distro_image.short_name,
+            aws_settings=aws_settings,
+            files_to_upload=file_mappings,
         )
+
+        final_command = ["/tmp/test_runner", "-s", *command]
+
+        try:
+            ssh = create_ssh_connection(
+                instance.public_ip_address,
+                username=distro_image.ssh_username,
+                private_key_path=aws_settings.private_key_path,
+            )
+
+            ssh_run_command(ssh_connection=ssh, command=final_command, run_as_root=True)
+        finally:
+            logger.info("Terminating EC2 instance.")
+            instance.terminate()
     else:
         mount_options = []
 
@@ -214,12 +243,8 @@ def run_test_remotely(
                 "-v",
                 f"{pytest_runner_path}:/test_runner",
                 *mount_options,
-                "-e",
-                "TEST_RUNS_REMOTELY=1",
-                "-e",
-                "TEST_RUNS_IN_DOCKER=1",
                 "--platform",
-                str(architecture.as_docker_platform),
+                str(architecture.as_docker_platform.value),
                 distro,
                 "/test_runner",
                 "-s",

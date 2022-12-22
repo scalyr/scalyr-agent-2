@@ -12,10 +12,12 @@ import textwrap
 import pytest
 
 
+from agent_build_refactored.tools.constants import Architecture
 from agent_build_refactored.tools.runner import Runner, RunnerMappedPath
 from agent_build_refactored.managed_packages.managed_packages_builders import (
     ALL_MANAGED_PACKAGE_BUILDERS,
     PREPARE_TOOLSET_GLIBC_X86_64,
+    PREPARE_TOOLSET_GLIBC_ARM64,
     PYTHON_PACKAGE_NAME,
     AGENT_LIBS_PACKAGE_NAME,
     AGENT_PACKAGE_NAME,
@@ -48,9 +50,15 @@ def pytest_addoption(parser):
     parser.addoption(
         "--remote-machine-type",
         required=True,
-        choices=["ec2", "docker", "local"],
+        choices=["ec2", "docker"],
         help="Type of the remote machine for the test. For 'ec2' - run in AWS ec2 instance,"
         "'docker' - run in docker container, 'local', run locally.",
+    )
+
+    parser.addoption(
+        "--runs-locally",
+        action="store_true",
+        help="If set, then tests run inside local machine, not in remote one.",
     )
 
     parser.addoption(
@@ -59,42 +67,6 @@ def pytest_addoption(parser):
         required=True,
         choices=DISTROS.keys(),
         help="Distribution to test.",
-    )
-
-    parser.addoption(
-        "--aws-access-key",
-        required=False,
-        help="ID of an access key of an AWS account. Required for testing in ec2 instances.",
-    )
-    parser.addoption(
-        "--aws-secret-key",
-        required=False,
-        help="Secret key of an AWS account. Required for testing in ec2 instances.",
-    )
-    parser.addoption(
-        "--aws-private-key-path",
-        required=False,
-        help="Path to a private key file. Required for testing in ec2 instances.",
-    )
-    parser.addoption(
-        "--aws-private-key-name",
-        required=False,
-        help="Name to a private key file. Required for testing in ec2 instances.",
-    )
-    parser.addoption(
-        "--aws-region",
-        required=False,
-        help="Name of a AWS region. Required for testing in ec2 instances.",
-    )
-    parser.addoption(
-        "--aws-security-group",
-        required=False,
-        help="Name of an AWS security group. Required for testing in ec2 instances.",
-    )
-    parser.addoption(
-        "--aws-security-groups-prefix-list-id",
-        required=False,
-        help="ID of the prefix list of the security group. Required for testing in ec2 instances.",
     )
 
 
@@ -106,12 +78,12 @@ def pytest_collection_modifyitems(config, items):
     index = names.index("test_remotely")
     test_remotely = items[index]
 
-    # If the remo machine type is not 'local', then we remove all test cases
+    # If tests have to be run in remote machine then we remove all test cases
     # and leave only the 'test_remotely' case, which has to run all tests remotely.
-    if config.option.remote_machine_type != "local":
+    if not config.option.runs_locally:
         del items[:]
         items.append(test_remotely)
-    # Or remove the 'test_remotely' case if it's a 'local' test run.
+    # Or remove the 'test_remotely' case if tests have to be run locally.
     else:
         items.pop(index)
 
@@ -153,18 +125,6 @@ class RepoBuilder(Runner):
     This runner class is responsible for creating deb/rpm repositories from provided packages.
     The result repo is used as a mock repository for testing.
     """
-
-    APT_REPO_CONF = textwrap.dedent(
-        """
-        Origin: test_repo
-        Label: test_repo
-        Codename: trusty
-        Architectures: amd64 source
-        Components: main
-        Description: example repo
-        SignWith: test@test.com
-        """
-    )
 
     BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
 
@@ -223,7 +183,7 @@ class RepoBuilder(Runner):
                 Origin: test_repo
                 Label: test_repo
                 Codename: scalyr
-                Architectures: amd64 source
+                Architectures: amd64 arm64 source
                 Components: main
                 Description: example repo
                 SignWith: {sign_key_id}
@@ -287,6 +247,20 @@ class RepoBuilder(Runner):
         )
 
 
+class RepoBuilderX86_64(RepoBuilder):
+    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
+
+
+class RepoBuilderARM64(RepoBuilder):
+    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_ARM64
+
+
+REPO_BUILDER_CLASSES = {
+    Architecture.X86_64: RepoBuilderX86_64,
+    Architecture.ARM64: RepoBuilderARM64,
+}
+
+
 @pytest.fixture(scope="session")
 def server_root(request, tmp_path_factory, package_builder):
     """
@@ -312,7 +286,9 @@ def server_root(request, tmp_path_factory, package_builder):
             packages_dir = pl.Path(request.config.option.packages_source)
 
         # Build mock repo from packages.
-        repo_builder = RepoBuilder()
+        arch = package_builder.DEPENDENCY_PACKAGES_ARCHITECTURE
+        repo_builder_cls = REPO_BUILDER_CLASSES[arch]
+        repo_builder = repo_builder_cls()
         repo_builder.build(
             package_type=package_builder.PACKAGE_TYPE, packages_dir_path=packages_dir
         )

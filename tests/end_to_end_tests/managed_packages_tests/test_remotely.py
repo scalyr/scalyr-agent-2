@@ -23,7 +23,7 @@ import pytest
 
 from tests.end_to_end_tests.run_in_remote_machine import run_test_remotely
 from tests.end_to_end_tests.run_in_remote_machine.portable_pytest_runner import (
-    PortablePytestRunnerBuilder,
+    PORTABLE_PYTEST_RUNNER_BUILDERS,
 )
 
 
@@ -41,10 +41,11 @@ def test_remotely(
     scalyr_server,
     test_session_suffix,
     tmp_path,
-    request,
 ):
 
-    pytest_runner_builder = PortablePytestRunnerBuilder()
+    arch = package_builder.DEPENDENCY_PACKAGES_ARCHITECTURE
+    pytest_runner_builder_cls = PORTABLE_PYTEST_RUNNER_BUILDERS[arch]
+    pytest_runner_builder = pytest_runner_builder_cls()
     pytest_runner_builder.build()
 
     packages_archive_path = tmp_path / "packages.tar"
@@ -60,9 +61,10 @@ def test_remotely(
                 "--builder-name",
                 package_builder_name,
                 "--distro-name",
-                request.config.option.distro_name,
+                distro_name,
                 "--remote-machine-type",
-                "local",
+                remote_machine_type,
+                "--runs-locally",
                 "--packages-source-type",
                 "repo-tarball",
                 "--packages-source",
@@ -78,7 +80,6 @@ def test_remotely(
             ],
             architecture=package_builder.DEPENDENCY_PACKAGES_ARCHITECTURE,
             pytest_runner_path=pytest_runner_builder.result_runner_path,
-            test_options=request.config.option,
             file_mappings={str(packages_archive_path): "/tmp/packages.tar"},
         )
     except Exception:

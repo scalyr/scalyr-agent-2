@@ -44,6 +44,19 @@ class DockerPlatformInfo:
             result = f"{result}-{self.variant}"
         return result
 
+    @property
+    def as_architecture(self):
+        if "amd64" in str(self):
+            return Architecture.X86_64
+
+        if "arm64" in str(self) or "arm/v8" in str(self):
+            return Architecture.ARM64
+
+        if "arm/v7" in str(self):
+            return Architecture.ARMV7
+
+        return Architecture.UNKNOWN
+
 
 class DockerPlatform(enum.Enum):
     AMD64 = DockerPlatformInfo("linux", "amd64")
@@ -67,18 +80,19 @@ class Architecture(enum.Enum):
     UNKNOWN = "unknown"
 
     @property
-    def as_docker_platform(self) -> str:
+    def as_docker_platform(self) -> DockerPlatform:
         global _ARCHITECTURE_TO_DOCKER_PLATFORM
-        return _ARCHITECTURE_TO_DOCKER_PLATFORM[self].value
+        return _ARCHITECTURE_TO_DOCKER_PLATFORM[self]
 
     @property
     def to_docker_build_triplet(self):
-        return f"linux-{self.as_docker_platform}"
+        return f"linux-{self.as_docker_platform.value}"
 
     @property
     def as_deb_package_arch(self):
         mapping = {
             Architecture.X86_64: "amd64",
+            Architecture.ARM64: "arm64",
             Architecture.UNKNOWN: "all"
         }
 
@@ -88,6 +102,7 @@ class Architecture(enum.Enum):
     def as_rpm_package_arch(self):
         mapping = {
             Architecture.X86_64: "x86_64",
+            Architecture.ARM64: "aarch64",
             Architecture.UNKNOWN: "noarch"
         }
         return mapping[self]

@@ -325,10 +325,9 @@ def verify_logs(
             time.sleep(_QUERY_RETRY_DELAY)
             continue
 
-        assert len(events) == TEST_LOG_MESSAGE_COUNT, (
-            f"Number of uploaded event more that "
-            f"expected ({TEST_LOG_MESSAGE_COUNT})."
-        )
+        assert (
+            len(events) == TEST_LOG_MESSAGE_COUNT
+        ), f"Expected number of events: {TEST_LOG_MESSAGE_COUNT}, got {len(events)}."
 
         event_counts = [counter_getter(e) for e in events]
 
@@ -351,20 +350,37 @@ def verify_logs(
 
 
 def verify_agent_status(
-    agent_version: str,
-    agent_commander: AgentCommander,
-    # timeout_tracker: TimeoutTracker
+    agent_version: str, agent_commander: AgentCommander, timeout_tracker: TimeoutTracker
 ):
     """
     Perform basic verification of the agent output.
     """
 
     log.info("Verifying agent status output")
-    # Verify text status
-    string_status = agent_commander.get_status()
-    print("!!!")
-    print(string_status)
+    while True:
+        json_status = agent_commander.get_status_json()
+        copying_manager_status = json_status.get("copying_manager_status")
 
+        if copying_manager_status is None:
+            timeout_tracker.sleep(
+                1, "Can't wait further for agent's copying_manager_status."
+            )
+            continue
+
+        last_response_status = copying_manager_status.get("last_response_status")
+        if last_response_status is None:
+            timeout_tracker.sleep(
+                1,
+                "Can't wait further for agent's copying manager last_response_status.",
+            )
+            continue
+
+        assert (
+            last_response_status == "success"
+        ), "last_response_status is not successful"
+        break
+
+    string_status = agent_commander.get_status()
     assert "agent.log" in string_status
     if platform.system() == "Linux":
         message = f"Can not find linux system metrics monitor is agent's status. Status: {string_status}"

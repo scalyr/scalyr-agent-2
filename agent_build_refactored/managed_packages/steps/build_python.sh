@@ -95,8 +95,8 @@ cp -a /usr/local/lib/libuuid.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/li
 cp -a /usr/local/lib/libgdbm.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
 cp -a /usr/local/lib/libgdbm_compat.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
 cp -a /usr/local/lib64/libffi.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-cp -a /usr/local/lib64/libcrypto.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-cp -a /usr/local/lib64/libssl.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
+cp -a "${LIBSSL_DIR}"/libcrypto.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
+cp -a "${LIBSSL_DIR}"/libssl.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
 
 # Copy wrapper for Python interpreter executable.
 cp -a "${SOURCE_ROOT}/agent_build_refactored/managed_packages/files/python3" "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/bin/python3"
@@ -109,7 +109,7 @@ find "${PYTHON_EXEC_LIBS_PATH}" -name "__pycache__" -type d -prune -exec rm -r {
 find "${PYTHON_LIBS_PATH}" -name "__pycache__" -type d -prune -exec rm -r {} \;
 
 rm -r "${PYTHON_LIBS_PATH}/test"
-rm -r "${PYTHON_LIBS_PATH}/config-${PYTHON_SHORT_VERSION}-x86_64-linux-gnu"
+rm -r "${PYTHON_LIBS_PATH}/config-${PYTHON_SHORT_VERSION}-${PYTHON_CONFIG_ARCHITECTURE}-linux-gnu"
 rm -r "${PYTHON_LIBS_PATH}/lib2to3"
 
 

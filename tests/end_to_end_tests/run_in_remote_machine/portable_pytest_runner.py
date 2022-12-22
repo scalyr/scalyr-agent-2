@@ -1,20 +1,35 @@
+# Copyright 2014-2022 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+This module defines logic that allows to build single-file, standalone executable binary with pytest runner.
+This executable is used in ec2 and docker end-to-end tests to run those tests in completely clean environment
+without Python and other dependencies.
+"""
+
 import os
 import subprocess
 import sys
 
-from agent_build_refactored.tools.constants import SOURCE_ROOT
+from agent_build_refactored.tools.constants import SOURCE_ROOT, Architecture
 from agent_build_refactored.tools.runner import Runner
 from agent_build_refactored.managed_packages.managed_packages_builders import (
     PREPARE_TOOLSET_GLIBC_X86_64,
+    PREPARE_TOOLSET_GLIBC_ARM64,
 )
 
-"""
-This module defines logic that allows to build single-file, standalone executable binary with pytest runner.
-This executable is used in ec2 and docker end to end tests to run those tests in completely clean environment
-without Python and other dependencies.
-"""
-
-PORTABLE_RUNNER_NAME = "portable_runner_name"
+PORTABLE_RUNNER_NAME = "portable_runner"
 
 
 class PortablePytestRunnerBuilder(Runner):
@@ -73,6 +88,20 @@ class PortablePytestRunnerBuilder(Runner):
         super(PortablePytestRunnerBuilder, cls).handle_command_line_arguments(args)
         builder = cls(work_dir=args.work_dir)
         builder.build()
+
+
+class PortablePytestRunnerBuilderX86_64(PortablePytestRunnerBuilder):
+    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
+
+
+class PortablePytestRunnerBuilderARM64(PortablePytestRunnerBuilder):
+    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_ARM64
+
+
+PORTABLE_PYTEST_RUNNER_BUILDERS = {
+    Architecture.X86_64: PortablePytestRunnerBuilderX86_64,
+    Architecture.ARM64: PortablePytestRunnerBuilderARM64,
+}
 
 
 if __name__ == "__main__":

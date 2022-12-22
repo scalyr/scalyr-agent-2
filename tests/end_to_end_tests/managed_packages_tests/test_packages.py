@@ -20,7 +20,6 @@ are changing system state and must be aware of risks.
 """
 
 import json
-import os
 import pathlib as pl
 import shlex
 import subprocess
@@ -148,12 +147,13 @@ def test_packages(
     agent_version,
     tmp_path,
 ):
-    timeout_tracker = TimeoutTracker(300)
+    timeout_tracker = TimeoutTracker(400)
     _print_system_information()
     _prepare_environment(
         package_type=package_builder.PACKAGE_TYPE,
         remote_machine_type=remote_machine_type,
         distro_name=distro_name,
+        timeout_tracker=timeout_tracker,
     )
 
     logger.info("Install agent from install script.")
@@ -221,7 +221,11 @@ def test_packages(
 
     agent_commander.start()
 
-    verify_agent_status(agent_version=agent_version, agent_commander=agent_commander)
+    verify_agent_status(
+        agent_version=agent_version,
+        agent_commander=agent_commander,
+        timeout_tracker=timeout_tracker,
+    )
 
     logger.info("Verify agent log uploads.")
     verify_logs(
@@ -322,7 +326,7 @@ def _perform_ssl_checks(
         agent_paths.agent_config_path.write_text(json.dumps(config))
 
     # 1. Configure invalid path for "ca_cert_path" and verify agent throws and fails to start
-    logger.info("Performing invalid ca_cert_path config option checks")
+    logger.info("Performing invalid ca_cert path config option checks")
     invalid_ca_cert_path_config = default_config.copy()
     invalid_ca_cert_path_config["ca_cert_path"] = "/tmp/invalid/ca_certs.crt"
     _add_config(invalid_ca_cert_path_config)
@@ -406,7 +410,12 @@ def _perform_ssl_checks(
     assert "because of server certificate validation error" in agent_log
     assert "This likely indicates a MITM attack" in agent_log
 
+    print("!!!")
+    print(agent_log)
+
     agent_status = agent_commander.get_status()
+    print("@@@@@")
+    print(agent_status)
     assert "Last successful communication with Scalyr: Never" in agent_status
     assert "Bytes uploaded successfully:               0" in agent_status
     assert "Last copy request size:                    0" in agent_status
@@ -466,22 +475,46 @@ def _install_from_convenience_script(
     subprocess.check_call(["bash", str(script_path)], env=_ADDITIONAL_ENVIRONMENT)
 
 
-def _prepare_environment(package_type: str, remote_machine_type: str, distro_name: str):
+def _prepare_environment(
+    package_type: str,
+    remote_machine_type: str,
+    distro_name: str,
+    timeout_tracker: TimeoutTracker,
+):
     """
     If needed, do some preparation before agent installation.
     :return:
     """
-    if "TEST_RUNS_IN_DOCKER" in os.environ:
+
+    logger.info("Preparing test environment")
+    packages_to_install = []
+
+    if remote_machine_type == "docker":
         if package_type == "deb":
-            _run_shell("apt update")
-            _call_apt(
-                ["install", "-y", "ca-certificates"],
-            )
+            packages_to_install.append("ca-certificates")
             if "debian" in distro_name:
-                _call_apt(["install", "-y", "procps"])
+                packages_to_install.append("procps")
         elif package_type == "rpm":
             if distro_name == "amazonlinux2":
-                _call_yum(["install", "-y", "procps"])
+                packages_to_install.append("procps")
+
+    if package_type == "deb":
+        # In some distributions apt update may be a pretty flaky due to connection and cache issues,
+        # so we add some retries.
+        while True:
+            try:
+                _run_shell("apt-get clean")
+                _run_shell("apt update")
+                break
+            except subprocess.CalledProcessError:
+                timeout_tracker.sleep(1, "Can not update apt.")
+
+    # Install additional packages if needed.
+    if packages_to_install:
+        if package_type == "deb":
+            _call_apt(["install", "-y", *packages_to_install])
+        elif package_type == "rpm":
+            _call_yum(["install", "-y", *packages_to_install])
 
     if distro_name == "centos6":
         # for centos 6, we remove repo file for disabled repo, so it could use vault repo.
