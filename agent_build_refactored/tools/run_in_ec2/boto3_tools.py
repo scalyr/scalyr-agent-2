@@ -197,6 +197,7 @@ def create_ec2_instance(
     if root_volume_size:
         block_device_mappings = [
             {
+                "DeviceName": "/dev/sda1",
                 "Ebs": {
                     "VolumeSize": root_volume_size,
                     "DeleteOnTermination": True,
