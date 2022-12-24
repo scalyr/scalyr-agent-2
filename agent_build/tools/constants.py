@@ -15,6 +15,7 @@
 
 import enum
 import pathlib as pl
+import pkg_resources
 
 SOURCE_ROOT = pl.Path(__file__).parent.parent.parent.absolute()
 AGENT_BUILD_OUTPUT = SOURCE_ROOT / "agent_build_output"

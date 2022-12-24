@@ -22,14 +22,29 @@ import os
 import subprocess
 import sys
 
-from agent_build_refactored.tools.constants import SOURCE_ROOT, Architecture
-from agent_build_refactored.tools.runner import Runner
+from agent_build_refactored.tools.constants import SOURCE_ROOT, Architecture, DockerPlatform
+from agent_build_refactored.tools.runner import Runner, EnvironmentRunnerStep, DockerImageSpec, GitHubActionsSettings
 from agent_build_refactored.managed_packages.managed_packages_builders import (
     PREPARE_TOOLSET_GLIBC_X86_64,
     PREPARE_TOOLSET_GLIBC_ARM64,
 )
 
 PORTABLE_RUNNER_NAME = "portable_runner"
+
+PREPARE_TOOLSET_GLIBC_ARMHF = EnvironmentRunnerStep(
+    name="prepare_pytest_runner_builder_armhf",
+    script_path="tests/end_to_end_tests/run_in_remote_machine/steps/prepare_pytest_runner_builder.sh",
+    tracked_files_globs=[
+        "agent_build/requirement-files/*.txt",
+    ],
+    base=DockerImageSpec(
+        name="python:3.7",
+        platform=DockerPlatform.ARMV7.value
+    ),
+    github_actions_settings=GitHubActionsSettings(
+        cacheable=True
+    )
+)
 
 
 class PortablePytestRunnerBuilder(Runner):
@@ -98,9 +113,14 @@ class PortablePytestRunnerBuilderARM64(PortablePytestRunnerBuilder):
     BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_ARM64
 
 
+class PortablePytestRunnerBuilderARMHF(PortablePytestRunnerBuilder):
+    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_ARMHF
+
+
 PORTABLE_PYTEST_RUNNER_BUILDERS = {
     Architecture.X86_64: PortablePytestRunnerBuilderX86_64,
     Architecture.ARM64: PortablePytestRunnerBuilderARM64,
+    Architecture.ARMV7: PortablePytestRunnerBuilderARMHF
 }
 
 

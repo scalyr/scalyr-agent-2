@@ -205,9 +205,6 @@ class RepoBuilder(Runner):
                 #     ]
                 # )
 
-            from agent_build_refactored.tools.constants import SOURCE_ROOT
-            p = SOURCE_ROOT / "scalyr-agent-2_2.1.38_all.deb"
-            subprocess.run(f"aptly repo add scalyr {p}", shell=True)
 
             subprocess.run(f'aptly publish repo -distribution="scalyr" -gpg-key="{sign_key_id}" scalyr', shell=True)
 
@@ -262,20 +259,6 @@ class RepoBuilder(Runner):
         )
 
 
-class RepoBuilderX86_64(RepoBuilder):
-    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
-
-
-class RepoBuilderARM64(RepoBuilder):
-    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_ARM64
-
-
-REPO_BUILDER_CLASSES = {
-    Architecture.X86_64: RepoBuilderX86_64,
-    Architecture.ARM64: RepoBuilderARM64,
-}
-
-
 @pytest.fixture(scope="session")
 def server_root(request, tmp_path_factory, package_builder):
     """
@@ -294,16 +277,25 @@ def server_root(request, tmp_path_factory, package_builder):
     elif package_source_type == "dir":
         if request.config.option.packages_source is None:
             # Build packages now.
-            builder = package_builder()
-            builder.build()
-            packages_dir = builder.output_path / "packages"
+
+            packages_dir = tmp_path_factory.mktemp("packages")
+            dependencies_builder = package_builder()
+            dependencies_builder.build()
+            for package_path in dependencies_builder.output_path.glob(f"*.{package_builder.PACKAGE_TYPE}"):
+                shutil.copy(package_path, packages_dir)
+
+            # Build agent package.
+            agent_builder_name = f"{package_builder.PACKAGE_TYPE}-agent"
+            agent_builder_cls = ALL_MANAGED_PACKAGE_BUILDERS[agent_builder_name]
+            agent_builder = agent_builder_cls()
+            agent_builder.build()
+            for package_path in agent_builder.output_path.glob(f"*.{package_builder.PACKAGE_TYPE}"):
+                shutil.copy(package_path, packages_dir)
         else:
             packages_dir = pl.Path(request.config.option.packages_source)
 
         # Build mock repo from packages.
-        arch = package_builder.DEPENDENCY_PACKAGES_ARCHITECTURE
-        repo_builder_cls = REPO_BUILDER_CLASSES[arch]
-        repo_builder = repo_builder_cls()
+        repo_builder = RepoBuilder()
         repo_builder.build(
             package_type=package_builder.PACKAGE_TYPE, packages_dir_path=packages_dir
         )

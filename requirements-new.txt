@@ -1,0 +1,12 @@
+# NOTE: orjson doesnt provide pre-built wheels for ARMv7 for glibc and musl.
+# orjson is not available for armv7 + musl yet, but it's available for armv7 +
+# libc. we handle that in dockerfile since python environment markers are not
+# specific enough.
+orjson==3.8.0; platform_system != 'Darwin'
+requests==2.28.1;
+
+# Dependency of the Syslog monitor.
+syslogmp==0.3;
+
+# Dependency of the Windows Event monitor.
+xmltodict==0.13.0; platform_system == 'Windows'

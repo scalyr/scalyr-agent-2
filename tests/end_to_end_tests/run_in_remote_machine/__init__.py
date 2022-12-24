@@ -161,6 +161,12 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
         },
         "docker": "amazonlinux:2",
     },
+    "python37": {
+        "docker": "python:3.7",
+    },
+    "python36": {
+        "docker": "python:3.6-slim",
+    },
 }
 
 

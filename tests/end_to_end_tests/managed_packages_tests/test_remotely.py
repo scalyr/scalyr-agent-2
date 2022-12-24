@@ -21,6 +21,8 @@ import tarfile
 
 import pytest
 
+from agent_build_refactored.tools.constants import Architecture
+from agent_build_refactored.managed_packages.managed_packages_builders import AgentEmbeddedPythonDependenciesBuilder
 from tests.end_to_end_tests.run_in_remote_machine import run_test_remotely
 from tests.end_to_end_tests.run_in_remote_machine.portable_pytest_runner import (
     PORTABLE_PYTEST_RUNNER_BUILDERS,
@@ -43,7 +45,13 @@ def test_remotely(
     tmp_path,
 ):
 
-    arch = package_builder.DEPENDENCY_PACKAGES_ARCHITECTURE
+    if isinstance(package_builder, AgentEmbeddedPythonDependenciesBuilder):
+        arch = package_builder.ARCHITECTURE
+    else:
+        if package_builder.PACKAGE_TYPE == "deb":
+            #arch = Architecture.ARMV7
+            arch = Architecture.X86_64
+
     pytest_runner_builder_cls = PORTABLE_PYTEST_RUNNER_BUILDERS[arch]
     pytest_runner_builder = pytest_runner_builder_cls()
     pytest_runner_builder.build()
@@ -78,7 +86,7 @@ def test_remotely(
                 "--test-session-suffix",
                 test_session_suffix,
             ],
-            architecture=package_builder.DEPENDENCY_PACKAGES_ARCHITECTURE,
+            architecture=arch,
             pytest_runner_path=pytest_runner_builder.result_runner_path,
             file_mappings={str(packages_archive_path): "/tmp/packages.tar"},
         )

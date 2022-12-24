@@ -25,6 +25,7 @@ import shlex
 import subprocess
 import logging
 import functools
+import sys
 import time
 from typing import List, Dict
 
@@ -169,21 +170,22 @@ def test_packages(
         logger.exception("Install script has failed.")
         raise
 
-    logger.info(
-        "Execute simple sanity test script for the python interpreter and its libraries."
-    )
-    subprocess.check_call(
-        [
-            f"/usr/lib/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/bin/python3",
-            "tests/end_to_end_tests/managed_packages_tests/verify_python_interpreter.py",
-        ],
-        env={
-            # It's important to override the 'LD_LIBRARY_PATH' to be sure that libraries paths from the test runner
-            # frozen binary are not leaked to a script's process.
-            "LD_LIBRARY_PATH": "",
-            "PYTHONPATH": str(SOURCE_ROOT),
-        },
-    )
+    if "system-python" not in package_builder_name:
+        logger.info(
+            "Execute simple sanity test script for the python interpreter and its libraries."
+        )
+        subprocess.check_call(
+            [
+                f"/usr/lib/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/bin/python3",
+                "tests/end_to_end_tests/managed_packages_tests/verify_python_interpreter.py",
+            ],
+            env={
+                # It's important to override the 'LD_LIBRARY_PATH' to be sure that libraries paths from the test runner
+                # frozen binary are not leaked to a script's process.
+                "LD_LIBRARY_PATH": "",
+                "PYTHONPATH": str(SOURCE_ROOT),
+            },
+        )
 
     agent_paths = AgentPaths(
         configs_dir=pl.Path("/etc/scalyr-agent-2"),
@@ -464,7 +466,7 @@ def _perform_ssl_checks(
 # Additional paths to add in case if tests run within "frozen" pytest executable.
 _ADDITIONAL_ENVIRONMENT = {
     "LD_LIBRARY_PATH": "/lib",
-    "PATH": "/bin:/sbin:/usr/bin:/usr/sbin",
+    "PATH": "/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/sbin:/usr/local/bin",
 }
 
 
@@ -508,6 +510,8 @@ def _prepare_environment(
                 break
             except subprocess.CalledProcessError:
                 timeout_tracker.sleep(1, "Can not update apt.")
+
+        #packages_to_install.append("python3.6-venv")
 
     # Install additional packages if needed.
     if packages_to_install:

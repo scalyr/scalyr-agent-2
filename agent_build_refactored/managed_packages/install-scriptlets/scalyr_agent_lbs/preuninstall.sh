@@ -1,5 +1,5 @@
-#!/usr/bin/env bash
-# Copyright 2014-2022 Scalyr Inc.
+#!/bin/bash
+# Copyright 2014-2020 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,5 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Always remove the .pyc files and __pycache__ directories
+find /usr/lib/scalyr-agent-2-dependencies -type f -name '*.py[co]' -delete -o -type d -name __pycache__ -exec rm -r {} \;
 
-exec /var/lib/scalyr-agent-2-dependencies/venv/bin/python3 -E "/usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py" "$@"
+exit 0;

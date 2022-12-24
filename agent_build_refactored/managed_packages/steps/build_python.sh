@@ -53,8 +53,7 @@ pushd "cpython-${PYTHON_VERSION}"
 mkdir build
 pushd build
 
-PACKAGE_INSTALL_PREFIX="/usr/share/${SUBDIR_NAME}"
-PACKAGE_INSTALL_EXEC_PREFIX="/usr/lib/${SUBDIR_NAME}"
+PACKAGE_INSTALL_PREFIX="/usr/lib/${SUBDIR_NAME}/python3"
 
 # Configure Python. Also provide options to store result files in sub-directories.
 ../configure \
@@ -65,7 +64,7 @@ PACKAGE_INSTALL_EXEC_PREFIX="/usr/lib/${SUBDIR_NAME}"
 	--with-openssl="/usr/local" \
 	--with-readline=edit \
 	--prefix="${PACKAGE_INSTALL_PREFIX}" \
-	--exec-prefix="${PACKAGE_INSTALL_EXEC_PREFIX}" \
+	--exec-prefix="${PACKAGE_INSTALL_PREFIX}" \
 	--with-ensurepip=upgrade \
 	--with-suffix="-orig"
 
@@ -86,26 +85,26 @@ popd
 cp -a ${BUILD_ROOT} "${STEP_OUTPUT_PATH}/python_original"
 
 # Copy Python dependency shared libraries.
-cp -a /usr/local/lib/libz.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-cp -a /usr/local/lib/libbz2.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-cp -a /usr/local/lib/libedit.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-cp -a /usr/local/lib/libncurses.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-cp -a /usr/local/lib/liblzma.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-cp -a /usr/local/lib/libuuid.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-cp -a /usr/local/lib/libgdbm.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-cp -a /usr/local/lib/libgdbm_compat.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-cp -a /usr/local/lib64/libffi.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-cp -a /usr/local/${LIBSSL_DIR}/libcrypto.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-cp -a /usr/local/${LIBSSL_DIR}/libssl.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
+cp -a /usr/local/lib/libz.so* "${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/lib"
+cp -a /usr/local/lib/libbz2.so* "${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/lib"
+cp -a /usr/local/lib/libedit.so* "${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/lib"
+cp -a /usr/local/lib/libncurses.so* "${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/lib"
+cp -a /usr/local/lib/liblzma.so* "${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/lib"
+cp -a /usr/local/lib/libuuid.so* "${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/lib"
+cp -a /usr/local/lib/libgdbm.so* "${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/lib"
+cp -a /usr/local/lib/libgdbm_compat.so* "${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/lib"
+cp -a /usr/local/lib64/libffi.so* "${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/lib"
+cp -a /usr/local/${LIBSSL_DIR}/libcrypto.so* "${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/lib"
+cp -a /usr/local/${LIBSSL_DIR}/libssl.so* "${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/lib"
 
 # Copy wrapper for Python interpreter executable.
-cp -a "${SOURCE_ROOT}/agent_build_refactored/managed_packages/files/python3" "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/bin/python3"
+mkdir -p "${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/python3/bin"
+cp -a "${SOURCE_ROOT}/agent_build_refactored/managed_packages/files/embedded-python/python3" "${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/bin/python3"
 
 # Remove some of the files to reduce package size
-PYTHON_EXEC_LIBS_PATH="${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib/python${PYTHON_SHORT_VERSION}"
 PYTHON_LIBS_PATH="${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/lib/python${PYTHON_SHORT_VERSION}"
 
-find "${PYTHON_EXEC_LIBS_PATH}" -name "__pycache__" -type d -prune -exec rm -r {} \;
+find "${PYTHON_LIBS_PATH}" -name "__pycache__" -type d -prune -exec rm -r {} \;
 find "${PYTHON_LIBS_PATH}" -name "__pycache__" -type d -prune -exec rm -r {} \;
 
 rm -r "${PYTHON_LIBS_PATH}/test"

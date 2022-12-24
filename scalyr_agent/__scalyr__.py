@@ -141,7 +141,6 @@ def __determine_install_type():
 # Holds which type of installation we are currently running from.
 INSTALL_TYPE = __determine_install_type()
 
-
 def scalyr_init():
     """Initializes the environment to execute a Scalyr script.
 
@@ -150,10 +149,12 @@ def scalyr_init():
 
     It performs such tasks as ensures PYTHONPATH include the Scalyr package and fixing some third-party import issues.
     """
+    pass
     # If this is a win32 executable, then all the packages have already been bundled in the exec and there is no
     # need to change the PYTHONPATH
-    if not __is_frozen__:
-        __add_scalyr_package_to_path()
+    pass
+    # if not __is_frozen__:
+    #     __add_scalyr_package_to_path()
 
 
 def __determine_package_root():
@@ -229,6 +230,12 @@ def __add_scalyr_package_to_path():
     If you add any new paths in this method, be sure to add them near the top of `setup.py` as well so as not
     to break the Windows builds.
     """
+
+    agent_executable_path = "/usr/share/scalyr-agent-2/bin/scalyr-agent-2"
+    if os.path.islink(agent_executable_path):
+        if os.readlink(agent_executable_path) == "/usr/share/scalyr-agent-2/py/scalyr_agent/agent_main_py_embedded.py":
+            return
+
     # prepend the third party directory first so it appears after the package root, third_party_pythonX
     # and third_party_tls directories
     sys.path.insert(0, os.path.join(get_package_root(), "third_party"))

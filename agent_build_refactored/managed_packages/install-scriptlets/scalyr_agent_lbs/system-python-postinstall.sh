@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # Copyright 2014-2022 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,5 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set -e
 
-exec /var/lib/scalyr-agent-2-dependencies/venv/bin/python3 -E "/usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py" "$@"
+VENV_DIR="/var/lib/scalyr-agent-2-dependencies/venv"
+/usr/lib/scalyr-agent-2-dependencies/python3/bin/python3 -m venv "${VENV_DIR}"
+"${VENV_DIR}/bin/python3" -m pip install \
+  --no-index --find-links /usr/lib/scalyr-agent-2-dependencies/wheels requests
+
+
