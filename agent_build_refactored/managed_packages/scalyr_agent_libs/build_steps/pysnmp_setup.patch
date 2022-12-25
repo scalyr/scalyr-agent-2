@@ -1,20 +1,20 @@
---- setup.py	2022-12-25 12:53:38.000000000 +0100
-+++ setup.py	2022-12-25 13:04:30.000000000 +0100
-@@ -53,8 +53,6 @@
-         'install_requires': ['pyasn1>=0.1.8', 'pysmi'],
+--- setup.py	2022-12-25 14:10:24.000000000 +0100
++++ setup_changed.py	2022-12-25 14:11:28.000000000 +0100
+@@ -58,7 +58,7 @@
+     from setuptools import setup
+ 
+     params = {
+-        'install_requires': ['pyasn1>=0.1.8', 'pysmi', 'pycryptodome'],
++        'install_requires': ['pyasn1>=0.1.8', 'pysmi'],
          'zip_safe': True
      }
--    if sys.platform.lower()[:3] != 'win':
--        params['install_requires'].append('pycrypto>=2.4.1')
  
- except ImportError:
-     for arg in sys.argv:
-@@ -66,8 +64,6 @@
+@@ -72,7 +72,7 @@
+ 
      params = {}
      if sys.version_info[:2] > (2, 4):
-         params['requires'] = ['pyasn1(>=0.1.8)', 'pysmi']
--        if sys.platform.lower()[:3] != 'win':
--            params['requires'].append('pycrypto(>=2.4.1)')
+-        params['requires'] = ['pyasn1(>=0.1.8)', 'pysmi', 'pycryptodome']
++        params['requires'] = ['pyasn1(>=0.1.8)', 'pysmi']
  
- if sys.platform.lower()[:3] == 'win':
-     try:
+ doclines = [x.strip() for x in (__doc__ or '').split('\n') if x]
+ 
