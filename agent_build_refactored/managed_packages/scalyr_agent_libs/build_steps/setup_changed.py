@@ -20,9 +20,17 @@ License :: OSI Approved :: BSD License
 Natural Language :: English
 Operating System :: OS Independent
 Programming Language :: Python :: 2
+Programming Language :: Python :: 2.4
+Programming Language :: Python :: 2.5
+Programming Language :: Python :: 2.6
+Programming Language :: Python :: 2.7
 Programming Language :: Python :: 3
+Programming Language :: Python :: 3.2
+Programming Language :: Python :: 3.3
+Programming Language :: Python :: 3.4
+Programming Language :: Python :: 3.5
+Programming Language :: Python :: 3.6
 Topic :: Communications
-Topic :: Software Development :: Libraries :: Python Modules
 Topic :: System :: Monitoring
 Topic :: System :: Networking :: Monitoring
 Topic :: Software Development :: Libraries :: Python Modules
@@ -50,46 +58,33 @@ try:
     from setuptools import setup
 
     params = {
-        'install_requires': ['pyasn1>=0.1.8', 'pysmi'],
+        'install_requires': ['pyasn1>=0.1.8', 'pysmi', 'pycryptodome'],
         'zip_safe': True
     }
-    if sys.platform.lower()[:3] != 'win':
-        params['install_requires'].append('pycrypto>=2.4.1')
 
 except ImportError:
     for arg in sys.argv:
         if 'egg' in arg:
             howto_install_setuptools()
             sys.exit(1)
+
     from distutils.core import setup
 
     params = {}
     if sys.version_info[:2] > (2, 4):
-        params['requires'] = ['pyasn1(>=0.1.8)', 'pysmi']
-        if sys.platform.lower()[:3] != 'win':
-            params['requires'].append('pycrypto(>=2.4.1)')
+        params['requires'] = ['pyasn1(>=0.1.8)', 'pysmi', 'pycryptodome']
 
-if sys.platform.lower()[:3] == 'win':
-    try:
-        import Crypto
-    except ImportError:
-        sys.stderr.write("""WARNING! WARNING! WARNING!
-PyCrypto binaries are required for SNMPv3 encryption to work.
-You may wish to grab them from http://www.voidspace.org.uk/python/modules.shtml
-and install into your system.
-""")
-
-doclines = [x.strip() for x in __doc__.split('\n') if x]
+doclines = [x.strip() for x in (__doc__ or '').split('\n') if x]
 
 params.update({
     'name': 'pysnmp',
     'version': open(os.path.join('pysnmp', '__init__.py')).read().split('\'')[1],
     'description': doclines[0],
     'long_description': ' '.join(doclines[1:]),
-    'maintainer': 'Ilya Etingof <ilya@glas.net>',
+    'maintainer': 'Ilya Etingof <etingof@gmail.com>',
     'author': 'Ilya Etingof',
-    'author_email': 'ilya@glas.net',
-    'url': 'http://sourceforge.net/projects/pysnmp/',
+    'author_email': 'etingof@gmail.com',
+    'url': 'https://github.com/etingof/pysnmp',
     'classifiers': [x for x in classifiers.split('\n') if x],
     'platforms': ['any'],
     'license': 'BSD',
