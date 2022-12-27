@@ -13,12 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script is a wrapper executable for Python interpreter from the agent's 'scalyr-agent-python3' dependency
+# This script is a wrapper executable for Python interpreter form the agent's 'scalyr-agent-python3' dependency
 # package.
 
-
-PYTHON_SUBDIR_NAME="scalyr-agent-2-dependencies/python3"
+PYTHON_SUBDIR_NAME="scalyr-agent-2/python3"
 
 # Override some variables in order to run dependency Python interpreter correctly.
-export LD_LIBRARY_PATH="/usr/lib/${PYTHON_SUBDIR_NAME}/lib"
-exec /usr/lib/${PYTHON_SUBDIR_NAME}/bin/python3-orig "$@"
+export LD_LIBRARY_PATH="/usr/lib/${PYTHON_SUBDIR_NAME}/lib:${LD_LIBRARY_PATH}"
+exec /usr/lib/${PYTHON_SUBDIR_NAME}/bin/python3 "$@"

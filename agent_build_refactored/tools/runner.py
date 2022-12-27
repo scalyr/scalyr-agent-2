@@ -28,7 +28,7 @@ import sys
 from typing import Union, Optional, List, Dict, Type, Callable
 
 
-from agent_build_refactored.tools.steps_libs.utils import calculate_file_checksum
+from agent_build_refactored.tools.steps_libs.utils import calculate_files_checksum
 from agent_build_refactored.tools.constants import SOURCE_ROOT, DockerPlatformInfo, Architecture, IN_CICD
 from agent_build_refactored.tools import (
     check_call_with_log,
@@ -351,12 +351,11 @@ class RunnerStep:
             sha256.update(value.encode())
 
         # Calculate the sha256 for each file's content, filename.
-        for file_path in self._tracked_files:
-            calculate_file_checksum(
-                file_path=file_path,
-                relative_to=SOURCE_ROOT,
-                sha256=sha256
-            )
+
+        calculate_files_checksum(
+            files_paths=[pl.Path(p) for p in self._tracked_files],
+            sha256=sha256
+        )
 
         # Also add user into the checksum.
         sha256.update(self.user.encode())
@@ -1149,7 +1148,7 @@ def run_docker_command(
             final_command,
         )
 
-    subprocess.check_call(
+    check_call_with_log(
         final_command,
         env=env
     )

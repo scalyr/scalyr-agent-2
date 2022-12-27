@@ -29,14 +29,26 @@ set -e
 # shellcheck disable=SC1090
 source ~/.bashrc
 
-REQUIREMENTS_FILES_PATH="${SOURCE_ROOT}/agent_build_refactored/requirements"
+REQUIREMENTS_FILE="/tmp/requirements.txt"
+
+echo "${REQUIREMENTS}" > "${REQUIREMENTS_FILE}"
 
 
-WHEELS_DIR="${STEP_OUTPUT_PATH}/usr/lib/${SUBDIR_NAME}/wheels"
+WHEELS_DIR="${STEP_OUTPUT_PATH}/usr/share/${SUBDIR_NAME}/agent-libs/wheels"
 mkdir -p "${WHEELS_DIR}"
-python3 -m pip wheel -v --wheel-dir "${WHEELS_DIR}"  \
-  -r "${REQUIREMENTS_FILES_PATH}/main-requirements.txt"
+python3 -m pip wheel -v \
+  --wheel-dir "${WHEELS_DIR}"  \
+  --no-cache-dir \
+  -r "${REQUIREMENTS_FILE}"
 
+rm "$WHEELS_DIR"/pycryptodome-*
+
+python3 -m pip cache purge
+python3 -m pip uninstall -y pycryptodome
+
+
+
+python3 -m pip install --no-cache-dir --no-index --find-links "${WHEELS_DIR}" -r "${REQUIREMENTS_FILE}"
 
 mkdir -p "${STEP_OUTPUT_PATH}/usr/lib/${SUBDIR_NAME}/python3/bin"
-cp "${SOURCE_ROOT}/agent_build_refactored/managed_packages/files/system_python/python3" "${STEP_OUTPUT_PATH}/usr/lib/${SUBDIR_NAME}/python3/bin/python3"
+cp "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_libs/files/system_python/scalyr-agent-python3" "${STEP_OUTPUT_PATH}/usr/lib/${SUBDIR_NAME}/bin/scalyr-agent-python3"

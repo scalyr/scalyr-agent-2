@@ -25,9 +25,9 @@ import re
 from typing import List, Tuple, Optional, Dict, Type, Union
 
 
-from agent_build_refactored.tools.steps_libs.utils import calculate_file_checksum
+from agent_build_refactored.tools.steps_libs.utils import calculate_files_checksum
 from agent_build_refactored.tools.runner import Runner, RunnerStep, ArtifactRunnerStep, RunnerMappedPath, EnvironmentRunnerStep, DockerImageSpec,GitHubActionsSettings, IN_DOCKER
-from agent_build_refactored.tools.constants import SOURCE_ROOT, DockerPlatform, Architecture
+from agent_build_refactored.tools.constants import SOURCE_ROOT, DockerPlatform, Architecture, REQUIREMENTS_COMMON, REQUIREMENTS_COMMON_PLATFORM_DEPENDENT
 from agent_build_refactored.tools import check_call_with_log
 from agent_build_refactored.prepare_agent_filesystem import build_linux_fhs_agent_files, add_config
 
@@ -60,22 +60,22 @@ The structure of the mentioned packages has to guarantee that files of these pac
     own 'sub-directories'
 
     For now there are two subdirectories:
-        - /usr/lib/scalyr-agent-2-dependencies - for platform dependent files.
-        - /usr/shared/scalyr-agent-2-dependencies - for platform independent files.
+        - /usr/lib/scalyr-agent-2/python3 - for Python3 interpreter package.
+        - /usr/lib/scalyr-agent-2/agent-libs - for agent requirement libraries.
 
     and agent from the 'scalyr-agent-2' package has to use the
-    '/usr/lib/scalyr-agent-2-dependencies/bin/python3' executable.
+    '/usr/lib/scalyr-agent-2/bin/python3' executable.
 """
 
 # Name of the subdirectory of dependency packages.
-AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME = "scalyr-agent-2-dependencies"
+AGENT_SUBDIR_NAME = "scalyr-agent-2"
 
 # Name of the dependency package with Python interpreter.
 PYTHON_PACKAGE_NAME = "scalyr-agent-python3"
 
 # name of the dependency package with agent requirement libraries.
 AGENT_LIBS_PACKAGE_NAME = "scalyr-agent-libs"
-AGENT_LIBS_MIN_PACKAGE_NAME = "scalyr-agent-libs-min"
+AGENT_LIBS_WHEELS_PACKAGE_NAME = "scalyr-agent-libs-wheels"
 
 AGENT_PACKAGE_NAME = "scalyr-agent-2"
 
@@ -225,7 +225,7 @@ class ManagedPackagesBuilder(Runner):
             "-n", AGENT_LIBS_PACKAGE_NAME,
             "--license", '"Apache 2.0"',
             "--vendor", "Scalyr",
-            "--provides", "scalyr-agent-2-dependencies",
+            "--provides", "scalyr-agent-2",
             "--description", description,
             "--depends", "bash >= 3.2",
             "--url", "https://www.scalyr.com",
@@ -980,7 +980,9 @@ class AgentSystemPythonDependenciesBuilder(PackagesBuilder):
     @classmethod
     def get_all_required_steps(cls) -> List[RunnerStep]:
         steps = super(AgentSystemPythonDependenciesBuilder, cls).get_all_required_steps()
-        steps.append(BUILD_AGENT_LIBS_MIN)
+        steps.extend([
+            BUILD_SYSTEM_PYTHON_AGENT_PACKAGES_ROOTS,
+        ])
         return steps
 
     @classmethod
@@ -990,21 +992,27 @@ class AgentSystemPythonDependenciesBuilder(PackagesBuilder):
         for package_arch in cls.PACKAGE_ARCHITECTURES:
             sha256.update(package_arch.encode())
 
+        sha256.update(BUILD_SYSTEM_PYTHON_AGENT_PACKAGES_ROOTS.checksum.encode())
+
         # Add arguments that are used to build package.
         for arg in cls._get_package_build_cmd_args():
             sha256.update(arg.encode())
 
         # Also calculate checksum of install scriptlets to reflect possible changes in them.
-        post_install_scriptlet_path = SOURCE_ROOT / "agent_build_refactored/managed_packages/install-scriptlets/scalyr_agent_lbs/system-python-postinstall.sh"
-        sha256 = calculate_file_checksum(
-            file_path=post_install_scriptlet_path,
-            relative_to=SOURCE_ROOT,
+        scriptlets_path = SOURCE_ROOT / "agent_build_refactored/managed_packages/scalyr_agent_libs/install_scriptlets"
+        scriptlets = [
+            scriptlets_path / "system-python-preinstall.sh",
+            scriptlets_path / "system-python-postinstall.sh",
+            scriptlets_path / "preuninstall.sh",
+        ]
+        sha256 = calculate_files_checksum(
+            files_paths=scriptlets,
             sha256=sha256
         )
         return sha256.hexdigest()
 
     @classmethod
-    def _get_agent_libs_min_package_build_cmd_args(cls) -> List[str]:
+    def _get_agent_libs_wheels_package_build_cmd_args(cls) -> List[str]:
         """
         Returns list of arguments for command that build agent-libs package.
         """
@@ -1018,12 +1026,13 @@ class AgentSystemPythonDependenciesBuilder(PackagesBuilder):
             "-s", "dir",
             "-a", "all",
             "-t", cls.PACKAGE_TYPE,
-            "-n", AGENT_LIBS_MIN_PACKAGE_NAME,
+            "-n", AGENT_LIBS_WHEELS_PACKAGE_NAME,
             "--license", '"Apache 2.0"',
             "--vendor", "Scalyr",
-            "--provides", "scalyr-agent-2-dependencies",
+            "--provides", "scalyr-agent-2",
             "--description", description,
             "--depends", "bash >= 3.2",
+            "--directories", f"/usr/share/{AGENT_SUBDIR_NAME}/agent-libs",
             "--url", "https://www.scalyr.com",
             "--deb-user", "root",
             "--deb-group", "root",
@@ -1038,7 +1047,7 @@ class AgentSystemPythonDependenciesBuilder(PackagesBuilder):
         Returns list of arguments for command that build agent-libs package.
         """
 
-        scriptlets_path = SOURCE_ROOT / "agent_build_refactored/managed_packages/install-scriptlets/scalyr_agent_lbs"
+        scriptlets_path = SOURCE_ROOT / "agent_build_refactored/managed_packages/scalyr_agent_libs/install_scriptlets"
 
         description = "Dependency package which provides Python requirement libraries which are used by the agent " \
                       "from the 'scalyr-agent-2 package'"
@@ -1051,15 +1060,16 @@ class AgentSystemPythonDependenciesBuilder(PackagesBuilder):
             "-n", AGENT_LIBS_PACKAGE_NAME,
             "--license", '"Apache 2.0"',
             "--vendor", "Scalyr",
-            "--provides", "scalyr-agent-2-dependencies",
+            "--provides", "scalyr-agent-2",
             "--description", description,
             "--depends", "bash >= 3.2",
             "--url", "https://www.scalyr.com",
             "--before-install", str(scriptlets_path / "system-python-preinstall.sh"),
             "--after-install", str(scriptlets_path / "system-python-postinstall.sh"),
             "--before-remove", str(scriptlets_path / "preuninstall.sh"),
-            "--directories", f"/usr/lib/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}",
-            "--directories", f"/var/lib/{AGENT_LIBS_PACKAGE_NAME}",
+            "--directories", f"/usr/lib/{AGENT_SUBDIR_NAME}/agent-libs",
+            "--directories", f"/var/lib/{AGENT_SUBDIR_NAME}",
+            "--directories", f"/etc/{AGENT_SUBDIR_NAME}",
             "--deb-user", "root",
             "--deb-group", "root",
             "--rpm-user", "root",
@@ -1089,14 +1099,15 @@ class AgentSystemPythonDependenciesBuilder(PackagesBuilder):
 
         package_roots = self.output_path / "package_roots"
         agent_libs_min_package_root = package_roots / "agent_libs_min_package_root"
+        step_output = BUILD_SYSTEM_PYTHON_AGENT_PACKAGES_ROOTS.get_output_directory(work_dir=self.work_dir)
         shutil.copytree(
-            BUILD_AGENT_LIBS_MIN.get_output_directory(work_dir=self.work_dir),
+             step_output / "agent-libs-wheels",
             agent_libs_min_package_root,
         )
 
         check_call_with_log(
             [
-                *self._get_agent_libs_min_package_build_cmd_args(),
+                *self._get_agent_libs_wheels_package_build_cmd_args(),
                 "-v", version,
                 "-C", str(agent_libs_min_package_root),
                 "--verbose"
@@ -1105,7 +1116,10 @@ class AgentSystemPythonDependenciesBuilder(PackagesBuilder):
         )
 
         agent_libs_package_root = package_roots / "agent_libs_package_root"
-        agent_libs_package_root.mkdir(parents=True)
+        shutil.copytree(
+            step_output / "agent-libs",
+            agent_libs_package_root,
+        )
 
         for package_arch in self.PACKAGE_ARCHITECTURES:
             check_call_with_log(
@@ -1114,7 +1128,7 @@ class AgentSystemPythonDependenciesBuilder(PackagesBuilder):
                     "-a", package_arch,
                     "-v", version,
                     "-C", str(agent_libs_package_root),
-                    "--depends", f"{AGENT_LIBS_MIN_PACKAGE_NAME} >= {version}",
+                    "--depends", f"{AGENT_LIBS_WHEELS_PACKAGE_NAME} >= {version}",
                     "--verbose"
                 ],
                 cwd=str(self.output_path)
@@ -1232,7 +1246,7 @@ class AgentEmbeddedPythonDependenciesBuilder(PackagesBuilder):
             "-n", AGENT_LIBS_PACKAGE_NAME,
             "--license", '"Apache 2.0"',
             "--vendor", "Scalyr",
-            "--provides", "scalyr-agent-2-dependencies",
+            "--provides", "scalyr-agent-2",
             "--description", description,
             "--depends", "bash >= 3.2",
             "--url", "https://www.scalyr.com",
@@ -1509,7 +1523,7 @@ def create_build_python_step(
         name="build_python",
         script_path="agent_build_refactored/managed_packages/steps/build_python.sh",
         tracked_files_globs=[
-            "agent_build_refactored/managed_packages/files/embedded-python/python3",
+            "agent_build_refactored/managed_packages/scalyr_agent_python3/python3",
         ],
         base=base_step,
         environment_variables={
@@ -1518,7 +1532,7 @@ def create_build_python_step(
             "PYTHON_INSTALL_PREFIX": "/usr",
             "LIBSSL_DIR": libssl_dir,
             "PYTHON_CONFIG_ARCHITECTURE": python_config_architectures[base_step.architecture],
-            "SUBDIR_NAME": AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME
+            "SUBDIR_NAME": AGENT_SUBDIR_NAME
         },
         github_actions_settings=GitHubActionsSettings(
             cacheable=True,
@@ -1554,7 +1568,7 @@ def create_build_agent_libs_step(
         environment_variables={
             "PYTHON_SHORT_VERSION": EMBEDDED_PYTHON_SHORT_VERSION,
             "RUST_VERSION": "1.63.0",
-            "SUBDIR_NAME": AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME
+            "SUBDIR_NAME": AGENT_SUBDIR_NAME
         },
         github_actions_settings=GitHubActionsSettings(
             cacheable=True,
@@ -1599,6 +1613,11 @@ INSTALL_BUILD_DEPENDENCIES_GLIBC_ARM64 = create_build_dependencies_step(
     run_in_remote_docker=True
 )
 
+_INSTALL_BUILD_DEPENDENCIES_STEPS = {
+    Architecture.X86_64: INSTALL_BUILD_DEPENDENCIES_GLIBC_X86_64,
+    Architecture.ARM64: INSTALL_BUILD_DEPENDENCIES_GLIBC_ARM64
+}
+
 # Create step that builds Python interpreter.
 BUILD_PYTHON_GLIBC_X86_64 = create_build_python_step(
     base_step=INSTALL_BUILD_DEPENDENCIES_GLIBC_X86_64,
@@ -1634,8 +1653,8 @@ _BUILD_AGENT_LIBS_STEPS = {
 
 
 def create_prepare_toolset_step(
-    build_python_step: ArtifactRunnerStep,
-    build_agent_libs_step: ArtifactRunnerStep,
+    # build_python_step: ArtifactRunnerStep,
+    #build_agent_libs_step: ArtifactRunnerStep,
     base_docker_image: DockerImageSpec,
     run_in_remote_docker: bool = False
 ):
@@ -1645,16 +1664,40 @@ def create_prepare_toolset_step(
 
     architecture = base_docker_image.platform.as_architecture
 
+    build_all_wheels = ArtifactRunnerStep(
+        name=f"build_all_wheels_{architecture.value}",
+        script_path="agent_build_refactored/managed_packages/steps/build_all_wheels.sh",
+        tracked_files_globs=[
+            "dev-requirements-new.txt",
+        ],
+        base=_INSTALL_BUILD_DEPENDENCIES_STEPS[architecture],
+        required_steps={
+            "BUILD_PYTHON": _BUILD_PYTHON_STEPS[architecture]
+        },
+        environment_variables={
+            "PYTHON_SHORT_VERSION": EMBEDDED_PYTHON_SHORT_VERSION,
+            "RUST_VERSION": "1.63.0",
+            "SUBDIR_NAME": AGENT_SUBDIR_NAME
+        },
+        github_actions_settings=GitHubActionsSettings(
+            cacheable=True,
+            run_in_remote_docker=run_in_remote_docker
+        )
+    )
+
     return EnvironmentRunnerStep(
         name=f"prepare_toolset_{architecture.value}",
         script_path="agent_build_refactored/managed_packages/steps/prepare_toolset.sh",
+        tracked_files_globs=[
+            "dev-requirements-new.txt",
+        ],
         base=base_docker_image,
         required_steps={
-            "BUILD_PYTHON": build_python_step,
-            "BUILD_AGENT_LIBS": build_agent_libs_step
+            "BUILD_PYTHON": _BUILD_PYTHON_STEPS[architecture],
+            "BUILD_ALL_WHEELS": build_all_wheels
         },
         environment_variables={
-            "SUBDIR_NAME": AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME,
+            "SUBDIR_NAME": AGENT_SUBDIR_NAME,
             "FPM_VERSION": "1.14.2",
             "PACKAGECLOUD_VERSION": "0.3.11",
         },
@@ -1667,8 +1710,8 @@ def create_prepare_toolset_step(
 
 
 PREPARE_TOOLSET_GLIBC_X86_64 = create_prepare_toolset_step(
-    build_python_step=BUILD_PYTHON_GLIBC_X86_64,
-    build_agent_libs_step=BUILD_AGENT_LIBS_GLIBC_X86_64,
+   # build_python_step=BUILD_PYTHON_GLIBC_X86_64,
+   # build_agent_libs_step=BUILD_AGENT_LIBS_GLIBC_X86_64,
     base_docker_image=DockerImageSpec(
         name="ubuntu:22.04",
         platform=DockerPlatform.AMD64.value
@@ -1676,8 +1719,8 @@ PREPARE_TOOLSET_GLIBC_X86_64 = create_prepare_toolset_step(
 )
 
 PREPARE_TOOLSET_GLIBC_ARM64 = create_prepare_toolset_step(
-    build_python_step=BUILD_PYTHON_GLIBC_ARM64,
-    build_agent_libs_step=BUILD_AGENT_LIBS_GLIBC_ARM64,
+    # build_python_step=BUILD_PYTHON_GLIBC_ARM64,
+    #build_agent_libs_step=BUILD_AGENT_LIBS_GLIBC_ARM64,
     base_docker_image=DockerImageSpec(
         name="ubuntu:22.04",
         platform=DockerPlatform.ARM64.value
@@ -1691,21 +1734,60 @@ PREPARE_TOOLSET_STEPS = {
 }
 
 
-BUILD_AGENT_LIBS_MIN = ArtifactRunnerStep(
-    name="build_agent_libs-min",
-    script_path="agent_build_refactored/managed_packages/steps/build_agent_libs-min.sh",
+def create_build_wheels_step(
+        name: str,
+        prepare_wheels_base_image: Union[EnvironmentRunnerStep, DockerImageSpec],
+):
+    return ArtifactRunnerStep(
+        name=name,
+        script_path="agent_build_refactored/managed_packages/scalyr_agent_libs/system_python/build_steps/build_wheels.sh",
+        tracked_files_globs=[
+            "agent_build_refactored/managed_packages/scalyr_agent_libs/system_python/build_steps/pysnmp_setup.patch"
+        ],
+        base=prepare_wheels_base_image,
+        environment_variables={
+            "SUBDIR_NAME": AGENT_SUBDIR_NAME,
+            "REQUIREMENTS": REQUIREMENTS_COMMON
+        },
+        github_actions_settings=GitHubActionsSettings(
+            cacheable=True
+        )
+    )
+
+BUILD_SYSTEM_PYTHON_AGENT_PACKAGES_ROOTS = ArtifactRunnerStep(
+    name="build_system_python_agent_libs_packages_roots",
+    script_path="agent_build_refactored/managed_packages/scalyr_agent_libs/system_python/build_steps/build_packages_roots.sh",
     tracked_files_globs=[
-        "agent_build_refactored/requirements/main-requirements.txt",
-        "agent_build_refactored/managed_packages/files/system_python/python3"
+        "agent_build_refactored/managed_packages/scalyr_agent_libs/system_python/files/scalyr-agent-python3",
+        "agent_build_refactored/managed_packages/scalyr_agent_libs/files/config/config.ini",
+        "agent_build_refactored/managed_packages/scalyr_agent_libs/files/scalyr-agent-2-libs.py",
+        "agent_build_refactored/managed_packages/scalyr_agent_libs/files/config/additional-requirements.txt",
     ],
     base=PREPARE_TOOLSET_GLIBC_X86_64,
+    required_steps={
+        "PREPARE_WHEELS_PY36": create_build_wheels_step(
+            name="build_wheels_py36",
+            prepare_wheels_base_image=DockerImageSpec(
+                name="python:3.6",
+                platform=Architecture.X86_64.as_docker_platform.value
+            )
+        ),
+        "PREPARE_WHEELS": create_build_wheels_step(
+            name="build_wheels",
+            prepare_wheels_base_image=PREPARE_TOOLSET_GLIBC_X86_64,
+        ),
+    },
     environment_variables={
-        "SUBDIR_NAME": AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME
+        "SUBDIR_NAME": AGENT_SUBDIR_NAME,
+        "REQUIREMENTS": REQUIREMENTS_COMMON,
+        "PLATFORM_DEPENDENT_REQUIREMENTS": REQUIREMENTS_COMMON_PLATFORM_DEPENDENT,
     },
     github_actions_settings=GitHubActionsSettings(
         cacheable=True
     )
 )
+
+
 
 
 class DebAgentEmbeddedPythonDependenciesBuilderAMD64(AgentEmbeddedPythonDependenciesBuilder):

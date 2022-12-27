@@ -34,9 +34,11 @@ set -e
 # shellcheck disable=SC1090
 source ~/.bashrc
 cp -a "${BUILD_PYTHON}/python/." /
-cp -a "${BUILD_AGENT_LIBS}/dev_libs/." /
+#cp -a "${BUILD_ALL_WHEELS}/." /
 
 ln -s "/usr/lib/${SUBDIR_NAME}/python3/bin/python3" /usr/bin/python3
+
+python3 -m pip install --no-index --find-links "${BUILD_ALL_WHEELS}" -r "${SOURCE_ROOT}/dev-requirements-new.txt"
 
 apt update
 DEBIAN_FRONTEND=noninteractive apt install -y ruby ruby-dev rubygems build-essential rpm git reprepro createrepo-c gnupg2

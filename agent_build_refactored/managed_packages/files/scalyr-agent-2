@@ -14,4 +14,4 @@
 # limitations under the License.
 
 
-exec /var/lib/scalyr-agent-2-dependencies/venv/bin/python3 -E "/usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py" "$@"
+exec /var/lib/scalyr-agent-2/agent-libs/venv/bin/python3 -E "/usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py" "$@"

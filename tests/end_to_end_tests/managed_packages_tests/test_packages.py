@@ -20,7 +20,9 @@ are changing system state and must be aware of risks.
 """
 
 import json
+import os
 import pathlib as pl
+import pprint
 import shlex
 import subprocess
 import logging
@@ -31,11 +33,12 @@ from typing import List, Dict
 
 import pytest
 
-from agent_build_refactored.tools.constants import SOURCE_ROOT
+from agent_build_refactored.tools.constants import SOURCE_ROOT, Architecture
 from agent_build_refactored.managed_packages.managed_packages_builders import (
     PYTHON_PACKAGE_NAME,
     AGENT_LIBS_PACKAGE_NAME,
-    AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME,
+    AGENT_LIBS_WHEELS_PACKAGE_NAME,
+    AGENT_SUBDIR_NAME,
 )
 from tests.end_to_end_tests.tools import AgentPaths, AgentCommander, TimeoutTracker
 from tests.end_to_end_tests.verify import (
@@ -48,9 +51,10 @@ logger = logging.getLogger(__name__)
 
 
 def _verify_package_subdirectories(
-    package_path: pl.Path,
+    repo_root: pl.Path,
     package_type: str,
     package_name: str,
+    package_architecture: Architecture,
     output_dir: pl.Path,
     expected_folders: List[str],
 ):
@@ -67,6 +71,13 @@ def _verify_package_subdirectories(
     package_root = output_dir / package_name
     package_root.mkdir()
 
+    package_path = _get_package_path_from_repo(
+        package_name=package_name,
+        package_type=package_type,
+        package_architecture=package_architecture,
+        repo_root=repo_root
+    )
+
     _extract_package(
         package_type=package_type,
         package_path=package_path,
@@ -74,6 +85,17 @@ def _verify_package_subdirectories(
     )
 
     remaining_paths = set(package_root.glob("**/*"))
+
+    # Depending on its type, a package also may install its own "metadata", so we have to take it into
+    # account too.
+    if package_type == "deb":
+        package_metadata_path = f"usr/share/doc/{package_name}/"
+    elif package_type == "rpm":
+        package_metadata_path = "usr/lib/.build-id/"
+    else:
+        raise Exception(f"Unknown package type: {package_type}")
+
+    expected_folders.append(package_metadata_path)
 
     for expected in expected_folders:
         expected_path = package_root / expected
@@ -85,16 +107,20 @@ def _verify_package_subdirectories(
 
     assert (
         len(remaining_paths) == 0
-    ), "Something remains outside if the expected package structure."
+    ), f"Something remains outside if the expected package structure: {[str(p) for p in remaining_paths]}"
 
 
-def test_dependency_packages(
+def test_embedded_python_dependency_packages(
+    package_builder_name,
     package_builder,
+    package_architecture,
     tmp_path,
     distro_name,
-    python_package_path,
-    agent_libs_package_path,
+    repo_root
 ):
+
+    if "system-python" in package_builder_name:
+        pytest.skip("Only test packages with embedded python.")
 
     if distro_name not in ["ubuntu2204", "amazonlinux2"]:
         pytest.skip("No need to check on all distros.")
@@ -102,38 +128,29 @@ def test_dependency_packages(
     package_type = package_builder.PACKAGE_TYPE
 
     _verify_package_subdirectories(
-        package_path=python_package_path,
-        package_type=package_builder.PACKAGE_TYPE,
+        repo_root=repo_root,
+        package_type=package_type,
         package_name=PYTHON_PACKAGE_NAME,
+        package_architecture=package_architecture,
         output_dir=tmp_path,
         expected_folders=[
-            f"usr/lib/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/",
-            f"usr/share/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/",
-            # Depending on its type, a package also may install its own "metadata", so we have to take it into
-            # account too.
-            f"usr/share/doc/{PYTHON_PACKAGE_NAME}/"
-            if package_type == "deb"
-            else "usr/lib/.build-id/",
+            f"usr/lib/{AGENT_SUBDIR_NAME}/",
+            f"usr/share/{AGENT_SUBDIR_NAME}/",
         ],
     )
 
     # Verify structure of the agent_libs package and make sure there's no any file outside it.
     _verify_package_subdirectories(
-        package_path=agent_libs_package_path,
+        repo_root=repo_root,
         package_type=package_builder.PACKAGE_TYPE,
         package_name=AGENT_LIBS_PACKAGE_NAME,
+        package_architecture=package_architecture,
         output_dir=tmp_path,
         expected_folders=[
-            f"usr/lib/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/",
-            f"usr/share/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/",
-            # Depending on its type, a package also may install its own "metadata", so we have to take it into
-            # account too.
-            f"usr/share/doc/{AGENT_LIBS_PACKAGE_NAME}/"
-            if package_type == "deb"
-            else "usr/lib/.build-id/",
+            f"usr/lib/{AGENT_SUBDIR_NAME}/",
+            f"usr/share/{AGENT_SUBDIR_NAME}/",
         ],
     )
-
 
 def test_packages(
     package_builder_name,
@@ -176,7 +193,7 @@ def test_packages(
         )
         subprocess.check_call(
             [
-                f"/usr/lib/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/bin/python3",
+                f"/usr/lib/{AGENT_SUBDIR_NAME}/bin/python3",
                 "tests/end_to_end_tests/managed_packages_tests/verify_python_interpreter.py",
             ],
             env={
@@ -463,18 +480,65 @@ def _perform_ssl_checks(
     _stop_agent_and_remove_logs_and_data(agent_commander)
 
 
+def test_system_python_dependency_packages(
+    package_builder_name,
+    package_builder,
+    package_architecture,
+    tmp_path,
+    distro_name,
+    repo_root
+):
+
+    if "system-python" not in package_builder_name:
+        pytest.skip("Only test packages with system python.")
+
+    #o = subprocess.check_output("getconf", shell=True).decode()
+    ee = pl.Path("/etc/environment")
+    print(ee.read_text())
+    #pytest.exit(0)
+
+    package_type = package_builder.PACKAGE_TYPE
+
+    _verify_package_subdirectories(
+        repo_root=repo_root,
+        package_type=package_type,
+        package_name=AGENT_LIBS_WHEELS_PACKAGE_NAME,
+        package_architecture=Architecture.UNKNOWN,
+        output_dir=tmp_path,
+        expected_folders=[
+            f"usr/share/{AGENT_SUBDIR_NAME}/agent-libs",
+        ],
+    )
+
+    # Verify structure of the agent_libs package and make sure there's no any file outside it.
+    _verify_package_subdirectories(
+        repo_root=repo_root,
+        package_type=package_builder.PACKAGE_TYPE,
+        package_name=AGENT_LIBS_PACKAGE_NAME,
+        package_architecture=package_architecture,
+        output_dir=tmp_path,
+        expected_folders=[
+            f"etc/{AGENT_SUBDIR_NAME}/agent-libs",
+            f"usr/lib/{AGENT_SUBDIR_NAME}/bin",
+            f"var/lib/{AGENT_SUBDIR_NAME}/agent-libs",
+        ],
+    )
+
+
 # Additional paths to add in case if tests run within "frozen" pytest executable.
-_ADDITIONAL_ENVIRONMENT = {
-    "LD_LIBRARY_PATH": "/lib",
-    "PATH": "/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/sbin:/usr/local/bin",
-}
+def _get_additional_environment():
+    return {
+        #"LD_LIBRARY_PATH": os.environ.get("LD_LIBRARY_PATH_ORIG", ""),
+        "LD_LIBRARY_PATH": "/lib",
+        "PATH": "/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/sbin:/usr/local/bin",
+    }
 
 
 def _install_from_convenience_script(
     script_path: pl.Path,
 ):
     """Install agent using convenience script."""
-    subprocess.check_call(["bash", str(script_path)], env=_ADDITIONAL_ENVIRONMENT)
+    subprocess.check_call(["bash", str(script_path)], env=_get_additional_environment())
 
 
 def _prepare_environment(
@@ -493,9 +557,7 @@ def _prepare_environment(
 
     if remote_machine_type == "docker":
         if package_type == "deb":
-            packages_to_install.append("ca-certificates")
-            if "debian" in distro_name:
-                packages_to_install.append("procps")
+            packages_to_install.extend(["ca-certificates", "procps"])
         elif package_type == "rpm":
             if distro_name == "amazonlinux2":
                 packages_to_install.append("procps")
@@ -580,6 +642,27 @@ System information
     logger.info(output)
 
 
+def _get_package_path_from_repo(
+    package_name: str,
+    package_type: str,
+    package_architecture: Architecture,
+    repo_root: pl.Path,
+):
+    """Helper function that finds package inside repo root."""
+    if package_type == "deb":
+        package_dir_path = repo_root / f"pool/main/s/{package_name}"
+        glob = f"{package_name}_*_{package_architecture.as_deb_package_arch}.{package_type}"
+    elif package_type == "rpm":
+        package_dir_path = repo_root
+        glob = f"{package_name}-*-1.{package_architecture.as_rpm_package_arch}.{package_type}"
+    else:
+        raise Exception(f"Unknown package type: '{package_type}'")
+
+    found = list(package_dir_path.rglob(glob))
+    assert len(found) == 1, f"Could not find any package by glob: '{glob}'"
+    return found[0]
+
+
 def _extract_package(package_type: str, package_path: pl.Path, output_path: pl.Path):
     if package_type == "deb":
         subprocess.check_call(["dpkg-deb", "-x", str(package_path), str(output_path)])
@@ -590,7 +673,7 @@ def _extract_package(package_type: str, package_path: pl.Path, output_path: pl.P
             command,
             shell=True,
             cwd=output_path,
-            env={"LD_LIBRARY_PATH": "/lib64"},
+            env=_get_additional_environment(),
         )
     else:
         raise Exception(f"Unknown package type {package_type}.")
@@ -609,7 +692,7 @@ def _call_apt(command: List[str]):
     subprocess.check_call(
         ["apt", *command],
         # Since test may run in "frozen" pytest executable, add missing variables.
-        env={"LD_LIBRARY_PATH": "/lib", "PATH": "/usr/sbin:/sbin:/usr/bin:/bin"},
+        env=_get_additional_environment(),
     )
 
 
@@ -618,5 +701,5 @@ def _call_yum(command: List[str]):
     subprocess.check_call(
         ["yum", *command],
         # Since test may run in "frozen" pytest executable, add missing variables.
-        env={"LD_LIBRARY_PATH": "/lib64"},
+        env=_get_additional_environment(),
     )

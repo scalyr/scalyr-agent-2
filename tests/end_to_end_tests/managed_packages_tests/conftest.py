@@ -1,4 +1,5 @@
 import pathlib as pl
+import random
 import shutil
 import subprocess
 import argparse
@@ -108,6 +109,17 @@ def package_builder(package_builder_name):
 
 
 @pytest.fixture(scope="session")
+def package_architecture(package_builder, package_builder_name):
+    if "system-python" in package_builder_name:
+        # Since builder, that builds packages that use system python, builds them "in bulk",
+        # then we should pick one architecture to test such packages.
+        # For example armv7.
+        return Architecture.X86_64
+    else:
+        return package_builder.ARCHITECTURE
+
+
+@pytest.fixture(scope="session")
 def remote_machine_type(request):
     """
     Fixture with time of the remote machine where tests can run. For now that's ec2 or docker.
@@ -116,8 +128,19 @@ def remote_machine_type(request):
 
 
 @pytest.fixture(scope="session")
-def distro_name(request):
-    return request.config.option.distro_name
+def distro_name(request, package_builder, package_builder_name):
+    if "system-python" not in package_builder_name:
+        return request.config.option.distro_name
+
+    available_distro_names = []
+    for name in DISTROS.keys():
+        if name.startswith("python3") and name.endswith(package_builder.PACKAGE_TYPE):
+            available_distro_names.append(name)
+    if not available_distro_names:
+        raise Exception("No any distro name to test for system python packages.")
+
+    return random.choice(available_distro_names)
+
 
 
 class RepoBuilder(Runner):

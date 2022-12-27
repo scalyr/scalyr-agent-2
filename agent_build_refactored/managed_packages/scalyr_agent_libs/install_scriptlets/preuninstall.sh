@@ -1,5 +1,5 @@
-#!/usr/bin/env bash
-# Copyright 2014-2022 Scalyr Inc.
+#!/bin/bash
+# Copyright 2014-2020 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,12 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script is a wrapper executable for Python interpreter form the agent's 'scalyr-agent-python3' dependency
-# package.
+# Always remove the .pyc files and __pycache__ directories
+find /usr/lib/scalyr-agent-2 -type f -name '*.py[co]' -delete -o -type d -name __pycache__ -exec rm -r {} \;
 
-
-PYTHON_SUBDIR_NAME="scalyr-agent-2-dependencies/python3"
-
-# Override some variables in order to run dependency Python interpreter correctly.
-export LD_LIBRARY_PATH="/usr/lib/${PYTHON_SUBDIR_NAME}/lib"
-exec /usr/lib/${PYTHON_SUBDIR_NAME}/bin/python3-orig "$@"
+exit 0;

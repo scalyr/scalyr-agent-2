@@ -1,0 +1,4 @@
+# Here additional requirements for the agent can be specified.
+# Please make sure you have specified the 'include_binary_packages=1' in
+# the '/etc/scalyr-agent-2/agent-libs/config.ini' file.
+# Execute command '/usr/lib/scalyr-agent-2/bin/scalyr-agent-2-libs.py requirements recreate'

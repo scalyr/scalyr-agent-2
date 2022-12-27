@@ -31,7 +31,7 @@ from agent_build_refactored.managed_packages.managed_packages_builders import (
 
 PORTABLE_RUNNER_NAME = "portable_runner"
 
-PREPARE_TOOLSET_GLIBC_ARMHF = EnvironmentRunnerStep(
+PREPARE_TOOLSET_GLIBC_ARMV7 = EnvironmentRunnerStep(
     name="prepare_pytest_runner_builder_armhf",
     script_path="tests/end_to_end_tests/run_in_remote_machine/steps/prepare_pytest_runner_builder.sh",
     tracked_files_globs=[
@@ -85,6 +85,8 @@ class PortablePytestRunnerBuilder(Runner):
                 f"agent_build_refactored{os.pathsep}agent_build_refactored",
                 "--add-data",
                 f"VERSION{os.pathsep}.",
+                "--add-data",
+                f"dev-requirements-new.txt{os.pathsep}.",
                 # As an entry point we use this file itself because it also acts like a script which invokes pytest.
                 __file__,
             ],
@@ -114,7 +116,7 @@ class PortablePytestRunnerBuilderARM64(PortablePytestRunnerBuilder):
 
 
 class PortablePytestRunnerBuilderARMHF(PortablePytestRunnerBuilder):
-    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_ARMHF
+    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_ARMV7
 
 
 PORTABLE_PYTEST_RUNNER_BUILDERS = {
@@ -127,7 +129,6 @@ PORTABLE_PYTEST_RUNNER_BUILDERS = {
 if __name__ == "__main__":
     # We use this file as an entry point for the pytest runner.
     import pytest
-
     sys.path.append(str(SOURCE_ROOT))
 
     os.chdir(SOURCE_ROOT)

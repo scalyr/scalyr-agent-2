@@ -13,6 +13,8 @@
 # limitations under the License.
 
 import os
+import pathlib as pl
 
+SOURCE_ROOT = pl.Path(__file__).parent.parent.parent.parent.absolute()
 # If this env. variable is set, then the code runs inside the docker.
 IN_DOCKER = bool(os.environ.get("AGENT_BUILD_IN_DOCKER"))

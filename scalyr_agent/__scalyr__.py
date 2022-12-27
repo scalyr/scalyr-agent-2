@@ -153,8 +153,8 @@ def scalyr_init():
     # If this is a win32 executable, then all the packages have already been bundled in the exec and there is no
     # need to change the PYTHONPATH
     pass
-    # if not __is_frozen__:
-    #     __add_scalyr_package_to_path()
+    if not __is_frozen__:
+        __add_scalyr_package_to_path()
 
 
 def __determine_package_root():
@@ -231,10 +231,8 @@ def __add_scalyr_package_to_path():
     to break the Windows builds.
     """
 
-    agent_executable_path = "/usr/share/scalyr-agent-2/bin/scalyr-agent-2"
-    if os.path.islink(agent_executable_path):
-        if os.readlink(agent_executable_path) == "/usr/share/scalyr-agent-2/py/scalyr_agent/agent_main_py_embedded.py":
-            return
+    sys.path.insert(0, os.path.dirname(get_package_root()))
+    return
 
     # prepend the third party directory first so it appears after the package root, third_party_pythonX
     # and third_party_tls directories

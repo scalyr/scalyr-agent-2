@@ -37,21 +37,9 @@ cd ~
 export PATH="/usr/local/bin:/root/.cargo/bin:${PATH}"
 export PKG_CONFIG_PATH="/usr/local/lib64/pkgconfig:/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH}"
 curl --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain "${RUST_VERSION}"
-cargo install cargo-update -v
-
-REQUIREMENTS_FILES_PATH="${SOURCE_ROOT}/agent_build/requirement-files"
-
-#
-# Build dev libs.
-#
+# cargo install cargo-update -v
 
 
-"/usr/lib/${SUBDIR_NAME}/python3/bin/python3" -m pip install --root "${STEP_OUTPUT_PATH}/dev_libs" -r "${SOURCE_ROOT}/dev-requirements.txt"
-
-#
-# Build agent libs.
-#
-
-"/usr/lib/${SUBDIR_NAME}/python3/bin/python3" -m pip install -v --force-reinstall --root "${STEP_OUTPUT_PATH}/agent_libs"  \
-  -r "${REQUIREMENTS_FILES_PATH}/main-requirements.txt" \
-  -r "${REQUIREMENTS_FILES_PATH}/compression-requirements.txt"
+"/usr/lib/${SUBDIR_NAME}/python3/bin/python3" -m pip wheel \
+  -r "${SOURCE_ROOT}/dev-requirements-new.txt" \
+  --wheel-dir "${STEP_OUTPUT_PATH}"

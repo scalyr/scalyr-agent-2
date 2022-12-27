@@ -14,26 +14,28 @@
 
 import pathlib as pl
 import hashlib
+from typing import List
+
+from agent_build_refactored.tools.steps_libs.constants import SOURCE_ROOT
 
 
-def calculate_file_checksum(
-        file_path: pl.Path,
-        relative_to: pl.Path = None,
+def calculate_files_checksum(
+        files_paths: List[pl.Path],
         sha256=None
 ):
     """Calculate checksum of a file."""
     if sha256 is None:
         sha256 = hashlib.sha256()
-    # Include file's path...
-    if relative_to:
-        path = file_path.relative_to(relative_to)
-    else:
-        path = file_path
 
-    sha256.update(str(path).encode())
-    # ... content ...
-    sha256.update(file_path.read_bytes())
-    # ... and permissions.
-    sha256.update(str(file_path.stat().st_mode).encode())
+    for file_path in files_paths:
+        if not str(file_path).startswith(str(SOURCE_ROOT)):
+            raise Exception(f"Path {file_path}has to be relative to project root: {SOURCE_ROOT}")
+        # Include file's path...
+        rel_path = file_path.relative_to(SOURCE_ROOT)
+        sha256.update(str(rel_path).encode())
+        # ... content ...
+        sha256.update(file_path.read_bytes())
+        # ... and permissions.
+        sha256.update(str(file_path.stat().st_mode).encode())
 
     return sha256

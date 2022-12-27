@@ -27,6 +27,10 @@ from agent_build_refactored.tools.run_in_ec2.constants import EC2DistroImage
 
 logger = logging.getLogger(__name__)
 
+_SYSTEM_PYTHON_DISTROS = {}
+
+
+
 # Collection of remote machine distro specifications for end to end remote tests.
 DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
     "ubuntu2204": {
@@ -167,6 +171,15 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
     "python36": {
         "docker": "python:3.6-slim",
     },
+    **{
+        f"python3{ver}_deb": {"docker": f"python:3.{ver}-slim"}
+        for ver in [6, 7, 8, 9, 10, 11]
+    },
+    **{
+        f"python3{ver}_rpm": {"docker": f"centos/python-3{ver}-centos7"}
+        for ver in [6, 8]
+    }
+
 }
 
 
