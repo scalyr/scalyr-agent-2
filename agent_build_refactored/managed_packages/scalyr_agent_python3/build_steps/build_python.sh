@@ -94,11 +94,11 @@ cp -a /usr/local/lib/libuuid.so* "${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/lib"
 cp -a /usr/local/lib/libgdbm.so* "${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/lib"
 cp -a /usr/local/lib/libgdbm_compat.so* "${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/lib"
 cp -a /usr/local/lib64/libffi.so* "${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/lib"
-cp -a /usr/local/${LIBSSL_DIR}/libcrypto.so* "${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/lib"
-cp -a /usr/local/${LIBSSL_DIR}/libssl.so* "${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/lib"
+cp -a "${LIBSSL_DIR}"/libcrypto.so* "${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/lib"
+cp -a "${LIBSSL_DIR}"/libssl.so* "${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/lib"
 
 # Copy wrapper for Python interpreter executable.
-cp -a "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_python3/python3" "${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/bin/python3"
+cp -a "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_python3/files/python3" "${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/bin/python3"
 
 # Remove some of the files to reduce package size
 PYTHON_LIBS_PATH="${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/lib/python${PYTHON_SHORT_VERSION}"
@@ -111,13 +111,8 @@ rm -r "${PYTHON_LIBS_PATH}/config-${PYTHON_SHORT_VERSION}-${PYTHON_CONFIG_ARCHIT
 rm -r "${PYTHON_LIBS_PATH}/lib2to3"
 
 
-# Install built Python to current system and upgrade it's pip, for some reason,
-# the configure directive '--with-ensurepip=upgrade' does not install latest one.
+# Install built Python to current system and install wheel package to be able to build package wheels
 cp -a "${BUILD_ROOT}/." /
-
-"/usr/lib/${SUBDIR_NAME}/python3/bin/python3" -m pip install --root "${BUILD_ROOT}" --upgrade pip
-cp -a "${BUILD_ROOT}/." /
-# Also install wheel package to be able to build package wheels
 "/usr/lib/${SUBDIR_NAME}/python3/bin/python3" -m pip install --root "${BUILD_ROOT}" wheel
 
 cp -a "${BUILD_ROOT}" "${STEP_OUTPUT_PATH}/python"

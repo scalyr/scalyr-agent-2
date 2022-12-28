@@ -19,10 +19,16 @@ import pathlib as pl
 import re
 
 
-from agent_build_refactored.tools.steps_libs.constants import SOURCE_ROOT
+from agent_build_refactored.tools.steps_libs.constants import SOURCE_ROOT, IN_DOCKER
 AGENT_BUILD_PATH = SOURCE_ROOT / "agent_build"
 
 IN_CICD = bool(os.environ.get("AGENT_BUILD_IN_CICD"))
+
+PYTHON_PACKAGE_SSL_VERSION = "1.1.1k"
+EMBEDDED_PYTHON_VERSION = "3.11.0"
+
+# Name of the subdirectory of dependency packages.
+AGENT_SUBDIR_NAME = "scalyr-agent-2"
 
 
 @dataclasses.dataclass(frozen=True)

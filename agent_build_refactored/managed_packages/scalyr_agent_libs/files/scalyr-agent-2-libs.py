@@ -24,7 +24,6 @@ def recreate_venv():
 
     config = configparser.ConfigParser()
     config.read(config_path)
-    print(config.sections())
     requirements = config["requirements"]
     source = requirements["source"]
     include_binary_packages = requirements.getboolean("include_binary_packages")
@@ -87,8 +86,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    if args.command == "venv":
-        if args.venv_command == "recreate":
+    if args.command == "requirements":
+        if args.requirements_command == "recreate":
             recreate_venv()
 
     elif not args.command:

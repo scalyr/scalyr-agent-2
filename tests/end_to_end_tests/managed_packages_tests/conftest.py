@@ -15,13 +15,13 @@ import pytest
 
 from agent_build_refactored.tools.constants import Architecture
 from agent_build_refactored.tools.runner import Runner, RunnerMappedPath
+
 from agent_build_refactored.managed_packages.managed_packages_builders import (
     ALL_MANAGED_PACKAGE_BUILDERS,
-    PREPARE_TOOLSET_GLIBC_X86_64,
-    PREPARE_TOOLSET_GLIBC_ARM64,
     PYTHON_PACKAGE_NAME,
     AGENT_LIBS_PACKAGE_NAME,
     AGENT_PACKAGE_NAME,
+    PREPARE_TOOLSET_STEPS
 )
 from agent_build_refactored.managed_packages.convenience_install_script.builder import (
     ConvenienceScriptBuilder,
@@ -149,7 +149,7 @@ class RepoBuilder(Runner):
     The result repo is used as a mock repository for testing.
     """
 
-    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
+    BASE_ENVIRONMENT = PREPARE_TOOLSET_STEPS[Architecture.X86_64]
 
     def build(
         self,
