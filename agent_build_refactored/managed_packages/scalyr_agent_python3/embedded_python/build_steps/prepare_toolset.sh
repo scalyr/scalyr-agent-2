@@ -33,10 +33,17 @@ set -e
 
 # shellcheck disable=SC1090
 source ~/.bashrc
+
+
+
+cat ~/.bashrc
+echo "11111111"
+echo "${LD_LIBRARY_PATH}"
+
+export LD_LIBRARY_PATH="/usr/lib/scalyr-agent-2/python3/lib:${LD_LIBRARY_PATH}"
 cp -a "${BUILD_PYTHON}/python/." /
 
 ln -s "/usr/lib/${SUBDIR_NAME}/python3/bin/python3" /usr/bin/python3
-
 python3 -m pip install \
   --no-index \
   --find-links "${BUILD_AGENT_DEV_REQUIREMENTS}" \

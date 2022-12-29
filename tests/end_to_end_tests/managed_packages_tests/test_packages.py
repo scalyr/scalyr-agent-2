@@ -35,7 +35,7 @@ import pytest
 
 from agent_build_refactored.tools.constants import SOURCE_ROOT, Architecture
 from agent_build_refactored.managed_packages.managed_packages_builders import (
-    PYTHON_PACKAGE_NAME,
+    AGENT_PYTHON_PACKAGE_NAME,
     AGENT_LIBS_PACKAGE_NAME,
     AGENT_LIBS_WHEELS_PACKAGE_NAME,
     AGENT_SUBDIR_NAME,
@@ -130,7 +130,7 @@ def test_embedded_python_dependency_packages(
     _verify_package_subdirectories(
         repo_root=repo_root,
         package_type=package_type,
-        package_name=PYTHON_PACKAGE_NAME,
+        package_name=AGENT_PYTHON_PACKAGE_NAME,
         package_architecture=package_architecture,
         output_dir=tmp_path,
         expected_folders=[

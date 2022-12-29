@@ -18,7 +18,7 @@ from agent_build_refactored.tools.runner import Runner, RunnerMappedPath
 
 from agent_build_refactored.managed_packages.managed_packages_builders import (
     ALL_MANAGED_PACKAGE_BUILDERS,
-    PYTHON_PACKAGE_NAME,
+    AGENT_PYTHON_PACKAGE_NAME,
     AGENT_LIBS_PACKAGE_NAME,
     AGENT_PACKAGE_NAME,
     PREPARE_TOOLSET_STEPS
@@ -390,7 +390,7 @@ def python_package_path(repo_root, package_builder):
         return None
 
     return _get_package_path_from_repo(
-        package_name=PYTHON_PACKAGE_NAME,
+        package_name=AGENT_PYTHON_PACKAGE_NAME,
         package_type=package_builder.PACKAGE_TYPE,
         repo_root=repo_root,
     )

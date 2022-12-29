@@ -24,11 +24,16 @@ AGENT_BUILD_PATH = SOURCE_ROOT / "agent_build"
 
 IN_CICD = bool(os.environ.get("AGENT_BUILD_IN_CICD"))
 
-PYTHON_PACKAGE_SSL_VERSION = "1.1.1k"
-EMBEDDED_PYTHON_VERSION = "3.11.0"
+# Name of the agent linux dependency packages
+AGENT_REQUIREMENTS_PACKAGE_NAME = "scalyr-agent-requirements"
+AGENT_WHEELS_PACKAGE_NAME = "scalyr-agent-wheels"
+AGENT_PYTHON_PACKAGE_NAME = "scalyr-agent-python3"
 
-# Name of the subdirectory of dependency packages.
+# Name of the subdirectory of the agent packages.
 AGENT_SUBDIR_NAME = "scalyr-agent-2"
+
+EMBEDDED_PYTHON_VERSION = "3.11.0"
+PYTHON_PACKAGE_SSL_VERSION = "1.1.1k"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -115,6 +120,15 @@ class Architecture(enum.Enum):
             Architecture.UNKNOWN: "noarch"
         }
         return mapping[self]
+
+    def get_as_package_arch(self, package_type: str):
+        if package_type == "deb":
+            return self.as_deb_package_arch
+        elif package_type == "rpm":
+            return self.as_rpm_package_arch
+        else:
+            raise Exception(f"Unknown package type: {package_type}")
+
 
 
 _ARCHITECTURE_TO_DOCKER_PLATFORM = {

@@ -79,14 +79,16 @@ pushd "${SOURCE_ROOT}"
 PYSNMP_TARBALL=$(find "${TARBALLS_DIR}" -name "pysnmp-*.*.*.tar.gz" -type f -maxdepth 1)
 tar -xvf ${PYSNMP_TARBALL} -C "$STEP_OUTPUT_PATH/pysnmp" --strip-components=1
 pushd "$STEP_OUTPUT_PATH/pysnmp"
-patch -f "$STEP_OUTPUT_PATH/pysnmp/setup.py" "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_libs/system_python/build_steps/pysnmp_setup.patch"
+patch -f "$STEP_OUTPUT_PATH/pysnmp/setup.py" "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_requirements/system_python/build_steps/pysnmp_setup.patch"
 tar -czvf "${PYSNMP_TARBALL}" -C "$STEP_OUTPUT_PATH/pysnmp" .
-
 
 
 WHEELS_DIR="${STEP_OUTPUT_PATH}/wheels"
 mkdir -p "${WHEELS_DIR}"
 
+if [ -n "${BUILD_SYSTEM_PYTHON_WHEELS_PY36}" ];then
+  cp -a "${BUILD_SYSTEM_PYTHON_WHEELS_PY36}/wheels/." "${WHEELS_DIR}"
+fi
 
 python3 -m pip wheel \
   --no-index --find-links "${TARBALLS_DIR}" \

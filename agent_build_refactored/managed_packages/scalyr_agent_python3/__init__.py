@@ -120,11 +120,11 @@ INSTALL_BUILD_DEPENDENCIES_STEPS = {
 }
 
 
-def create_build_python_step(
+def create_build_embedded_python_step(
         architecture: Architecture,
         libssl_dir: str,
         run_in_remote_docker: bool = False
-):
+) -> ArtifactRunnerStep:
     """
     Function that creates step instance that build Python interpreter.
     :param base_step: Step with environment where to build.
@@ -141,10 +141,10 @@ def create_build_python_step(
     base_step = INSTALL_BUILD_DEPENDENCIES_STEPS[architecture]
 
     return ArtifactRunnerStep(
-        name="build_python",
-        script_path="agent_build_refactored/managed_packages/scalyr_agent_python3/build_steps/build_python.sh",
+        name=f"build_python_embedded_{architecture.value}",
+        script_path="agent_build_refactored/managed_packages/scalyr_agent_python3/embedded_python/build_steps/build_python.sh",
         tracked_files_globs=[
-            "agent_build_refactored/managed_packages/scalyr_agent_python3/files/python3",
+            "agent_build_refactored/managed_packages/scalyr_agent_python3/embedded_python/files/python3",
         ],
         base=base_step,
         environment_variables={
@@ -162,17 +162,19 @@ def create_build_python_step(
     )
 
 # Create steps that builds Python interpreter.
-BUILD_PYTHON_STEPS = {
-    Architecture.X86_64: create_build_python_step(
+BUILD_EMBEDDED_PYTHON_STEPS = {
+    Architecture.X86_64: create_build_embedded_python_step(
         architecture=Architecture.X86_64,
         libssl_dir="/usr/local/lib64"
     ),
-    Architecture.ARM64: create_build_python_step(
+    Architecture.ARM64: create_build_embedded_python_step(
         architecture=Architecture.ARM64,
         libssl_dir="/usr/local/lib",
         run_in_remote_docker=True
     )
 }
+
+
 
 
 def create_build_agent_dev_requirements_step(
@@ -188,11 +190,11 @@ def create_build_agent_dev_requirements_step(
     """
 
     base_step = INSTALL_BUILD_DEPENDENCIES_STEPS[architecture]
-    build_python_step = BUILD_PYTHON_STEPS[architecture]
+    build_python_step = BUILD_EMBEDDED_PYTHON_STEPS[architecture]
 
     return ArtifactRunnerStep(
         name=f"build_agent_dev_requirements_{base_step.architecture.value}",
-        script_path="agent_build_refactored/managed_packages/scalyr_agent_python3/build_steps/build_dev_requirements.sh",
+        script_path="agent_build_refactored/managed_packages/scalyr_agent_python3/embedded_python/build_steps/build_dev_requirements.sh",
         tracked_files_globs=[
             "dev-requirements-new.txt"
         ],
@@ -238,13 +240,13 @@ def create_prepare_toolset_step(
 
     return EnvironmentRunnerStep(
         name=f"prepare_toolset_{architecture.value}",
-        script_path="agent_build_refactored/managed_packages/scalyr_agent_python3/build_steps/prepare_toolset.sh",
+        script_path="agent_build_refactored/managed_packages/scalyr_agent_python3/embedded_python/build_steps/prepare_toolset.sh",
         tracked_files_globs=[
             "dev-requirements-new.txt",
         ],
         base=base_docker_image,
         required_steps={
-            "BUILD_PYTHON": BUILD_PYTHON_STEPS[architecture],
+            "BUILD_PYTHON": BUILD_EMBEDDED_PYTHON_STEPS[architecture],
             "BUILD_AGENT_DEV_REQUIREMENTS": BUILD_AGENT_DEV_REQUIREMENTS_STEPS[architecture]
         },
         environment_variables={
@@ -268,3 +270,49 @@ PREPARE_TOOLSET_STEPS = {
         architecture=Architecture.ARM64
     )
 }
+
+
+def create_embedded_python_package_root_step(
+        architecture: Architecture,
+) -> ArtifactRunnerStep:
+    return ArtifactRunnerStep(
+        name="create_embedded_python_package_root",
+        script_path="agent_build_refactored/managed_packages/scalyr_agent_python3/embedded_python/build_steps/build_package_root.sh",
+        tracked_files_globs=[
+            "agent_build_refactored/managed_packages/scalyr_agent_python3/embedded_python/files/python3",
+        ],
+        base=PREPARE_TOOLSET_STEPS[architecture],
+        required_steps={
+           "BUILD_PYTHON": BUILD_EMBEDDED_PYTHON_STEPS[architecture],
+        },
+        github_actions_settings=GitHubActionsSettings(
+            cacheable=True,
+        )
+    )
+
+
+CREATE_EMBEDDED_PYTHON_PACKAGE_ROOT_STEPS = {
+    Architecture.X86_64: create_embedded_python_package_root_step(
+        architecture=Architecture.X86_64
+    ),
+    Architecture.ARM64: create_embedded_python_package_root_step(
+        architecture=Architecture.ARM64
+    ),
+}
+
+CREATE_SYSTEM_PYTHON_PACKAGE_ROOT_STEP = ArtifactRunnerStep(
+    name="create_system_python_package_root",
+    script_path="agent_build_refactored/managed_packages/scalyr_agent_python3/system_python/build_steps/build_package_root.sh",
+    tracked_files_globs=[
+        "agent_build_refactored/managed_packages/scalyr_agent_python3/system_python/files/python3",
+    ],
+    base=PREPARE_TOOLSET_STEPS[Architecture.X86_64],
+    environment_variables={
+        "SUBDIR_NAME": AGENT_SUBDIR_NAME
+    },
+    github_actions_settings=GitHubActionsSettings(
+        cacheable=True,
+    )
+
+
+)
