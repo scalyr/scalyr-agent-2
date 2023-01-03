@@ -36,6 +36,25 @@ from agent_build_refactored import ALL_USED_BUILDERS
 
 used_builders = []
 
+
+def _create_step_runner(step):
+    # Create "dummy" Runner for each runner step that has to be pre-built, this dummy runner will be executed
+    # by its fqdn to run the step.
+    class StepWrapperRunner(Runner):
+        @classmethod
+        def get_all_required_steps(cls) -> List[RunnerStep]:
+            return [step]
+
+    # Since this runner class is created dynamically we have to generate a constant fqdn for it.
+    StepWrapperRunner.assign_fully_qualified_name(
+        class_name="pre-built-",
+        module_name=__name__,
+        class_name_suffix=step.id,
+    )
+
+    return StepWrapperRunner
+
+
 existing_runners = {}
 builders_to_prebuilt_runners = collections.defaultdict(dict)
 for name, runner_cls in ALL_USED_BUILDERS.items():
@@ -44,20 +63,9 @@ for name, runner_cls in ALL_USED_BUILDERS.items():
             continue
 
         StepWrapperRunner = existing_runners.get(step.id)
-        if StepWrapperRunner is None:
-            # Create "dummy" Runner for each runner step that has to be pre-built, this dummy runner will be executed
-            # by its fqdn to run the step.
-            class StepWrapperRunner(Runner):
-                @classmethod
-                def get_all_required_steps(cls) -> List[RunnerStep]:
-                    return [step]
 
-            # Since this runner class is created dynamically we have to generate a constant fqdn for it.
-            StepWrapperRunner.assign_fully_qualified_name(
-                class_name="pre-built-",
-                module_name=__name__,
-                class_name_suffix=step.id,
-            )
+        if StepWrapperRunner is None:
+            StepWrapperRunner = _create_step_runner(step=step)
             existing_runners[step.id] = StepWrapperRunner
 
         fqdn = StepWrapperRunner.get_fully_qualified_name()
