@@ -172,12 +172,6 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
         },
         "docker": "amazonlinux:2",
     },
-    "python37": {
-        "docker": "python:3.7",
-    },
-    "python36": {
-        "docker": "python:3.6-slim",
-    },
     **{
         f"python3{ver}_deb": {"docker": f"python:3.{ver}-slim"}
         for ver in [6, 7, 8, 9, 10, 11]
