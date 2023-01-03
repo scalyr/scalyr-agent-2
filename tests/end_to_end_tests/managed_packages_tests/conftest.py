@@ -323,6 +323,10 @@ def server_root(request, tmp_path_factory, package_builder):
         else:
             packages_dir = pl.Path(request.config.option.packages_source)
 
+
+        print("!!!!!!!!!!#####")
+        print(list(packages_dir.iterdir()))
+
         # Build mock repo from packages.
         repo_builder = RepoBuilder()
         repo_builder.build(
