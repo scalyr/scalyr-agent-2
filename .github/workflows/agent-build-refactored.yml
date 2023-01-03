@@ -86,7 +86,9 @@ jobs:
               { "name": "deb-amd64", "master_run_only": false },
               { "name": "deb-arm64", "master_run_only": false },
               { "name": "rpm-x86_64", "master_run_only": false },
-              { "name": "rpm-aarch64", "master_run_only": false }
+              { "name": "rpm-aarch64", "master_run_only": false },
+              { "name": "deb-system-python", "master_run_only": false },
+              { "name": "rpm-system-python", "master_run_only": false }
             ]
 
           managed-packages-to-test: |
