@@ -22,6 +22,7 @@ import argparse
 import os
 import pathlib as pl
 import re
+import sys
 import tempfile
 from typing import List, Tuple, Optional, Dict, Type, Union
 
@@ -140,9 +141,10 @@ class BuilderBase(Runner):
     def add_command_line_arguments(cls, parser: argparse.ArgumentParser):
         super(BuilderBase, cls).add_command_line_arguments(parser)
 
-        parser.add_argument("build")
+        subparsers = parser.add_subparsers(dest="command")
+        build_parser = subparsers.add_parser("build")
 
-        parser.add_argument(
+        build_parser.add_argument(
             "--stable_versions-file",
             required=False
         )
@@ -154,22 +156,25 @@ class BuilderBase(Runner):
     ):
         super(BuilderBase, cls).handle_command_line_arguments(args=args)
 
-        work_dir = pl.Path(args.work_dir)
+        if args.command == "build":
+            work_dir = pl.Path(args.work_dir)
+            builder = cls(work_dir=work_dir)
 
-        builder = cls(work_dir=work_dir)
-
-        builder.build(
-            stable_versions_file=args.stable_versions_file
-        )
-        if not IN_DOCKER:
-            output_path = SOURCE_ROOT / "build"
-            if output_path.exists():
-                shutil.rmtree(output_path)
-            shutil.copytree(
-                builder.output_path,
-                output_path,
-                dirs_exist_ok=True,
+            builder.build(
+                stable_versions_file=args.stable_versions_file
             )
+            if not IN_DOCKER:
+                output_path = SOURCE_ROOT / "build"
+                if output_path.exists():
+                    shutil.rmtree(output_path)
+                shutil.copytree(
+                    builder.output_path,
+                    output_path,
+                    dirs_exist_ok=True,
+                )
+        else:
+            print(f"Unknown command: {args.command}", file=sys.stderr)
+            exit(1)
 
 
 
