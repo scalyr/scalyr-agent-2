@@ -347,6 +347,9 @@ def ssh_run_command(
     logger.info(f"STDERR: {sterr.read().decode()}")
 
     exit_status = stdout.channel.exit_status
+    stdout.channel.close()
+    print("!!!@@@@@")
+    print(stdout.channel.exit_status)
     if exit_status != 0:
         raise Exception(
             f"SSH command '{command_str}' returned {exit_status}."
