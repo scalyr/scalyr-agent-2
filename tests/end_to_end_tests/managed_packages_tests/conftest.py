@@ -306,7 +306,9 @@ def server_root(request, tmp_path_factory, package_builder):
             packages_dir = tmp_path_factory.mktemp("packages")
             dependencies_builder = package_builder()
             dependencies_builder.build()
-            for package_path in dependencies_builder.output_path.glob(f"*.{package_builder.PACKAGE_TYPE}"):
+
+            dependency_packages_path = dependencies_builder.output_path / "packages"
+            for package_path in dependency_packages_path.glob(f"*.{package_builder.PACKAGE_TYPE}"):
                 shutil.copy(package_path, packages_dir)
 
             # Build agent package.
@@ -314,7 +316,9 @@ def server_root(request, tmp_path_factory, package_builder):
             agent_builder_cls = ALL_MANAGED_PACKAGE_BUILDERS[agent_builder_name]
             agent_builder = agent_builder_cls()
             agent_builder.build()
-            for package_path in agent_builder.output_path.glob(f"*.{package_builder.PACKAGE_TYPE}"):
+
+            agent_builder_output = agent_builder.output_path / "packages"
+            for package_path in agent_builder_output.glob(f"*.{package_builder.PACKAGE_TYPE}"):
                 shutil.copy(package_path, packages_dir)
         else:
             packages_dir = pl.Path(request.config.option.packages_source)
