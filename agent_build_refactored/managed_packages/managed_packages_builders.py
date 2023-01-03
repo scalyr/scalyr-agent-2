@@ -137,6 +137,11 @@ class BuilderBase(Runner):
     def build(self, stable_versions_file: str = None):
         pass
 
+
+    @property
+    def result_packages_path(self) -> pl.Path:
+        return self.output_path / "packages"
+
     @classmethod
     def add_command_line_arguments(cls, parser: argparse.ArgumentParser):
         super(BuilderBase, cls).add_command_line_arguments(parser)
@@ -168,7 +173,7 @@ class BuilderBase(Runner):
                 if output_path.exists():
                     shutil.rmtree(output_path)
                 shutil.copytree(
-                    builder.output_path,
+                    builder.result_packages_path,
                     output_path,
                     dirs_exist_ok=True,
                 )
@@ -238,24 +243,6 @@ class ManagedPackagesBuilder(BuilderBase):
             cls.get_create_agent_requirements_package_root_step(),
         ])
         return steps
-
-    # @property
-    # def dependency_packages_arch(self) -> str:
-    #     if self.PACKAGE_TYPE == "deb":
-    #         return self.DEPENDENCY_PACKAGES_ARCHITECTURE.as_deb_package_arch
-    #     elif self.PACKAGE_TYPE == "rpm":
-    #         return self.DEPENDENCY_PACKAGES_ARCHITECTURE.as_rpm_package_arch
-    #     else:
-    #         raise ValueError(f"Unknown package type: {self.PACKAGE_TYPE}")
-
-    # @property
-    # def agent_package_arch(self) -> str:
-    #     if self.PACKAGE_TYPE == "deb":
-    #         return Architecture.UNKNOWN.as_deb_package_arch
-    #     elif self.PACKAGE_TYPE == "rpm":
-    #         return Architecture.UNKNOWN.as_rpm_package_arch
-    #     else:
-    #         raise ValueError(f"Unknown package type: {self.PACKAGE_TYPE}")
 
     @property
     def packages_output_path(self) -> pl.Path:
@@ -396,6 +383,7 @@ class ManagedPackagesBuilder(BuilderBase):
 
         package_root = self.get_build_python_package_root_step().get_output_directory(work_dir=self.work_dir) / "root"
 
+        self.packages_output_path.mkdir(exist_ok=True)
         check_call_with_log(
             [
                 *self.get_python_package_build_args(),
@@ -403,7 +391,7 @@ class ManagedPackagesBuilder(BuilderBase):
                 "-C", str(package_root),
                 "--verbose"
             ],
-            cwd=str(self.output_path)
+            cwd=str(self.packages_output_path)
         )
 
         return version
@@ -426,6 +414,7 @@ class ManagedPackagesBuilder(BuilderBase):
         package_root = output / "root"
         package_scriptlets = output / "scriptlets"
 
+        self.result_packages_path.mkdir(exist_ok=True)
         check_call_with_log(
             [
                 *self.get_agent_wheels_package_build_args(),
@@ -435,7 +424,7 @@ class ManagedPackagesBuilder(BuilderBase):
                 "-C", str(package_root),
                 "--verbose"
             ],
-            cwd=str(self.output_path)
+            cwd=str(self.result_packages_path)
         )
 
         return version
@@ -484,6 +473,7 @@ class ManagedPackagesBuilder(BuilderBase):
 
         tmp_dir = tempfile.TemporaryDirectory()
 
+        self.result_packages_path.mkdir(exist_ok=True)
         for arch in requirements_package_architectures:
             check_call_with_log(
                 [
@@ -501,7 +491,7 @@ class ManagedPackagesBuilder(BuilderBase):
                     "--verbose"
                     # fmt: on
                 ],
-                cwd=str(self.output_path)
+                cwd=str(self.result_packages_path)
             )
 
         tmp_dir.cleanup()
