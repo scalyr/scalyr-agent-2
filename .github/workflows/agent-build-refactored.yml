@@ -242,7 +242,7 @@ jobs:
           retention-days: 1
 
   build-linux-dependency-packages:
-    name: Build managed package ${{ matrix.name }}
+    name: Build Linux dependency packages ${{ matrix.name }}
     needs:
       - pre_job
       - pre-build-cached-step
@@ -342,7 +342,7 @@ jobs:
           retention-days: 1
 
   build-agent-linux-package:
-    name: Build agent Linux package ${{ matrix.name }}
+    name: Build Agent Linux package
     needs:
       - pre_job
       - pre-build-cached-step
@@ -387,7 +387,6 @@ jobs:
       - name: Download dependency packages.
         uses: actions/download-artifact@v3
         with:
-          name: linux-packages-managed-${{ matrix.name }}
           path: /tmp/dependency_packages
 
       # Finally build the packages. We also specify already pre-downloaded dependency 'python' and 'agent-libs' packages
