@@ -887,6 +887,9 @@ class AgentPackageBuilder(BuilderBase):
 
         scriptlets_path = SOURCE_ROOT / "agent_build_refactored/managed_packages/install-scriptlets"
 
+        packages_output = self.output_path / "packages"
+        packages_output.mkdir()
+
         subprocess.check_call(
             [
                 # fmt: off
@@ -928,7 +931,7 @@ class AgentPackageBuilder(BuilderBase):
                 "--verbose",
                 # fmt: on
             ],
-            cwd=str(self.output_path)
+            cwd=str(packages_output)
         )
         # if self.PACKAGE_TYPE == "deb":
         #     package_glob = f"{AGENT_PACKAGE_NAME}_{version}_all.{self.PACKAGE_TYPE}"
