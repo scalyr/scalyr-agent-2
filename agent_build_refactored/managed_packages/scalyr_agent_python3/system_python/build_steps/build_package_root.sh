@@ -22,7 +22,7 @@
 
 set -e
 
-mkdir -p "${STEP_OUTPUT_PATH}/root/usr/lib/${SUBDIR_NAME}/bin"
+mkdir -p "${STEP_OUTPUT_PATH}/root/usr/lib/${SUBDIR_NAME}/requirements/python3/bin"
 
 # Copy wrapper for Python interpreter executable.
-cp -a "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_python3/system_python/files/python3" "${STEP_OUTPUT_PATH}/root/usr/lib/${SUBDIR_NAME}/bin/python3"
+cp -a "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_python3/system_python/files/python3" "${STEP_OUTPUT_PATH}/root/usr/lib/${SUBDIR_NAME}/requirements/python3/bin/python3"

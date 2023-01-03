@@ -19,7 +19,7 @@ from agent_build_refactored.tools.runner import Runner, RunnerMappedPath
 from agent_build_refactored.managed_packages.managed_packages_builders import (
     ALL_MANAGED_PACKAGE_BUILDERS,
     AGENT_PYTHON_PACKAGE_NAME,
-    AGENT_LIBS_PACKAGE_NAME,
+    AGENT_WHEELS_PACKAGE_NAME,
     AGENT_PACKAGE_NAME,
     PREPARE_TOOLSET_STEPS
 )
@@ -110,13 +110,15 @@ def package_builder(package_builder_name):
 
 @pytest.fixture(scope="session")
 def package_architecture(package_builder, package_builder_name):
-    if "system-python" in package_builder_name:
+
+    if package_builder.has_embedded_python():
+        return package_builder.EMBEDDED_PYTHON_ARCHITECTURE
+    else:
         # Since builder, that builds packages that use system python, builds them "in bulk",
         # then we should pick one architecture to test such packages.
         # For example armv7.
         return Architecture.X86_64
-    else:
-        return package_builder.ARCHITECTURE
+
 
 
 @pytest.fixture(scope="session")

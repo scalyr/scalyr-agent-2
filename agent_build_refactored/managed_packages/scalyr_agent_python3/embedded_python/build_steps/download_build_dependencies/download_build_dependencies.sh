@@ -177,7 +177,7 @@ sMB+Qkul/Hc+0BLBe+OVT6Ml1IAL
 " | gpg --import
 
 
-GNU_KEYRING_PATH="${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_python3/build_steps/download_build_dependencies/gnu-keyring.gpg"
+GNU_KEYRING_PATH="${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_python3/embedded_python/build_steps/download_build_dependencies/gnu-keyring.gpg"
 
 mkdir "${STEP_OUTPUT_PATH}/texinfo"
 pushd "${STEP_OUTPUT_PATH}/texinfo"
@@ -282,15 +282,16 @@ taTApkk=
 
 mkdir "${STEP_OUTPUT_PATH}/zlib"
 pushd "${STEP_OUTPUT_PATH}/zlib"
-curl -L "https://www.zlib.net/zlib-${ZLIB_VERSION}.tar.gz" > zlib.tar.gz
-curl -L "https://www.zlib.net/zlib-${ZLIB_VERSION}.tar.gz.asc" > zlib.tar.gz.asc
+curl -L "https://github.com/madler/zlib/releases/download/v${ZLIB_VERSION}/zlib-${ZLIB_VERSION}.tar.gz" > zlib.tar.gz
+curl -L "https://github.com/madler/zlib/releases/download/v${ZLIB_VERSION}/zlib-${ZLIB_VERSION}.tar.gz.asc" > zlib.tar.gz.asc
+cat zlib.tar.gz.asc
 gpg --verify zlib.tar.gz.asc zlib.tar.gz
 popd
 
 clear_public_keys
 
 
-BZIP2_GPG_KEY_PATH="${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_python3/build_steps/download_build_dependencies/gpgkey-5C1D1AA44BE649DE760A.gpg"
+BZIP2_GPG_KEY_PATH="${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_python3/embedded_python/build_steps/download_build_dependencies/gpgkey-5C1D1AA44BE649DE760A.gpg"
 
 mkdir "${STEP_OUTPUT_PATH}/bzip2"
 pushd "${STEP_OUTPUT_PATH}/bzip2"

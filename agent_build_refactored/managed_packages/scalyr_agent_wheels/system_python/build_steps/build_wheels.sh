@@ -29,28 +29,14 @@ set -e
 # shellcheck disable=SC1090
 source ~/.bashrc
 
-REQUIREMENTS_FILE="/tmp/requirements.txt"
 
-#REQUIREMENTS="
-##requests==2.28.1; python_version >= '3.7'
-#requests==2.27.1; python_version < '3.8'
-#"
+WHEELS_DIR="${STEP_OUTPUT_PATH}/wheels"
+mkdir -p "${WHEELS_DIR}"
+COMMON_REQUIREMENTS_FILE="${WHEELS_DIR}/requirements.txt"
+BINARY_REQUIREMENTS_FILE="${WHEELS_DIR}/binary-requirements.txt"
 
-#REQUIREMENTS="
-#requests==2.28.1; python_version >= '3.7'
-#requests==2.27.1; python_version == '3.6'
-##setuptools
-##wheel
-##setuptools_scm
-##flit_core<4,>=3.2
-#python-dateutil==2.8.2
-#repoze.lru==0.7
-#six==1.14.0
-#redis==2.10.5
-#PyMySQL==0.9.3
-#pysnmp==4.3.0
-##pysmi==0.3.4
-##ply==3.11"
+echo "${REQUIREMENTS_COMMON}" >> "${COMMON_REQUIREMENTS_FILE}"
+echo "${REQUIREMENTS_COMMON_PLATFORM_DEPENDENT}" >> "${BINARY_REQUIREMENTS_FILE}"
 
 
 echo "${REQUIREMENTS}" > "${REQUIREMENTS_FILE}"
@@ -58,7 +44,7 @@ echo "${REQUIREMENTS}" > "${REQUIREMENTS_FILE}"
 TARBALLS_DIR="$STEP_OUTPUT_PATH/tarballs"
 python3 -m pip download --no-binary=:all: \
   -d "${TARBALLS_DIR}" \
-  -r "${REQUIREMENTS_FILE}" \
+  -r "${COMMON_REQUIREMENTS_FILE}" \
   wheel setuptools setuptools_scm flit_core
 
 
@@ -79,12 +65,9 @@ pushd "${SOURCE_ROOT}"
 PYSNMP_TARBALL=$(find "${TARBALLS_DIR}" -name "pysnmp-*.*.*.tar.gz" -type f -maxdepth 1)
 tar -xvf ${PYSNMP_TARBALL} -C "$STEP_OUTPUT_PATH/pysnmp" --strip-components=1
 pushd "$STEP_OUTPUT_PATH/pysnmp"
-patch -f "$STEP_OUTPUT_PATH/pysnmp/setup.py" "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_requirements/system_python/build_steps/pysnmp_setup.patch"
+patch -f "$STEP_OUTPUT_PATH/pysnmp/setup.py" "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_wheels/system_python/build_steps/pysnmp_setup.patch"
 tar -czvf "${PYSNMP_TARBALL}" -C "$STEP_OUTPUT_PATH/pysnmp" .
 
-
-WHEELS_DIR="${STEP_OUTPUT_PATH}/wheels"
-mkdir -p "${WHEELS_DIR}"
 
 if [ -n "${BUILD_SYSTEM_PYTHON_WHEELS_PY36}" ];then
   cp -a "${BUILD_SYSTEM_PYTHON_WHEELS_PY36}/wheels/." "${WHEELS_DIR}"
@@ -93,4 +76,4 @@ fi
 python3 -m pip wheel \
   --no-index --find-links "${TARBALLS_DIR}" \
   --wheel-dir "${WHEELS_DIR}"  \
-  -r "${REQUIREMENTS_FILE}"
+  -r "${COMMON_REQUIREMENTS_FILE}"

@@ -24,6 +24,8 @@ AGENT_BUILD_PATH = SOURCE_ROOT / "agent_build"
 
 IN_CICD = bool(os.environ.get("AGENT_BUILD_IN_CICD"))
 
+# Name of the managed agent linux package.
+AGENT_PACKAGE_NAME = "scalyr-agent-2"
 # Name of the agent linux dependency packages
 AGENT_REQUIREMENTS_PACKAGE_NAME = "scalyr-agent-requirements"
 AGENT_WHEELS_PACKAGE_NAME = "scalyr-agent-wheels"

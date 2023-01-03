@@ -31,9 +31,9 @@ from agent_build_refactored.tools.runner import Runner, RunnerStep, ArtifactRunn
 from agent_build_refactored.tools.constants import SOURCE_ROOT, DockerPlatform, Architecture, REQUIREMENTS_COMMON, REQUIREMENTS_COMMON_PLATFORM_DEPENDENT
 from agent_build_refactored.tools import check_call_with_log
 from agent_build_refactored.prepare_agent_filesystem import build_linux_fhs_agent_files, add_config
-from agent_build_refactored.tools.constants import AGENT_PYTHON_PACKAGE_NAME, AGENT_WHEELS_PACKAGE_NAME, AGENT_SUBDIR_NAME, AGENT_REQUIREMENTS_PACKAGE_NAME
-from agent_build_refactored.managed_packages.scalyr_agent_python3 import PREPARE_TOOLSET_STEPS, BUILD_EMBEDDED_PYTHON_STEPS, CREATE_SYSTEM_PYTHON_PACKAGE_ROOT_STEP, CREATE_EMBEDDED_PYTHON_PACKAGE_ROOT_STEPS
-from agent_build_refactored.managed_packages.scalyr_agent_requirements import CREATE_AGENT_REQUIREMENTS_EMBEDDED_PYTHON_PACKAGE_ROOT_STEPS, CREATE_AGENT_REQUIREMENTS_SYSTEM_PYTHON_PACKAGE_ROOT_STEP
+from agent_build_refactored.tools.constants import AGENT_PYTHON_PACKAGE_NAME, AGENT_WHEELS_PACKAGE_NAME, AGENT_SUBDIR_NAME, AGENT_REQUIREMENTS_PACKAGE_NAME, AGENT_PACKAGE_NAME
+from agent_build_refactored.managed_packages.scalyr_agent_python3 import PREPARE_TOOLSET_STEPS, BUILD_EMBEDDED_PYTHON_STEPS, CREATE_AGENT_PYTHON3_SYSTEM_PACKAGE_ROOT_STEP, CREATE_AGENT_PYTHON3_EMBEDDED_PACKAGE_ROOT_STEPS
+from agent_build_refactored.managed_packages.scalyr_agent_wheels import CREATE_AGENT_WHEELS_EMBEDDED_PYTHON_PACKAGE_ROOT_STEPS, CREATE_AGENT_WHEELS_SYSTEM_PYTHON_PACKAGE_ROOT_STEP
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +130,50 @@ _FPM_COMMON_BUILD_ARGS = [
 ]
 
 
-class ManagedPackagesBuilder(Runner):
+class BuilderBase(Runner):
+
+    @abc.abstractmethod
+    def build(self, stable_versions_file: str = None):
+        pass
+
+    @classmethod
+    def add_command_line_arguments(cls, parser: argparse.ArgumentParser):
+        super(BuilderBase, cls).add_command_line_arguments(parser)
+
+        parser.add_argument("build")
+
+        parser.add_argument(
+            "--stable_versions-file",
+            required=False
+        )
+
+    @classmethod
+    def handle_command_line_arguments(
+            cls,
+            args,
+    ):
+        super(BuilderBase, cls).handle_command_line_arguments(args=args)
+
+        work_dir = pl.Path(args.work_dir)
+
+        builder = cls(work_dir=work_dir)
+
+        builder.build(
+            stable_versions_file=args.stable_versions_file
+        )
+        if not IN_DOCKER:
+            output_path = SOURCE_ROOT / "build"
+            if output_path.exists():
+                shutil.rmtree(output_path)
+            shutil.copytree(
+                builder.output_path,
+                output_path,
+                dirs_exist_ok=True,
+            )
+
+
+
+class ManagedPackagesBuilder(BuilderBase):
     """
     Builder class that is responsible for the building of the Linux agent deb and rpm packages that are managed by package
         managers such as apt and yum.
@@ -157,18 +200,29 @@ class ManagedPackagesBuilder(Runner):
     PACKAGECLOUD_DISTRO_VERSION: str
 
     @classmethod
+    def get_base_environment(cls):
+        if cls.EMBEDDED_PYTHON_ARCHITECTURE:
+            return PREPARE_TOOLSET_STEPS[cls.EMBEDDED_PYTHON_ARCHITECTURE]
+        else:
+            return PREPARE_TOOLSET_STEPS[Architecture.X86_64]
+
+    @classmethod
+    def has_embedded_python(cls):
+        return cls.EMBEDDED_PYTHON_ARCHITECTURE is not None
+
+    @classmethod
     def get_build_python_package_root_step(cls) -> ArtifactRunnerStep:
         if cls.EMBEDDED_PYTHON_ARCHITECTURE is not None:
-            return CREATE_EMBEDDED_PYTHON_PACKAGE_ROOT_STEPS[cls.EMBEDDED_PYTHON_ARCHITECTURE]
+            return CREATE_AGENT_PYTHON3_EMBEDDED_PACKAGE_ROOT_STEPS[cls.EMBEDDED_PYTHON_ARCHITECTURE]
         else:
-            return CREATE_SYSTEM_PYTHON_PACKAGE_ROOT_STEP
+            return CREATE_AGENT_PYTHON3_SYSTEM_PACKAGE_ROOT_STEP
 
     @classmethod
     def get_create_agent_requirements_package_root_step(cls) -> ArtifactRunnerStep:
         if cls.EMBEDDED_PYTHON_ARCHITECTURE is not None:
-            return CREATE_AGENT_REQUIREMENTS_EMBEDDED_PYTHON_PACKAGE_ROOT_STEPS[cls.EMBEDDED_PYTHON_ARCHITECTURE]
+            return CREATE_AGENT_WHEELS_EMBEDDED_PYTHON_PACKAGE_ROOT_STEPS[cls.EMBEDDED_PYTHON_ARCHITECTURE]
         else:
-            return CREATE_AGENT_REQUIREMENTS_SYSTEM_PYTHON_PACKAGE_ROOT_STEP
+            return CREATE_AGENT_WHEELS_SYSTEM_PYTHON_PACKAGE_ROOT_STEP
 
     @classmethod
     def get_all_required_steps(cls) -> List[RunnerStep]:
@@ -228,15 +282,6 @@ class ManagedPackagesBuilder(Runner):
             package_name, version = prefix.rsplit("-", 1)
 
         return package_name, version, arch, ext
-
-    def _parse_version_from_package_file_name(self, package_file_name: str):
-        """
-        Parse version of the package from its filename.
-        """
-        _, version, _, _ = self._parser_package_file_parts(
-            package_file_name=package_file_name
-        )
-        return version
 
     @classmethod
     def get_python_package_name(cls) -> str:
@@ -372,12 +417,15 @@ class ManagedPackagesBuilder(Runner):
         if not should_build:
             return version
 
-        package_root = self.get_create_agent_requirements_package_root_step().get_output_directory(work_dir=self.work_dir) / "root"
+        output = self.get_create_agent_requirements_package_root_step().get_output_directory(work_dir=self.work_dir)
+        package_root = output / "root"
+        package_scriptlets = output / "scriptlets"
 
         check_call_with_log(
             [
                 *self.get_agent_wheels_package_build_args(),
                 "--depends", f"{self.get_python_package_name()} = {python_package_version}",
+                "--after-install", str(package_scriptlets / "system-python-postinstall.sh"),
                 "-v", version,
                 "-C", str(package_root),
                 "--verbose"
@@ -681,150 +729,6 @@ class ManagedPackagesBuilder(Runner):
 
         return package_path
 
-    @classmethod
-    def add_command_line_arguments(cls, parser: argparse.ArgumentParser):
-        super(ManagedPackagesBuilder, cls).add_command_line_arguments(parser=parser)
-
-        subparsers = parser.add_subparsers(dest="command")
-
-        build_packages_parser = subparsers.add_parser(
-            "build", help="Build needed packages."
-        )
-
-        build_packages_parser.add_argument(
-            "--last-repo-python-package-file",
-            dest="last_repo_python_package_file",
-            required=False,
-            help="Path to the python package file. If specified, then the python "
-                 "dependency package from this path will be reused instead of building a new one."
-        )
-        build_packages_parser.add_argument(
-            "--last-repo-agent-libs-package-file",
-            dest="last_repo_agent_requirements_package_file",
-            required=False,
-            help="Path to the agent libs package file. If specified, then the agent-libs dependency package from this "
-                 "path will be reused instead of building a new one."
-        )
-
-        def _add_packagecloud_args(_parser):
-            _parser.add_argument(
-                "--token",
-                required=True,
-                help="Auth token for packagecloud."
-            )
-
-            _parser.add_argument(
-                "--user-name",
-                dest="user_name",
-                required=True,
-                help="Target username for packagecloud."
-            )
-
-            _parser.add_argument(
-                "--repo-name",
-                dest="repo_name",
-                required=True,
-                help="Target repo for packagecloud."
-            )
-
-        publish_packages_parser = subparsers.add_parser(
-            "publish",
-            help="Publish packages that are built by 'build' command."
-        )
-        publish_packages_parser.add_argument(
-            "--packages-dir",
-            dest="packages_dir",
-            required=True,
-            help="Path to a directory with packages to publish."
-        )
-        _add_packagecloud_args(publish_packages_parser)
-
-        find_last_repo_package_parser = subparsers.add_parser(
-            "find_last_repo_package",
-            help="Find existing packages in repo, in order to reuse them."
-        )
-
-        find_last_repo_package_parser.add_argument(
-            "--package-name",
-            dest="package_name",
-            required=True,
-            #choices=[AGENT_PYTHON_PACKAGE_NAME, AGENT_REQUIREMENTS_PACKAGE_NAME],
-            help="Name of the package to find."
-        )
-        _add_packagecloud_args(find_last_repo_package_parser)
-
-        download_package_parser = subparsers.add_parser(
-            "download_package",
-            help="Download package from repo. Used by CI/CD to reuse already existing packages from repo."
-        )
-        download_package_parser.add_argument(
-            "--package-filename",
-            dest="package_filename",
-            required=True,
-            help="Package filename to download."
-        )
-        download_package_parser.add_argument(
-            "--output-dir",
-            dest="output_dir",
-            required=True,
-            help="Path where to store downloaded package."
-        )
-        _add_packagecloud_args(download_package_parser)
-
-    @classmethod
-    def handle_command_line_arguments(
-        cls,
-        args,
-    ):
-        super(ManagedPackagesBuilder, cls).handle_command_line_arguments(args=args)
-
-        work_dir = pl.Path(args.work_dir)
-
-        builder = cls(work_dir=work_dir)
-
-        if args.command == "build":
-            builder.build()
-            if not IN_DOCKER:
-                output_path = SOURCE_ROOT / "build"
-                if output_path.exists():
-                    shutil.rmtree(output_path)
-                shutil.copytree(
-                    builder.output_path,
-                    output_path,
-                    dirs_exist_ok=True,
-                )
-        elif args.command == "publish":
-            builder.publish_packages_to_packagecloud(
-                packages_dir_path=pl.Path(args.packages_dir),
-                token=args.token,
-                user_name=args.user_name,
-                repo_name=args.repo_name,
-            )
-        elif args.command == "find_last_repo_package":
-            last_package_filename = builder.find_last_repo_package(
-                package_name=args.package_name,
-                token=args.token,
-                user_name=args.user_name,
-                repo_name=args.repo_name,
-            )
-            if last_package_filename:
-                print(last_package_filename)
-
-        elif args.command == "download_package":
-            last_package_path = builder.download_package_from_repo(
-                package_filename=args.package_filename,
-                output_dir=args.output_dir,
-                token=args.token,
-                user_name=args.user_name,
-                repo_name=args.repo_name,
-            )
-            if last_package_path:
-                print(last_package_path)
-
-        else:
-            logging.error(f"Unknown command {args.command}.")
-            exit(1)
-
 
 class DebDependencyPackagesBuilderX64_86(ManagedPackagesBuilder):
     EMBEDDED_PYTHON_ARCHITECTURE = Architecture.X86_64
@@ -917,7 +821,137 @@ def _parse_package_version_parts(version: str) -> Tuple[int, str]:
     return int(iteration), checksum
 
 
-ALL_MANAGED_PACKAGE_BUILDERS = _ALL_DEPENDENCY_PACKAGES_BUILDERS
+class AgentPackageBuilder(BuilderBase):
+    PACKAGE_TYPE: str
+
+    def build(
+            self,
+            stable_versions_file: str = None
+    ):
+
+        self.run_required()
+
+        if self.runs_in_docker:
+            args = ["build"]
+            if stable_versions_file:
+                args.extend([
+                    "--stable-versions-file", RunnerMappedPath(stable_versions_file)
+                ])
+            self.run_in_docker(
+                command_args=args
+            )
+            return
+
+        agent_requirements_package_version, _ = _get_dependency_package_version_to_use(
+            checksum=_ALL_AGENT_WHEELS_PACKAGES_CHECKSUM,
+            package_name=AGENT_REQUIREMENTS_PACKAGE_NAME,
+            stable_versions_file_path=stable_versions_file
+        )
+
+        agent_package_root = self.output_path / "agent_package_root"
+
+        build_linux_fhs_agent_files(
+            output_path=agent_package_root,
+            copy_agent_source=True
+        )
+
+        install_root_executable_path = agent_package_root / f"usr/share/{AGENT_PACKAGE_NAME}/bin/scalyr-agent-2"
+        install_root_executable_path.unlink()
+        shutil.copy(
+            SOURCE_ROOT / "agent_build_refactored/managed_packages/files/scalyr-agent-2",
+            install_root_executable_path
+        )
+
+        # Add config file
+        add_config(
+            SOURCE_ROOT / "config",
+            agent_package_root / "etc/scalyr-agent-2"
+        )
+
+        # Copy init.d folder.
+        shutil.copytree(
+            SOURCE_ROOT / "agent_build_refactored/managed_packages/files/init.d",
+            agent_package_root / "etc/init.d",
+            dirs_exist_ok=True
+        )
+
+        version = (SOURCE_ROOT / "VERSION").read_text().strip()
+
+        description = "Scalyr Agent 2 is the daemon process Scalyr customers run on their servers to collect metrics" \
+                      " and log files and transmit them to Scalyr."
+
+        scriptlets_path = SOURCE_ROOT / "agent_build_refactored/managed_packages/install-scriptlets"
+
+        subprocess.check_call(
+            [
+                # fmt: off
+                "fpm",
+                "-s", "dir",
+                "-a", "all",
+                "-t", self.PACKAGE_TYPE,
+                "-C", str(agent_package_root),
+                "-n" "scalyr-agent-2",
+                "-v", version,
+                "--license", "Apache 2.0",
+                "--vendor", "Scalyr",
+                "--provides", "scalyr-agent-2",
+                "--description", description,
+                "--depends", "bash >= 3.2",
+                "--depends", f"{AGENT_REQUIREMENTS_PACKAGE_NAME} = {agent_requirements_package_version}",
+                "--url", "https://www.scalyr.com",
+                "--deb-user", "root",
+                "--deb-group", "root",
+                "--rpm-user", "root",
+                "--rpm-group", "root",
+                #"--deb-changelog", "changelog-deb",
+                #"--rpm-changelog", "changelog-rpm",
+                "--after-install", scriptlets_path / "postinstall.sh",
+                "--before-remove", scriptlets_path / "preuninstall.sh",
+                "--deb-no-default-config-files",
+                "--no-deb-auto-config-files",
+                "--config-files", "/etc/scalyr-agent-2/agent.json",
+                "--directories", "/usr/share/scalyr-agent-2",
+                "--directories", "/var/lib/scalyr-agent-2",
+                "--directories", "/var/log/scalyr-agent-2",
+                "--rpm-use-file-permissions",
+                "--deb-use-file-permissions",
+                # NOTE: Sadly we can't use defattrdir since it breakes permissions for some other
+                # directories such as /etc/init.d and we need to handle that in postinst :/
+                # "  --rpm-auto-add-directories "
+                # "  --rpm-defattrfile 640"
+                # "  --rpm-defattrdir 751"
+                "--verbose",
+                # fmt: on
+            ],
+            cwd=str(self.output_path)
+        )
+        # if self.PACKAGE_TYPE == "deb":
+        #     package_glob = f"{AGENT_PACKAGE_NAME}_{version}_all.{self.PACKAGE_TYPE}"
+        # elif self.PACKAGE_TYPE == "rpm":
+        #     package_glob = f"{AGENT_PACKAGE_NAME}-{version}-1.noarch.{self.PACKAGE_TYPE}"
+        # else:
+        #     raise Exception(f"Unknown package type {self.PACKAGE_TYPE}")
+        #
+        # found = list(self.output_path.glob(package_glob))
+        # assert len(found) == 1, f"Number of result agent packages has to be 1, got {len(found)}"
+        # return found[0].name
+
+
+class DebAgentBuilder(AgentPackageBuilder):
+    BASE_ENVIRONMENT = PREPARE_TOOLSET_STEPS[Architecture.X86_64]
+    PACKAGE_TYPE = "deb"
+
+
+class RpmAgentBuilder(AgentPackageBuilder):
+    BASE_ENVIRONMENT = PREPARE_TOOLSET_STEPS[Architecture.X86_64]
+    PACKAGE_TYPE = "rpm"
+
+
+ALL_MANAGED_PACKAGE_BUILDERS: Dict[str, Type[Union[ManagedPackagesBuilder, AgentPackageBuilder]]] = {
+    **_ALL_DEPENDENCY_PACKAGES_BUILDERS,
+    "deb-agent": DebAgentBuilder,
+    "rpm-agent": RpmAgentBuilder,
+}
 
 
 

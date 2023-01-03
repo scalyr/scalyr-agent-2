@@ -1034,6 +1034,7 @@ class Runner:
             known_hosts_file_backup = known_hosts_file.read_text()
         else:
             known_hosts_file_backup = ""
+
         try:
             for s in steps:
                 s.run(work_dir=work_dir, remote_docker_host_getter=get_remote_docker_host_for_step)

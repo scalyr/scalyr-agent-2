@@ -23,6 +23,6 @@ set -e
 #  --find-links /usr/share/scalyr-agent-2/agent-libs/wheels \
 #  -r /usr/share/scalyr-agent-2/agent-libs/requirements.txt
 
-/usr/lib/scalyr-agent-2/bin/scalyr-agent-2-libs requirements recreate
+/usr/lib/scalyr-agent-2/requirements/bin/scalyr-agent-2-requirements requirements recreate
 
 

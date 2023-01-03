@@ -1,4 +1,4 @@
-#!/usr/lib/scalyr-agent-2/bin/scalyr-agent-python3
+#!/usr/lib/scalyr-agent-2/requirements/python3/bin/python3
 # Copyright 2014-2022 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,9 +18,12 @@ import pathlib as pl
 import subprocess
 import sys
 
+AGENT_REQUIREMENTS_PACKAGE_LIB_DIR = pl.Path("/usr/lib/scalyr-agent-2/requirements")
+AGENT_REQUIREMENTS_PACKAGE_ETC_DIR = pl.Path("/etc/scalyr-agent-2/requirements")
+AGENT_REQUIREMENTS_PACKAGE_VAR_DIR = pl.Path("/var/lib/scalyr-agent-2/requirements")
 
 def recreate_venv():
-    config_path = pl.Path("/etc/scalyr-agent-2/agent-libs/config.ini")
+    config_path = AGENT_REQUIREMENTS_PACKAGE_ETC_DIR / "config.ini"
 
     config = configparser.ConfigParser()
     config.read(config_path)
@@ -28,14 +31,19 @@ def recreate_venv():
     source = requirements["source"]
     include_binary_packages = requirements.getboolean("include_binary_packages")
 
-    wheels_dir = pl.Path("/usr/share/scalyr-agent-2/agent-libs/wheels")
-    core_requirements_path = pl.Path("/usr/share/scalyr-agent-2/agent-libs/requirements.txt")
-    binary_requirements_path = pl.Path("/usr/share/scalyr-agent-2/agent-libs/binary-requirements.txt")
-    additional_requirements_path = pl.Path("/etc/scalyr-agent-2/agent-libs/additional-requirements.txt")
-    venv_dir = pl.Path("/var/lib/scalyr-agent-2/agent-libs/venv")
-    python_executable = "/usr/lib/scalyr-agent-2/bin/scalyr-agent-python3"
+    wheels_dir = AGENT_REQUIREMENTS_PACKAGE_LIB_DIR / "wheels"
+    core_requirements_path = wheels_dir / "requirements.txt"
+    binary_requirements_path = wheels_dir / "binary-requirements.txt"
+    additional_requirements_path = AGENT_REQUIREMENTS_PACKAGE_ETC_DIR / "additional-requirements.txt"
+
+    venv_dir = AGENT_REQUIREMENTS_PACKAGE_VAR_DIR / "venv"
     subprocess.check_call(
-        [str(python_executable), "-m", "venv", str(venv_dir)],
+        [
+            str(AGENT_REQUIREMENTS_PACKAGE_LIB_DIR / "python3/bin/python3"),
+            "-m",
+            "venv",
+            str(venv_dir)
+        ],
     )
 
     if include_binary_packages and source != "pypi":
@@ -45,14 +53,15 @@ def recreate_venv():
         )
         include_binary_packages = False
 
-    venv_python_executable = venv_dir / "bin/python3"
+    python_executable = AGENT_REQUIREMENTS_PACKAGE_LIB_DIR / "bin/scalyr-agent-python3"
 
     pip_install_args = [
-        str(venv_python_executable),
+        str(python_executable),
         "-m",
         "pip",
         "install",
         "-r", str(core_requirements_path),
+        "-v",
     ]
 
     # Install core requirements from local wheels.

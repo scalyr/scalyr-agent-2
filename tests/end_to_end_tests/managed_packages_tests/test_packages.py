@@ -36,8 +36,7 @@ import pytest
 from agent_build_refactored.tools.constants import SOURCE_ROOT, Architecture
 from agent_build_refactored.managed_packages.managed_packages_builders import (
     AGENT_PYTHON_PACKAGE_NAME,
-    AGENT_LIBS_PACKAGE_NAME,
-    AGENT_LIBS_WHEELS_PACKAGE_NAME,
+    AGENT_WHEELS_PACKAGE_NAME,
     AGENT_SUBDIR_NAME,
 )
 from tests.end_to_end_tests.tools import AgentPaths, AgentCommander, TimeoutTracker
@@ -110,7 +109,7 @@ def _verify_package_subdirectories(
     ), f"Something remains outside if the expected package structure: {[str(p) for p in remaining_paths]}"
 
 
-def test_embedded_python_dependency_packages(
+def test_dependency_packages(
     package_builder_name,
     package_builder,
     package_architecture,
@@ -130,7 +129,7 @@ def test_embedded_python_dependency_packages(
     _verify_package_subdirectories(
         repo_root=repo_root,
         package_type=package_type,
-        package_name=AGENT_PYTHON_PACKAGE_NAME,
+        package_name=package_builder.get_python_package_name(),
         package_architecture=package_architecture,
         output_dir=tmp_path,
         expected_folders=[
@@ -143,7 +142,7 @@ def test_embedded_python_dependency_packages(
     _verify_package_subdirectories(
         repo_root=repo_root,
         package_type=package_builder.PACKAGE_TYPE,
-        package_name=AGENT_LIBS_PACKAGE_NAME,
+        package_name=package_builder.get_agent_wheels_package_name(),
         package_architecture=package_architecture,
         output_dir=tmp_path,
         expected_folders=[
@@ -152,6 +151,7 @@ def test_embedded_python_dependency_packages(
         ],
     )
 
+#@pytest.mark.skip
 def test_packages(
     package_builder_name,
     package_builder,
@@ -187,22 +187,36 @@ def test_packages(
         logger.exception("Install script has failed.")
         raise
 
-    if "system-python" not in package_builder_name:
+    if package_builder.has_embedded_python():
         logger.info(
             "Execute simple sanity test script for the python interpreter and its libraries."
         )
         subprocess.check_call(
             [
-                f"/usr/lib/{AGENT_SUBDIR_NAME}/bin/python3",
+                f"/usr/lib/{AGENT_SUBDIR_NAME}/requirements/python3/bin/python3",
                 "tests/end_to_end_tests/managed_packages_tests/verify_python_interpreter.py",
             ],
             env={
-                # It's important to override the 'LD_LIBRARY_PATH' to be sure that libraries paths from the test runner
-                # frozen binary are not leaked to a script's process.
                 "LD_LIBRARY_PATH": "",
                 "PYTHONPATH": str(SOURCE_ROOT),
             },
         )
+
+    subprocess.check_call(f"/usr/lib/{AGENT_SUBDIR_NAME}/requirements/bin/scalyr-agent-python3 -m pip freeze", shell=True)
+    verify_venv_args = [
+            f"/usr/lib/{AGENT_SUBDIR_NAME}/requirements/bin/scalyr-agent-python3",
+            "tests/end_to_end_tests/managed_packages_tests/verify_venv_installed_from_wheels_package.py",
+    ]
+    if package_builder.has_embedded_python():
+        verify_venv_args.append("--including-binary-packages")
+
+    subprocess.check_call(
+        verify_venv_args,
+        env={
+            "LD_LIBRARY_PATH": "/lib:/lib64:/usr/lib:/usr/lib64",
+            "PYTHONPATH": str(SOURCE_ROOT),
+        },
+    )
 
     agent_paths = AgentPaths(
         configs_dir=pl.Path("/etc/scalyr-agent-2"),
@@ -502,11 +516,11 @@ def test_system_python_dependency_packages(
     _verify_package_subdirectories(
         repo_root=repo_root,
         package_type=package_type,
-        package_name=AGENT_LIBS_WHEELS_PACKAGE_NAME,
+        package_name=package_builder.get_python_package_name(),
         package_architecture=Architecture.UNKNOWN,
         output_dir=tmp_path,
         expected_folders=[
-            f"usr/share/{AGENT_SUBDIR_NAME}/agent-libs",
+            f"usr/lib/{AGENT_SUBDIR_NAME}/requirements/python3",
         ],
     )
 
@@ -514,13 +528,13 @@ def test_system_python_dependency_packages(
     _verify_package_subdirectories(
         repo_root=repo_root,
         package_type=package_builder.PACKAGE_TYPE,
-        package_name=AGENT_LIBS_PACKAGE_NAME,
-        package_architecture=package_architecture,
+        package_name=package_builder.get_agent_wheels_package_name(),
+        package_architecture=Architecture.UNKNOWN,
         output_dir=tmp_path,
         expected_folders=[
-            f"etc/{AGENT_SUBDIR_NAME}/agent-libs",
-            f"usr/lib/{AGENT_SUBDIR_NAME}/bin",
-            f"var/lib/{AGENT_SUBDIR_NAME}/agent-libs",
+            f"usr/lib/{AGENT_SUBDIR_NAME}/requirements/wheels",
+            f"usr/lib/{AGENT_SUBDIR_NAME}/requirements/bin",
+            f"etc/{AGENT_SUBDIR_NAME}/requirements",
         ],
     )
 
@@ -565,6 +579,7 @@ def _prepare_environment(
     if package_type == "deb":
         # In some distributions apt update may be a pretty flaky due to connection and cache issues,
         # so we add some retries.
+        logger.info("Update apt sources")
         while True:
             try:
                 _run_shell("apt-get clean")

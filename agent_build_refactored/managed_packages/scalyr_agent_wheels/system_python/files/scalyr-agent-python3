@@ -16,5 +16,5 @@
 # This script is a wrapper executable for Python interpreter form the agent's 'scalyr-agent-python3' dependency
 # package.
 
-
-exec /usr/lib/scalyr-agent-2/bin/python3 "$@"
+# We also look for Python3 inside /usr/local as an additional fallback
+PATH="${PATH}:/ust/local/sbin:/usr/local/bin" exec "/var/lib/scalyr-agent-2/requirements/venv/bin/python3" "$@"

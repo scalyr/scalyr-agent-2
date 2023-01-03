@@ -45,6 +45,4 @@ set -e
 # Copy python interpreter, which is built by the previous step.
 cp -a "${BUILD_PYTHON}/python" "${STEP_OUTPUT_PATH}/root"
 
-# Copy wrapper for Python interpreter executable.
-mkdir -p "${STEP_OUTPUT_PATH}/root/usr/lib/${SUBDIR_NAME}/bin"
-cp -a "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_python3/embedded_python/files/python3" "${STEP_OUTPUT_PATH}/root/usr/lib/${SUBDIR_NAME}/bin/python3"
+#ln -s "../../bin/python3" "${STEP_OUTPUT_PATH}/root/usr/lib/scalyr-agent-2/requirements/python3/bin/python3"

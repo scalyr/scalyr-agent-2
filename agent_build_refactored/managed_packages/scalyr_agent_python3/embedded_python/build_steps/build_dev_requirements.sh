@@ -39,15 +39,11 @@ export PKG_CONFIG_PATH="/usr/local/lib64/pkgconfig:/usr/local/lib/pkgconfig:${PK
 curl --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain "${RUST_VERSION}"
 # cargo install cargo-update -v
 
-"/usr/lib/${SUBDIR_NAME}/python3/bin/python3" -m pip wheel \
+"/usr/lib/${SUBDIR_NAME}/requirements/python3/bin/python3" -m pip wheel \
   --wheel-dir "${STEP_OUTPUT_PATH}" \
   -r "${SOURCE_ROOT}/dev-requirements-new.txt"
 
-"/usr/lib/${SUBDIR_NAME}/python3/bin/python3" -m pip install \
+"/usr/lib/${SUBDIR_NAME}/requirements/python3/bin/python3" -m pip install \
   --no-index \
   --find-links "${STEP_OUTPUT_PATH}" \
   -r "${SOURCE_ROOT}/dev-requirements-new.txt"
-
-#"/usr/lib/${SUBDIR_NAME}/python3/bin/python3" -m pip install \
-#  --root "${STEP_OUTPUT_PATH}" \
-#  -r "${SOURCE_ROOT}/dev-requirements-new.txt"

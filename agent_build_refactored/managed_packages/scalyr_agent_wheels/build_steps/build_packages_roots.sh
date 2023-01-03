@@ -29,19 +29,22 @@ mkdir -p "${WHEELS_PATH}"
 cp -a "${BUILD_WHEELS}/wheels/." "${WHEELS_PATH}"
 
 #echo "${REQUIREMENTS}" > "${STEP_OUTPUT_PATH}/usr/share/${SUBDIR_NAME}/agent-libs/requirements.txt"
-echo "${REQUIREMENTS}" > "${WHEELS_PATH}/requirements.txt"
+#echo "${REQUIREMENTS}" > "${WHEELS_PATH}/requirements.txt"
 #echo "${PLATFORM_DEPENDENT_REQUIREMENTS}" > "${AGENT_LIBS_WHEELS_PACKAGE_ROOT}/usr/share/${SUBDIR_NAME}/agent-libs/binary-requirements.txt"
-echo "${PLATFORM_DEPENDENT_REQUIREMENTS}" > "${WHEELS_PATH}/binary-requirements.txt"
+#echo "${PLATFORM_DEPENDENT_REQUIREMENTS}" > "${WHEELS_PATH}/binary-requirements.txt"
 
 
-#PACKAGE_BIN_DIR="${STEP_OUTPUT_PATH}/root/usr/lib/${SUBDIR_NAME}/bin"
-#mkdir -p "${PACKAGE_BIN_DIR}"
-#cp "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_libs/system_python/files/scalyr-agent-python3" "${PACKAGE_BIN_DIR}/scalyr-agent-python3"
-#
-#cp "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_libs/files/scalyr-agent-2-libs.py" "${PACKAGE_BIN_DIR}/scalyr-agent-2-libs"
-#
-#PACKAGE_ETC_DIR="${STEP_OUTPUT_PATH}/root/etc/${SUBDIR_NAME}/requirements"
-#mkdir -p "${AGENT_LIBS_PACKAGE_ROOT}/etc/${SUBDIR_NAME}/agent-libs"
-#cp "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_libs/files/config/config.ini" "${AGENT_LIBS_PACKAGE_ROOT}/etc/${SUBDIR_NAME}/agent-libs/config.ini"
-#cp "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_libs/files/config/additional-requirements.txt" "${AGENT_LIBS_PACKAGE_ROOT}/etc/${SUBDIR_NAME}/agent-libs/additional-requirements.txt"
+PACKAGE_BIN_DIR="${STEP_OUTPUT_PATH}/root/usr/lib/${SUBDIR_NAME}/requirements/bin"
+mkdir -p "${PACKAGE_BIN_DIR}"
+cp "${SOURCE_ROOT}/${VENV_PYTHON3_EXECUTABLE_PATH}" "${PACKAGE_BIN_DIR}/scalyr-agent-python3"
 
+cp "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_wheels/files/scalyr-agent-2-requirements.py" "${PACKAGE_BIN_DIR}/scalyr-agent-2-requirements"
+
+PACKAGE_ETC_DIR="${STEP_OUTPUT_PATH}/root/etc/${SUBDIR_NAME}/requirements"
+mkdir -p "${PACKAGE_ETC_DIR}"
+cp "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_wheels/files/config/config.ini" "${PACKAGE_ETC_DIR}/config.ini"
+cp "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_wheels/files/config/additional-requirements.txt" "${PACKAGE_ETC_DIR}/additional-requirements.txt"
+
+SCRIPTLETS_DIR="${STEP_OUTPUT_PATH}/scriptlets"
+mkdir -p "${SCRIPTLETS_DIR}"
+cp "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_wheels/install_scriptlets/system-python-postinstall.sh" "${SCRIPTLETS_DIR}"

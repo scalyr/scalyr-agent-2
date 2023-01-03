@@ -16,8 +16,10 @@
 # This script is a wrapper executable for Python interpreter form the agent's 'scalyr-agent-python3' dependency
 # package.
 
-PYTHON_SUBDIR_NAME="scalyr-agent-2/python3"
+
+PYTHON_SUBDIR_NAME="scalyr-agent-2/requirements/python3"
 
 # Override some variables in order to run dependency Python interpreter correctly.
 export LD_LIBRARY_PATH="/usr/lib/${PYTHON_SUBDIR_NAME}/lib:${LD_LIBRARY_PATH}"
-exec /usr/lib/${PYTHON_SUBDIR_NAME}/bin/python3-orig "$@"
+exec "/var/lib/scalyr-agent-2/requirements/venv/bin/python3" "$@"
+

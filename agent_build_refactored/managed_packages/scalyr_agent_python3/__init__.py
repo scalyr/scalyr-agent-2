@@ -7,7 +7,7 @@ EMBEDDED_PYTHON_SHORT_VERSION = ".".join(EMBEDDED_PYTHON_VERSION.split(".")[:2])
 # Step that prepares initial environment for X86_64 build environment.
 _PREPARE_BUILD_BASE_X86_64 = EnvironmentRunnerStep(
         name="install_gcc_7",
-        script_path="agent_build_refactored/managed_packages/scalyr_agent_python3/build_steps/install_gcc_7_amd64.sh",
+        script_path="agent_build_refactored/managed_packages/scalyr_agent_python3/embedded_python/build_steps/install_gcc_7_amd64.sh",
         base=DockerImageSpec(
             name="centos:6",
             platform=DockerPlatform.AMD64.value
@@ -20,7 +20,7 @@ _PREPARE_BUILD_BASE_X86_64 = EnvironmentRunnerStep(
 # Step that prepares initial environment for X86_64 build environment.
 _PREPARE_BUILD_BASE_ARM64 = EnvironmentRunnerStep(
         name="install_gcc_7_arm64",
-        script_path="agent_build_refactored/managed_packages/scalyr_agent_python3/build_steps/install_gcc_7_arm64.sh",
+        script_path="agent_build_refactored/managed_packages/scalyr_agent_python3/embedded_python/build_steps/install_gcc_7_arm64.sh",
         base=DockerImageSpec(
             name="centos:7",
             platform=DockerPlatform.ARM64.value
@@ -71,10 +71,10 @@ def create_build_dependencies_step(
 
     download_build_dependencies = ArtifactRunnerStep(
         name="download_build_dependencies",
-        script_path="agent_build_refactored/managed_packages/scalyr_agent_python3/build_steps/download_build_dependencies/download_build_dependencies.sh",
+        script_path="agent_build_refactored/managed_packages/scalyr_agent_python3/embedded_python/build_steps/download_build_dependencies/download_build_dependencies.sh",
         tracked_files_globs=[
-            "agent_build_refactored/managed_packages/scalyr_agent_python3/build_steps/download_build_dependencies/gnu-keyring.gpg",
-            "agent_build_refactored/managed_packages/scalyr_agent_python3/build_steps/download_build_dependencies/gpgkey-5C1D1AA44BE649DE760A.gpg",
+            "agent_build_refactored/managed_packages/scalyr_agent_python3/embedded_python/build_steps/download_build_dependencies/gnu-keyring.gpg",
+            "agent_build_refactored/managed_packages/scalyr_agent_python3/embedded_python/build_steps/download_build_dependencies/gpgkey-5C1D1AA44BE649DE760A.gpg",
         ],
         base=DockerImageSpec(
             name="ubuntu:22.04",
@@ -94,7 +94,7 @@ def create_build_dependencies_step(
 
     return EnvironmentRunnerStep(
         name="install_build_dependencies",
-        script_path="agent_build_refactored/managed_packages/scalyr_agent_python3/build_steps/install_build_dependencies.sh",
+        script_path="agent_build_refactored/managed_packages/scalyr_agent_python3/embedded_python/build_steps/install_build_dependencies.sh",
         base=base_image,
         required_steps={
             "DOWNLOAD_BUILD_DEPENDENCIES": download_build_dependencies
@@ -272,16 +272,16 @@ PREPARE_TOOLSET_STEPS = {
 }
 
 
-def create_embedded_python_package_root_step(
+def create_agent_python3_embedded_package_root_step(
         architecture: Architecture,
 ) -> ArtifactRunnerStep:
     return ArtifactRunnerStep(
-        name="create_embedded_python_package_root",
+        name="create_agent_python3_embedded_package_root",
         script_path="agent_build_refactored/managed_packages/scalyr_agent_python3/embedded_python/build_steps/build_package_root.sh",
         tracked_files_globs=[
             "agent_build_refactored/managed_packages/scalyr_agent_python3/embedded_python/files/python3",
         ],
-        base=PREPARE_TOOLSET_STEPS[architecture],
+        base=INSTALL_BUILD_DEPENDENCIES_STEPS[architecture],
         required_steps={
            "BUILD_PYTHON": BUILD_EMBEDDED_PYTHON_STEPS[architecture],
         },
@@ -291,17 +291,17 @@ def create_embedded_python_package_root_step(
     )
 
 
-CREATE_EMBEDDED_PYTHON_PACKAGE_ROOT_STEPS = {
-    Architecture.X86_64: create_embedded_python_package_root_step(
+CREATE_AGENT_PYTHON3_EMBEDDED_PACKAGE_ROOT_STEPS = {
+    Architecture.X86_64: create_agent_python3_embedded_package_root_step(
         architecture=Architecture.X86_64
     ),
-    Architecture.ARM64: create_embedded_python_package_root_step(
+    Architecture.ARM64: create_agent_python3_embedded_package_root_step(
         architecture=Architecture.ARM64
     ),
 }
 
-CREATE_SYSTEM_PYTHON_PACKAGE_ROOT_STEP = ArtifactRunnerStep(
-    name="create_system_python_package_root",
+CREATE_AGENT_PYTHON3_SYSTEM_PACKAGE_ROOT_STEP = ArtifactRunnerStep(
+    name="create_agent_python3_system_package_root",
     script_path="agent_build_refactored/managed_packages/scalyr_agent_python3/system_python/build_steps/build_package_root.sh",
     tracked_files_globs=[
         "agent_build_refactored/managed_packages/scalyr_agent_python3/system_python/files/python3",

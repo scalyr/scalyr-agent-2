@@ -53,7 +53,7 @@ pushd "cpython-${PYTHON_VERSION}"
 mkdir build
 pushd build
 
-PACKAGE_INSTALL_PREFIX="/usr/lib/${SUBDIR_NAME}/python3"
+PACKAGE_INSTALL_PREFIX="/usr/lib/${SUBDIR_NAME}/requirements/python3"
 
 # Configure Python. Also provide options to store result files in sub-directories.
 ../configure \
@@ -96,6 +96,7 @@ cp -a /usr/local/lib/libgdbm_compat.so* "${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/
 cp -a /usr/local/lib64/libffi.so* "${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/lib"
 cp -a "${LIBSSL_DIR}"/libcrypto.so* "${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/lib"
 cp -a "${LIBSSL_DIR}"/libssl.so* "${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/lib"
+cp -a /lib64/libgcc_s.so.1 "${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/lib"
 
 # Copy wrapper for Python interpreter executable.
 cp -a "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_python3/embedded_python/files/python3" "${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/bin/python3"
@@ -114,6 +115,6 @@ rm -r "${PYTHON_LIBS_PATH}/lib2to3"
 # Install built Python to current system and install wheel package to be able to build package wheels
 cp -a "${BUILD_ROOT}/." /
 
-"/usr/lib/${SUBDIR_NAME}/python3/bin/python3" -m pip install --root "${BUILD_ROOT}" wheel
+"/usr/lib/${SUBDIR_NAME}/requirements/python3/bin/python3" -m pip install --root "${BUILD_ROOT}" wheel
 
 cp -a "${BUILD_ROOT}" "${STEP_OUTPUT_PATH}/python"

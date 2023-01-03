@@ -26,6 +26,10 @@ pysnmp==4.3.0
 orjson==3.8.0; python_version >= '3.7' and platform_system != 'Darwin'
 orjson==3.6.1; python_version == '3.6' and 'armv7' not in platform_machine and platform_system != 'Darwin'
 orjson==2.0.11; python_version == '3.5' and 'armv7' not in platform_machine and platform_system != 'Darwin'
+zstandard==0.19.0; python_version >= '3.7'
+zstandard==0.18.0; python_version < '3.7'
+lz4==4.0.2; python_version >= '3.7'
+lz4==3.1.10; python_version < '3.7'
 
 
 

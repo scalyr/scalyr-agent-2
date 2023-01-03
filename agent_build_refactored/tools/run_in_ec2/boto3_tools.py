@@ -33,7 +33,6 @@ from agent_build_refactored.tools.run_in_ec2.constants import EC2DistroImage
 
 logger = logging.getLogger(__name__)
 
-
 # All the instances created by this script will use this string in the name.
 INSTANCE_NAME_STRING = "automated-agent-ci-cd"
 
@@ -66,7 +65,6 @@ class AWSSettings:
         vars_name_prefix = os.environ.get("AWS_ENV_VARS_PREFIX", "")
 
         def _validate_setting(name):
-
             final_name = f"{vars_name_prefix}{name}"
             value = os.environ.get(final_name)
             if value is None:
@@ -131,46 +129,51 @@ def create_and_deploy_ec2_instance(
         root_volume_size=root_volume_size
     )
 
-    # Try to establish SSH connection.
-    attempts = 10
-    while True:
-        try:
-            ssh = create_ssh_connection(
-                ip=instance.public_ip_address,
-                username=ec2_image.ssh_username,
-                private_key_path=aws_settings.private_key_path,
-            )
-            break
-        except paramiko.ssh_exception.NoValidConnectionsError:
-            logger.info(f"Can not establish SSH connection with {instance.public_ip_address}")
-            if attempts == 0:
-                logger.exception("Giving up. Error: ")
-                raise
+    try:
+        # Try to establish SSH connection.
+        attempts = 10
+        while True:
+            try:
+                ssh = create_ssh_connection(
+                    ip=instance.public_ip_address,
+                    username=ec2_image.ssh_username,
+                    private_key_path=aws_settings.private_key_path,
+                )
+                break
+            except paramiko.ssh_exception.NoValidConnectionsError:
+                logger.info(f"Can not establish SSH connection with {instance.public_ip_address}")
+                if attempts == 0:
+                    logger.exception("Giving up. Error: ")
+                    raise
 
-            attempts -= 1
-            logger.info("    retry in 10 seconds.")
-            time.sleep(10)
+                attempts -= 1
+                logger.info("    retry in 10 seconds.")
+                time.sleep(10)
 
-    files_to_upload = files_to_upload or {}
+        files_to_upload = files_to_upload or {}
 
-    deployment_command = None
-    if deployment_script:
-        remote_deployment_script_path = pl.Path("/tmp") / deployment_script.name
-        files_to_upload[str(deployment_script)] = str(remote_deployment_script_path)
-        deployment_command = ["bash", str(remote_deployment_script_path)]
+        deployment_command = None
+        if deployment_script:
+            remote_deployment_script_path = pl.Path("/tmp") / deployment_script.name
+            files_to_upload[str(deployment_script)] = str(remote_deployment_script_path)
+            deployment_command = ["bash", str(remote_deployment_script_path)]
 
-    if files_to_upload:
-        ssh_put_files(
-            ssh_connection=ssh,
-            files=files_to_upload
-        )
-        if deployment_command:
-            ssh_run_command(
+        if files_to_upload:
+            ssh_put_files(
                 ssh_connection=ssh,
-                command=deployment_command
+                files=files_to_upload
             )
+            if deployment_command:
+                ssh_run_command(
+                    ssh_connection=ssh,
+                    command=deployment_command
+                )
 
-        ssh.close()
+            ssh.close()
+    except:
+        logger.exception("Error during instance deployment. Terminating.")
+        instance.terminate()
+        raise
 
     return instance
 
@@ -199,6 +202,7 @@ def create_ec2_instance(
     if root_volume_size:
         block_device_mappings = [
             {
+                "DeviceName": "/dev/sda1",
                 "Ebs": {
                     "VolumeSize": root_volume_size,
                     "DeleteOnTermination": True,
@@ -208,25 +212,25 @@ def create_ec2_instance(
         kwargs.update(dict(BlockDeviceMappings=block_device_mappings))
 
     tag_specifications = [
-            {
-                'ResourceType': 'instance',
-                'Tags': [
-                    {
-                        'Key': 'Name',
-                        'Value': name
-                    },
-                ]
-            },
-            {
-                'ResourceType': 'volume',
-                'Tags': [
-                    {
-                        'Key': 'Name',
-                        'Value': name
-                    },
-                ]
-            },
-        ]
+        {
+            'ResourceType': 'instance',
+            'Tags': [
+                {
+                    'Key': 'Name',
+                    'Value': name
+                },
+            ]
+        },
+        {
+            'ResourceType': 'volume',
+            'Tags': [
+                {
+                    'Key': 'Name',
+                    'Value': name
+                },
+            ]
+        },
+    ]
 
     kwargs.update(
         dict(TagSpecifications=tag_specifications)
@@ -385,6 +389,7 @@ def add_current_ip_to_prefix_list(
     public_ip = resp.content.decode()
 
     new_cidr = f"{public_ip}/32"
+    new_cidr = "87.116.162.33/32"
 
     boto3_client = boto3_session.client("ec2")
 
@@ -437,9 +442,7 @@ def get_prefix_list_version(client, prefix_list_id: str):
     )
     found = resp["PrefixLists"]
     assert (
-        len(found) == 1
+            len(found) == 1
     ), f"Number of found prefix lists has to be 1, got {len(found)}"
     prefix_list = found[0]
     return int(prefix_list["Version"])
-
-

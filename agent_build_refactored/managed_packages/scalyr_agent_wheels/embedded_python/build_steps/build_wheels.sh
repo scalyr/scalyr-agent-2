@@ -29,17 +29,26 @@ set -e
 # shellcheck disable=SC1090
 source ~/.bashrc
 
-# Copy python interpreter, which is built by the previous step.
-cp -a "${BUILD_PYTHON}/python/." /
 
-# First install Rust, in order to be able to build some of required libraries.
-cd ~
-export PATH="/usr/local/bin:/root/.cargo/bin:${PATH}"
-export PKG_CONFIG_PATH="/usr/local/lib64/pkgconfig:/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH}"
-curl --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain "${RUST_VERSION}"
-# cargo install cargo-update -v
+#cp -a "${BUILD_PYTHON}/python/." /
+##cp -a "${BUILD_AGENT_DEV_REQUIREMENTS}/." /
+
+WHEELS_DIR="${STEP_OUTPUT_PATH}/wheels"
+mkdir -p "${WHEELS_DIR}"
+COMMON_REQUIREMENTS_FILE="${WHEELS_DIR}/requirements.txt"
+BINARY_REQUIREMENTS_FILE="${WHEELS_DIR}/binary-requirements.txt"
 
 
-"/usr/lib/${SUBDIR_NAME}/python3/bin/python3" -m pip wheel \
-  -r "${SOURCE_ROOT}/dev-requirements-new.txt" \
-  --wheel-dir "${STEP_OUTPUT_PATH}"
+echo "${REQUIREMENTS_COMMON}" >> "${COMMON_REQUIREMENTS_FILE}"
+echo "${REQUIREMENTS_COMMON_PLATFORM_DEPENDENT}" >> "${COMMON_REQUIREMENTS_FILE}"
+touch "${BINARY_REQUIREMENTS_FILE}"
+
+
+
+
+
+/usr/lib/scalyr-agent-2/requirements/python3/bin/python3 -m pip wheel \
+  --no-index \
+  --find-links "${BUILD_AGENT_DEV_REQUIREMENTS}" \
+  --wheel-dir "${WHEELS_DIR}"  \
+  -r "${COMMON_REQUIREMENTS_FILE}"

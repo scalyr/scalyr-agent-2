@@ -41,6 +41,13 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
                 short_name="ubuntu2204",
                 size_id="m1.small",
                 ssh_username="ubuntu",
+            ),
+            Architecture.ARM64: EC2DistroImage(
+                image_id="ami-0e2b332e63c56bcb5",
+                image_name="Ubuntu Server 22.04 LTS (HVM), SSD Volume Type",
+                short_name="ubuntu2204_ARM",
+                size_id="c7g.small",
+                ssh_username="ubuntu"
             )
         },
         "docker": "ubuntu:22.04",
