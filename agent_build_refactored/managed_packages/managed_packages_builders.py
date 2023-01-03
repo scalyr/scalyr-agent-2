@@ -97,7 +97,6 @@ The structure of the mentioned packages has to guarantee that files of these pac
 
 OTHER_PACKAGES_ARCHITECTURES = {
     "deb": [
-        "amd64",
         "armhf",
         "armel",
         "ppc64el",
@@ -107,8 +106,6 @@ OTHER_PACKAGES_ARCHITECTURES = {
         "i386",
     ],
     "rpm": [
-        "aarch64",
-        "x86_64",
         "ppc64le",
         "s390x",
         "i386"
