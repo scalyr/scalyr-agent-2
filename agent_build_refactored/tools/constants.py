@@ -71,6 +71,9 @@ class DockerPlatformInfo:
         if "arm/v7" in str(self):
             return Architecture.ARMV7
 
+        if "ppc64le" in str(self):
+            return Architecture.PPC64
+
         return Architecture.UNKNOWN
 
 
@@ -81,6 +84,7 @@ class DockerPlatform(enum.Enum):
     ARM = DockerPlatformInfo("linux", "arm")
     ARMV7 = DockerPlatformInfo("linux", "arm", "v7")
     ARMV8 = DockerPlatformInfo("linux", "arm", "v8")
+    PPC64 = DockerPlatformInfo("linux", "ppc64le")
 
 
 class Architecture(enum.Enum):
@@ -93,6 +97,7 @@ class Architecture(enum.Enum):
     ARM = "arm"
     ARMV7 = "armv7"
     ARMV8 = "armv8"
+    PPC64 = "ppc64"
     UNKNOWN = "unknown"
 
     @property
@@ -109,6 +114,7 @@ class Architecture(enum.Enum):
         mapping = {
             Architecture.X86_64: "amd64",
             Architecture.ARM64: "arm64",
+            Architecture.PPC64: "ppc64el",
             Architecture.UNKNOWN: "all"
         }
 
@@ -119,6 +125,7 @@ class Architecture(enum.Enum):
         mapping = {
             Architecture.X86_64: "x86_64",
             Architecture.ARM64: "aarch64",
+            Architecture.PPC64: "ppc64le",
             Architecture.UNKNOWN: "noarch"
         }
         return mapping[self]
@@ -139,6 +146,7 @@ _ARCHITECTURE_TO_DOCKER_PLATFORM = {
     Architecture.ARM: DockerPlatform.ARM,
     Architecture.ARMV7: DockerPlatform.ARMV7,
     Architecture.ARMV8: DockerPlatform.ARMV8,
+    Architecture.PPC64: DockerPlatform.PPC64,
     # Handle unknown architecture value as x86_64
     Architecture.UNKNOWN: DockerPlatform.AMD64,
 }

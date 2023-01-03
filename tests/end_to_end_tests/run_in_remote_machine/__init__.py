@@ -177,8 +177,8 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
         for ver in [6, 7, 8, 9, 10, 11]
     },
     **{
-        f"python3{ver}_rpm": {"docker": f"centos/python-3{ver}-centos7"}
-        for ver in [6, 8]
+        f"python3{ver}_rpm": {"docker": f"registry.access.redhat.com/ubi8/python-3{ver}"}
+        for ver in [6, 7, 8]
     }
 
 }

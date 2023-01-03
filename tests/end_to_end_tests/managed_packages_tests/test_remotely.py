@@ -47,7 +47,7 @@ def test_remotely(
     if package_builder.EMBEDDED_PYTHON_ARCHITECTURE:
         arch = package_builder.EMBEDDED_PYTHON_ARCHITECTURE
     else:
-        arch = Architecture.ARMV7
+        arch = Architecture.PPC64
 
     pytest_runner_builder_cls = PORTABLE_PYTEST_RUNNER_BUILDERS[arch]
     pytest_runner_builder = pytest_runner_builder_cls()
