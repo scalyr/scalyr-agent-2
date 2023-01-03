@@ -503,6 +503,8 @@ jobs:
           echo "${{ secrets.AWS_DEV_US_EAST_1_KEYPAIR_NAME }}" > /tmp/private_key.pem
           chmod 600 /tmp/private_key.pem
           
+          ls -al /tmp/packages
+          
           python3 -m pytest tests/end_to_end_tests/managed_packages_tests \
             -s \
             --builder-name ${{ matrix.name }} \
