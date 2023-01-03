@@ -100,14 +100,14 @@ jobs:
               { "name": "deb-amd64",          "package_type": "deb", "distro-name": "ubuntu1404",    "remote-machine-type": "docker", "master_run_only": false },
               { "name": "deb-amd64",          "package_type": "deb", "distro-name": "debian10",      "remote-machine-type": "ec2",    "master_run_only": false },
               { "name": "deb-amd64",          "package_type": "deb", "distro-name": "debian11",      "remote-machine-type": "docker", "master_run_only": false },
-              { "name": "deb-system-python",  "package_type": "deb", "distro-name": "python36",      "remote-machine-type": "docker", "master_run_only": false },
+              { "name": "deb-system-python",  "package_type": "deb", "distro-name": "python37_deb",      "remote-machine-type": "docker", "master_run_only": false },
               { "name": "rpm-x86_64",         "package_type": "rpm", "distro-name": "centos8",       "remote-machine-type": "docker", "master_run_only": false },
               { "name": "rpm-x86_64",         "package_type": "rpm", "distro-name": "centos7",       "remote-machine-type": "ec2",    "master_run_only": false },
               { "name": "rpm-x86_64",         "package_type": "rpm", "distro-name": "centos6",       "remote-machine-type": "docker", "master_run_only": false },
               { "name": "rpm-x86_64",         "package_type": "rpm", "distro-name": "amazonlinux2",  "remote-machine-type": "ec2",    "master_run_only": false },
               { "name": "deb-arm64",          "package_type": "rpm", "distro-name": "ubuntu1404",    "remote-machine-type": "docker", "master_run_only": false },
               { "name": "rpm-aarch64",        "package_type": "rpm", "distro-name": "centos7",       "remote-machine-type": "docker", "master_run_only": false },
-              { "name": "rpm-system-python",  "package_type": "rpm", "distro-name": "centos7",       "remote-machine-type": "docker", "master_run_only": false }
+              { "name": "rpm-system-python",  "package_type": "rpm", "distro-name": "python37_rpm",       "remote-machine-type": "docker", "master_run_only": false }
             ]
 
   # This job pre-executes and caches Runner steps that has to be executed in a separate job.
