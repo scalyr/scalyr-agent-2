@@ -817,6 +817,7 @@ def _parse_package_version_parts(version: str) -> Tuple[int, str]:
 
 
 class AgentPackageBuilder(BuilderBase):
+    BASE_ENVIRONMENT = PREPARE_TOOLSET_STEPS[Architecture.X86_64]
     PACKAGE_TYPE: str
 
     def build(
@@ -925,12 +926,10 @@ class AgentPackageBuilder(BuilderBase):
         )
 
 class DebAgentBuilder(AgentPackageBuilder):
-    BASE_ENVIRONMENT = PREPARE_TOOLSET_STEPS[Architecture.X86_64]
     PACKAGE_TYPE = "deb"
 
 
 class RpmAgentBuilder(AgentPackageBuilder):
-    BASE_ENVIRONMENT = PREPARE_TOOLSET_STEPS[Architecture.X86_64]
     PACKAGE_TYPE = "rpm"
 
 
