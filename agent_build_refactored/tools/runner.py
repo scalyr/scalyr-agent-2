@@ -919,6 +919,22 @@ class Runner:
             *final_command_args
         ])
 
+        run_docker_command(
+            [
+                "run",
+                "-i",
+                "--rm",
+                "-v",
+                f"{self.output_path}:/tmp/output",
+                "ubuntu:22.04",
+                "chown",
+                f"{os.getuid()}:{os.getgid()}",
+                "-R",
+                "/tmp/output"
+
+            ]
+        )
+
     def run_required(self):
         """
         Function where Runner performs its main actions.

@@ -425,6 +425,7 @@ jobs:
     needs:
       - pre_job
       - build-managed-packages
+      - build-agent-linux-package
 
     runs-on: ${{ matrix.os }}
     strategy:
