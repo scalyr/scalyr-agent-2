@@ -45,9 +45,7 @@ python3 -m pip download --no-binary=:all: \
   -r "${COMMON_REQUIREMENTS_FILE}" \
   wheel setuptools setuptools_scm flit_core
 
-
 rm "${TARBALLS_DIR}"/pycrypto-*
-#rm "${TARBALLS_DIR}"/pycryptodome-*
 
 
 # We patch the setup.py file of the 'pysnmp' package in order to remove the 'pycryptodome' package

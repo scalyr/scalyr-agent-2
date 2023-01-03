@@ -26,7 +26,8 @@ BUILD_AGENT_WHEELS_SYSTEM_PYTHON_PY36 = ArtifactRunnerStep(
     ),
     environment_variables={
         "SUBDIR_NAME": AGENT_SUBDIR_NAME,
-        "REQUIREMENTS": REQUIREMENTS_COMMON,
+        "REQUIREMENTS_COMMON": REQUIREMENTS_COMMON,
+        "REQUIREMENTS_COMMON_PLATFORM_DEPENDENT": REQUIREMENTS_COMMON_PLATFORM_DEPENDENT,
     },
     github_actions_settings=GitHubActionsSettings(
         cacheable=True
@@ -46,7 +47,7 @@ BUILD_AGENT_WHEELS_SYSTEM_PYTHON = ArtifactRunnerStep(
     environment_variables={
         "SUBDIR_NAME": AGENT_SUBDIR_NAME,
         "REQUIREMENTS_COMMON": REQUIREMENTS_COMMON,
-        "PLATFORM_DEPENDENT_REQUIREMENTS": REQUIREMENTS_COMMON_PLATFORM_DEPENDENT,
+        "REQUIREMENTS_COMMON_PLATFORM_DEPENDENT": REQUIREMENTS_COMMON_PLATFORM_DEPENDENT,
     },
     github_actions_settings=GitHubActionsSettings(
         cacheable=True
