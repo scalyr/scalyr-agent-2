@@ -503,7 +503,7 @@ def test_system_python_dependency_packages(
     repo_root
 ):
 
-    if "system-python" not in package_builder_name:
+    if package_builder.has_embedded_python():
         pytest.skip("Only test packages with system python.")
 
     #o = subprocess.check_output("getconf", shell=True).decode()
