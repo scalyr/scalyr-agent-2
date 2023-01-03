@@ -349,6 +349,7 @@ def ssh_run_command(
     exit_status = stdout.channel.exit_status
     stdout.channel.close()
     print("!!!@@@@@")
+    print(stdout.channel.closed)
     print(stdout.channel.exit_status)
     if exit_status != 0:
         raise Exception(
