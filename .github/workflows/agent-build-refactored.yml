@@ -477,14 +477,8 @@ jobs:
       - name: Download built packages.
         uses: actions/download-artifact@v3
         with:
-          name: linux-packages-managed-${{ matrix.name }}
+          name: all-linux-packages
           path: /tmp/packages
-
-      - name: Download agent built packages.
-        uses: actions/download-artifact@v3
-        with:
-          name: linux-packages-managed-${{ matrix.package_type }}-agent
-          path: /tmp/agent-packages
 
 
       - name: Prepare everything that is needed by builder '${{ matrix.name }}'
