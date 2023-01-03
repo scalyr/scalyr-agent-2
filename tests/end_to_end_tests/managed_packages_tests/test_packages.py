@@ -146,8 +146,9 @@ def test_dependency_packages(
         package_architecture=package_architecture,
         output_dir=tmp_path,
         expected_folders=[
-            f"usr/lib/{AGENT_SUBDIR_NAME}/",
-            f"usr/share/{AGENT_SUBDIR_NAME}/",
+            f"usr/lib/{AGENT_SUBDIR_NAME}/requirements/wheels",
+            f"usr/lib/{AGENT_SUBDIR_NAME}/requirements/bin",
+            f"etc/{AGENT_SUBDIR_NAME}/requirements",
         ],
     )
 
