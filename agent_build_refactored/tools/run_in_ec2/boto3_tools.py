@@ -389,7 +389,6 @@ def add_current_ip_to_prefix_list(
     public_ip = resp.content.decode()
 
     new_cidr = f"{public_ip}/32"
-    new_cidr = "87.116.162.33/32"
 
     boto3_client = boto3_session.client("ec2")
 
