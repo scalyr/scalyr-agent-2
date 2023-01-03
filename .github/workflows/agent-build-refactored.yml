@@ -241,7 +241,7 @@ jobs:
           path: /tmp/result
           retention-days: 1
 
-  build-managed-packages:
+  build-linux-dependency-packages:
     name: Build managed package ${{ matrix.name }}
     needs:
       - pre_job
@@ -346,6 +346,7 @@ jobs:
     needs:
       - pre_job
       - pre-build-cached-step
+      - build-linux-dependency-packages
     runs-on: "ubuntu-22.04"
 
     steps:
@@ -431,7 +432,6 @@ jobs:
     name: Test package on ${{ matrix.distro-name }}-${{ matrix.remote-machine-type }}, ${{ matrix.name }}
     needs:
       - pre_job
-      - build-managed-packages
       - build-agent-linux-package
 
     runs-on: ${{ matrix.os }}
