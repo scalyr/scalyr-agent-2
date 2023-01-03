@@ -415,7 +415,9 @@ jobs:
           cp -a ./build/. /tmp/all_packages
           
           for DIR_PATH in /tmp/dependency_packages/linux-packages-managed-*; do 
+            echo "DEPP!"
             echo $DIR_PATH; 
+            ls -al $DIR_PATH
             cp -a "${DIR_PATH}/." /tmp/all_packages
           done
 
