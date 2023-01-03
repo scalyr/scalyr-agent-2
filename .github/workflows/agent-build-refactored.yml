@@ -426,7 +426,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: all-linux-packages
-          path: build
+          path: /tmp/all_packages
           retention-days: 1
 
   test_managed_packages:
