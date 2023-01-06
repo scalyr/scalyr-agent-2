@@ -87,7 +87,7 @@ jobs:
 
       - name: Run image test
         env:
-          SCALYR_API_KEY: ${{ secrets.SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
+          SCALYR_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
         run: |
           python3 tests/package_tests/run_package_test.py package-test \
            "${{ matrix.image-type }}-${{ matrix.image-distro-name }}_test" \
@@ -113,7 +113,7 @@ jobs:
 
     uses: scalyr/scalyr-agent-2/.github/workflows/publish-docker-images.yml@master
     secrets:
-      SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN: ${{ secrets.SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
-      SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY: ${{ secrets.SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
+      SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
+      SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
       DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME_PROD_ACCOUNT }}
       DOCKER_HUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD_PROD_ACCOUNT }}
