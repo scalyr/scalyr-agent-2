@@ -195,7 +195,7 @@ jobs:
         env:
           VARIANT: ${{ matrix.variant }}
           KIND: smoketests
-          SCALYR_API_KEY: ${{ secrets.SCALYR_TOKEN_PROD_US }}
+          SCALYR_API_KEY: ${{ secrets.SCALYR_TOKEN_CLOUDTECH_TESTING_PROD_US }}
           READ_API_KEY: ${{ secrets.SCALYR_READ_API_KEY }}
           SCALYR_SERVER: https://agent.scalyr.com
           AGENT_HOST_NAME: agent-smoke-standalone-${{ matrix.python-version }}-${{ github.run_number }}
@@ -262,7 +262,7 @@ jobs:
           mkdir -p artifacts test-results
           tox -e agent_monitors_ubuntu -- --artifacts-path artifacts -n 2 --junitxml=test-results/junit-1.xml
         env:
-          SCALYR_API_KEY: ${{ secrets.SCALYR_TOKEN_PROD_US }}
+          SCALYR_API_KEY: ${{ secrets.SCALYR_TOKEN_CLOUDTECH_TESTING_PROD_US }}
           READ_API_KEY: ${{ secrets.SCALYR_READ_API_KEY }}
           SCALYR_SERVER: https://agent.scalyr.com
           AGENT_HOST_NAME: monitors-test-${{ github.run_number }}
