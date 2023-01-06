@@ -506,7 +506,7 @@ jobs:
             --remote-machine-type ${{ matrix.remote-machine-type }} \
             --packages-source-type dir \
             --packages-source /tmp/packages \
-            --scalyr-api-key ${{ secrets.SCALYR_API_KEY }} \
+            --scalyr-api-key ${{ secrets.SCALYR_TOKEN_PROD_US }} \
             --scalyr-api-read-key ${{ secrets.SCALYR_READ_API_KEY }} \
             --test-session-suffix ${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}
 

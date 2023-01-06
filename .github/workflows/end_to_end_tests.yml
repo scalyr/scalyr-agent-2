@@ -461,7 +461,7 @@ jobs:
         env:
           CIRCLE_BUILD_NUM: ${{ github.run_number }}
           SCALYR_SERVER: https://agent.scalyr.com
-          SCALYR_API_KEY: ${{ secrets.SCALYR_API_KEY }}
+          SCALYR_API_KEY: ${{ secrets.SCALYR_TOKEN_PROD_US }}
           READ_API_KEY: ${{ secrets.SCALYR_READ_API_KEY }}
         run: |
           source ./.circleci/smoketest_k8s.sh scalyr/scalyr-agent-ci-unittest:4 150 no_delete_existing_k8s_objs
@@ -519,7 +519,7 @@ jobs:
         env:
           CIRCLE_BUILD_NUM: ${{ github.run_number }}
           SCALYR_SERVER: https://agent.scalyr.com
-          SCALYR_API_KEY: ${{ secrets.SCALYR_API_KEY }}
+          SCALYR_API_KEY: ${{ secrets.SCALYR_TOKEN_PROD_US }}
           READ_API_KEY: ${{ secrets.SCALYR_READ_API_KEY }}
         run: |
           source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 docker-${{ matrix.variant.log_mode }} ${{ matrix.variant.timeout }}
