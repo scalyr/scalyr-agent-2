@@ -167,7 +167,7 @@ jobs:
         uses: ./.github/actions/install-k8s-agent/
         with:
           scalyr_server: "agent.scalyr.com"
-          scalyr_api_key: "${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}"
+          scalyr_api_key: "${{ secrets.SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}"
           scalyr_cluster_name: "${K8S_CLUSTER_NAME}"
           scalyr_k8s_events_disable: "false"
           main_yaml_path: "tests/e2e/scalyr-agent-2-daemonset.yaml"
@@ -176,7 +176,7 @@ jobs:
         timeout-minutes: 14
         env:
           # Needed for scalyr-tool
-          scalyr_readlog_token: "${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }}"
+          scalyr_readlog_token: "${{ secrets.SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}"
           SCALYR_AGENT_POD_NAME: "${{ env.SCALYR_AGENT_POD_NAME }}"
           K8S_NODE_NAME: "${{ env.K8S_NODE_NAME }}"
         run: |
@@ -344,7 +344,7 @@ jobs:
         uses: ./.github/actions/install-k8s-agent/
         with:
           scalyr_server: "agent.scalyr.com"
-          scalyr_api_key: "${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }}"
+          scalyr_api_key: "${{ secrets.SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}"
           scalyr_cluster_name: "${K8S_CLUSTER_NAME}"
           main_yaml_path: "tests/e2e/k8s_om_monitor/scalyr-agent-2-daemonset.yaml"
           # Monitor is not enabled by default yet since it's still in preview and testing phase so
@@ -355,7 +355,7 @@ jobs:
         timeout-minutes: 14
         env:
           # Needed for scalyr-tool
-          scalyr_readlog_token: "${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }}"
+          scalyr_readlog_token: "${{ secrets.SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}"
           SCALYR_AGENT_POD_NAME: "${{ env.SCALYR_AGENT_POD_NAME }}"
           K8S_NODE_NAME: "${{ env.K8S_NODE_NAME }}"
           K8S_CLUSTER_NAME: "${{ env.K8S_CLUSTER_NAME }}"
@@ -461,8 +461,8 @@ jobs:
         env:
           CIRCLE_BUILD_NUM: ${{ github.run_number }}
           SCALYR_SERVER: https://agent.scalyr.com
-          SCALYR_API_KEY: ${{ secrets.SCALYR_TOKEN_CLOUDTECH_TESTING_PROD_US }}
-          READ_API_KEY: ${{ secrets.SCALYR_READ_API_KEY }}
+          SCALYR_API_KEY: ${{ secrets.SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
+          READ_API_KEY: ${{ secrets.SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
         run: |
           source ./.circleci/smoketest_k8s.sh scalyr/scalyr-agent-ci-unittest:4 150 no_delete_existing_k8s_objs
 
@@ -519,8 +519,8 @@ jobs:
         env:
           CIRCLE_BUILD_NUM: ${{ github.run_number }}
           SCALYR_SERVER: https://agent.scalyr.com
-          SCALYR_API_KEY: ${{ secrets.SCALYR_TOKEN_CLOUDTECH_TESTING_PROD_US }}
-          READ_API_KEY: ${{ secrets.SCALYR_READ_API_KEY }}
+          SCALYR_API_KEY: ${{ secrets.SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
+          READ_API_KEY: ${{ secrets.SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
         run: |
           source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 docker-${{ matrix.variant.log_mode }} ${{ matrix.variant.timeout }}
 
@@ -579,8 +579,8 @@ jobs:
         shell: bash
         run: |
           python3 -m pytest  tests/end_to_end_tests/test_from_source/test_from_source.py \
-            --scalyr-api-key ${{ secrets.SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN }} \
-            --scalyr-api-read-key ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY }} \
+            --scalyr-api-key ${{ secrets.SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }} \
+            --scalyr-api-read-key ${{ secrets.SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }} \
             --test-session-suffix ${{ github.run_id }}-${{ github.run_attempt }}
 
 
