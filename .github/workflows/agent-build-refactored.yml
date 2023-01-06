@@ -154,7 +154,7 @@ jobs:
         id: prepare-ssh
         shell: bash
         run: |
-          echo '${{ secrets.AWS_DEV_US_EAST_1_KEYPAIR_NAME }}' > /tmp/private_key.pem
+          echo '${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}' > /tmp/private_key.pem
           chmod 600 /tmp/private_key.pem
           eval `ssh-agent -s`
           
@@ -167,8 +167,8 @@ jobs:
           SSH_AUTH_SOCK: ${{ steps.prepare-ssh.outputs.ssh_auth_sock }}
         with:
           runner-fqdn: ${{ matrix.step-runner-fqdn }}
-          aws_access_key: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_AWS_ACCESS_KEY }}
-          aws_secret_key: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_AWS_ACCESS_SECRET }}
+          aws_access_key: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
+          aws_secret_key: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
           aws_private_key_path:  "/tmp/private_key.pem"
           aws_private_key_name: ${{ needs.pre_job.outputs.aws_private_key_name }}
           aws_region: ${{ needs.pre_job.outputs.aws_region }}
@@ -285,7 +285,7 @@ jobs:
         id: prepare-ssh
         shell: bash
         run: |
-          echo '${{ secrets.AWS_DEV_US_EAST_1_KEYPAIR_NAME }}' > /tmp/private_key.pem
+          echo '${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}' > /tmp/private_key.pem
           chmod 600 /tmp/private_key.pem
           eval `ssh-agent -s`
 
@@ -299,8 +299,8 @@ jobs:
           SSH_AUTH_SOCK: ${{ steps.prepare-ssh.outputs.ssh_auth_sock }}
         with:
           runner-fqdn: ${{ matrix.builder-fqdn }}
-          aws_access_key: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_AWS_ACCESS_KEY }}
-          aws_secret_key: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_AWS_ACCESS_SECRET }}
+          aws_access_key: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
+          aws_secret_key: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
           aws_private_key_path: "/tmp/private_key.pem"
           aws_private_key_name: ${{ needs.pre_job.outputs.aws_private_key_name }}
           aws_region: ${{ needs.pre_job.outputs.aws_region }}
@@ -397,8 +397,8 @@ jobs:
       - name: Build managed package with builder '${{ matrix.name }}'
         env:
           SSH_AUTH_SOCK: ${{ steps.prepare-ssh.outputs.ssh_auth_sock }}
-          AWS_ACCESS_KEY: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_AWS_ACCESS_KEY }}
-          AWS_SECRET_KEY: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_AWS_ACCESS_SECRET }}
+          AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
+          AWS_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
           AWS_PRIVATE_KEY_NAME: ${{ needs.pre_job.outputs.aws_private_key_name }}
           AWS_PRIVATE_KEY_PATH: "/tmp/private_key.pem"
           AWS_REGION: ${{ needs.pre_job.outputs.aws_region }}
@@ -483,8 +483,8 @@ jobs:
 
       - name: Test '${{ matrix.name }}' packages
         env:
-          AWS_ACCESS_KEY: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_AWS_ACCESS_KEY }}
-          AWS_SECRET_KEY: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_AWS_ACCESS_SECRET }}
+          AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
+          AWS_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
           AWS_PRIVATE_KEY_NAME: ${{ needs.pre_job.outputs.aws_private_key_name }}
           AWS_PRIVATE_KEY_PATH: "/tmp/private_key.pem"
           AWS_REGION: ${{ needs.pre_job.outputs.aws_region }}
@@ -496,7 +496,7 @@ jobs:
           echo "Changing build version to ${{ needs.pre_job.outputs.version }}"
           echo "${{ needs.pre_job.outputs.version }}" > VERSION
           
-          echo "${{ secrets.AWS_DEV_US_EAST_1_KEYPAIR_NAME }}" > /tmp/private_key.pem
+          echo "${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}" > /tmp/private_key.pem
           chmod 600 /tmp/private_key.pem
           
           python3 -m pytest tests/end_to_end_tests/managed_packages_tests \
@@ -506,8 +506,8 @@ jobs:
             --remote-machine-type ${{ matrix.remote-machine-type }} \
             --packages-source-type dir \
             --packages-source /tmp/packages \
-            --scalyr-api-key ${{ secrets.SCALYR_API_KEY }} \
-            --scalyr-api-read-key ${{ secrets.SCALYR_READ_API_KEY }} \
+            --scalyr-api-key ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }} \
+            --scalyr-api-read-key ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }} \
             --test-session-suffix ${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}
 
 
@@ -595,8 +595,8 @@ jobs:
 
       - name: Cleanup old prefix lists for ec2 test security group.
         env:
-          AWS_ACCESS_KEY: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_AWS_ACCESS_KEY }}
-          AWS_SECRET_KEY: ${{ secrets.SCALYR_CLOUDTECH_TESTING_DEV_AWS_ACCESS_SECRET }}
+          AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
+          AWS_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
           AWS_PRIVATE_KEY_NAME: ${{ needs.pre_job.outputs.aws_private_key_name }}
           AWS_PRIVATE_KEY_PATH: "/tmp/private_key.pem"
           AWS_REGION: ${{ needs.pre_job.outputs.aws_region }}
