@@ -1,0 +1,58 @@
+#!/opt/scalyr-agent-2-dependencies/bin/python3
+# Copyright 2014-2022 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+This script serves as executable that allows to create/recreate venv for the Linux Agent requirements.
+"""
+
+
+import pathlib as pl
+import shutil
+import subprocess
+
+DEPENDENCIES_PACKAGE_ROOT = pl.Path("/opt/scalyr-agent-2-dependencies")
+
+
+def main():
+    core_requirements_path = DEPENDENCIES_PACKAGE_ROOT / "etc/core-requirements.txt"
+    additional_requirements_path = pl.Path("/etc/scalyr-agent-2/additional-requirements.txt")
+
+    venv_source_dir = DEPENDENCIES_PACKAGE_ROOT / "venv"
+    venv_dst_dir = pl.Path("/var/opt/scalyr-agent-2-dependencies/venv")
+
+    shutil.copytree(
+        venv_source_dir,
+        venv_dst_dir,
+    )
+
+    python_executable = venv_dst_dir / "bin/python3"
+    subprocess.check_call(
+        [
+            str(python_executable),
+            "-m",
+            "pip",
+            "install",
+            #"--quiet",
+            "-r", str(core_requirements_path),
+            "-r", str(additional_requirements_path),
+        ]
+    )
+
+
+if __name__ == '__main__':
+    main()
+
+
+

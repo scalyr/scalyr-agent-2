@@ -1,0 +1,4 @@
+# Here additional requirements for the agent can be specified.
+# Execute command '/usr/lib/scalyr-agent-2/bin/scalyr-agent-2-libs.py requirements recreate'
+
+docker

@@ -758,7 +758,7 @@ class Runner:
             the `REQUIRED_STEPS` class attribute is used.
         """
 
-        self.base_environment = type(self).BASE_ENVIRONMENT
+        self.base_environment = type(self).get_base_environment()
         self.required_steps = required_steps or type(self).REQUIRED_STEPS[:]
         self.required_runners = {}
 
@@ -767,6 +767,10 @@ class Runner:
         self.output_path = self.work_dir / "runner_outputs" / output_name
 
         self._input_values = {}
+
+    @classmethod
+    def get_base_environment(cls) -> Optional[EnvironmentRunnerStep]:
+        return cls.BASE_ENVIRONMENT
 
     @classmethod
     def get_all_required_steps(cls) -> List[RunnerStep]:
@@ -778,9 +782,9 @@ class Runner:
         Gather all (including nested) RunnerSteps from all possible plases which are used by this runner.
         """
         result = []
-
-        if cls.BASE_ENVIRONMENT:
-            result.extend(cls.BASE_ENVIRONMENT.get_all_cacheable_steps())
+        base_environment = cls.get_base_environment()
+        if base_environment:
+            result.extend(base_environment.get_all_cacheable_steps())
 
         for req_step in cls.get_all_required_steps():
             result.extend(req_step.get_all_cacheable_steps())

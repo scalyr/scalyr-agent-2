@@ -384,7 +384,8 @@ else
   fi
 
   lecho "  Installing scalyr-agent-2 package"
-  run_command "apt-get -y install $PACKAGE_NAME";
+  #run_command "apt-get -y install $PACKAGE_NAME";
+   apt-get -y install $PACKAGE_NAME
 fi
 
 if [ -n "$CONFIG_KEY" ]; then

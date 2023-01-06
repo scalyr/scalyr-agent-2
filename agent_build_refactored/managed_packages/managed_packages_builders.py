@@ -26,9 +26,9 @@ from typing import List, Tuple, Optional, Dict, Type
 
 
 from agent_build_refactored.tools.runner import Runner, RunnerStep, ArtifactRunnerStep, RunnerMappedPath, EnvironmentRunnerStep, DockerImageSpec,GitHubActionsSettings, IN_DOCKER
-from agent_build_refactored.tools.constants import SOURCE_ROOT, DockerPlatform, Architecture
+from agent_build_refactored.tools.constants import SOURCE_ROOT, DockerPlatform, Architecture, REQUIREMENTS_COMMON, REQUIREMENTS_COMMON_PLATFORM_DEPENDENT
 from agent_build_refactored.tools import check_call_with_log
-from agent_build_refactored.prepare_agent_filesystem import build_linux_fhs_agent_files, add_config
+from agent_build_refactored.prepare_agent_filesystem import build_linux_fhs_agent_files, add_config, create_change_logs
 
 logger = logging.getLogger(__name__)
 
@@ -83,8 +83,17 @@ EMBEDDED_PYTHON_SHORT_VERSION = ".".join(EMBEDDED_PYTHON_VERSION.split(".")[:2])
 
 PYTHON_PACKAGE_SSL_VERSION = "1.1.1k"
 
+AGENT_LIBS_REQUIREMENTS_CONTENT = f"{REQUIREMENTS_COMMON}\n" \
+                                  f"{REQUIREMENTS_COMMON_PLATFORM_DEPENDENT}"
 
-class ManagedPackagesBuilder(Runner):
+
+SUPPORTED_ARCHITECTURES = [
+    Architecture.X86_64,
+    Architecture.ARM64
+]
+
+
+class LinuxDependencyPackagesBuilder(Runner):
     """
     Builder class that is responsible for the building of the Linux agent deb and rpm packages that are managed by package
         managers such as apt and yum.
@@ -96,11 +105,6 @@ class ManagedPackagesBuilder(Runner):
     # package architecture, for example: amd64 for deb.
     DEPENDENCY_PACKAGES_ARCHITECTURE: Architecture
 
-    # Instance of the step that builds filesystem for the python package.
-    PYTHON_BUILD_STEP: ArtifactRunnerStep
-    # Instance of the step that builds filesystem for the agent-libs package.
-    AGENT_LIBS_BUILD_STEP: ArtifactRunnerStep
-
     # Name of a target distribution in the packagecloud.
     PACKAGECLOUD_DISTRO: str
 
@@ -108,12 +112,16 @@ class ManagedPackagesBuilder(Runner):
     PACKAGECLOUD_DISTRO_VERSION: str
 
     @classmethod
+    def get_base_environment(cls) -> EnvironmentRunnerStep:
+        return PREPARE_TOOLSET_STEPS[Architecture.X86_64]
+
+    @classmethod
     def get_all_required_steps(cls) -> List[RunnerStep]:
-        steps = super(ManagedPackagesBuilder, cls).get_all_required_steps()
+        steps = super(LinuxDependencyPackagesBuilder, cls).get_all_required_steps()
 
         steps.extend([
-            cls.PYTHON_BUILD_STEP,
-            cls.AGENT_LIBS_BUILD_STEP
+            cls._get_build_package_root_step(package_name=PYTHON_PACKAGE_NAME),
+            cls._get_build_package_root_step(package_name=AGENT_LIBS_PACKAGE_NAME)
         ])
         return steps
 
@@ -175,9 +183,8 @@ class ManagedPackagesBuilder(Runner):
         )
         return version
 
-
-    @property
-    def python_package_build_cmd_args(self) -> List[str]:
+    @classmethod
+    def get_python_package_build_cmd_args(cls) -> List[str]:
         """
         Returns list of arguments for the command that builds python package.
         """
@@ -185,12 +192,15 @@ class ManagedPackagesBuilder(Runner):
         description = "Dependency package which provides Python interpreter which is used by the agent from the " \
                       "'scalyr-agent-2 package'"
 
+        package_arch = cls.DEPENDENCY_PACKAGES_ARCHITECTURE.get_package_arch(
+            package_type=cls.PACKAGE_TYPE
+        )
         return [
                 # fmt: off
                 "fpm",
                 "-s", "dir",
-                "-a", self.dependency_packages_arch,
-                "-t", self.PACKAGE_TYPE,
+                "-a", package_arch,
+                "-t", cls.PACKAGE_TYPE,
                 "-n", PYTHON_PACKAGE_NAME,
                 "--license", '"Apache 2.0"',
                 "--vendor", "Scalyr",
@@ -205,8 +215,8 @@ class ManagedPackagesBuilder(Runner):
                 # fmt: on
             ]
 
-    @property
-    def agent_libs_build_command_args(self) -> List[str]:
+    @classmethod
+    def get_agent_libs_build_command_args(cls) -> List[str]:
         """
         Returns list of arguments for command that build agent-libs package.
         """
@@ -214,13 +224,18 @@ class ManagedPackagesBuilder(Runner):
         description = "Dependency package which provides Python requirement libraries which are used by the agent " \
                       "from the 'scalyr-agent-2 package'"
 
+        package_arch = cls.DEPENDENCY_PACKAGES_ARCHITECTURE.get_package_arch(
+            package_type=cls.PACKAGE_TYPE
+        )
+
         return [
             # fmt: off
             "fpm",
             "-s", "dir",
-            "-a", self.dependency_packages_arch,
-            "-t", self.PACKAGE_TYPE,
+            "-a", package_arch,
+            "-t", cls.PACKAGE_TYPE,
             "-n", AGENT_LIBS_PACKAGE_NAME,
+            "--config-files", "etc/scalyr-agent-2/additional-requirements.txt",
             "--license", '"Apache 2.0"',
             "--vendor", "Scalyr",
             "--provides", "scalyr-agent-2-dependencies",
@@ -246,14 +261,16 @@ class ManagedPackagesBuilder(Runner):
             copy_agent_source=True
         )
 
-        install_root_executable_path = agent_package_root / f"usr/share/{AGENT_PACKAGE_NAME}/bin/scalyr-agent-2"
-        install_root_executable_path.unlink()
-
+        install_root_executable_path = agent_package_root / f"usr/share/{AGENT_PACKAGE_NAME}/bin/scalyr-agent-2-new"
         # Add agent's executable script.
         shutil.copy(
             SOURCE_ROOT / "agent_build_refactored/managed_packages/files/scalyr-agent-2",
             install_root_executable_path,
         )
+
+        usr_sbin_executable = agent_package_root / "usr/sbin/scalyr-agent-2"
+        usr_sbin_executable.unlink()
+        usr_sbin_executable.symlink_to("../share/scalyr-agent-2/bin/scalyr-agent-2-new")
 
         # Add config file
         add_config(
@@ -268,12 +285,32 @@ class ManagedPackagesBuilder(Runner):
             dirs_exist_ok=True
         )
 
+        # Also remove third party libraries except tcollector.
+        agent_module_path = agent_package_root / "usr/share/scalyr-agent-2/py/scalyr_agent"
+        third_party_libs_dir = agent_module_path / "third_party"
+        shutil.rmtree(agent_module_path / "third_party_python2")
+        shutil.rmtree(agent_module_path / "third_party_tls")
+        shutil.rmtree(third_party_libs_dir)
+
+        shutil.copytree(
+            SOURCE_ROOT / "scalyr_agent/third_party/tcollector",
+            third_party_libs_dir / "tcollector"
+        )
+        shutil.copy2(
+            SOURCE_ROOT / "scalyr_agent/third_party/__init__.py",
+            third_party_libs_dir / "__init__.py"
+        )
+
         version = (SOURCE_ROOT / "VERSION").read_text().strip()
 
         scriptlets_path = SOURCE_ROOT / "agent_build_refactored/managed_packages/install-scriptlets"
 
         description = "Scalyr Agent 2 is the daemon process Scalyr customers run on their servers to collect metrics" \
                       " and log files and transmit them to Scalyr."
+
+        changelogs_path = self.output_path / "changelogs"
+        changelogs_path.mkdir()
+        create_change_logs(output_dir=changelogs_path)
 
         subprocess.check_call(
             [
@@ -296,8 +333,8 @@ class ManagedPackagesBuilder(Runner):
                 "--deb-group", "root",
                 "--rpm-user", "root",
                 "--rpm-group", "root",
-                #"--deb-changelog", "changelog-deb",
-                #"--rpm-changelog", "changelog-rpm",
+                "--deb-changelog", str(changelogs_path / "changelog-deb"),
+                "--rpm-changelog", str(changelogs_path / "changelog-rpm"),
                 "--after-install", scriptlets_path / "postinstall.sh",
                 "--before-remove", scriptlets_path / "preuninstall.sh",
                 "--deb-no-default-config-files",
@@ -308,11 +345,6 @@ class ManagedPackagesBuilder(Runner):
                 "--directories", "/var/log/scalyr-agent-2",
                 "--rpm-use-file-permissions",
                 "--deb-use-file-permissions",
-                # NOTE: Sadly we can't use defattrdir since it breakes permissions for some other
-                # directories such as /etc/init.d and we need to handle that in postinst :/
-                # "  --rpm-auto-add-directories "
-                # "  --rpm-defattrfile 640"
-                # "  --rpm-defattrdir 751"
                 "--verbose",
                 # fmt: on
             ],
@@ -329,8 +361,22 @@ class ManagedPackagesBuilder(Runner):
         assert len(found) == 1, f"Number of result agent packages has to be 1, got {len(found)}"
         return found[0].name
 
-    def _get_package_checksum(
-            self,
+
+    @classmethod
+    def _get_build_package_root_step(cls, package_name: str) -> ArtifactRunnerStep:
+
+        package_to_steps = {
+            PYTHON_PACKAGE_NAME: BUILD_PYTHON_PACKAGE_ROOT_STEPS,
+            AGENT_LIBS_PACKAGE_NAME: BUILD_AGENT_LIBS_PACKAGE_ROOT_STEPS
+        }
+        steps = package_to_steps[package_name]
+
+        return steps[cls.DEPENDENCY_PACKAGES_ARCHITECTURE]
+
+
+    @classmethod
+    def get_package_checksum(
+            cls,
             package_name: str,
     ):
         """
@@ -345,22 +391,92 @@ class ManagedPackagesBuilder(Runner):
         :return:
         """
 
+        build_root_step = cls._get_build_package_root_step(
+            package_name=package_name
+        )
+
         if package_name == PYTHON_PACKAGE_NAME:
-            build_step = self.PYTHON_BUILD_STEP
-            build_command_args = self.python_package_build_cmd_args
+            build_command_args = cls.get_python_package_build_cmd_args()
         else:
-            build_step = self.AGENT_LIBS_BUILD_STEP
-            build_command_args = self.agent_libs_build_command_args
+            build_command_args = cls.get_agent_libs_build_command_args()
 
         # Add checksum of the step that builds package files.
         sha256 = hashlib.sha256()
-        sha256.update(build_step.checksum.encode())
+        sha256.update(build_root_step.checksum.encode())
 
         # Add arguments that are used to build package.
         for arg in build_command_args:
             sha256.update(arg.encode())
 
         return sha256.hexdigest()
+
+    def build(self, stable_versions_file: str = None):
+
+        self.run_required()
+
+        # Run inside the docker if needed.
+        if self.runs_in_docker:
+            command_args = ["build"]
+            self.run_in_docker(command_args=command_args)
+            return
+
+        self.packages_output_path.mkdir(parents=True)
+
+        # Build agent libs package
+        agent_libs_version, should_build_agent_libs = _get_dependency_package_version_to_use(
+            checksum=_ALL_AGENT_LIBS_PACKAGES_CHECKSUM,
+            package_name=AGENT_LIBS_PACKAGE_NAME,
+            stable_versions_file_path=stable_versions_file
+        )
+
+        if should_build_agent_libs:
+            # build python package
+            python_version, should_build_python = _get_dependency_package_version_to_use(
+                checksum=_ALL_PYTHON_PACKAGES_CHECKSUM,
+                package_name=PYTHON_PACKAGE_NAME,
+                stable_versions_file_path=stable_versions_file,
+            )
+            if should_build_python:
+                build_python_package_root_step = self._get_build_package_root_step(
+                    package_name=PYTHON_PACKAGE_NAME
+                )
+                build_python_step_output = build_python_package_root_step.get_output_directory(
+                    work_dir=self.work_dir
+                )
+                check_call_with_log(
+                    [
+                        *self.get_python_package_build_cmd_args(),
+                        "-v", python_version,
+                        "-C", str(build_python_step_output / "root"),
+                        "--verbose"
+                    ],
+                    cwd=str(self.packages_output_path),
+                )
+
+            build_agent_libs_package_root_step = self._get_build_package_root_step(
+                package_name=AGENT_LIBS_PACKAGE_NAME
+            )
+            build_agent_libs_step_output = build_agent_libs_package_root_step.get_output_directory(
+                work_dir=self.work_dir
+            )
+
+            scriptlets_dir = build_agent_libs_step_output / "scriptlets"
+
+            check_call_with_log(
+                [
+                    *self.get_agent_libs_build_command_args(),
+                    "--depends", f"{PYTHON_PACKAGE_NAME} = {python_version}",
+                    "--after-install", str(scriptlets_dir / "postinstall.sh"),
+                    "-v", agent_libs_version,
+                    "-C", str(build_agent_libs_step_output / "root"),
+                    "--verbose"
+                ],
+                cwd=str(self.packages_output_path),
+            )
+
+        self._build_agent_package(
+            agent_libs_package_version=agent_libs_version,
+        )
 
     def _get_final_package_path_and_version(
             self,
@@ -378,7 +494,7 @@ class ManagedPackagesBuilder(Runner):
         """
         final_package_path = None
 
-        current_package_checksum = self._get_package_checksum(
+        current_package_checksum = self.get_package_checksum(
             package_name=package_name
         )
 
@@ -465,7 +581,7 @@ class ManagedPackagesBuilder(Runner):
 
             check_call_with_log(
                 [
-                    *self.python_package_build_cmd_args,
+                    *self.get_python_package_build_cmd_args,
                     "-v", final_python_version,
                     "-C", str(package_root),
                     "--verbose"
@@ -506,7 +622,7 @@ class ManagedPackagesBuilder(Runner):
 
             check_call_with_log(
                 [
-                    *self.agent_libs_build_command_args,
+                    *self.get_agent_libs_build_command_args,
                     "-v", final_agent_libs_version,
                     "-C", str(package_root),
                     "--depends", f"scalyr-agent-python3 = {final_python_version}",
@@ -782,7 +898,7 @@ class ManagedPackagesBuilder(Runner):
 
     @classmethod
     def add_command_line_arguments(cls, parser: argparse.ArgumentParser):
-        super(ManagedPackagesBuilder, cls).add_command_line_arguments(parser=parser)
+        super(LinuxDependencyPackagesBuilder, cls).add_command_line_arguments(parser=parser)
 
         subparsers = parser.add_subparsers(dest="command")
 
@@ -875,17 +991,14 @@ class ManagedPackagesBuilder(Runner):
         cls,
         args,
     ):
-        super(ManagedPackagesBuilder, cls).handle_command_line_arguments(args=args)
+        super(LinuxDependencyPackagesBuilder, cls).handle_command_line_arguments(args=args)
 
         work_dir = pl.Path(args.work_dir)
 
         builder = cls(work_dir=work_dir)
 
         if args.command == "build":
-            builder.build_packages(
-                last_repo_python_package_file=args.last_repo_python_package_file,
-                last_repo_agent_libs_package_file=args.last_repo_agent_libs_package_file,
-            )
+            builder.build()
             if not IN_DOCKER:
                 output_path = SOURCE_ROOT / "build"
                 if output_path.exists():
@@ -928,11 +1041,8 @@ class ManagedPackagesBuilder(Runner):
             exit(1)
 
 
-def create_build_dependencies_step(
-        base_image: EnvironmentRunnerStep,
-        run_in_remote_docker: bool = False
-
-) -> EnvironmentRunnerStep:
+def create_build_dependencies_steps(
+) -> Dict[Architecture, EnvironmentRunnerStep]:
     """
     This function creates step that installs Python build requirements, to a given environment.
     :param base_image: Environment step runner with the target environment.
@@ -976,102 +1086,223 @@ def create_build_dependencies_step(
         }
 
     )
-    openssl_configure_platforms = {
-        Architecture.X86_64: "linux-x86_64",
-        Architecture.ARM64: "linux-aarch64"
-    }
 
-    return EnvironmentRunnerStep(
-        name="install_build_dependencies",
-        script_path="agent_build_refactored/managed_packages/steps/install_build_dependencies.sh",
-        base=base_image,
-        required_steps={
-            "DOWNLOAD_BUILD_DEPENDENCIES": download_build_dependencies
-        },
-        environment_variables={
-            "OPENSSL_CONFIGURE_PLATFORM": openssl_configure_platforms[base_image.architecture],
-            **build_dependencies_versions,
-        },
-        github_actions_settings=GitHubActionsSettings(
-            run_in_remote_docker=run_in_remote_docker
+    steps = {}
+    for arch in SUPPORTED_ARCHITECTURES:
+        run_in_remote_docker = True
+        if arch == Architecture.X86_64:
+            base_image = INSTALL_GCC_7_GLIBC_X86_64
+            run_in_remote_docker = False
+        elif arch == Architecture.ARM64:
+            base_image = INSTALL_GCC_7_GLIBC_ARM64
+        else:
+            raise Exception(f"Unsupported architecture: {arch.value}")
+
+        step = EnvironmentRunnerStep(
+            name=f"install_build_dependencies_{arch.value}",
+            script_path="agent_build_refactored/managed_packages/steps/install_build_dependencies.sh",
+            base=base_image,
+            required_steps={
+                "DOWNLOAD_BUILD_DEPENDENCIES": download_build_dependencies
+            },
+            environment_variables={
+                **build_dependencies_versions,
+            },
+            github_actions_settings=GitHubActionsSettings(
+                run_in_remote_docker=run_in_remote_docker
+            )
         )
-    )
+        steps[arch] = step
+
+    return steps
 
 
-def create_build_python_step(
-        base_step: EnvironmentRunnerStep,
-        libssl_dir: str,
-        run_in_remote_docker: bool = False
-):
+def create_build_python_steps() -> Dict[Architecture, ArtifactRunnerStep]:
     """
-    Function that creates step instance that build Python interpreter.
-    :param base_step: Step with environment where to build.
-    :param libssl_dir: Name of the directory where ssl library is located because it may vary on some distibutions.
-    :param run_in_remote_docker: If possible, run this step in remote docker engine.
-    :return: Result step.
+    Function that creates step instances that build Python interpreter.
+    :return: Result steps mapped to architectures..
     """
+
+    install_prefix = f"/opt/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}"
+
+    steps = {}
+
+    for architecture in SUPPORTED_ARCHITECTURES:
+        run_in_remote_docker = architecture != Architecture.X86_64
+
+        build_python_initial = ArtifactRunnerStep(
+            name=f"build_python_initial_{architecture.value}",
+            script_path="agent_build_refactored/managed_packages/steps/build_python_initial.sh",
+            base=INSTALL_BUILD_DEPENDENCIES_STEPS[architecture],
+            environment_variables={
+                "PYTHON_VERSION": EMBEDDED_PYTHON_VERSION,
+                "INSTALL_PREFIX": install_prefix,
+            },
+            github_actions_settings=GitHubActionsSettings(
+                run_in_remote_docker=run_in_remote_docker
+            )
+        )
+
+        build_python_final = ArtifactRunnerStep(
+            name=f"build_python_final_{architecture.value}",
+            script_path="agent_build_refactored/managed_packages/steps/build_python_final.sh",
+            base=DockerImageSpec(
+                name="ubuntu:22.04",
+                platform=architecture.as_docker_platform.value
+            ),
+            environment_variables={
+                "PYTHON_SHORT_VERSION": EMBEDDED_PYTHON_SHORT_VERSION,
+                "INSTALL_PREFIX": install_prefix,
+            },
+            required_steps={
+                "BUILD_PYTHON_INITIAL": build_python_initial
+            },
+            github_actions_settings=GitHubActionsSettings(
+                cacheable=True
+            )
+        )
+
+        steps[architecture] = build_python_final
+
+    return steps
+
+
+def create_build_python_package_root_steps() -> Dict[Architecture, ArtifactRunnerStep]:
+    """
+    Function that creates step instances that build Python interpreter.
+    :return: Result steps dict mapped to architectures.
+    """
+    steps = {}
 
     python_config_architectures = {
         Architecture.X86_64: "x86_64",
         Architecture.ARM64: "aarch64"
     }
 
-    return ArtifactRunnerStep(
-        name="build_python",
-        script_path="agent_build_refactored/managed_packages/steps/build_python.sh",
-        tracked_files_globs=[
-            "agent_build_refactored/managed_packages/files/python3",
-        ],
-        base=base_step,
-        environment_variables={
-            "PYTHON_VERSION": EMBEDDED_PYTHON_VERSION,
-            "PYTHON_SHORT_VERSION": EMBEDDED_PYTHON_SHORT_VERSION,
-            "PYTHON_INSTALL_PREFIX": "/usr",
-            "LIBSSL_DIR": libssl_dir,
-            "PYTHON_CONFIG_ARCHITECTURE": python_config_architectures[base_step.architecture],
-            "SUBDIR_NAME": AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME
-        },
-        github_actions_settings=GitHubActionsSettings(
-            cacheable=True,
-            run_in_remote_docker=run_in_remote_docker
+    for architecture in SUPPORTED_ARCHITECTURES:
+
+        step = ArtifactRunnerStep(
+            name="build_python_package_root",
+            script_path="agent_build_refactored/managed_packages/steps/build_python_package_root.sh",
+            tracked_files_globs=[
+                "agent_build_refactored/managed_packages/files/python3",
+            ],
+            base=INSTALL_BUILD_DEPENDENCIES_STEPS[Architecture.X86_64],
+            required_steps={
+                "BUILD_PYTHON": BUILD_PYTHON_STEPS[architecture]
+            },
+            environment_variables={
+                "PYTHON_VERSION": EMBEDDED_PYTHON_VERSION,
+                "PYTHON_SHORT_VERSION": EMBEDDED_PYTHON_SHORT_VERSION,
+                "INSTALL_PREFIX": "/opt/scalyr-agent-2-dependencies",
+                "SUBDIR_NAME": AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME
+            },
+
         )
-    )
+
+        steps[architecture] = step
+
+    return steps
 
 
-def create_build_agent_libs_step(
-        base_step: EnvironmentRunnerStep,
-        build_python_step: ArtifactRunnerStep,
-        run_in_remote_docker: bool = False
-):
-    """
-    Function that creates step that installs agent requirement libraries.
-    :param base_step: Step with environment where to build.
-    :param build_python_step: Required step that builds Python.
-    :param run_in_remote_docker: If possible, run this step in remote docker engine.
-    :return: Result step.
-    """
+def create_build_dev_requirements_steps() -> Dict[Architecture, ArtifactRunnerStep]:
+    steps = {}
+    for architecture in SUPPORTED_ARCHITECTURES:
+        run_in_remote_docker = architecture != Architecture.X86_64
 
-    return ArtifactRunnerStep(
-        name=f"build_agent_libs_{base_step.architecture.value}",
-        script_path="agent_build_refactored/managed_packages/steps/build_agent_libs.sh",
-        tracked_files_globs=[
-            "agent_build/requirement-files/*.txt",
-            "dev-requirements.txt"
-        ],
-        base=base_step,
-        required_steps={
-            "BUILD_PYTHON": build_python_step
-        },
-        environment_variables={
-            "PYTHON_SHORT_VERSION": EMBEDDED_PYTHON_SHORT_VERSION,
-            "RUST_VERSION": "1.63.0",
-            "SUBDIR_NAME": AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME
-        },
-        github_actions_settings=GitHubActionsSettings(
-            cacheable=True,
-            run_in_remote_docker=run_in_remote_docker
+        build_dev_requirements_step = ArtifactRunnerStep(
+            name=f"build_dev_requirements_{architecture.value}",
+            script_path="agent_build_refactored/managed_packages/steps/build_dev_requirements.sh",
+            tracked_files_globs=[
+                "dev-requirements-new.txt",
+            ],
+            base=INSTALL_BUILD_DEPENDENCIES_STEPS[architecture],
+            required_steps={
+                "BUILD_PYTHON": BUILD_PYTHON_STEPS[architecture]
+            },
+            environment_variables={
+                "PYTHON_SHORT_VERSION": EMBEDDED_PYTHON_SHORT_VERSION,
+                "RUST_VERSION": "1.63.0",
+                "SUBDIR_NAME": AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME
+            },
+            github_actions_settings=GitHubActionsSettings(
+                cacheable=True,
+                run_in_remote_docker=run_in_remote_docker
+            )
         )
-    )
+        steps[architecture] = build_dev_requirements_step
+
+    return steps
+
+
+def create_build_agent_libs_venv_steps() -> Dict[Architecture, ArtifactRunnerStep]:
+    """
+    Function that creates steps that install agent requirement libraries.
+    :return: Result steps dict mapped to architectures..
+    """
+
+    steps = {}
+    for architecture in SUPPORTED_ARCHITECTURES:
+
+        run_in_remote_docker = architecture != Architecture.X86_64
+
+        build_agent_libs_step = ArtifactRunnerStep(
+            name=f"build_agent_libs_venv_{architecture.value}",
+            script_path="agent_build_refactored/managed_packages/steps/build_agent_libs_venv.sh",
+            tracked_files_globs=[
+                "dev-requirements-new.txt",
+            ],
+            base=INSTALL_BUILD_DEPENDENCIES_STEPS[architecture],
+            required_steps={
+                "BUILD_PYTHON": BUILD_PYTHON_STEPS[architecture],
+                "BUILD_DEV_REQUIREMENTS": BUILD_DEV_REQUIREMENTS_STEPS[architecture]
+            },
+            environment_variables={
+                "SUBDIR_NAME": AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME,
+                "REQUIREMENTS": AGENT_LIBS_REQUIREMENTS_CONTENT
+            },
+            github_actions_settings=GitHubActionsSettings(
+                cacheable=True,
+                run_in_remote_docker=run_in_remote_docker
+            )
+        )
+        steps[architecture] = build_agent_libs_step
+
+    return steps
+
+
+def create_build_agent_libs_package_root_steps() -> Dict[Architecture, ArtifactRunnerStep]:
+    """
+    Function that creates steps that builds agent requirement libraries package roots.
+    :return: Result steps dict mapped to architectures.
+    """
+
+    steps = {}
+    for architecture in SUPPORTED_ARCHITECTURES:
+
+        step = ArtifactRunnerStep(
+            name="build_agent_libs_package_root",
+            script_path="agent_build_refactored/managed_packages/steps/build_agent_libs_package_root.sh",
+            tracked_files_globs=[
+                "agent_build_refactored/managed_packages/files/config/additional-requirements.txt",
+                "agent_build_refactored/managed_packages/files/recreate_venv",
+                "agent_build_refactored/managed_packages/install-scriptlets/scalyr-agent-libs/postinstall.sh",
+            ],
+            base=PREPARE_TOOLSET_STEPS[Architecture.X86_64],
+            required_steps={
+                "BUILD_AGENT_LIBS": BUILD_AGENT_LIBS_VENV_STEPS[architecture],
+            },
+            environment_variables={
+                "REQUIREMENTS": AGENT_LIBS_REQUIREMENTS_CONTENT
+            },
+            github_actions_settings=GitHubActionsSettings(
+                cacheable=True,
+            )
+
+        )
+        steps[architecture] = step
+
+    return steps
 
 
 # Step that prepares initial environment for X86_64 build environment.
@@ -1101,140 +1332,164 @@ INSTALL_GCC_7_GLIBC_ARM64 = EnvironmentRunnerStep(
         )
     )
 
-# Step that installs Python build requirements to the build environment.
-INSTALL_BUILD_DEPENDENCIES_GLIBC_X86_64 = create_build_dependencies_step(
-    base_image=INSTALL_GCC_7_GLIBC_X86_64,
-)
-INSTALL_BUILD_DEPENDENCIES_GLIBC_ARM64 = create_build_dependencies_step(
-    base_image=INSTALL_GCC_7_GLIBC_ARM64,
-    run_in_remote_docker=True
-)
+# Steps that installs Python build requirements to the build environment.
+INSTALL_BUILD_DEPENDENCIES_STEPS = create_build_dependencies_steps()
+
 
 # Create step that builds Python interpreter.
-BUILD_PYTHON_GLIBC_X86_64 = create_build_python_step(
-    base_step=INSTALL_BUILD_DEPENDENCIES_GLIBC_X86_64,
-    libssl_dir="/usr/local/lib64"
-)
+BUILD_PYTHON_STEPS = create_build_python_steps()
 
-BUILD_PYTHON_GLIBC_ARM64 = create_build_python_step(
-    base_step=INSTALL_BUILD_DEPENDENCIES_GLIBC_ARM64,
-    libssl_dir="/usr/local/lib",
-    run_in_remote_docker=True
-)
+BUILD_DEV_REQUIREMENTS_STEPS = create_build_dev_requirements_steps()
 
-# Create step that builds agent requirement libs.
-BUILD_AGENT_LIBS_GLIBC_X86_64 = create_build_agent_libs_step(
-    base_step=INSTALL_BUILD_DEPENDENCIES_GLIBC_X86_64,
-    build_python_step=BUILD_PYTHON_GLIBC_X86_64,
-)
-BUILD_AGENT_LIBS_GLIBC_ARM64 = create_build_agent_libs_step(
-    base_step=INSTALL_BUILD_DEPENDENCIES_GLIBC_ARM64,
-    build_python_step=BUILD_PYTHON_GLIBC_ARM64,
-    run_in_remote_docker=True
-)
+# Create steps that build agent requirement libs.
+BUILD_AGENT_LIBS_VENV_STEPS = create_build_agent_libs_venv_steps()
 
 
-def create_prepare_toolset_step(
-    build_python_step: ArtifactRunnerStep,
-    build_agent_libs_step: ArtifactRunnerStep,
-    base_docker_image: DockerImageSpec,
-    run_in_remote_docker: bool = False
-):
+def create_prepare_toolset_steps() -> Dict[Architecture, EnvironmentRunnerStep]:
     """
-    Create step that prepare environment with all needed tools.
+    Create steps that prepare environment with all needed tools.
     """
-
-    architecture = base_docker_image.platform.as_architecture
-
-    return EnvironmentRunnerStep(
-        name=f"prepare_toolset_{architecture.value}",
-        script_path="agent_build_refactored/managed_packages/steps/prepare_toolset.sh",
-        base=base_docker_image,
-        required_steps={
-            "BUILD_PYTHON": build_python_step,
-            "BUILD_AGENT_LIBS": build_agent_libs_step
-        },
-        environment_variables={
-            "SUBDIR_NAME": AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME,
-            "FPM_VERSION": "1.14.2",
-            "PACKAGECLOUD_VERSION": "0.3.11",
-        },
-        github_actions_settings=GitHubActionsSettings(
-            cacheable=True,
-            pre_build_in_separate_job=True,
-            run_in_remote_docker=run_in_remote_docker
+    steps = {}
+    for architecture in SUPPORTED_ARCHITECTURES:
+        base_image = DockerImageSpec(
+            name="ubuntu:22.04",
+            platform=architecture.as_docker_platform.value
         )
-)
+
+        prepare_toolset_step = EnvironmentRunnerStep(
+            name=f"prepare_toolset_{architecture.value}",
+            script_path="agent_build_refactored/managed_packages/steps/prepare_toolset.sh",
+            base=base_image,
+            required_steps={
+                "BUILD_PYTHON": BUILD_PYTHON_STEPS[architecture],
+                "BUILD_DEV_REQUIREMENTS": BUILD_DEV_REQUIREMENTS_STEPS[architecture]
+            },
+            environment_variables={
+                "SUBDIR_NAME": AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME,
+                "FPM_VERSION": "1.14.2",
+                "PACKAGECLOUD_VERSION": "0.3.11",
+            },
+            github_actions_settings=GitHubActionsSettings(
+                cacheable=True,
+                pre_build_in_separate_job=True,
+            )
+        )
+
+        steps[architecture] = prepare_toolset_step
+
+    return steps
 
 
-PREPARE_TOOLSET_GLIBC_X86_64 = create_prepare_toolset_step(
-    build_python_step=BUILD_PYTHON_GLIBC_X86_64,
-    build_agent_libs_step=BUILD_AGENT_LIBS_GLIBC_X86_64,
-    base_docker_image=DockerImageSpec(
-        name="ubuntu:22.04",
-        platform=DockerPlatform.AMD64.value
-    )
-)
+PREPARE_TOOLSET_STEPS = create_prepare_toolset_steps()
 
-PREPARE_TOOLSET_GLIBC_ARM64 = create_prepare_toolset_step(
-    build_python_step=BUILD_PYTHON_GLIBC_ARM64,
-    build_agent_libs_step=BUILD_AGENT_LIBS_GLIBC_ARM64,
-    base_docker_image=DockerImageSpec(
-        name="ubuntu:22.04",
-        platform=DockerPlatform.ARM64.value
-    ),
-    run_in_remote_docker=True
-)
+BUILD_PYTHON_PACKAGE_ROOT_STEPS = create_build_python_package_root_steps()
 
-PREPARE_TOOLSET_STEPS = {
-    Architecture.X86_64: PREPARE_TOOLSET_GLIBC_X86_64,
-    Architecture.ARM64: PREPARE_TOOLSET_GLIBC_ARM64
-}
+BUILD_AGENT_LIBS_PACKAGE_ROOT_STEPS = create_build_agent_libs_package_root_steps()
 
 
-class DebManagedPackagesBuilderX86_64(ManagedPackagesBuilder):
-    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
-    DEPENDENCY_PACKAGES_ARCHITECTURE = Architecture.X86_64
-    PACKAGE_TYPE = "deb"
-    PYTHON_BUILD_STEP = BUILD_PYTHON_GLIBC_X86_64
-    AGENT_LIBS_BUILD_STEP = BUILD_AGENT_LIBS_GLIBC_X86_64
-    PACKAGECLOUD_DISTRO = "any"
-    PACKAGECLOUD_DISTRO_VERSION = "any"
+# class DebLinuxDependencyPackagesBuilder(LinuxDependencyPackagesBuilder):
+#     PACKAGE_TYPE = "deb"
+#     PACKAGECLOUD_DISTRO = "any"
+#     PACKAGECLOUD_DISTRO_VERSION = "any"
+#
+#
+# class RpmLinuxDependencyPackagesBuilder(LinuxDependencyPackagesBuilder):
+#     PACKAGE_TYPE = "rpm"
+#     PACKAGECLOUD_DISTRO = "rpm_any"
+#     PACKAGECLOUD_DISTRO_VERSION = "rpm_any"
 
 
-class DebManagedPackagesBuilderARM64(ManagedPackagesBuilder):
-    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_ARM64
-    DEPENDENCY_PACKAGES_ARCHITECTURE = Architecture.ARM64
-    PACKAGE_TYPE = "deb"
-    PYTHON_BUILD_STEP = BUILD_PYTHON_GLIBC_ARM64
-    AGENT_LIBS_BUILD_STEP = BUILD_AGENT_LIBS_GLIBC_ARM64
-    PACKAGECLOUD_DISTRO = "any"
-    PACKAGECLOUD_DISTRO_VERSION = "any"
+# class DebLinuxDependencyPackagesBuilderX86_64(DebLinuxDependencyPackagesBuilder):
+#     DEPENDENCY_PACKAGES_ARCHITECTURE = Architecture.X86_64
+#
+#
+# class DebLinuxDependencyPackagesBuilderARM64(DebLinuxDependencyPackagesBuilder):
+#     DEPENDENCY_PACKAGES_ARCHITECTURE = Architecture.ARM64
+#
+#
+# class RpmLinuxDependencyPackagesBuilderx86_64(RpmLinuxDependencyPackagesBuilder):
+#     DEPENDENCY_PACKAGES_ARCHITECTURE = Architecture.X86_64
+#
+#
+# class RpmLinuxDependencyPackagesBuilderAarch64(RpmLinuxDependencyPackagesBuilder):
+#     DEPENDENCY_PACKAGES_ARCHITECTURE = Architecture.ARM64
 
 
-class RpmManagedPackagesBuilderx86_64(ManagedPackagesBuilder):
-    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
-    DEPENDENCY_PACKAGES_ARCHITECTURE = Architecture.X86_64
-    PACKAGE_TYPE = "rpm"
-    PYTHON_BUILD_STEP = BUILD_PYTHON_GLIBC_X86_64
-    AGENT_LIBS_BUILD_STEP = BUILD_AGENT_LIBS_GLIBC_X86_64
-    PACKAGECLOUD_DISTRO = "rpm_any"
-    PACKAGECLOUD_DISTRO_VERSION = "rpm_any"
+ALL_MANAGED_PACKAGE_BUILDERS: Dict[str, Type[LinuxDependencyPackagesBuilder]] = {}
+
+for arch in SUPPORTED_ARCHITECTURES:
+    class DebLinuxDependencyPackagesBuilder(LinuxDependencyPackagesBuilder):
+        PACKAGE_TYPE = "deb"
+        PACKAGECLOUD_DISTRO = "any"
+        PACKAGECLOUD_DISTRO_VERSION = "any"
+        DEPENDENCY_PACKAGES_ARCHITECTURE = arch
 
 
-class RpmManagedPackagesBuilderAarch64(ManagedPackagesBuilder):
-    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_ARM64
-    DEPENDENCY_PACKAGES_ARCHITECTURE = Architecture.ARM64
-    PACKAGE_TYPE = "rpm"
-    PYTHON_BUILD_STEP = BUILD_PYTHON_GLIBC_ARM64
-    AGENT_LIBS_BUILD_STEP = BUILD_AGENT_LIBS_GLIBC_ARM64
-    PACKAGECLOUD_DISTRO = "rpm_any"
-    PACKAGECLOUD_DISTRO_VERSION = "rpm_any"
+    class RpmLinuxDependencyPackagesBuilder(LinuxDependencyPackagesBuilder):
+        PACKAGE_TYPE = "rpm"
+        PACKAGECLOUD_DISTRO = "rpm_any"
+        PACKAGECLOUD_DISTRO_VERSION = "rpm_any"
+        DEPENDENCY_PACKAGES_ARCHITECTURE = arch
+
+    for cls in [DebLinuxDependencyPackagesBuilder, RpmLinuxDependencyPackagesBuilder]:
+        cls.assign_fully_qualified_name(
+            class_name=cls.__name__,
+            module_name=__name__,
+            class_name_suffix=arch.value
+        )
+        name = f"{cls.PACKAGE_TYPE}-{arch.value}"
+        ALL_MANAGED_PACKAGE_BUILDERS[name] = cls
 
 
-ALL_MANAGED_PACKAGE_BUILDERS: Dict[str, Type[ManagedPackagesBuilder]] = {
-    "deb-amd64": DebManagedPackagesBuilderX86_64,
-    "deb-arm64": DebManagedPackagesBuilderARM64,
-    "rpm-x86_64": RpmManagedPackagesBuilderx86_64,
-    "rpm-aarch64": RpmManagedPackagesBuilderAarch64
-}
+
+# ALL_MANAGED_PACKAGE_BUILDERS: Dict[str, Type[LinuxDependencyPackagesBuilder]] = {
+#     "deb-amd64": DebLinuxDependencyPackagesBuilderX86_64,
+#     "deb-arm64": DebLinuxDependencyPackagesBuilderARM64,
+#     "rpm-x86_64": RpmLinuxDependencyPackagesBuilderx86_64,
+#     "rpm-aarch64": RpmLinuxDependencyPackagesBuilderAarch64
+# }
+
+
+def _calculate_all_packages_checksum(package_name: str):
+    sha256 = hashlib.sha256()
+    for builder_name in sorted(ALL_MANAGED_PACKAGE_BUILDERS.keys()):
+        builder_cls = ALL_MANAGED_PACKAGE_BUILDERS[builder_name]
+        checksum = builder_cls.get_package_checksum(package_name=package_name)
+        sha256.update(checksum.encode())
+
+    return sha256.hexdigest()
+
+
+_ALL_PYTHON_PACKAGES_CHECKSUM = _calculate_all_packages_checksum(package_name=PYTHON_PACKAGE_NAME)
+
+_ALL_AGENT_LIBS_PACKAGES_CHECKSUM = _calculate_all_packages_checksum(package_name=AGENT_LIBS_PACKAGE_NAME)
+
+
+def _get_dependency_package_version_to_use(
+        checksum: str,
+        package_name: str,
+        stable_versions_file_path: str = None
+) -> Tuple[str, bool]:
+    stable_version = None
+    if stable_versions_file_path:
+        versions = json.loads(pl.Path(stable_versions_file_path).read_text())
+        stable_version = versions[package_name]
+
+    if not stable_version:
+        stable_version = "0+0"
+
+    stable_iteration, stable_checksum = _parse_package_version_parts(version=stable_version)
+
+    if checksum == stable_checksum:
+        return stable_version, False
+    else:
+        new_iteration = stable_iteration + 1
+        return f"{new_iteration}+{checksum}", True
+
+
+def _parse_package_version_parts(version: str) -> Tuple[int, str]:
+    """
+    Deconstructs package version string and return tuple with version's iteration and checksum parts.
+    """
+    iteration, checksum = version.split("+")
+    return int(iteration), checksum

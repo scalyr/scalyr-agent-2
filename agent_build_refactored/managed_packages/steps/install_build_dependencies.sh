@@ -49,100 +49,103 @@ set -e
 # shellcheck disable=SC1090
 source ~/.bashrc
 
-# NOTE: The order of installation is important.
 
 
 mkdir /tmp/build-xz
 pushd /tmp/build-xz
 tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/xz/xz.tar.gz"
 pushd "xz-${XZ_VERSION}"
-./configure
-make -j "$(nproc)"
-make install
-popd
-popd
-
-mkdir /tmp/build-perl
-pushd /tmp/build-perl
-tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/perl/perl.tar.gz"
-pushd "perl-${PERL_VERSION}"
-./Configure -des
-make -j "$(nproc)"
-make install
-popd
-popd
-
-mkdir /tmp/build-texinfo
-pushd /tmp/build-texinfo
-tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/texinfo/texinfo.tar.gz"
-pushd "texinfo-${TEXINFO_VERSION}"
-./configure
+./configure CFLAGS="-fPIC" --enable-shared=no --disable-xzdec --disable-lzmadec
 make -j "$(nproc)"
 make install
 popd
 popd
 
 
-mkdir /tmp/build-m4
-pushd /tmp/build-m4
-tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/m4/m4.tar.gz"
-pushd "m4-${M4_VERSION}"
-./configure
-make -j "$(nproc)"
-make install
-popd
-popd
+
+#mkdir /tmp/build-perl
+#pushd /tmp/build-perl
+#tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/perl/perl.tar.gz"
+#pushd "perl-${PERL_VERSION}"
+#./Configure -des
+#make -j "$(nproc)"
+#make install
+#popd
+#popd
+#
+#mkdir /tmp/build-texinfo
+#pushd /tmp/build-texinfo
+#tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/texinfo/texinfo.tar.gz"
+#pushd "texinfo-${TEXINFO_VERSION}"
+#./configure
+#make -j "$(nproc)"
+#make install
+#popd
+#popd
+#
+#
+#mkdir /tmp/build-m4
+#pushd /tmp/build-m4
+#tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/m4/m4.tar.gz"
+#pushd "m4-${M4_VERSION}"
+#./configure
+#make -j "$(nproc)"
+#make install
+#popd
+#popd
+#
+#
+#mkdir /tmp/build-autoconf
+#pushd /tmp/build-autoconf
+#tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/autoconf/autoconf.tar.gz"
+#pushd "autoconf-${AUTOCONF_VERSION}"
+#./configure
+#make -j "$(nproc)"
+#make install
+#popd
+#popd
+#
+#
+#mkdir /tmp/build-libtool
+#pushd /tmp/build-libtool
+#tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/libtool/libtool.tar.gz"
+#pushd "libtool-${LIBTOOL_VERSION}"
+#./configure
+#make -j "$(nproc)"
+#make install
+#popd
+#popd
+#
+#
+#mkdir /tmp/build-help2man
+#pushd /tmp/build-help2man
+#tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/help2man/help2man.tar.xz"
+#pushd "help2man-${HELP2MAN_VERSION}"
+#./configure
+#make -j "$(nproc)"
+#make install
+#popd
+#popd
+#
+#
+#mkdir /tmp/build-automake
+#pushd /tmp/build-automake
+#tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/automake/automake.tar.gz"
+#pushd "automake-${AUTOMAKE_VERSION}"
+#./configure
+#make -j "$(nproc)"
+#make install
+#popd
+#popd
 
 
-mkdir /tmp/build-autoconf
-pushd /tmp/build-autoconf
-tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/autoconf/autoconf.tar.gz"
-pushd "autoconf-${AUTOCONF_VERSION}"
-./configure
-make -j "$(nproc)"
-make install
-popd
-popd
-
-
-mkdir /tmp/build-libtool
-pushd /tmp/build-libtool
-tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/libtool/libtool.tar.gz"
-pushd "libtool-${LIBTOOL_VERSION}"
-./configure
-make -j "$(nproc)"
-make install
-popd
-popd
-
-
-mkdir /tmp/build-help2man
-pushd /tmp/build-help2man
-tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/help2man/help2man.tar.xz"
-pushd "help2man-${HELP2MAN_VERSION}"
-./configure
-make -j "$(nproc)"
-make install
-popd
-popd
-
-
-mkdir /tmp/build-automake
-pushd /tmp/build-automake
-tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/automake/automake.tar.gz"
-pushd "automake-${AUTOMAKE_VERSION}"
-./configure
-make -j "$(nproc)"
-make install
-popd
-popd
 
 
 mkdir /tmp/build-zlib
 pushd /tmp/build-zlib
 tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/zlib/zlib.tar.gz"
 pushd "zlib-${ZLIB_VERSION}"
-./configure --shared
+CFLAGS="-fPIC" ./configure  --static
 make -j "$(nproc)"
 make install
 popd
@@ -153,9 +156,7 @@ mkdir /tmp/build-bzip
 pushd /tmp/build-bzip
 tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/bzip2/bzip2.tar.gz"
 pushd "bzip2-${BZIP_VERSION}"
-make -f Makefile-libbz2_so -j "$(nproc)"
-make install
-cp -a libbz2.so* /usr/local/lib
+make install CFLAGS="-fPIC" PREFIX=/usr/local -j "$(nproc)"
 popd
 popd
 
@@ -165,7 +166,7 @@ mkdir /tmp/build-util-linux
 pushd /tmp/build-util-linux
 tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/util-linux/util-linux.tar"
 pushd "util-linux-${UTIL_LINUX_VERSION}"
-./configure --disable-all-programs --enable-libuuid --prefix=/usr/local
+CFLAGS="-fPIC" ./configure --disable-all-programs --prefix=/usr/local --enable-libuuid --enable-shared=no
 make -j "$(nproc)"
 make install
 popd
@@ -176,7 +177,7 @@ mkdir /tmp/build-ncurses
 pushd /tmp/build-ncurses
 tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/ncurses/ncurses.tar.gz"
 pushd "ncurses-${NCURSES_VERSION}"
-./configure --with-shared --prefix=/usr/local
+CFLAGS="-fPIC" ./configure --prefix=/usr/local
 make -j "$(nproc)"
 make install
 popd
@@ -188,9 +189,10 @@ pushd /tmp/build-libedit
 tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/libedit/libedit.tar.gz"
 pushd "libedit-${LIBEDIT_VERSION}"
 ./configure \
-  CFLAGS="-I/usr/local/include -I/usr/local/include/ncurses" \
+  CFLAGS="-fPIC -I/usr/local/include -I/usr/local/include/ncurses" \
   LDFLAGS="-L/usr/local/lib -L/usr/local/lib64" \
-  LD_LIBRARY_PATH="/usr/local/lib:/usr/local/lib64:${LD_LIBRARY_PATH}"
+  LD_LIBRARY_PATH="/usr/local/lib:/usr/local/lib64:${LD_LIBRARY_PATH}" \
+  --enable-shared=no
 make -j "$(nproc)"
 make install
 popd
@@ -201,7 +203,7 @@ mkdir /tmp/build-gdbm
 pushd /tmp/build-gdbm
 tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/gdbm/gdbm.tar.gz"
 pushd "gdbm-${GDBM_VERSION}"
-./configure --enable-libgdbm-compat
+CFLAGS="-fPIC" ./configure --enable-shared=no
 make -j "$(nproc)"
 make install
 popd
@@ -214,7 +216,7 @@ tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/libffi/libffi.tar.gz"
 pushd "libffi-${LIBFFI_VERSION}"
 mkdir build
 pushd build
-../configure --enable-shared
+CFLAGS="-fPIC" ../configure --enable-shared=no
 make -j "$(nproc)"
 make install
 popd
@@ -226,7 +228,7 @@ mkdir /tmp/build-openssl
 pushd /tmp/build-openssl
 tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/openssl/openssl.tar.gz"
 pushd "openssl-${OPENSSL_VERSION}"
-./Configure "${OPENSSL_CONFIGURE_PLATFORM}" shared
+./config -fPIC no-shared
 make -j "$(nproc)"
 make install_sw
 popd

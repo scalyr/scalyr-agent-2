@@ -121,13 +121,13 @@ EOT
 
 
 # RHSCL is installed, so we can install newer tools, such as gcc-7
-yum install -y devtoolset-7
+yum install -y devtoolset-9
 yum install -y scl-utils
 
 # Remove this preinstalled packages, since we build and install those libraries from source.
-yum remove -y help2man m4 perl
+#yum remove -y help2man m4 perl
 
-echo "source /opt/rh/devtoolset-7/enable" >> ~/.bashrc
+echo "source /opt/rh/devtoolset-9/enable" >> ~/.bashrc
 # shellcheck disable=SC2016
 echo 'export LD_LIBRARY_PATH="/usr/local/lib:/usr/local/lib64:${LD_LIBRARY_PATH}"' >> ~/.bashrc
 

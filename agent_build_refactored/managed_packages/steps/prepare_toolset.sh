@@ -33,14 +33,16 @@ set -e
 
 # shellcheck disable=SC1090
 source ~/.bashrc
-cp -a "${BUILD_PYTHON}/python/." /
-cp -a "${BUILD_AGENT_LIBS}/dev_libs/." /
-
-ln -s "/usr/lib/${SUBDIR_NAME}/bin/python3" /usr/bin/python3
 
 apt update
 DEBIAN_FRONTEND=noninteractive apt install -y ruby ruby-dev rubygems build-essential rpm git reprepro createrepo-c gnupg2
 gem install "fpm:${FPM_VERSION}" "package_cloud:${PACKAGECLOUD_VERSION}"
+
+
+cp -a "${BUILD_PYTHON}/." /
+cp -a "${BUILD_DEV_REQUIREMENTS}/root/." /
+
+ln -s "/opt/${SUBDIR_NAME}/bin/python3" /usr/bin/python3
 
 # Generate keypair to sign and verify test repos for packages.
 gpg --batch --passphrase '' --quick-gen-key test default default

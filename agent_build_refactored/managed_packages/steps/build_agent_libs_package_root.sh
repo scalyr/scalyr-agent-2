@@ -29,29 +29,25 @@ set -e
 # shellcheck disable=SC1090
 source ~/.bashrc
 
-# Copy python interpreter, which is built by the previous step.
-cp -a "${BUILD_PYTHON}/python/." /
+PACKAGE_ROOT="${STEP_OUTPUT_PATH}/root"
+mkdir -p "${PACKAGE_ROOT}"
 
-# First install Rust, in order to be able to build some of required libraries.
-cd ~
-export PATH="/usr/local/bin:/root/.cargo/bin:${PATH}"
-export PKG_CONFIG_PATH="/usr/local/lib64/pkgconfig:/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH}"
-curl --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain "${RUST_VERSION}"
-cargo install cargo-update -v
-
-REQUIREMENTS_FILES_PATH="${SOURCE_ROOT}/agent_build/requirement-files"
-
-#
-# Build dev libs.
-#
+VENV_DIR="${PACKAGE_ROOT}/opt/${SUBDIR_NAME}/venv"
+mkdir -p "${VENV_DIR}"
+cp -a "${BUILD_AGENT_LIBS}/venv/." "${VENV_DIR}"
 
 
-"/usr/lib/${SUBDIR_NAME}/bin/python3" -m pip install --root "${STEP_OUTPUT_PATH}/dev_libs" -r "${SOURCE_ROOT}/dev-requirements.txt"
+mkdir -p "${PACKAGE_ROOT}/opt/${SUBDIR_NAME}/etc"
+echo "${REQUIREMENTS}" > "${PACKAGE_ROOT}/opt/${SUBDIR_NAME}/etc/core-requirements.txt"
 
-#
-# Build agent libs.
-#
+mkdir -p "${PACKAGE_ROOT}/etc/scalyr-agent-2"
+cp "${SOURCE_ROOT}/agent_build_refactored/managed_packages/files/config/additional-requirements.txt" "${PACKAGE_ROOT}/etc/scalyr-agent-2"
 
-"/usr/lib/${SUBDIR_NAME}/bin/python3" -m pip install -v --force-reinstall --root "${STEP_OUTPUT_PATH}/agent_libs"  \
-  -r "${REQUIREMENTS_FILES_PATH}/main-requirements.txt" \
-  -r "${REQUIREMENTS_FILES_PATH}/compression-requirements.txt"
+mkdir -p "${PACKAGE_ROOT}/opt/${SUBDIR_NAME}/bin"
+cp "${SOURCE_ROOT}/agent_build_refactored/managed_packages/files/recreate_venv" "${PACKAGE_ROOT}/opt/${SUBDIR_NAME}/bin"
+
+PACKAGE_SCRIPTLETS_DIR="${STEP_OUTPUT_PATH}/scriptlets"
+mkdir -p "${PACKAGE_SCRIPTLETS_DIR}"
+
+cp "agent_build_refactored/managed_packages/install-scriptlets/scalyr-agent-libs/postinstall.sh" "${PACKAGE_SCRIPTLETS_DIR}"
+

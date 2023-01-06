@@ -14,6 +14,7 @@
 import dataclasses
 import enum
 import os
+import re
 import pathlib as pl
 
 SOURCE_ROOT = pl.Path(__file__).parent.parent.parent.absolute()
@@ -107,6 +108,14 @@ class Architecture(enum.Enum):
         }
         return mapping[self]
 
+    def get_package_arch(self, package_type: str):
+        if package_type == "deb":
+            return self.as_deb_package_arch
+        elif package_type == "rpm":
+            return self.as_rpm_package_arch
+        else:
+            raise Exception(f"Unknown package type: {package_type}")
+
 
 _ARCHITECTURE_TO_DOCKER_PLATFORM = {
     Architecture.X86_64: DockerPlatform.AMD64,
@@ -130,3 +139,42 @@ class PackageType(enum.Enum):
     K8S_WITH_OPENMETRICS = "k8s-with-openmetrics"
     K8S_RESTART_AGENT_ON_MONITOR_DEATH = "k8s-restart-agent-on-monitor-death"
     MSI = "msi"
+
+
+def _parse_requirements_file():
+    requirements_file_path = SOURCE_ROOT / "dev-requirements-new.txt"
+    requirements_file_content = requirements_file_path.read_text()
+
+    current_component_name = None
+
+    all_components = dict()
+
+    for line in requirements_file_content.splitlines():
+        if line == "":
+            continue
+
+        if line.rstrip().startswith("#"):
+            m = re.match(r"^# <COMPONENT:([^>]+)>$", line)
+
+            if m:
+                current_component_name = m.group(1)
+            else:
+                continue
+        else:
+            if current_component_name is None:
+                raise Exception(f"Requirement '{line}' is outside of any COMPONENT")
+
+            component = all_components.get(current_component_name)
+            if component:
+                all_components[current_component_name] = "\n".join([component, line])
+            else:
+                all_components[current_component_name] = line
+
+    return all_components
+
+
+_REQUIREMENT_FILE_COMPONENTS = _parse_requirements_file()
+
+REQUIREMENTS_COMMON = _REQUIREMENT_FILE_COMPONENTS["COMMON"]
+REQUIREMENTS_COMMON_PLATFORM_DEPENDENT = _REQUIREMENT_FILE_COMPONENTS["COMMON_PLATFORM_DEPENDENT"]
+a=10

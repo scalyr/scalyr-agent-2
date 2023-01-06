@@ -1,5 +1,5 @@
-#!/usr/bin/env bash
-# Copyright 2014-2022 Scalyr Inc.
+#!/opt/scalyr-agent-2-dependencies/bin/python3
+# Copyright 2014-2023 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,5 +13,49 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
+import sys
+import os
+import pathlib as pl
 
-exec /usr/lib/scalyr-agent-2-dependencies/bin/python3 -E "/usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py" "$@"
+
+def handle_dependencies_config_args():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "dependencies-config",
+    )
+    parser.add_argument(
+        "command",
+        choices=["recreate-venv"]
+    )
+    args = parser.parse_args()
+
+    if args.command == "recreate-venv":
+        recreate_venv_executable = pl.Path("/opt/scalyr-agent-2-dependencies/bin/recreate-venv")
+        os.execv(str(recreate_venv_executable), [])
+
+
+if __name__ == '__main__':
+    command = None
+
+    argv = sys.argv[:]
+
+    if argv:
+        if argv[0] == __file__:
+            argv.pop(0)
+
+    if argv:
+        command = argv[0]
+
+    if command == "dependencies-config":
+        handle_dependencies_config_args()
+    else:
+        venv_python_executable = "/var/opt/scalyr-agent-2-dependencies/venv/bin/python3"
+        argv = [venv_python_executable, "/usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py", *argv]
+        os.execv(venv_python_executable, argv)
+
+
+
+
+

@@ -53,64 +53,31 @@ pushd "cpython-${PYTHON_VERSION}"
 mkdir build
 pushd build
 
-PACKAGE_INSTALL_PREFIX="/usr/share/${SUBDIR_NAME}"
-PACKAGE_INSTALL_EXEC_PREFIX="/usr/lib/${SUBDIR_NAME}"
+#rm /usr/local/lib/libgdbm.so*
+#rm /usr/local/lib/libgdbm_compat.so*
+# rm /usr/local/include/ndbm.h
 
 # Configure Python. Also provide options to store result files in sub-directories.
 ../configure \
   CFLAGS="-I/usr/local/include -I/usr/local/include/ncurses" \
   LDFLAGS="-L/usr/local/lib -L/usr/local/lib64" \
-  LD_LIBRARY_PATH="/usr/local/lib:/usr/local/lib64:${LD_LIBRARY_PATH}" \
+  LD_LIBRARY_PATH="/usr/local/lib:/usr/local/lib64" \
 	--enable-shared \
 	--with-openssl="/usr/local" \
 	--with-readline=edit \
-	--prefix="${PACKAGE_INSTALL_PREFIX}" \
-	--exec-prefix="${PACKAGE_INSTALL_EXEC_PREFIX}" \
-	--with-ensurepip=upgrade \
-	--with-suffix="-orig"
+	--with-dbmliborder=gdbm \
+	--prefix="${INSTALL_PREFIX}" \
+	--exec-prefix="${INSTALL_PREFIX}" \
+	--with-ensurepip=upgrade
 
 #		--enable-optimizations \
 #	--with-lto \
 
-
-BUILD_ROOT="/tmp/python"
-
 make -j "$(nproc)"
 #make test
-make DESTDIR="${BUILD_ROOT}" install
+make DESTDIR="${STEP_OUTPUT_PATH}" install
+
 popd
 popd
 popd
 
-#Uncomment this in order to save built Python files with original filesystem structure. May be useful for debugging.
-cp -a ${BUILD_ROOT} "${STEP_OUTPUT_PATH}/python_original"
-
-# Copy Python dependency shared libraries.
-cp -a /usr/local/lib/libz.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-cp -a /usr/local/lib/libbz2.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-cp -a /usr/local/lib/libedit.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-cp -a /usr/local/lib/libncurses.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-cp -a /usr/local/lib/liblzma.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-cp -a /usr/local/lib/libuuid.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-cp -a /usr/local/lib/libgdbm.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-cp -a /usr/local/lib/libgdbm_compat.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-cp -a /usr/local/lib64/libffi.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-cp -a "${LIBSSL_DIR}"/libcrypto.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-cp -a "${LIBSSL_DIR}"/libssl.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-
-# Copy wrapper for Python interpreter executable.
-cp -a "${SOURCE_ROOT}/agent_build_refactored/managed_packages/files/python3" "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/bin/python3"
-
-# Remove some of the files to reduce package size
-PYTHON_EXEC_LIBS_PATH="${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib/python${PYTHON_SHORT_VERSION}"
-PYTHON_LIBS_PATH="${BUILD_ROOT}${PACKAGE_INSTALL_PREFIX}/lib/python${PYTHON_SHORT_VERSION}"
-
-find "${PYTHON_EXEC_LIBS_PATH}" -name "__pycache__" -type d -prune -exec rm -r {} \;
-find "${PYTHON_LIBS_PATH}" -name "__pycache__" -type d -prune -exec rm -r {} \;
-
-rm -r "${PYTHON_LIBS_PATH}/test"
-rm -r "${PYTHON_LIBS_PATH}/config-${PYTHON_SHORT_VERSION}-${PYTHON_CONFIG_ARCHITECTURE}-linux-gnu"
-rm -r "${PYTHON_LIBS_PATH}/lib2to3"
-
-
-cp -a "${BUILD_ROOT}" "${STEP_OUTPUT_PATH}/python"

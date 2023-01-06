@@ -30,8 +30,8 @@ from agent_build_refactored.managed_packages.managed_packages_builders import (
 )
 
 # Make sure that current interpreter prefixes are withing subdirectories.
-assert sys.prefix == f"/usr/share/{SUBDIR}"
-assert sys.exec_prefix == f"/usr/lib/{SUBDIR}"
+assert sys.prefix == f"/var/opt/{SUBDIR}/venv"
+assert sys.exec_prefix == sys.prefix
 
 # Check that only verified prefixes are used.
 assert set(site.PREFIXES) == {sys.prefix, sys.exec_prefix}
@@ -50,15 +50,11 @@ assert set(site.getsitepackages()) == {
 assert sys.path == [
     str(pl.Path(__file__).parent),
     str(SOURCE_ROOT),
-    f"{sys.prefix}/lib/python{PYTHON_MAJOR_VERSION}{PYTHON_MINOR_VERSION}.zip",
-    f"{sys.prefix}/lib/python{PYTHON_X_Y_VERSION}",
-    f"{sys.exec_prefix}/lib/python{PYTHON_X_Y_VERSION}/lib-dynload",
+    f"{sys.base_prefix}/lib/python{PYTHON_MAJOR_VERSION}{PYTHON_MINOR_VERSION}.zip",
+    f"{sys.base_prefix}/lib/python{PYTHON_X_Y_VERSION}",
+    f"{sys.base_prefix}/lib/python{PYTHON_X_Y_VERSION}/lib-dynload",
     f"{sys.prefix}/lib/python{PYTHON_X_Y_VERSION}/site-packages",
-    f"{sys.exec_prefix}/lib/python{PYTHON_X_Y_VERSION}/site-packages",
 ]
-
-# Check that only libraries from the previously verified prefix are used.
-assert os.environ["LD_LIBRARY_PATH"] == f"{sys.exec_prefix}/lib"
 
 print("Check OpenSSL")
 import ssl
