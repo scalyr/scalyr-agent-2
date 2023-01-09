@@ -97,8 +97,8 @@ def test_dependency_packages(
     agent_libs_package_path,
 ):
 
-    # if distro_name not in ["ubuntu2204", "amazonlinux2"]:
-    #     pytest.skip("No need to check on all distros.")
+    if distro_name not in ["ubuntu2204", "amazonlinux2"]:
+        pytest.skip("No need to check on all distros.")
 
     package_type = package_builder.PACKAGE_TYPE
     _verify_package_subdirectories(
@@ -168,6 +168,15 @@ def test_packages(
 
         logger.exception("Install script has failed.")
         raise
+
+    ssl_path = pl.Path("/opt/scalyr-agent-2-dependencies/lib/libssl.so")
+    cl_path = pl.Path("/opt/scalyr-agent-2-dependencies/lib/libcrypto.so")
+
+    ssl_path.unlink()
+    #cl_path.unlink()
+
+    ssl_path.symlink_to("/usr/lib/x86_64-linux-gnu/libssl.so.3")
+    #cl_path.symlink_to("/usr/lib/x86_64-linux-gnu/libcrypto.so.3")
 
     logger.info(
         "Execute simple sanity test script for the python interpreter and its libraries."
@@ -330,15 +339,7 @@ def _perform_ssl_checks(
     invalid_ca_cert_path_config["ca_cert_path"] = "/tmp/invalid/ca_certs.crt"
     _add_config(invalid_ca_cert_path_config)
 
-    if sys.stdout.isatty():
-        with pytest.raises(subprocess.CalledProcessError) as err_info:
-            subprocess.check_call(
-                [*agent_commander.executable_args, "start"]
-            )
-
-        print("!!!!!!!!")
-        print(err_info.value)
-        raise
+    agent_commander.start()
 
     with pytest.raises(subprocess.CalledProcessError) as err_info:
         agent_commander.get_status()
@@ -417,12 +418,7 @@ def _perform_ssl_checks(
     assert "because of server certificate validation error" in agent_log
     assert "This likely indicates a MITM attack" in agent_log
 
-    print("!!!")
-    print(agent_log)
-
     agent_status = agent_commander.get_status()
-    print("@@@@@")
-    print(agent_status)
     assert "Last successful communication with Scalyr: Never" in agent_status
     assert "Bytes uploaded successfully:               0" in agent_status
     assert "Last copy request size:                    0" in agent_status

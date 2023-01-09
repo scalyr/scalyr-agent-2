@@ -25,7 +25,7 @@ import site
 
 from agent_build_refactored.tools.constants import SOURCE_ROOT
 from agent_build_refactored.managed_packages.managed_packages_builders import (
-    PYTHON_PACKAGE_SSL_VERSION,
+    PYTHON_PACKAGE_SSL_1_1_1_VERSION,
     AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME as SUBDIR,
 )
 
@@ -59,10 +59,10 @@ assert sys.path == [
 print("Check OpenSSL")
 import ssl
 
-escaped_open_ssl_version = re.escape(PYTHON_PACKAGE_SSL_VERSION)
+escaped_open_ssl_version = re.escape(PYTHON_PACKAGE_SSL_1_1_1_VERSION)
 assert re.match(
     rf"OpenSSL {escaped_open_ssl_version}\s+\d+ [A-Za-z]+ \d+", ssl.OPENSSL_VERSION
-), f"Current version of OpenSSL does not match expected {PYTHON_PACKAGE_SSL_VERSION}"
+), f"Current version of OpenSSL does not match expected {PYTHON_PACKAGE_SSL_1_1_1_VERSION}"
 
 
 print("Check uuid")

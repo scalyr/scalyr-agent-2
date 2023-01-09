@@ -45,6 +45,10 @@ set -e
 # shellcheck disable=SC1090
 source ~/.bashrc
 
+tar -xzvf "${BUILD_PYTHON_DEPENDENCIES}/common.tar.gz" -C /
+cp -a "${BUILD_OPENSSL}/openssl/." /
+
+
 mkdir /tmp/build-python
 pushd /tmp/build-python
 curl -L "https://github.com/python/cpython/archive/refs/tags/v${PYTHON_VERSION}.tar.gz" > python.tar.gz
@@ -52,10 +56,6 @@ tar -xvf python.tar.gz
 pushd "cpython-${PYTHON_VERSION}"
 mkdir build
 pushd build
-
-#rm /usr/local/lib/libgdbm.so*
-#rm /usr/local/lib/libgdbm_compat.so*
-# rm /usr/local/include/ndbm.h
 
 # Configure Python. Also provide options to store result files in sub-directories.
 ../configure \
@@ -65,10 +65,12 @@ pushd build
 	--enable-shared \
 	--with-openssl="/usr/local" \
 	--with-readline=edit \
-	--with-dbmliborder=gdbm \
 	--prefix="${INSTALL_PREFIX}" \
 	--exec-prefix="${INSTALL_PREFIX}" \
-	--with-ensurepip=upgrade
+	--with-ensurepip=upgrade \
+
+#cp "config.log" "${STEP_OUTPUT_PATH}"
+#exit 0
 
 #		--enable-optimizations \
 #	--with-lto \

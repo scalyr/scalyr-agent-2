@@ -14,9 +14,22 @@
 # limitations under the License.
 
 import argparse
+import subprocess
 import sys
 import os
 import pathlib as pl
+
+PYTHON_EXECUTABLE_PATH = pl.Path("/opt/scalyr-agent-2-dependencies/bin/python3")
+
+
+def _set_openssl():
+    verify_sll_script = pl.Path(__file__) / "verify_openssl.py"
+    subprocess.check_call(
+        [
+            str(PYTHON_EXECUTABLE_PATH),
+            str(verify_sll_script)
+        ]
+    )
 
 
 def handle_dependencies_config_args():

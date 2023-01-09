@@ -35,12 +35,13 @@ set -e
 source ~/.bashrc
 
 apt update
-DEBIAN_FRONTEND=noninteractive apt install -y ruby ruby-dev rubygems build-essential rpm git reprepro createrepo-c gnupg2
+DEBIAN_FRONTEND=noninteractive apt install -y ruby ruby-dev rubygems build-essential rpm git reprepro createrepo-c gnupg2 patchelf binutils
 gem install "fpm:${FPM_VERSION}" "package_cloud:${PACKAGECLOUD_VERSION}"
 
 
-cp -a "${BUILD_PYTHON}/." /
+cp -a "${BUILD_PYTHON}/dev_python_root/." /
 cp -a "${BUILD_DEV_REQUIREMENTS}/root/." /
+ldconfig
 
 ln -s "/opt/${SUBDIR_NAME}/bin/python3" /usr/bin/python3
 

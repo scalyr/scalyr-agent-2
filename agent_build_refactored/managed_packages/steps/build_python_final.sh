@@ -20,7 +20,7 @@
 #
 # This script builds Python interpreter from source and then also modifies the result filesystem structure. In short:
 #   all installation files of the built Python interpreter have to be located in its special sub-directory.
-#   This is crucial, because we have to make sure that Python dependency package won't affect any existing Python
+#   This is crucial, because we have to make sure that Python dependency_to_replace package won't affect any existing Python
 #   installations. For example, instead of filesystem hierarchy of a "normal" package:
 #       /usr
 #          bin/<package_files>
@@ -46,13 +46,18 @@ set -e
 source ~/.bashrc
 
 apt update
-DEBIAN_FRONTEND=noninteractive apt install patchelf
+DEBIAN_FRONTEND=noninteractive apt install -y patchelf binutils
 
-cp -a "${BUILD_PYTHON_INITIAL}/." "${STEP_OUTPUT_PATH}"
+PYTHON_ROOT="${STEP_OUTPUT_PATH}/python"
+cp -a "${BUILD_PYTHON_INITIAL}" "${PYTHON_ROOT}"
 
 patchelf --replace-needed \
   "libpython${PYTHON_SHORT_VERSION}.so.1.0" \
   "${INSTALL_PREFIX}/lib/libpython${PYTHON_SHORT_VERSION}.so.1.0" \
-  "${STEP_OUTPUT_PATH}${INSTALL_PREFIX}/bin/python${PYTHON_SHORT_VERSION}"
+  "${PYTHON_ROOT}${INSTALL_PREFIX}/bin/python${PYTHON_SHORT_VERSION}"
 
 
+
+DEV_PYTHON_ROOT="${STEP_OUTPUT_PATH}/dev_python_root"
+cp -a "${PYTHON_ROOT}" "${DEV_PYTHON_ROOT}"
+cp -a "${BUILD_OPENSSL}/openssl/." "${DEV_PYTHON_ROOT}"

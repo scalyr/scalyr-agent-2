@@ -47,23 +47,75 @@ source ~/.bashrc
 
 PACKAGE_ROOT="${STEP_OUTPUT_PATH}/root"
 mkdir -p "${PACKAGE_ROOT}"
-cp -a "${BUILD_PYTHON}/." "${PACKAGE_ROOT}"
+cp -a "${BUILD_PYTHON}/python/." "${PACKAGE_ROOT}"
 
-## Copy Python dependency shared libraries.
-#cp -a /usr/local/lib/libz.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-#cp -a /usr/local/lib/libbz2.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-#cp -a /usr/local/lib/libedit.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-#cp -a /usr/local/lib/libncurses.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-#cp -a /usr/local/lib/liblzma.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-#cp -a /usr/local/lib/libuuid.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-#cp -a /usr/local/lib/libgdbm.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-#cp -a /usr/local/lib/libgdbm_compat.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-#cp -a /usr/local/lib64/libffi.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-#cp -a "${LIBSSL_DIR}"/libcrypto.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
-#cp -a "${LIBSSL_DIR}"/libssl.so* "${BUILD_ROOT}${PACKAGE_INSTALL_EXEC_PREFIX}/lib"
 
-## Copy wrapper for Python interpreter executable.
-#cp -a "${SOURCE_ROOT}/agent_build_refactored/managed_packages/files/python3" "${PACKAGE_ROOT}${INSTALL_PREFIX}/bin/python3"
+function get_standatd_c_binding_path() {
+  files=( "${PACKAGE_ROOT}${INSTALL_PREFIX}/lib/python${PYTHON_SHORT_VERSION}"/lib-dynload/$1 )
+  echo "${files[0]}"
+}
+
+function find_dependency_in_elf() {
+    elf_path="$1"
+    dependency_to_find="$2"
+    readelf --dynamic "${elf_path}" | grep NEEDED | grep "${dependency_to_find}" | tr -s ' ' | cut -d ' ' -f6 | tr -d '[' | tr -d ']'
+}
+
+function replace_elf_dependency() {
+  local elf_path="$1"
+  local dependency_to_replace="$2"
+  local new_dependency="$3"
+
+  patchelf --replace-needed \
+    "${dependency_to_replace}" \
+    "${new_dependency}" \
+    "${elf_path}"
+}
+
+SSL_C_BINDING_PATH="$(get_standatd_c_binding_path _ssl.cpython-*-*-*-*.so)"
+function replace_ssh_module_dependencies() {
+    elf_path="$1"
+
+    libssl_dependency_name="$(find_dependency_in_elf "${elf_path}" "libssl.so")"
+    libcrypto_dependency_name="$(find_dependency_in_elf "${elf_path}" "libcrypto.so")"
+}
+
+
+
+
+
+exit 0
+SSL_C_BINDING_LIBSLL_DEPENDENCY_NAME="$(find_dependency_in_elf "${SSL_C_BINDING_PATH}" "libssl.so")"
+SSL_C_BINDING_LIBCRYPTO_DEPENDENCY_NAME="$(find_dependency_in_elf "${SSL_C_BINDING_PATH}" "libcrypto.so")"
+
+REPLACED_LIBSSH_DEPENDENCY_PATH="${INSTALL_PREFIX}/lib/libssl.so"
+REPLACED_LIBCRYPTO_DEPENDENCY_PATH="${INSTALL_PREFIX}/lib/libcrypto.so"
+
+replace_elf_dependency "${SSL_C_BINDING_PATH}" "${SSL_C_BINDING_LIBSLL_DEPENDENCY_NAME}" "${REPLACED_LIBSSH_DEPENDENCY_PATH}"
+replace_elf_dependency "${SSL_C_BINDING_PATH}" "${SSL_C_BINDING_LIBCRYPTO_DEPENDENCY_NAME}" "${REPLACED_LIBCRYPTO_DEPENDENCY_PATH}"
+
+
+HASHLIB_C_BINDING_PATH="$(get_standatd_c_binding_path _hashlib.cpython-*-*-*-*.so)"
+
+HASHLIB_C_BINDING_LIBCRYPTO_DEPENDENCY_NAME="$(find_dependency_in_elf "${HASHLIB_C_BINDING_PATH}" "libcrypto.so")"
+
+replace_elf_dependency "${HASHLIB_C_BINDING_PATH}" "${HASHLIB_C_BINDING_LIBCRYPTO_DEPENDENCY_NAME}" "${REPLACED_LIBCRYPTO_DEPENDENCY_PATH}"
+
+mkdir -p "${PACKAGE_ROOT}${INSTALL_PREFIX}/lib/openssl"
+cp -a \
+  "${BUILD_OPENSSL}/openssl${LIBSSL_DIR}"/libssl.so* \
+  "${BUILD_OPENSSL}/openssl${LIBSSL_DIR}"/libcrypto.so* \
+  "${PACKAGE_ROOT}${INSTALL_PREFIX}/lib/openssl"
+
+ln -s "openssl/libssl.so" "${PACKAGE_ROOT}${REPLACED_LIBSSH_DEPENDENCY_PATH}"
+ln -s "openssl/libcrypto.so" "${PACKAGE_ROOT}${REPLACED_LIBCRYPTO_DEPENDENCY_PATH}"
+
+
+
+
+
+
+
 
 # Remove some of the files to reduce package size
 PYTHON_EXEC_LIBS_PATH="${PACKAGE_ROOT}${INSTALL_PREFIX}/lib/python${PYTHON_SHORT_VERSION}"

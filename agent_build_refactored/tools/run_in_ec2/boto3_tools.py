@@ -336,7 +336,7 @@ def ssh_run_command(
     if run_as_root:
         command_str = f"sudo -E {command_str}"
 
-    stdin, stdout, sterr = ssh_connection.exec_command(command_str, get_pty=True)
+    stdin, stdout, sterr = ssh_connection.exec_command(command_str)
 
     while True:
         data = stdout.channel.recv(1024)
@@ -346,7 +346,7 @@ def ssh_run_command(
 
     logger.info(f"STDERR: {sterr.read().decode()}")
 
-    exit_status = stdout.channel.exit_status
+    exit_status = stdout.channel.recv_exit_status()
     if exit_status != 0:
         raise Exception(
             f"SSH command '{command_str}' returned {exit_status}."

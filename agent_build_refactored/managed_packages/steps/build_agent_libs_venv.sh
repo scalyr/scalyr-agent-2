@@ -31,9 +31,11 @@ source ~/.bashrc
 
 # Copy python interpreter, which is built by the previous step.
 
-cp -a "${BUILD_PYTHON}/." /
+cp -a "${BUILD_PYTHON}/dev_python_root/." /
 cp -a "${BUILD_DEV_REQUIREMENTS}/root/." /
 cp -a "${BUILD_DEV_REQUIREMENTS}/cache" /tmp/pip_cache
+
+ldconfig
 
 
 VENV_DIR="/var/opt/${SUBDIR_NAME}/venv"

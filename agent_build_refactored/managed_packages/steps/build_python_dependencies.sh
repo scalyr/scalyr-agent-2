@@ -16,7 +16,7 @@
 # This script is meant to be executed by the instance of the 'agent_build_refactored.tools.runner.RunnerStep' class.
 # Every RunnerStep provides common environment variables to its script:
 #   SOURCE_ROOT: Path to the projects root.
-#   STEP_OUTPUT_PATH: Path to the step's output directory.
+#   DESTDIR_ROOT: Path to the step's output directory.
 #
 # This script build from source all libraries that are required to build Python. Since we build Python and its
 # requirements in a legacy OS (such as Centos 6) to achieve binary compatibility, we also have to build many essential
@@ -50,6 +50,7 @@ set -e
 source ~/.bashrc
 
 
+DESTDIR_ROOT=/tmp/root
 
 mkdir /tmp/build-xz
 pushd /tmp/build-xz
@@ -57,9 +58,11 @@ tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/xz/xz.tar.gz"
 pushd "xz-${XZ_VERSION}"
 ./configure CFLAGS="-fPIC" --enable-shared=no --disable-xzdec --disable-lzmadec
 make -j "$(nproc)"
-make install
+make DESTDIR="${DESTDIR_ROOT}" install
 popd
 popd
+
+
 
 
 
@@ -147,7 +150,7 @@ tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/zlib/zlib.tar.gz"
 pushd "zlib-${ZLIB_VERSION}"
 CFLAGS="-fPIC" ./configure  --static
 make -j "$(nproc)"
-make install
+make DESTDIR="${DESTDIR_ROOT}" install
 popd
 popd
 
@@ -156,10 +159,9 @@ mkdir /tmp/build-bzip
 pushd /tmp/build-bzip
 tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/bzip2/bzip2.tar.gz"
 pushd "bzip2-${BZIP_VERSION}"
-make install CFLAGS="-fPIC" PREFIX=/usr/local -j "$(nproc)"
+make install  CFLAGS="-fPIC" PREFIX="${DESTDIR_ROOT}/usr/local" -j "$(nproc)"
 popd
 popd
-
 
 
 mkdir /tmp/build-util-linux
@@ -168,7 +170,7 @@ tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/util-linux/util-linux.tar"
 pushd "util-linux-${UTIL_LINUX_VERSION}"
 CFLAGS="-fPIC" ./configure --disable-all-programs --prefix=/usr/local --enable-libuuid --enable-shared=no
 make -j "$(nproc)"
-make install
+make DESTDIR="${DESTDIR_ROOT}"  install
 popd
 popd
 
@@ -179,6 +181,7 @@ tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/ncurses/ncurses.tar.gz"
 pushd "ncurses-${NCURSES_VERSION}"
 CFLAGS="-fPIC" ./configure --prefix=/usr/local
 make -j "$(nproc)"
+make DESTDIR="${DESTDIR_ROOT}" install
 make install
 popd
 popd
@@ -194,7 +197,7 @@ pushd "libedit-${LIBEDIT_VERSION}"
   LD_LIBRARY_PATH="/usr/local/lib:/usr/local/lib64:${LD_LIBRARY_PATH}" \
   --enable-shared=no
 make -j "$(nproc)"
-make install
+make DESTDIR="${DESTDIR_ROOT}" install
 popd
 popd
 
@@ -205,7 +208,7 @@ tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/gdbm/gdbm.tar.gz"
 pushd "gdbm-${GDBM_VERSION}"
 CFLAGS="-fPIC" ./configure --enable-shared=no
 make -j "$(nproc)"
-make install
+make DESTDIR="${DESTDIR_ROOT}" install
 popd
 popd
 
@@ -218,20 +221,20 @@ mkdir build
 pushd build
 CFLAGS="-fPIC" ../configure --enable-shared=no
 make -j "$(nproc)"
-make install
+make DESTDIR="${DESTDIR_ROOT}" install
 popd
 popd
 popd
 
 
-mkdir /tmp/build-openssl
-pushd /tmp/build-openssl
-tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/openssl/openssl.tar.gz"
-pushd "openssl-${OPENSSL_VERSION}"
-./config -fPIC no-shared
-make -j "$(nproc)"
-make install_sw
-popd
+#mkdir /tmp/build-openssl
+#pushd /tmp/build-openssl
+#tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/openssl/openssl.tar.gz"
+#pushd "openssl-${OPENSSL_VERSION}"
+#./config
+#make -j "$(nproc)"
+#make DESTDIR="${STEP_OUTPUT_PATH}/openssl" install_sw
+#popd
 
 
-rm -r /tmp/build*
+tar -czvf "${STEP_OUTPUT_PATH}/common.tar.gz" -C "${DESTDIR_ROOT}" .

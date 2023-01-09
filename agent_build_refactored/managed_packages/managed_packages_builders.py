@@ -81,7 +81,8 @@ AGENT_PACKAGE_NAME = "scalyr-agent-2"
 EMBEDDED_PYTHON_VERSION = "3.11.0"
 EMBEDDED_PYTHON_SHORT_VERSION = ".".join(EMBEDDED_PYTHON_VERSION.split(".")[:2])
 
-PYTHON_PACKAGE_SSL_VERSION = "1.1.1k"
+PYTHON_PACKAGE_SSL_1_1_1_VERSION = "1.1.1k"
+PYTHON_PACKAGE_SSL_3_VERSION = "3.0.7"
 
 AGENT_LIBS_REQUIREMENTS_CONTENT = f"{REQUIREMENTS_COMMON}\n" \
                                   f"{REQUIREMENTS_COMMON_PLATFORM_DEPENDENT}"
@@ -1040,6 +1041,110 @@ class LinuxDependencyPackagesBuilder(Runner):
             logging.error(f"Unknown command {args.command}.")
             exit(1)
 
+DDD={}
+
+
+def create_build_openssl_steps(
+        use_openssl_3: bool = False
+) -> Dict[Architecture, ArtifactRunnerStep]:
+    steps = {}
+
+    if use_openssl_3:
+        script_name = "build_openssl_3.sh"
+        openssl_version = PYTHON_PACKAGE_SSL_3_VERSION
+    else:
+        script_name = "build_openssl_1_1_1.sh"
+        openssl_version = PYTHON_PACKAGE_SSL_1_1_1_VERSION
+
+    for architecture in SUPPORTED_ARCHITECTURES:
+        run_in_remote_docker = architecture != Architecture.X86_64
+
+        step = ArtifactRunnerStep(
+            name=f"build_openssl_{architecture.value}",
+            script_path=f"agent_build_refactored/managed_packages/steps/build_openssl/{script_name}",
+            base=INSTALL_BUILD_ENVIRONMENT_STEPS[architecture],
+            required_steps={
+                "DOWNLOAD_BUILD_DEPENDENCIES": DOWNLOAD_PYTHON_DEPENDENCIES,
+            },
+            environment_variables={
+                "OPENSSL_VERSION": openssl_version,
+            },
+            github_actions_settings=GitHubActionsSettings(
+                run_in_remote_docker=run_in_remote_docker
+            )
+        )
+        steps[architecture] = step
+
+    return steps
+
+
+def create_install_build_environment_steps():
+    steps = {}
+    for architecture in SUPPORTED_ARCHITECTURES:
+        run_in_remote_docker = True
+        if architecture == Architecture.X86_64:
+            script_name = "install_gcc_ubuntu_14.sh"
+            docker_image_name = "ubuntu:14.04"
+            run_in_remote_docker = False
+        elif architecture == Architecture.ARM64:
+            script_name = "install_gcc_7_arm64.sh"
+            docker_image_name = "centos:7"
+        else:
+            raise Exception(f"Unsupported architecture: {architecture.value}")
+
+        step = EnvironmentRunnerStep(
+            name=f"install_build_environment_{architecture.value}",
+            script_path=f"agent_build_refactored/managed_packages/steps/{script_name}",
+            base=DockerImageSpec(
+                name=docker_image_name,
+                platform=architecture.as_docker_platform.value
+            ),
+            github_actions_settings=GitHubActionsSettings(
+                run_in_remote_docker=run_in_remote_docker
+            )
+        )
+        steps[architecture] = step
+
+    return steps
+
+
+_PYTHON_BUILD_DEPENDENCIES_VERSIONS = {
+    "XZ_VERSION": "5.2.6",
+    "PERL_VERSION": "5.36.0",
+    "TEXINFO_VERSION": "6.8",
+    "M4_VERSION": "1.4.19",
+    "LIBTOOL_VERSION": "2.4.6",
+    "AUTOCONF_VERSION": "2.71",
+    "AUTOMAKE_VERSION": "1.16",
+    "HELP2MAN_VERSION": "1.49.2",
+    "LZMA_VERSION": "4.32.7",
+    "OPENSSL_1_1_1_VERSION": PYTHON_PACKAGE_SSL_1_1_1_VERSION,
+    "OPENSSL_3_VERSION": PYTHON_PACKAGE_SSL_3_VERSION,
+    "LIBFFI_VERSION": "3.4.2",
+    "UTIL_LINUX_VERSION": "2.38",
+    "NCURSES_VERSION": "6.3",
+    "LIBEDIT_VERSION": "20210910-3.1",
+    "GDBM_VERSION": "1.23",
+    "ZLIB_VERSION": "1.2.13",
+    "BZIP_VERSION": "1.0.8",
+}
+
+DOWNLOAD_PYTHON_DEPENDENCIES = ArtifactRunnerStep(
+        name="download_build_dependencies",
+        script_path="agent_build_refactored/managed_packages/steps/download_build_dependencies/download_build_dependencies.sh",
+        tracked_files_globs=[
+            "agent_build_refactored/managed_packages/steps/download_build_dependencies/gnu-keyring.gpg",
+            "agent_build_refactored/managed_packages/steps/download_build_dependencies/gpgkey-5C1D1AA44BE649DE760A.gpg",
+        ],
+        base=DockerImageSpec(
+            name="ubuntu:22.04",
+            platform=DockerPlatform.AMD64.value
+        ),
+        environment_variables={
+            **_PYTHON_BUILD_DEPENDENCIES_VERSIONS,
+        }
+
+    )
 
 def create_build_dependencies_steps(
 ) -> Dict[Architecture, EnvironmentRunnerStep]:
@@ -1049,26 +1154,6 @@ def create_build_dependencies_steps(
     :param run_in_remote_docker: If possible, run this step in remote docker engine.
     :return: Result step.
     """
-
-    build_dependencies_versions = {
-        "XZ_VERSION": "5.2.6",
-        "PERL_VERSION": "5.36.0",
-        "TEXINFO_VERSION": "6.8",
-        "M4_VERSION": "1.4.19",
-        "LIBTOOL_VERSION": "2.4.6",
-        "AUTOCONF_VERSION": "2.71",
-        "AUTOMAKE_VERSION": "1.16",
-        "HELP2MAN_VERSION": "1.49.2",
-        "LZMA_VERSION": "4.32.7",
-        "OPENSSL_VERSION": PYTHON_PACKAGE_SSL_VERSION,
-        "LIBFFI_VERSION": "3.4.2",
-        "UTIL_LINUX_VERSION": "2.38",
-        "NCURSES_VERSION": "6.3",
-        "LIBEDIT_VERSION": "20210910-3.1",
-        "GDBM_VERSION": "1.23",
-        "ZLIB_VERSION": "1.2.13",
-        "BZIP_VERSION": "1.0.8",
-    }
 
     download_build_dependencies = ArtifactRunnerStep(
         name="download_build_dependencies",
@@ -1082,16 +1167,18 @@ def create_build_dependencies_steps(
             platform=DockerPlatform.AMD64.value
         ),
         environment_variables={
-            **build_dependencies_versions
+            **_PYTHON_BUILD_DEPENDENCIES_VERSIONS
         }
 
     )
 
     steps = {}
     for arch in SUPPORTED_ARCHITECTURES:
+        DDD[arch] = download_build_dependencies
         run_in_remote_docker = True
         if arch == Architecture.X86_64:
             base_image = INSTALL_GCC_7_GLIBC_X86_64
+            base_image = INSTALL_GCC_7_UBUNTU_1404
             run_in_remote_docker = False
         elif arch == Architecture.ARM64:
             base_image = INSTALL_GCC_7_GLIBC_ARM64
@@ -1106,7 +1193,7 @@ def create_build_dependencies_steps(
                 "DOWNLOAD_BUILD_DEPENDENCIES": download_build_dependencies
             },
             environment_variables={
-                **build_dependencies_versions,
+                **_PYTHON_BUILD_DEPENDENCIES_VERSIONS,
             },
             github_actions_settings=GitHubActionsSettings(
                 run_in_remote_docker=run_in_remote_docker
@@ -1117,7 +1204,42 @@ def create_build_dependencies_steps(
     return steps
 
 
-def create_build_python_steps() -> Dict[Architecture, ArtifactRunnerStep]:
+def create_build_python_dependencies_steps(
+) -> Dict[Architecture, ArtifactRunnerStep]:
+    """
+    This function creates step that installs Python build requirements, to a given environment.
+    :param base_image: Environment step runner with the target environment.
+    :param run_in_remote_docker: If possible, run this step in remote docker engine.
+    :return: Result step.
+    """
+
+    steps = {}
+    for architecture in SUPPORTED_ARCHITECTURES:
+        run_in_remote_docker = architecture != Architecture.X86_64
+        DDD[architecture] = DOWNLOAD_PYTHON_DEPENDENCIES
+
+        step = ArtifactRunnerStep(
+            name=f"build_python_dependencies_{architecture.value}",
+            script_path="agent_build_refactored/managed_packages/steps/build_python_dependencies.sh",
+            base=INSTALL_BUILD_ENVIRONMENT_STEPS[architecture],
+            required_steps={
+                "DOWNLOAD_BUILD_DEPENDENCIES": DOWNLOAD_PYTHON_DEPENDENCIES
+            },
+            environment_variables={
+                **_PYTHON_BUILD_DEPENDENCIES_VERSIONS,
+            },
+            github_actions_settings=GitHubActionsSettings(
+                run_in_remote_docker=run_in_remote_docker
+            )
+        )
+        steps[architecture] = step
+
+    return steps
+
+
+def create_build_python_steps(
+        build_openssl_steps: Dict[Architecture, ArtifactRunnerStep]
+) -> Dict[Architecture, ArtifactRunnerStep]:
     """
     Function that creates step instances that build Python interpreter.
     :return: Result steps mapped to architectures..
@@ -1130,13 +1252,18 @@ def create_build_python_steps() -> Dict[Architecture, ArtifactRunnerStep]:
     for architecture in SUPPORTED_ARCHITECTURES:
         run_in_remote_docker = architecture != Architecture.X86_64
 
-        build_python_initial = ArtifactRunnerStep(
+        build_python_initial  =ArtifactRunnerStep(
             name=f"build_python_initial_{architecture.value}",
             script_path="agent_build_refactored/managed_packages/steps/build_python_initial.sh",
-            base=INSTALL_BUILD_DEPENDENCIES_STEPS[architecture],
+            base=INSTALL_BUILD_ENVIRONMENT_STEPS[architecture],
+            required_steps={
+                "BUILD_PYTHON_DEPENDENCIES": BUILD_PYTHON_DEPENDENCIES_STEPS[architecture],
+                "BUILD_OPENSSL": build_openssl_steps[architecture]
+            },
             environment_variables={
                 "PYTHON_VERSION": EMBEDDED_PYTHON_VERSION,
                 "INSTALL_PREFIX": install_prefix,
+
             },
             github_actions_settings=GitHubActionsSettings(
                 run_in_remote_docker=run_in_remote_docker
@@ -1155,7 +1282,9 @@ def create_build_python_steps() -> Dict[Architecture, ArtifactRunnerStep]:
                 "INSTALL_PREFIX": install_prefix,
             },
             required_steps={
-                "BUILD_PYTHON_INITIAL": build_python_initial
+                "BUILD_PYTHON_DEPENDENCIES": BUILD_PYTHON_DEPENDENCIES_STEPS[architecture],
+                "BUILD_PYTHON_INITIAL": build_python_initial,
+                "DOWNLOAD_BUILD_DEPENDENCIES": DDD[architecture]
             },
             github_actions_settings=GitHubActionsSettings(
                 cacheable=True
@@ -1181,21 +1310,33 @@ def create_build_python_package_root_steps() -> Dict[Architecture, ArtifactRunne
 
     for architecture in SUPPORTED_ARCHITECTURES:
 
+        if architecture in [Architecture.ARM64]:
+            libssl_dir = "/usr/local/lib64"
+        else:
+            libssl_dir = "/usr/local/lib"
+
         step = ArtifactRunnerStep(
             name="build_python_package_root",
             script_path="agent_build_refactored/managed_packages/steps/build_python_package_root.sh",
             tracked_files_globs=[
                 "agent_build_refactored/managed_packages/files/python3",
             ],
-            base=INSTALL_BUILD_DEPENDENCIES_STEPS[Architecture.X86_64],
+            # base=DockerImageSpec(
+            #     name="ubuntu:22.04",
+            #     platform=architecture.as_docker_platform.value
+            # ),
+            base=PREPARE_TOOLSET_STEPS[architecture],
             required_steps={
-                "BUILD_PYTHON": BUILD_PYTHON_STEPS[architecture]
+                "BUILD_PYTHON_WITH_OPENSSL_1_1_1": BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[architecture],
+                "BUILD_PYTHON_WITH_OPENSSL_3": BUILD_PYTHON_WITH_OPENSSL_3_STEPS[architecture],
+                "BUILD_PYTHON_DEPENDENCIES": BUILD_PYTHON_DEPENDENCIES_STEPS[architecture],
             },
             environment_variables={
                 "PYTHON_VERSION": EMBEDDED_PYTHON_VERSION,
                 "PYTHON_SHORT_VERSION": EMBEDDED_PYTHON_SHORT_VERSION,
                 "INSTALL_PREFIX": "/opt/scalyr-agent-2-dependencies",
-                "SUBDIR_NAME": AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME
+                "SUBDIR_NAME": AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME,
+                "LIBSSL_DIR": libssl_dir,
             },
 
         )
@@ -1216,9 +1357,9 @@ def create_build_dev_requirements_steps() -> Dict[Architecture, ArtifactRunnerSt
             tracked_files_globs=[
                 "dev-requirements-new.txt",
             ],
-            base=INSTALL_BUILD_DEPENDENCIES_STEPS[architecture],
+            base=INSTALL_BUILD_ENVIRONMENT_STEPS[architecture],
             required_steps={
-                "BUILD_PYTHON": BUILD_PYTHON_STEPS[architecture]
+                "BUILD_PYTHON": BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[architecture]
             },
             environment_variables={
                 "PYTHON_SHORT_VERSION": EMBEDDED_PYTHON_SHORT_VERSION,
@@ -1252,9 +1393,9 @@ def create_build_agent_libs_venv_steps() -> Dict[Architecture, ArtifactRunnerSte
             tracked_files_globs=[
                 "dev-requirements-new.txt",
             ],
-            base=INSTALL_BUILD_DEPENDENCIES_STEPS[architecture],
+            base=INSTALL_BUILD_ENVIRONMENT_STEPS[architecture],
             required_steps={
-                "BUILD_PYTHON": BUILD_PYTHON_STEPS[architecture],
+                "BUILD_PYTHON": BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[architecture],
                 "BUILD_DEV_REQUIREMENTS": BUILD_DEV_REQUIREMENTS_STEPS[architecture]
             },
             environment_variables={
@@ -1332,12 +1473,34 @@ INSTALL_GCC_7_GLIBC_ARM64 = EnvironmentRunnerStep(
         )
     )
 
-# Steps that installs Python build requirements to the build environment.
-INSTALL_BUILD_DEPENDENCIES_STEPS = create_build_dependencies_steps()
+INSTALL_GCC_7_UBUNTU_1404 = EnvironmentRunnerStep(
+        name="install_gcc_7_ubuntu_14",
+        script_path="agent_build_refactored/managed_packages/steps/install_gcc_ubuntu_14.sh",
+        base=DockerImageSpec(
+            name="ubuntu:14.04",
+            platform=DockerPlatform.AMD64.value
+        ),
+        github_actions_settings=GitHubActionsSettings(
+            cacheable=True,
+            #run_in_remote_docker=True
+        )
+    )
+
+
+## Steps that installs Python build requirements to the build environment.
+#INSTALL_BUILD_DEPENDENCIES_STEPS = create_build_python_dependencies_steps()
+
+INSTALL_BUILD_ENVIRONMENT_STEPS = create_install_build_environment_steps()
+
+BUILD_PYTHON_DEPENDENCIES_STEPS = create_build_python_dependencies_steps()
+
+BUILD_OPENSSL_1_1_1_STEPS = create_build_openssl_steps()
+BUILD_OPENSSL_3_STEPS = create_build_openssl_steps()
 
 
 # Create step that builds Python interpreter.
-BUILD_PYTHON_STEPS = create_build_python_steps()
+BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS = create_build_python_steps(build_openssl_steps=BUILD_OPENSSL_1_1_1_STEPS)
+BUILD_PYTHON_WITH_OPENSSL_3_STEPS = create_build_python_steps(build_openssl_steps=BUILD_OPENSSL_3_STEPS)
 
 BUILD_DEV_REQUIREMENTS_STEPS = create_build_dev_requirements_steps()
 
@@ -1361,8 +1524,8 @@ def create_prepare_toolset_steps() -> Dict[Architecture, EnvironmentRunnerStep]:
             script_path="agent_build_refactored/managed_packages/steps/prepare_toolset.sh",
             base=base_image,
             required_steps={
-                "BUILD_PYTHON": BUILD_PYTHON_STEPS[architecture],
-                "BUILD_DEV_REQUIREMENTS": BUILD_DEV_REQUIREMENTS_STEPS[architecture]
+                "BUILD_PYTHON": BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[architecture],
+                "BUILD_DEV_REQUIREMENTS": BUILD_DEV_REQUIREMENTS_STEPS[architecture],
             },
             environment_variables={
                 "SUBDIR_NAME": AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME,

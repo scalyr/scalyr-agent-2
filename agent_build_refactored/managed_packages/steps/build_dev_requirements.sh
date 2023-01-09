@@ -26,12 +26,12 @@
 
 set -e
 
+# Copy python interpreter, which is built by the previous step.
+cp -a "${BUILD_PYTHON}/dev_python_root/." /
+
 # shellcheck disable=SC1090
 source ~/.bashrc
-
-# Copy python interpreter, which is built by the previous step.
-
-cp -a "${BUILD_PYTHON}/." /
+ldconfig
 
 # First install Rust, in order to be able to build some of required libraries.
 cd ~
