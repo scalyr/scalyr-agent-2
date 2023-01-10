@@ -16,8 +16,7 @@
 """
 This script serves as executable that allows to create/recreate venv for the Linux Agent requirements.
 """
-
-
+import argparse
 import pathlib as pl
 import shutil
 import subprocess
@@ -25,12 +24,15 @@ import subprocess
 DEPENDENCIES_PACKAGE_ROOT = pl.Path("/opt/scalyr-agent-2-dependencies")
 
 
-def main():
-    core_requirements_path = DEPENDENCIES_PACKAGE_ROOT / "etc/core-requirements.txt"
+def initialize():
+    core_requirements_path = DEPENDENCIES_PACKAGE_ROOT / "core-requirements.txt"
     additional_requirements_path = pl.Path("/etc/scalyr-agent-2/additional-requirements.txt")
 
     venv_source_dir = DEPENDENCIES_PACKAGE_ROOT / "venv"
     venv_dst_dir = pl.Path("/var/opt/scalyr-agent-2-dependencies/venv")
+
+    if venv_dst_dir.exists():
+        shutil.rmtree(venv_dst_dir)
 
     shutil.copytree(
         venv_source_dir,
@@ -44,7 +46,6 @@ def main():
             "-m",
             "pip",
             "install",
-            #"--quiet",
             "-r", str(core_requirements_path),
             "-r", str(additional_requirements_path),
         ]
@@ -52,7 +53,16 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser()
+
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    initialize_parser = subparsers.add_parser("initialize")
+
+    args = parser.parse_args()
+
+    if args.command == "initialize":
+        initialize()
 
 
 

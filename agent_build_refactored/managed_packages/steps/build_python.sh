@@ -18,20 +18,7 @@
 #   SOURCE_ROOT: Path to the projects root.
 #   STEP_OUTPUT_PATH: Path to the step's output directory.
 #
-# This script builds Python interpreter from source and then also modifies the result filesystem structure. In short:
-#   all installation files of the built Python interpreter have to be located in its special sub-directory.
-#   This is crucial, because we have to make sure that Python dependency package won't affect any existing Python
-#   installations. For example, instead of filesystem hierarchy of a "normal" package:
-#       /usr
-#          bin/<package_files>
-#          lib/<package_files>
-#          share/<package_files>
-#          include/<package_files>
-#       <etc?
-#   the result package is expected to be:
-#       /usr
-#          lib/<subdir>/<exec-prefix>       // Prefix directory with all platform-dependent files.
-#          share/<subdir>/<prefix>          // Prefix directory with all platform-independent files.
+# This script builds from source the Python interpreter for the Agent's dependency package.
 #
 #
 # It expects next environment variables:
@@ -46,18 +33,17 @@ set -e
 source ~/.bashrc
 
 tar -xzvf "${BUILD_PYTHON_DEPENDENCIES}/common.tar.gz" -C /
-cp -a "${BUILD_OPENSSL}/openssl/." /
+cp -a "${BUILD_OPENSSL}/." /
+ldconfig
 
 
 mkdir /tmp/build-python
 pushd /tmp/build-python
-curl -L "https://github.com/python/cpython/archive/refs/tags/v${PYTHON_VERSION}.tar.gz" > python.tar.gz
-tar -xvf python.tar.gz
-pushd "cpython-${PYTHON_VERSION}"
+tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/python/python.tgz"
+pushd "Python-${PYTHON_VERSION}"
 mkdir build
 pushd build
 
-# Configure Python. Also provide options to store result files in sub-directories.
 ../configure \
   CFLAGS="-I/usr/local/include -I/usr/local/include/ncurses" \
   LDFLAGS="-L/usr/local/lib -L/usr/local/lib64" \
@@ -68,9 +54,6 @@ pushd build
 	--prefix="${INSTALL_PREFIX}" \
 	--exec-prefix="${INSTALL_PREFIX}" \
 	--with-ensurepip=upgrade \
-
-#cp "config.log" "${STEP_OUTPUT_PATH}"
-#exit 0
 
 #		--enable-optimizations \
 #	--with-lto \
@@ -83,3 +66,16 @@ popd
 popd
 popd
 
+# Install the 'patchelf' tool in order to be able to patch Python modules and libraries.
+cp -a "${STEP_OUTPUT_PATH}/." /
+LD_LIBRARY_PATH="${INSTALL_PREFIX}/lib" "${INSTALL_PREFIX}/bin/python3" -m pip install \
+  --root "/tmp/patchelf_root" "patchelf==0.17.0.0"
+
+cp -a "/tmp/patchelf_root/." "${STEP_OUTPUT_PATH}"
+cp -a "/tmp/patchelf_root/." /
+
+# Patch Python executable and hardcode libpython.so, so runtime linker does not have to search for it.
+"${INSTALL_PREFIX}/bin/patchelf" --replace-needed \
+  "libpython${PYTHON_SHORT_VERSION}.so.1.0" \
+  "${INSTALL_PREFIX}/lib/libpython${PYTHON_SHORT_VERSION}.so.1.0" \
+  "${STEP_OUTPUT_PATH}${INSTALL_PREFIX}/bin/python${PYTHON_SHORT_VERSION}"

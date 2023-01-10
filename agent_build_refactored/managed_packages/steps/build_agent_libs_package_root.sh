@@ -18,11 +18,7 @@
 #   SOURCE_ROOT: Path to the projects root.
 #   STEP_OUTPUT_PATH: Path to the step's output directory.
 #
-# This script downloads and builds Python libraries that are required by the agent.
-# it produces two directories:
-#     - dev_libs - root for all project requirement libraries. Mainly supposed to be used in various build and testing
-#         tools and images.
-#     - agent_libs: root for the agent_libs package. It contains only libraries that are required by the agent.
+# This script prepares root of the Agent's dependency package with Agent's requirement Python libraries.
 
 set -e
 
@@ -32,22 +28,26 @@ source ~/.bashrc
 PACKAGE_ROOT="${STEP_OUTPUT_PATH}/root"
 mkdir -p "${PACKAGE_ROOT}"
 
+# Copy venv with Agent's requirements from the previous step output.
 VENV_DIR="${PACKAGE_ROOT}/opt/${SUBDIR_NAME}/venv"
 mkdir -p "${VENV_DIR}"
 cp -a "${BUILD_AGENT_LIBS}/venv/." "${VENV_DIR}"
 
 
+# Create core requirements file.
 mkdir -p "${PACKAGE_ROOT}/opt/${SUBDIR_NAME}/etc"
-echo "${REQUIREMENTS}" > "${PACKAGE_ROOT}/opt/${SUBDIR_NAME}/etc/core-requirements.txt"
+echo "${REQUIREMENTS}" > "${PACKAGE_ROOT}/opt/${SUBDIR_NAME}/core-requirements.txt"
 
+# Copy additional requirements file.
 mkdir -p "${PACKAGE_ROOT}/etc/scalyr-agent-2"
-cp "${SOURCE_ROOT}/agent_build_refactored/managed_packages/files/config/additional-requirements.txt" "${PACKAGE_ROOT}/etc/scalyr-agent-2"
+cp "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_libs/additional-requirements.txt" "${PACKAGE_ROOT}/etc/scalyr-agent-2"
 
+# Copy executable that allows configure the package.
 mkdir -p "${PACKAGE_ROOT}/opt/${SUBDIR_NAME}/bin"
-cp "${SOURCE_ROOT}/agent_build_refactored/managed_packages/files/recreate_venv" "${PACKAGE_ROOT}/opt/${SUBDIR_NAME}/bin"
+cp "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_libs/agent-libs-config" "${PACKAGE_ROOT}/opt/${SUBDIR_NAME}/bin"
 
+# Copy scriptlets of the package.
 PACKAGE_SCRIPTLETS_DIR="${STEP_OUTPUT_PATH}/scriptlets"
 mkdir -p "${PACKAGE_SCRIPTLETS_DIR}"
-
-cp "agent_build_refactored/managed_packages/install-scriptlets/scalyr-agent-libs/postinstall.sh" "${PACKAGE_SCRIPTLETS_DIR}"
+cp "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_libs/install-scriptlets/postinstall.sh" "${PACKAGE_SCRIPTLETS_DIR}"
 

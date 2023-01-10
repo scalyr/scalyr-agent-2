@@ -47,14 +47,26 @@ class DockerPlatformInfo:
 
     @property
     def as_architecture(self):
-        if "amd64" in str(self):
+        name = str(self)
+        if "amd64" in name:
             return Architecture.X86_64
 
-        if "arm64" in str(self) or "arm/v8" in str(self):
+        if "arm64" in name or "arm/v8" in name:
             return Architecture.ARM64
 
-        if "arm/v7" in str(self):
+        if "arm/v7" in name:
             return Architecture.ARMV7
+
+        if "s390x" in name:
+             return Architecture.S390X
+
+        if "mips64le" in name:
+            return Architecture.MIPS64LE
+
+        if "riscv64" in name:
+            return Architecture.RISCV
+
+
 
         return Architecture.UNKNOWN
 
@@ -66,6 +78,10 @@ class DockerPlatform(enum.Enum):
     ARM = DockerPlatformInfo("linux", "arm")
     ARMV7 = DockerPlatformInfo("linux", "arm", "v7")
     ARMV8 = DockerPlatformInfo("linux", "arm", "v8")
+    RISCV = DockerPlatformInfo("linux", "riscv64")
+    PPC64LE = DockerPlatformInfo("linux", "ppc64le")
+    S390X = DockerPlatformInfo("linux", "s390x")
+    MIPS64LE = DockerPlatformInfo("linux", "mips64le")
 
 
 class Architecture(enum.Enum):
@@ -78,6 +94,10 @@ class Architecture(enum.Enum):
     ARM = "arm"
     ARMV7 = "armv7"
     ARMV8 = "armv8"
+    RISCV = "riscv64"
+    PPC64LE = "ppc64le"
+    S390X = "s390x"
+    MIPS64LE = "mips64le"
     UNKNOWN = "unknown"
 
     @property
@@ -94,6 +114,10 @@ class Architecture(enum.Enum):
         mapping = {
             Architecture.X86_64: "amd64",
             Architecture.ARM64: "arm64",
+            Architecture.RISCV: "riscv64",
+            Architecture.PPC64LE: "ppc64el",
+            Architecture.S390X: "s390x",
+            Architecture.MIPS64LE: "mips64el",
             Architecture.UNKNOWN: "all"
         }
 
@@ -104,6 +128,10 @@ class Architecture(enum.Enum):
         mapping = {
             Architecture.X86_64: "x86_64",
             Architecture.ARM64: "aarch64",
+            Architecture.RISCV: "riscv64",
+            Architecture.PPC64LE: "ppc64le",
+            Architecture.S390X: "s390x",
+            Architecture.MIPS64LE: "mips64el",
             Architecture.UNKNOWN: "noarch"
         }
         return mapping[self]
@@ -123,8 +151,12 @@ _ARCHITECTURE_TO_DOCKER_PLATFORM = {
     Architecture.ARM: DockerPlatform.ARM,
     Architecture.ARMV7: DockerPlatform.ARMV7,
     Architecture.ARMV8: DockerPlatform.ARMV8,
+    Architecture.RISCV: DockerPlatform.RISCV,
+    Architecture.MIPS64LE: DockerPlatform.MIPS64LE,
+    Architecture.PPC64LE: DockerPlatform.PPC64LE,
+    Architecture.S390X: DockerPlatform.S390X,
     # Handle unknown architecture value as x86_64
-    Architecture.UNKNOWN: DockerPlatform.AMD64,
+    #Architecture.UNKNOWN: DockerPlatform.AMD64,
 }
 
 
@@ -177,4 +209,3 @@ _REQUIREMENT_FILE_COMPONENTS = _parse_requirements_file()
 
 REQUIREMENTS_COMMON = _REQUIREMENT_FILE_COMPONENTS["COMMON"]
 REQUIREMENTS_COMMON_PLATFORM_DEPENDENT = _REQUIREMENT_FILE_COMPONENTS["COMMON_PLATFORM_DEPENDENT"]
-a=10

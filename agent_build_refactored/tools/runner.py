@@ -992,10 +992,17 @@ class Runner:
                 return None
 
             # Get EC2 AMI image according to step's architecture.
+
             ec2_image = DOCKER_EC2_BUILDERS.get(step.architecture)
             # If image is not found then just run in local docker engine.
-            if ec2_image is None:
-                return None
+            if ec2_image is None and step.architecture != Architecture.X86_64:
+                ec2_image = EC2DistroImage(
+                    image_id="ami-09d56f8956ab235b3",
+                    image_name="Ubuntu Server 22.04 (HVM), SSD Volume Type",
+                    short_name="ubuntu2204",
+                    size_id="t2.2xlarge",
+                    ssh_username="ubuntu",
+                )
 
             # Try to find already created node if it is created by previous steps.
             remote_docker_host = existing_ec2_hosts.get(step.architecture)
@@ -1104,6 +1111,9 @@ class Runner:
         """
         Handle parsed command line arguments and perform needed actions.
         """
+
+        cleanup()
+
         if args.get_all_cacheable_steps:
             steps = cls.get_all_cacheable_steps()
             steps_ids = [step.id for step in steps]
@@ -1158,6 +1168,7 @@ def run_docker_command(
     if return_output:
         return subprocess.check_output(
             final_command,
+            env=env
         )
 
     subprocess.check_call(
@@ -1205,5 +1216,5 @@ def cleanup():
         "docker", "system", "prune", "-f", "--volumes"
     ])
     check_output_with_log_debug([
-        "docker", "system", "prune", "-f"
+        "docker", "system", "prune", "-f" "-a"
     ])

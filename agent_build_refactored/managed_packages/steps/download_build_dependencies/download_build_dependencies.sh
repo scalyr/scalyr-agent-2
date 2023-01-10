@@ -18,21 +18,11 @@
 #   SOURCE_ROOT: Path to the projects root.
 #   STEP_OUTPUT_PATH: Path to the step's output directory.
 #
-# This script downloads source files for all libraries that are required to build Python. Since we build Python and its
-# requirements in a legacy OS (such as Centos 6) to achieve binary compatibility, we also have to build many essential
-# build tools because tools from legacy OS's ate too old.
+# This script downloads source files for all libraries that are required to build Python.
 #
 # It expects next environment variables:
 #
 #   XZ_VERSION: version of XZ Utils to build. Python requirement. ALso required by some make and configure scripts.
-#   PERL_VERSION: version of Perl to build. Required by some make and configure scripts.
-#   TEXINFO_VERSION: version of texinfo to build. Required by some make and configure scripts.
-#   M4_VERSION: version of M4 to build. Required by some make and configure scripts.
-#   AUTOCONF_VERSION: version of autoconf to build. Required by some make and configure scripts.
-#   LIBTOOL_VERSION: version of libtool to build. Required by some make and configure scripts.
-#   HELP2MAN_VERSION: version of help2man to build. Required by some make and configure scripts.
-#   AUTOMAKE_VERSION: version of automake to build. Required by some make and configure scripts.
-#   LZMA_VERSION: version of lzma to build. Python requirement.
 #   ZLIB_VERSION: version of zlib to build. Python requirement. Provides zlib module.
 #   BZIP_VERSION: version of bzip to build. Python requirement. Provides bz2 module.
 #   UTIL_LINUX_VERSION: version of lzma to build. Python requirement. Provides uuid module.
@@ -40,7 +30,9 @@
 #   LIBEDIT_VERSION: version of libedit to build. Python requirement. Provides non-GPL alternative for readline module.
 #   GDBM_VERSION: version of gdbm to build. Python requirement. Provides dbm module.
 #   LIBFFI_VERSION: version of libffi to build. Python requirement. Provides ctypes module and essential for C bindings.
-#   OPENSSL_VERSION: version of OpenSSL to build. Python requirement. Provides ssl module.
+#   OPENSSL_1_1_1_VERSION: version of OpenSSL 1.1.1 to build. Python requirement. Provides ssl module.
+#   OPENSSL_3_VERSION: version of OpenSSL 3 to build. Python requirement. Provides ssl module.
+#   PYTHON_VERSION: version of Python.
 
 set -e
 
@@ -145,16 +137,6 @@ popd
 clear_public_keys
 
 
-mkdir "${STEP_OUTPUT_PATH}/perl"
-pushd "${STEP_OUTPUT_PATH}/perl"
-curl -L  "http://www.cpan.org/src/5.0/perl-${PERL_VERSION}.tar.gz" > perl.tar.gz
-
-# Public keys and signatures for perl source couldn't be found, so we just verify the checksum of the particular version.
-echo -n "e26085af8ac396f62add8a533c3a0ea8c8497d836f0689347ac5abd7b7a4e00a  perl.tar.gz" > perl.tar.gz.sha256
-sha256sum -c perl.tar.gz.sha256
-popd
-
-
 # Import gnu public key. Used for many libraries.
 echo -n "-----BEGIN PGP PUBLIC KEY BLOCK-----
 Version: GnuPG v1.2.4 (GNU/Linux)
@@ -179,52 +161,6 @@ sMB+Qkul/Hc+0BLBe+OVT6Ml1IAL
 
 GNU_KEYRING_PATH="${SOURCE_ROOT}/agent_build_refactored/managed_packages/steps/download_build_dependencies/gnu-keyring.gpg"
 
-mkdir "${STEP_OUTPUT_PATH}/texinfo"
-pushd "${STEP_OUTPUT_PATH}/texinfo"
-curl -L "https://ftp.gnu.org/gnu/texinfo/texinfo-${TEXINFO_VERSION}.tar.gz" > texinfo.tar.gz
-curl -L "https://ftp.gnu.org/gnu/texinfo/texinfo-${TEXINFO_VERSION}.tar.gz.sig" > texinfo.tar.gz.sig
-gpg --verify --keyring "${GNU_KEYRING_PATH}" texinfo.tar.gz.sig texinfo.tar.gz
-popd
-
-
-mkdir "${STEP_OUTPUT_PATH}/m4"
-pushd "${STEP_OUTPUT_PATH}/m4"
-curl -L "https://ftp.gnu.org/gnu/m4/m4-${M4_VERSION}.tar.gz" > m4.tar.gz
-curl -L "https://ftp.gnu.org/gnu/m4/m4-${M4_VERSION}.tar.gz.sig" > m4.tar.gz.sig
-gpg --verify --keyring "${GNU_KEYRING_PATH}" m4.tar.gz.sig m4.tar.gz
-popd
-
-mkdir "${STEP_OUTPUT_PATH}/autoconf"
-pushd "${STEP_OUTPUT_PATH}/autoconf"
-curl -L "http://ftp.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VERSION}.tar.gz" > autoconf.tar.gz
-curl -L "http://ftp.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VERSION}.tar.gz.sig" > autoconf.tar.gz.sig
-gpg --verify --keyring "${GNU_KEYRING_PATH}" autoconf.tar.gz.sig autoconf.tar.gz
-popd
-
-
-mkdir "${STEP_OUTPUT_PATH}/libtool"
-pushd "${STEP_OUTPUT_PATH}/libtool"
-curl -L "http://ftp.gnu.org/gnu/libtool/libtool-${LIBTOOL_VERSION}.tar.gz" > libtool.tar.gz
-curl -L "http://ftp.gnu.org/gnu/libtool/libtool-${LIBTOOL_VERSION}.tar.gz.sig" > libtool.tar.gz.sig
-gpg --verify --keyring "${GNU_KEYRING_PATH}" libtool.tar.gz.sig libtool.tar.gz
-popd
-
-
-mkdir "${STEP_OUTPUT_PATH}/help2man"
-pushd "${STEP_OUTPUT_PATH}/help2man"
-curl -L "https://ftp.gnu.org/gnu/help2man/help2man-${HELP2MAN_VERSION}.tar.xz" > help2man.tar.xz
-curl -L "https://ftp.gnu.org/gnu/help2man/help2man-${HELP2MAN_VERSION}.tar.xz.sig" > help2man.tar.xz.sig
-gpg --verify --keyring "${GNU_KEYRING_PATH}" help2man.tar.xz.sig help2man.tar.xz
-popd
-
-
-mkdir "${STEP_OUTPUT_PATH}/automake"
-pushd "${STEP_OUTPUT_PATH}/automake"
-curl -L "https://ftp.gnu.org/gnu/automake/automake-${AUTOMAKE_VERSION}.tar.gz" > automake.tar.gz
-curl -L "https://ftp.gnu.org/gnu/automake/automake-${AUTOMAKE_VERSION}.tar.gz.sig" > automake.tar.gz.sig
-# It seems that key for this library is expired, skip verification.
-# gpg --verify --keyring "${GNU_KEYRING_PATH}" automake.tar.gz.sig automake.tar.gz
-popd
 
 
 mkdir "${STEP_OUTPUT_PATH}/gdbm"
@@ -956,8 +892,6 @@ mkdir "${STEP_OUTPUT_PATH}/openssl_1_1_1"
 pushd "${STEP_OUTPUT_PATH}/openssl_1_1_1"
 curl -L "https://www.openssl.org/source/old/1.1.1/openssl-${OPENSSL_1_1_1_VERSION}.tar.gz" > openssl.tar.gz
 curl -L "https://www.openssl.org/source/old/1.1.1/openssl-${OPENSSL_1_1_1_VERSION}.tar.gz.asc" > openssl.tar.gz.asc
-
-ls -al
 gpg --verify openssl.tar.gz.asc openssl.tar.gz
 popd
 
@@ -1090,6 +1024,130 @@ pushd "${STEP_OUTPUT_PATH}/openssl_3"
 curl -L "https://www.openssl.org/source/openssl-${OPENSSL_3_VERSION}.tar.gz" > openssl.tar.gz
 curl -L "https://www.openssl.org/source/openssl-${OPENSSL_3_VERSION}.tar.gz.asc" > openssl.tar.gz.asc
 gpg --verify openssl.tar.gz.asc openssl.tar.gz
+popd
+
+
+clear_public_keys
+
+
+# Python 3 public key
+echo -n "-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+mQINBFq+ToQBEADRYvIVtbK6owynD3j3nxwpW2KEk/p+aDvtXmc2SR2dBcZ8sFW2
+R5vEsG8d3/D3wgv5pcL3KfNNXQYUnXVbobrFUUWQYc79qIsE3MgiPf5NVOtwKPUR
+i5g9YJgKvpBxkQfqp3LYGm9ZBtwo3DVLA3yn7KsazCmAgTNFJYw7ku1XxgmIzY6K
+5J30DfbJiqDqj4f9GslCCCCH3qiPnuLG/HUyVLHMpbWlaiy9NI0GcaLxjJewHj9w
+W2D2lydkxe5JGo7egUkV3ILcuLVSVKA35SKY27dYqfuyqp9tAzaRbjDYjsYdHA6G
+BqrNrKBn/GwlFDPrVdcvN3ZSY2wMLTxWE3Axc/FweuHxFnou/80FwX7F3JD+oEQ6
+rofmcxOBCC7J98I7HZAhP9jBn88XIS2hztbLq8d6rZJZRtcz0k61VR0ddO+TrFmf
+9rMYCPgCckRtVxeFIVIabrN1IzKynLFeo040h8hSGswd6YKDOVwjJY6Oa6EmVefZ
+a8QSt4+M65RSzH6SEPY008F3nJUAK6MEkzTak+tFltZNrVWu8p2xd1j9nmxAwEhZ
+/lgbxLqzYgaUWmfyHeZ8yVA0MhHzdiAL8nVUEdG3KecIq0RWCJLGLWWIjd6KAJl1
+yAmhRYKK/sjPDsL3elHsFACfZbyx3o5GGQNlas1FYoPLWbaNGaJtgFTF2QARAQAB
+tCtQYWJsbyBHYWxpbmRvIFNhbGdhZG8gPHBhYmxvZ3NhbEBnbWFpbC5jb20+iQJO
+BBMBCgA4FiEEoDXIwZIZuoIezqhrZOYo+NaEaW0FAlq+ToQCGwMFCwkIBwMFFQoJ
+CAsFFgIDAQACHgECF4AACgkQZOYo+NaEaW2bmA/+PXIap2udLoUVOHxnsIBdqYwp
+sv1Aj5lfIJmNhmxPbHShwp1Jg+w4urxe+2Dj5ofKVlIo1i83bQkvnKJMDXDVuc/K
+P6zqhBJ3rT4Q3qx2mzX8bIfQoJ2JHuH4lkP+I7doDcHHRyeNASyk72VdQmU4twNw
+Ibn8nSNV6ThKHdoPYzVnO2rZUFcGIqH5HNsvR+B7cc1MBCHsgURYwSVhSePIFGlZ
+iasdBD6QQkDSe4QWi7AcJFWFElw4kbOKJWxAWsrEk+tMXJVGRjnmL289EmPCx/vx
+BqKy7Mse0yWCSRR3vB+O6TB1S5SgEyEgqlYsfGNv1qf/rfRD4KkyCbNU3LhY1Aim
+vJP4pDW+KFxTk2Ks8vrx8gOSd2aFqPeO/pFDrpsF7PD62XwsfoXu4xc5V0Giw7r1
+Nai0nax7kOrldNF8TbbtRjW0jmoC7wLIDujAkwDIOroZ0CXA3N4HVHdSbrHm/urX
+nyxJXupXAQNwGx64JCBcbF2fp3Kvu1VAXBEFnd01KaopthHcbG5pA50Kl2Vhe+98
+OdezUX42fHkQpQkB7HgtXfm6W1bw6YRBamrNvs1OoHBYmUjlECpe566IIu25Hc8s
+x3qA+6eca7iqizyLG+WyMT8ZIYTWGAS59jxwR4esqGczbbZPSAPHFwLbGv7Wr0Rd
+TPu5B0FcKpDkTd4IxQW5Ag0EWr5O2gEQAMjLe4CtbSfofmJrz5wfNkMVsZ81Gbqe
+MoYd3dtkJnQYERUj8flzBj3ucaxGJ+Cuf7ybh3naPopKvEI1q0vkcgCDqrEgXK//
+jKJbP28uPSMGhOG28q4PbamG55gy5FtM3ezzAxPWWKe9qBpV65GMmFy7eBQx2iJs
+yiDIOOQQ4kraS+cTqNFimEXAGLCOQRNLcwIZzwAAHoW7HEpNUfVwaBD9kMlbo1ND
+I60IKcNrNcmcmRxhJqfxjj8YBMwcKHO6GBE3AVpaE/+UO9zyr4TH+0YuQUgxKlPW
+Dkg5XlkDo0S1GyLY5e9ckIDIlkTdDa2pOkoE2yB5MQCEga3YiHrKUVTTWaxn9XVJ
+6x5ZjUF6bgSWGkrG5dUqSYoO1iDMuNVjtiujNyf/rvfj5cNxS7/lgxchhQKZHZXL
+WVqxlneeVJ6s0P4+ROVG9ga2Sve7aUJ6wXIewZwulBcV2sE/W/DgxHgLBi53CUQt
+vEzFzKvo48GnDqL5VYjA7l0HMYHd4GksCLi8E8U6Cgj+imXiM8voL7pHRZfs8mY8
+udR+UT4e1Scl2MYP2qBJ9/17B/X52B3s1EZdqI/r+hfOyqrhPs+dbAN0mtMPn68+
+nrvY1+nscvrSYEP6ZBlc9Hp2mgJdb6IcTvINXBEeLRjgc3pjViva443pkiFp9Axm
+ecOckMKP3uSlABEBAAGJBGwEGAEKACAWIQSgNcjBkhm6gh7OqGtk5ij41oRpbQUC
+Wr5O2gIbAgJACRBk5ij41oRpbcF0IAQZAQoAHRYhBM/cokWxBDzypfl4Zf/odAQW
+i9hHBQJavk7aAAoJEP/odAQWi9hHr7YP/RCLre1CmOoWYpAtoa1yVCeYMDV6eQgL
+B488/BEZHQE1zbrYy16XkhORob3JF/kUMjmJW7XaFF8FrWvRcdj/xaUGbOOEulKg
+v+8zWfswYQRiZ4/JlwER4vRLi6fTE89MVER6Fkj2ASD4D2cifY+EztD4flV3sq3s
+vIogGFaN9IvdrdeptOVGXs1RmAyoTsiS2mKQ6xsGh8B9ZAm55W8fBOGiSzLX21Xk
+Ofdw53BrFQxn3cu/JgIKpdeZxgukcvEAI62B6X+YL6Na4j0eqEGLzsNtU1+xeJlo
+WtVvmRwnRHGSxF6fzIZ3mk/p/aFiXAEq/xITCTY6tDv7x7pFE/RpdlJZyNJ+R5Y4
+SQiuDsylxNCa/4G5EB6q+7iVYtbEQ9MnZg2phowEE42tlj0rz8/rvDK3LH3xibot
+KHIodCWKlWByxH99u2PuHUQ0c1oCVBUE1KkruMpvI236DpU/dvdq4JLSg/fWrys/
+VIjqLZgsIE5g/KO9XqngWHkLcBLh4CNAmHJ8Iia+s+/rfgsejQWB5uJb6eYg2JjB
+4WP1EI0rULM6fdrCNB+MJ36wE2Lnb4bfT0phOMgjjH5/Ki7ZCbkxkOsBs4SRjiS+
+weCsmpAtMqodWY/Cnw9pWSA/qLSRD5/mKeb9SO6OZ/OPfAatwnGHsvZ2sAueC6rR
+04W5BfXZWrnJUXQP/id/EKE1Ksp5fKoxSCbkKTCig+Sf5Afwe36yFN+niZBqzn5b
+BgL/HIKaZM97oDHersPPANeEgS+JVlBf95iKIYnQbZP43FLVbvOuaINhBIVtFO54
+2Y7EYwl41kP7ILDElVy36KAmdQyBAfrjnZiRA70xShOxApLug1L0lxhR3YfmLwNi
+RJ0V6KnYDKf0pfdhO9VFyFFWUojX1usn2SmSsXNizsNtvRqHXzPnX0rbJzZ9+N4O
+9k1nxygYFG/2R/jGonVmTjRzcAHrAkNJETMWXMA7/8wRMDwluz8j+cCldey9x8Vk
+JwgLGnZSbQtVpcFAnm5r/36Gt+9wc1VWMyrUrVr6Z679aqAbG7PMaeR5h5ygMj1k
+VqRTYAUPSk1f8bZKRssQkQwEbp9dVIjm9SsR8VT7/tB+UuB85dABxgHfv3psJRT+
+tL8g9V7kSZqQfcLNGmvEVvr2Zl9NtxwXtsFM2OBprxCenwb+e9Ppm1LjfJG/NE72
+mAnOERfDaiLt4bqNo36Ei5sGCJ4Fx61phzNBXzkdRNM47i8J5UZRKFkE91c99BVM
+HKUaY61NRK24fR0zP98ftDU82YFw0VRFJpTeBrO5ivN1MlQxUPzUWxKxMxO+20wa
+UOXroEw11Tb4SRLGOla1pCl6lCUPJRy9IzadPDgTr/OTMkob/snt/XLdnV5/uQIN
+BFq+TvoBEAC8Oy1g6pPWBbrCMhIq7VWY2fjylJ1fwg5BPXkOKVK1dsGYO4QD7oW9
+L0aSqcFSNFGF9Cl0Ri4TFXZC3hnG4HeSXUWApuKdBLn21H3jba36Ay1oGcGfdm0v
+Zght4c6BlMVBpGCw2wIkJbUNEy6InMM+O8CCbbaH3iJkJ4141P7pODHignx5AmZI
+conMui4YOhC+IXQXynVEv1Juk7erB1Nh1RcRvsA4lb44HWx49lIwe85ejOmoZ0O3
+6f9NJRer6bV0+rHWmg4IV5Q9h/Gn4IhEDZxA0DZl1RQI7dMgaMbIFbXGq7Kgzstz
+EUnOoy29hXodxVmwIsMrAiQUYtwJ9hW+ESsw47+W2iPHVgviGWl7r/SgcgMYmf6m
+5kiTBtwU7BQPS9G3zwwP2Rm3AA/6g39Q+tQKjOwi1I8+GZsY2On44Zly7BreBNg5
+4gJgdAGcMOYU9etr050clH3UpTYcAEtX++ahtOKhJgLIPNcIAQNlnifqvU0VYpgw
+R4YpZ7hgg+AVDzC73PIM0lFI0XiDuqChbxE+K1jmLXWe5iJF0dzgVTwP+PmsifNZ
+Wg3+YxSsS+hDMPQ2xPiQN49gT4JJDHcDuyhHyCGYgyMiVJCsku9KrkubbfVRivyN
+ZF2Zfo3f+nbrRxsftz0yjAq8byCvb0V0XOpt4pJ/ddlug9ytRxALNwARAQABiQI2
+BBgBCgAgFiEEoDXIwZIZuoIezqhrZOYo+NaEaW0FAlq+TvoCGwwACgkQZOYo+NaE
+aW3urA//UQ/cKQ7HvWjcLphzQOZc+6m5YL0wxvZkSjemU7mqjZdpacteIvRAoers
+EqXHc208liIBtNfRzoreXdcXNzie65xXkrRnWoHVH/fTWy4lOnHr2CMXLeHjUgg/
+M6PYi8+sARm05YFB8nsYhlhx3IdLhcfeVVbJedQKO0yL3CK1okT30DUVq5Lq6X/K
+DC6AxuJR3D6UMSoT0WLaoX8qbhAp88qLynInfBVL18d97h916WPLTPeP0eHwhwND
+bYtKDCMDuKQ9XX5+QsNH0RmbxlX274LHrUMMvkLKxcfCBvP+iuqrBeIuoeVzXYJZ
+j7ZJtEH79bW44eecl/CY/STFYgSQ2XGTp2BI2q60wAmtKlNhwxY5ena0FgyFl6Tm
+5OBHW/Pwo+ndQJGfbrCyWkTgRay9c8er3gl3GQYIBH6X0kCiG7h/Epj0b5CHOPU5
+hCw0kEB8MB4poTIjeiY+Q01472/lQ68CL3DX158hR5d3XaPSIxAN+qFsfB1o316p
+yjxhfK1MD/IfrOgjlggPPnc/KmLkCzpgdwKcZwLCdZq9hYBvF1Zs34HbaVMYbWTK
+uxLowtXGU43vatCXXqmPOvl4/g4tZD6rysJDgOrHQnEHzT+Napn07s0BRC0IbbNn
+FynUrkr5KMSuRz7Hg7xMApENOrb0nqdHSUJ914ZpuMIS6RhJgGu5Ag0EWr5PIAEQ
+ALfh9vPD2B+miHDTMADI8aRZ7g9tnzynZYkk3+2sCiiusetsQQ+HIPJ/ASEJB7On
+ane9dyT/LTRhrK9qaxgVMimk2COXB/xyh7Mnw7nJgFU0aRSbtX0vbvQz2suSzrQ6
+9mPKzan28JGoClqB0bw1vwf3VjjxHV2dgD57CmqFPv7kAC/2a56dE+etzXattZAL
++2JWTpmfQ0ePRRadtBm0VahQhnU8x0+jvAVrEawqpVW83ozYFyW/0WInM2J7jHgQ
+16OosY4lj5L/DxpVxaArhRFoRfWPXfC37iE8Mou/I95isvPQIhp1wTo4jG0KM02B
+oIVbp/QRNBQ6WtpOzvJs1gqQiJJTfqbKJXQ3NDEY9crpVS83HJ+Zv99PNsyNkFjG
+QpU84U3ZhsI4ygjdY45mpZueqI1RVcRQdu8Hgvoo/78Q/Sir6gMGop3mVdVo2guI
+kFcJrXh0Xk3ech4aVqrmKx/mPXGwOAQU0DAul4RW3fKg1QxQE7Tlw3+95Ee/+q5j
+HARL0uDbCJpRO8Sl8NDEuL32n/2Ot6kQeCSHrU7KJRYAkTxkKvr8zNow7hFhHFPE
+SnHvTnskI6noh0VY6NwMhmLvhm0wKkRxZPzUNc3sgLvbK1NymIZ9aKCZamzhZrmG
+vnblEz/OSLwGUua465H3hM1vvBQiartj7+6ZqWIkSmBPABEBAAGJAjYEGAEKACAW
+IQSgNcjBkhm6gh7OqGtk5ij41oRpbQUCWr5PIAIbIAAKCRBk5ij41oRpbWmeEACG
++axtDC8UoNp9ORiYwEWLzZWDuugE+ah7DYYGD4Vs633FXVZW3SgM/bFtJ/0Lg8CF
+74jI4LMHyIjDzEjcoItwnhBLix+kUoJTvrY58GPydwekLuw1p4KXLqtRs4fsZbNQ
+YTknl4jYtRWoxO98x7tun7Gq2gqmJkIB2uj630fKz5cBk6p6oDFKjzyrHe+V7BiK
+3okQPaD4x7hq8OnTy7lOy92ZZAqztS4tNEb4DkYW1MpuwsJ7hbBZitc1siI+FVVb
+GjVVGZz6ssXoW67Tz8+VxdWJxNLXlv27eMcj4sme5S0th/YYNA5fRRv6zuzqZAru
+YNGLpYYU7JLvZJ+3lCwa5j5ycOGBF0GvsGs6gj6h+CHkjR/BgzAgWC+GgUgslt6q
+aH04rWtV6rVz+Y91LcrX5P6OM4anmXD3Gp3kl35AypXb4KyASF19+11RUziD4Z7q
+wQEWfbwOltNyZv2lD8s2jPr7P02axWRQUbZAEhxRmvOQev/FZPyCF6gqUo/HxRbQ
+y3bzmnipyHSv1DlXNfCFCHvN8kGyZnRWARqIKRg+j9ediJgOUqlLhg6KmrTVxd5v
+3Dfv52PW2UODDTM20s3cQGuX/UswzMRwPI/+P44iCMwEKdm7duM/5oisZT9Vhy7g
+P15MreFZLcZvUVgjqgy0u57cstyGK1Bo9e2sFcK2fA==
+=6Zb4
+-----END PGP PUBLIC KEY BLOCK-----
+" | gpg --import
+
+
+mkdir "${STEP_OUTPUT_PATH}/python"
+pushd "${STEP_OUTPUT_PATH}/python"
+curl -L "https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz" > python.tgz
+curl -L "https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz.asc" > python.tgz.asc
+gpg --verify python.tgz.asc python.tgz
 popd
 
 

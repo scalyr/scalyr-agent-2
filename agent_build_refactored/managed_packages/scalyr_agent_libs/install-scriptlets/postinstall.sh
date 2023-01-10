@@ -13,5 +13,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-/opt/scalyr-agent-2-dependencies/bin/recreate_venv
+# Run this script in order to initialize newly installed/upgraded package.
+/opt/scalyr-agent-2-dependencies/bin/agent-libs-config initialize

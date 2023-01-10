@@ -169,15 +169,6 @@ def test_packages(
         logger.exception("Install script has failed.")
         raise
 
-    ssl_path = pl.Path("/opt/scalyr-agent-2-dependencies/lib/libssl.so")
-    cl_path = pl.Path("/opt/scalyr-agent-2-dependencies/lib/libcrypto.so")
-
-    ssl_path.unlink()
-    #cl_path.unlink()
-
-    ssl_path.symlink_to("/usr/lib/x86_64-linux-gnu/libssl.so.3")
-    #cl_path.symlink_to("/usr/lib/x86_64-linux-gnu/libcrypto.so.3")
-
     logger.info(
         "Execute simple sanity test script for the python interpreter and its libraries."
     )

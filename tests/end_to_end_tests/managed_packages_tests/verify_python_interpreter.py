@@ -59,11 +59,10 @@ assert sys.path == [
 print("Check OpenSSL")
 import ssl
 
-escaped_open_ssl_version = re.escape(PYTHON_PACKAGE_SSL_1_1_1_VERSION)
-assert re.match(
-    rf"OpenSSL {escaped_open_ssl_version}\s+\d+ [A-Za-z]+ \d+", ssl.OPENSSL_VERSION
-), f"Current version of OpenSSL does not match expected {PYTHON_PACKAGE_SSL_1_1_1_VERSION}"
-
+import hashlib
+sha256 = hashlib.sha256()
+sha256.update("123456789".encode())
+assert sha256.hexdigest() == "15e2b0d3c33891ebb0f1ef609ec419420c20e320ce94c65fbc8c3312448eb225"
 
 print("Check uuid")
 import uuid

@@ -69,8 +69,6 @@ enabled=0
 metadata_expire=never
 EOT
 
-# Install RHSCL and update its sources.
-yum install -y centos-release-scl
 
 cat <<EOT > /etc/yum.repos.d/CentOS-SCLo-scl-rh.repo
 [centos-sclo-rh]
@@ -120,16 +118,12 @@ gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-SCLo
 EOT
 
 
-# RHSCL is installed, so we can install newer tools, such as gcc-7
-yum install -y devtoolset-9
-yum install -y scl-utils
-
-# Remove this preinstalled packages, since we build and install those libraries from source.
-#yum remove -y help2man m4 perl
+# Install newer tools, such as gcc-9
+yum install -y centos-release-scl
+yum install -y devtoolset-9 perl-core
 
 echo "source /opt/rh/devtoolset-9/enable" >> ~/.bashrc
-# shellcheck disable=SC2016
-echo 'export LD_LIBRARY_PATH="/usr/local/lib:/usr/local/lib64:${LD_LIBRARY_PATH}"' >> ~/.bashrc
+echo -e "/usr/local/lib\n/usr/local/lib64" >> /etc/ld.so.conf.d/local.conf
 
 yum clean all
 rm -rf /var/cache/yum

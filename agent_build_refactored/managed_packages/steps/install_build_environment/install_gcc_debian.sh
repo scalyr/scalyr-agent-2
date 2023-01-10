@@ -25,12 +25,8 @@ set -e
 
 export DEBIAN_FRONTEND="noninteractive"
 apt-get update
-apt-get install -y software-properties-common
-add-apt-repository ppa:ubuntu-toolchain-r/test
-apt update
-apt install -y gcc-9 make curl pkg-config
-update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 1
-update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-9 1
+apt install -y gcc make curl pkg-config gcc-multilib
 
-echo -e "/usr/local/lib\n/usr/local/lib64" > /etc/ld.so.conf.d/local.conf
-echo 'ldconfig' >> ~/.bashrc
+echo -e "/usr/local/lib\n/usr/local/lib64" >> /etc/ld.so.conf.d/local.conf
+
+apt clean

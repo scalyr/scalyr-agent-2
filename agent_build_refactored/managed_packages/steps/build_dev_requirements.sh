@@ -18,19 +18,18 @@
 #   SOURCE_ROOT: Path to the projects root.
 #   STEP_OUTPUT_PATH: Path to the step's output directory.
 #
-# This script downloads and builds Python libraries that are required by the agent.
-# it produces two directories:
-#     - dev_libs - root for all project requirement libraries. Mainly supposed to be used in various build and testing
-#         tools and images.
-#     - agent_libs: root for the agent_libs package. It contains only libraries that are required by the agent.
+# This script installs all requirements of the Agent's project, including development and testing requirements.
+#
 
 set -e
 
-# Copy python interpreter, which is built by the previous step.
-cp -a "${BUILD_PYTHON}/dev_python_root/." /
-
 # shellcheck disable=SC1090
 source ~/.bashrc
+
+# Copy python interpreter, which is built by the previous step.
+cp -a "${BUILD_PYTHON}/." /
+cp -a "${BUILD_OPENSSL}/." /
+tar -xzvf "${BUILD_PYTHON_DEPENDENCIES}/common.tar.gz" -C /
 ldconfig
 
 # First install Rust, in order to be able to build some of required libraries.
@@ -38,11 +37,10 @@ cd ~
 export PATH="/usr/local/bin:/root/.cargo/bin:${PATH}"
 export PKG_CONFIG_PATH="/usr/local/lib64/pkgconfig:/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH}"
 curl --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain "${RUST_VERSION}"
-#cargo install cargo-update -v
+# cargo install cargo-update -v
 
-#
-# Build dev libs.
-#
-
-
-"/opt/${SUBDIR_NAME}/bin/python3" -m pip install --root "${STEP_OUTPUT_PATH}/root"  --cache-dir "${STEP_OUTPUT_PATH}/cache" -r "${SOURCE_ROOT}/dev-requirements-new.txt"
+# Install all requirements and save them and their cache.
+"/opt/${SUBDIR_NAME}/bin/python3" -m pip install \
+  --root "${STEP_OUTPUT_PATH}/root" \
+  --cache-dir "${STEP_OUTPUT_PATH}/cache" \
+  -r "${SOURCE_ROOT}/dev-requirements-new.txt"

@@ -31,6 +31,11 @@
 
 set -e
 
+cp -a "${BUILD_PYTHON}/." /
+cp -a "${BUILD_OPENSSL}/." /
+cp -a "${BUILD_DEV_REQUIREMENTS}/root/." /
+ldconfig
+
 # shellcheck disable=SC1090
 source ~/.bashrc
 
@@ -39,9 +44,7 @@ DEBIAN_FRONTEND=noninteractive apt install -y ruby ruby-dev rubygems build-essen
 gem install "fpm:${FPM_VERSION}" "package_cloud:${PACKAGECLOUD_VERSION}"
 
 
-cp -a "${BUILD_PYTHON}/dev_python_root/." /
-cp -a "${BUILD_DEV_REQUIREMENTS}/root/." /
-ldconfig
+
 
 ln -s "/opt/${SUBDIR_NAME}/bin/python3" /usr/bin/python3
 

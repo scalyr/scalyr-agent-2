@@ -23,16 +23,17 @@
 
 set -e
 
-# RHSCL is installed, so we can install newer tools, such as gcc-7
-yum install -y centos-release-scl
-yum install -y devtoolset-9
+export DEBIAN_FRONTEND="noninteractive"
+apt-get update
+apt-get install -y software-properties-common
 
-# Remove this preinstalled packages, since we build and install those libraries from source.
-#yum remove -y help2man m4 perl
+# Install new repository with newer compiler.
+add-apt-repository ppa:ubuntu-toolchain-r/test
+apt update
+apt install -y gcc-9 make curl pkg-config
+update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 1
+update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-9 1
 
-echo "source /opt/rh/devtoolset-9/enable" >> ~/.bashrc
-# shellcheck disable=SC2016
-echo 'export LD_LIBRARY_PATH="/usr/local/lib:/usr/local/lib64:${LD_LIBRARY_PATH}"' >> ~/.bashrc
+echo -e "/usr/local/lib\n/usr/local/lib64" >> /etc/ld.so.conf.d/local.conf
 
-yum clean all
-rm -rf /var/cache/yum
+apt clean
