@@ -106,12 +106,12 @@ jobs:
               { "name": "deb-x86_64",  "distro-name": "ubuntu1404",    "remote-machine-type": "docker", "master_run_only": false },
               { "name": "deb-x86_64",  "distro-name": "debian10",      "remote-machine-type": "ec2",    "master_run_only": false },
               { "name": "deb-x86_64",  "distro-name": "debian11",      "remote-machine-type": "docker", "master_run_only": false },
-              { "name": "rpm-x86_64", "distro-name": "centos8",       "remote-machine-type": "docker", "master_run_only": false },
-              { "name": "rpm-x86_64", "distro-name": "centos7",       "remote-machine-type": "ec2",    "master_run_only": false },
-              { "name": "rpm-x86_64", "distro-name": "centos6",       "remote-machine-type": "docker", "master_run_only": false },
-              { "name": "rpm-x86_64", "distro-name": "amazonlinux2",  "remote-machine-type": "ec2",    "master_run_only": false },
-              { "name": "deb-arm64", "distro-name": "ubuntu1404",     "remote-machine-type": "docker", "master_run_only": false },
-              { "name": "rpm-arm64", "distro-name": "centos7",      "remote-machine-type": "docker", "master_run_only": false }
+              { "name": "rpm-x86_64",  "distro-name": "centos8",       "remote-machine-type": "docker", "master_run_only": false },
+              { "name": "rpm-x86_64",  "distro-name": "centos7",       "remote-machine-type": "ec2",    "master_run_only": false },
+              { "name": "rpm-x86_64",  "distro-name": "centos6",       "remote-machine-type": "docker", "master_run_only": false },
+              { "name": "rpm-x86_64",  "distro-name": "amazonlinux2",  "remote-machine-type": "ec2",    "master_run_only": false },
+              { "name": "deb-arm64",   "distro-name": "ubuntu1404",    "remote-machine-type": "docker", "master_run_only": false },
+              { "name": "rpm-arm64",   "distro-name": "centos7",       "remote-machine-type": "docker", "master_run_only": false }
             ]
 
   # This job pre-executes and caches Runner steps that has to be executed in a separate job.
@@ -124,6 +124,7 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       # This job receives its matrix from the 'pre_job' job. The matrix itself is created by the .github/actions/init-job-matrices action.
       # The matrix, for now, consists only from the 'include' part with following fields:
       #   "name": Name of the build job. (Not used in actiual build process, but just gives meaningful name to the job).

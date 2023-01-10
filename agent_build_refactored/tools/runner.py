@@ -1216,5 +1216,5 @@ def cleanup():
         "docker", "system", "prune", "-f", "--volumes"
     ])
     check_output_with_log_debug([
-        "docker", "system", "prune", "-f" "-a"
+        "docker", "system", "prune", "-f"
     ])
