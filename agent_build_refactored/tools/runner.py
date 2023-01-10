@@ -1000,7 +1000,8 @@ class Runner:
                     image_id="ami-09d56f8956ab235b3",
                     image_name="Ubuntu Server 22.04 (HVM), SSD Volume Type",
                     short_name="ubuntu2204",
-                    size_id="t2.2xlarge",
+                    #size_id="t2.2xlarge",
+                    size_id="m5.metal",
                     ssh_username="ubuntu",
                 )
 

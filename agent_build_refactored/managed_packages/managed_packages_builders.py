@@ -1136,7 +1136,9 @@ def create_install_build_environment_steps() -> Dict[Architecture, EnvironmentRu
                 platform=architecture.as_docker_platform.value
             ),
             github_actions_settings=GitHubActionsSettings(
-                run_in_remote_docker=run_in_remote_docker
+                run_in_remote_docker=run_in_remote_docker,
+                cacheable=True,
+                pre_build_in_separate_job=True
             )
         )
         steps[architecture] = step
@@ -1456,7 +1458,7 @@ def create_prepare_toolset_steps() -> Dict[Architecture, EnvironmentRunnerStep]:
             },
             github_actions_settings=GitHubActionsSettings(
                 cacheable=True,
-                pre_build_in_separate_job=True,
+                #pre_build_in_separate_job=True,
             )
         )
 

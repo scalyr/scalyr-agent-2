@@ -66,7 +66,8 @@ class DockerPlatformInfo:
         if "riscv64" in name:
             return Architecture.RISCV
 
-
+        if "ppc64le" in name:
+            return Architecture.PPC64LE
 
         return Architecture.UNKNOWN
 
