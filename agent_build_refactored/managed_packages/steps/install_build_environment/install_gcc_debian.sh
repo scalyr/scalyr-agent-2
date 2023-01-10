@@ -25,7 +25,7 @@ set -e
 
 export DEBIAN_FRONTEND="noninteractive"
 apt-get update
-apt install -y gcc make curl pkg-config gcc-multilib
+apt install -y gcc make curl pkg-config gcc-multilib cmake
 
 echo -e "/usr/local/lib\n/usr/local/lib64" >> /etc/ld.so.conf.d/local.conf
 

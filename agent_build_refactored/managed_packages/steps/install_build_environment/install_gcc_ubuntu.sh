@@ -30,7 +30,7 @@ apt-get install -y software-properties-common
 # Install new repository with newer compiler.
 add-apt-repository ppa:ubuntu-toolchain-r/test
 apt update
-apt install -y gcc-9 make curl pkg-config
+apt install -y gcc-9 make curl pkg-config cmake
 update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 1
 update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-9 1
 
