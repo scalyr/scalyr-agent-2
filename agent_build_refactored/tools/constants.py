@@ -157,7 +157,7 @@ _ARCHITECTURE_TO_DOCKER_PLATFORM = {
     Architecture.PPC64LE: DockerPlatform.PPC64LE,
     Architecture.S390X: DockerPlatform.S390X,
     # Handle unknown architecture value as x86_64
-    #Architecture.UNKNOWN: DockerPlatform.AMD64,
+    Architecture.UNKNOWN: DockerPlatform.AMD64,
 }
 
 
@@ -175,6 +175,10 @@ class PackageType(enum.Enum):
 
 
 def _parse_requirements_file():
+    """
+    Parse requirements file and get requirments that are grouped by "Components".
+    :return:
+    """
     requirements_file_path = SOURCE_ROOT / "dev-requirements-new.txt"
     requirements_file_content = requirements_file_path.read_text()
 
