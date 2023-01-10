@@ -90,10 +90,6 @@ AGENT_LIBS_REQUIREMENTS_CONTENT = f"{REQUIREMENTS_COMMON}\n" \
 SUPPORTED_ARCHITECTURES = [
     Architecture.X86_64,
     Architecture.ARM64,
-    Architecture.RISCV,
-    Architecture.PPC64LE,
-    Architecture.S390X,
-    Architecture.MIPS64LE,
 ]
 
 
@@ -1378,32 +1374,10 @@ BUILD_ENV_CENTOS_7 = BuildEnvInfo(
         image="centos:7"
     )
 
-BUILD_ENV_UBUNTU_16 = BuildEnvInfo(
-        script_name="install_gcc_ubuntu.sh",
-        image="ubuntu:16.04"
-    )
-
-BUILD_ENV_DEBIAN_11 = BuildEnvInfo(
-        script_name="install_gcc_debian.sh",
-        image="debian:11"
-    )
-
-BUILD_ENV_UBUNTU_20 = BuildEnvInfo(
-        script_name="install_gcc_ubuntu.sh",
-        image="ubuntu:20.04"
-)
-
 
 _SUPPORTED_ARCHITECTURES_TO_BUILD_ENVIRONMENTS = {
     Architecture.X86_64: BUILD_ENV_CENTOS_6,
-    #Architecture.X86_64: BUILD_ENV_DEBIAN_11,
-    #Architecture.X86_64: BUILD_ENV_DEBIAN_11,
     Architecture.ARM64: BUILD_ENV_CENTOS_7,
-    Architecture.PPC64LE: BUILD_ENV_CENTOS_7,
-    Architecture.S390X: BUILD_ENV_UBUNTU_16,
-    Architecture.ARMV7: BUILD_ENV_UBUNTU_16,
-    Architecture.RISCV: BUILD_ENV_UBUNTU_20,
-    Architecture.MIPS64LE: BUILD_ENV_DEBIAN_11
 }
 
 # Steps that prepares build environment.

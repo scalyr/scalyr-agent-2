@@ -88,15 +88,7 @@ jobs:
               { "name": "deb-x86_64", "master_run_only": false },
               { "name": "rpm-x86_64", "master_run_only": false },
               { "name": "deb-arm64", "master_run_only": false },
-              { "name": "rpm-arm64", "master_run_only": false },
-              { "name": "deb-ppc64le", "master_run_only": false },
-              { "name": "rpm-ppc64le", "master_run_only": false },
-              { "name": "deb-s390x", "master_run_only": false },
-              { "name": "rpm-s390x", "master_run_only": false },
-              { "name": "deb-mips64le", "master_run_only": false },
-              { "name": "rpm-mips64le", "master_run_only": false },
-              { "name": "deb-riscv64", "master_run_only": false },
-              { "name": "rpm-riscv64", "master_run_only": false }
+              { "name": "rpm-arm64", "master_run_only": false }
             ]
 
           managed-packages-to-test: |
