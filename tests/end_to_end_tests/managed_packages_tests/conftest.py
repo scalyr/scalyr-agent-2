@@ -16,8 +16,7 @@ from agent_build_refactored.tools.constants import Architecture
 from agent_build_refactored.tools.runner import Runner, RunnerMappedPath
 from agent_build_refactored.managed_packages.managed_packages_builders import (
     ALL_MANAGED_PACKAGE_BUILDERS,
-    PREPARE_TOOLSET_GLIBC_X86_64,
-    PREPARE_TOOLSET_GLIBC_ARM64,
+    PREPARE_TOOLSET_STEPS,
     PYTHON_PACKAGE_NAME,
     AGENT_LIBS_PACKAGE_NAME,
     AGENT_PACKAGE_NAME,
@@ -126,7 +125,7 @@ class RepoBuilder(Runner):
     The result repo is used as a mock repository for testing.
     """
 
-    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
+    BASE_ENVIRONMENT = PREPARE_TOOLSET_STEPS[Architecture.X86_64]
 
     def build(
         self,
@@ -247,20 +246,6 @@ class RepoBuilder(Runner):
         )
 
 
-class RepoBuilderX86_64(RepoBuilder):
-    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
-
-
-class RepoBuilderARM64(RepoBuilder):
-    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_ARM64
-
-
-REPO_BUILDER_CLASSES = {
-    Architecture.X86_64: RepoBuilderX86_64,
-    Architecture.ARM64: RepoBuilderARM64,
-}
-
-
 @pytest.fixture(scope="session")
 def server_root(request, tmp_path_factory, package_builder):
     """
@@ -280,15 +265,13 @@ def server_root(request, tmp_path_factory, package_builder):
         if request.config.option.packages_source is None:
             # Build packages now.
             builder = package_builder()
-            builder.build_packages()
+            builder.build()
             packages_dir = builder.output_path / "packages"
         else:
             packages_dir = pl.Path(request.config.option.packages_source)
 
         # Build mock repo from packages.
-        arch = package_builder.DEPENDENCY_PACKAGES_ARCHITECTURE
-        repo_builder_cls = REPO_BUILDER_CLASSES[arch]
-        repo_builder = repo_builder_cls()
+        repo_builder = RepoBuilder()
         repo_builder.build(
             package_type=package_builder.PACKAGE_TYPE, packages_dir_path=packages_dir
         )

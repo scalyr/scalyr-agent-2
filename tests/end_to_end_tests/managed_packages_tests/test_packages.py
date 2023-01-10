@@ -20,11 +20,13 @@ are changing system state and must be aware of risks.
 """
 
 import json
+import os
 import pathlib as pl
 import shlex
 import subprocess
 import logging
 import functools
+import sys
 import time
 from typing import List, Dict
 
@@ -99,15 +101,13 @@ def test_dependency_packages(
         pytest.skip("No need to check on all distros.")
 
     package_type = package_builder.PACKAGE_TYPE
-
     _verify_package_subdirectories(
         package_path=python_package_path,
         package_type=package_builder.PACKAGE_TYPE,
         package_name=PYTHON_PACKAGE_NAME,
         output_dir=tmp_path,
         expected_folders=[
-            f"usr/lib/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/",
-            f"usr/share/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/",
+            f"opt/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/",
             # Depending on its type, a package also may install its own "metadata", so we have to take it into
             # account too.
             f"usr/share/doc/{PYTHON_PACKAGE_NAME}/"
@@ -123,8 +123,8 @@ def test_dependency_packages(
         package_name=AGENT_LIBS_PACKAGE_NAME,
         output_dir=tmp_path,
         expected_folders=[
-            f"usr/lib/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/",
-            f"usr/share/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/",
+            f"opt/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/",
+            f"etc/scalyr-agent-2",
             # Depending on its type, a package also may install its own "metadata", so we have to take it into
             # account too.
             f"usr/share/doc/{AGENT_LIBS_PACKAGE_NAME}/"
@@ -174,13 +174,12 @@ def test_packages(
     )
     subprocess.check_call(
         [
-            f"/usr/lib/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/bin/python3",
+            f"/var/opt/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/venv/bin/python3",
             "tests/end_to_end_tests/managed_packages_tests/verify_python_interpreter.py",
         ],
         env={
             # It's important to override the 'LD_LIBRARY_PATH' to be sure that libraries paths from the test runner
             # frozen binary are not leaked to a script's process.
-            "LD_LIBRARY_PATH": "",
             "PYTHONPATH": str(SOURCE_ROOT),
         },
     )
@@ -410,12 +409,7 @@ def _perform_ssl_checks(
     assert "because of server certificate validation error" in agent_log
     assert "This likely indicates a MITM attack" in agent_log
 
-    print("!!!")
-    print(agent_log)
-
     agent_status = agent_commander.get_status()
-    print("@@@@@")
-    print(agent_status)
     assert "Last successful communication with Scalyr: Never" in agent_status
     assert "Bytes uploaded successfully:               0" in agent_status
     assert "Last copy request size:                    0" in agent_status

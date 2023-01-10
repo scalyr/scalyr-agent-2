@@ -18,21 +18,34 @@
 #   SOURCE_ROOT: Path to the projects root.
 #   STEP_OUTPUT_PATH: Path to the step's output directory.
 #
-# This script prepares base build environment for the ARM64 linux GLIBC binary packages, it expects to be run in
-# Centos 7 to compile against lower GLIBS (2.17).
+# This script creates venv with all libraries that are required by the Agent.
 
 set -e
 
-# RHSCL is installed, so we can install newer tools, such as gcc-7
-yum install -y centos-release-scl
-yum install -y devtoolset-7
+# shellcheck disable=SC1090
+source ~/.bashrc
 
-# Remove this preinstalled packages, since we build and install those libraries from source.
-yum remove -y help2man m4 perl
+# Copy python interpreter, which is built by the previous step.
 
-echo "source /opt/rh/devtoolset-7/enable" >> ~/.bashrc
-# shellcheck disable=SC2016
-echo 'export LD_LIBRARY_PATH="/usr/local/lib:/usr/local/lib64:${LD_LIBRARY_PATH}"' >> ~/.bashrc
+cp -a "${BUILD_PYTHON}/." /
+cp -a "${BUILD_OPENSSL}/." /
+cp -a "${BUILD_DEV_REQUIREMENTS}/root/." /
+cp -a "${BUILD_DEV_REQUIREMENTS}/cache" /tmp/pip_cache
+ldconfig
 
-yum clean all
-rm -rf /var/cache/yum
+# Prepare requirements file.
+REQUIREMENTS_FILE=/tmp/requirements.txt
+echo "${REQUIREMENTS}" > "${REQUIREMENTS_FILE}"
+
+
+# Create venv.
+VENV_DIR="/var/opt/${SUBDIR_NAME}/venv"
+"/opt/${SUBDIR_NAME}/bin/python3" -m venv "${VENV_DIR}"
+
+# Install requirements to venv.
+"${VENV_DIR}/bin/python3" -m pip install  -v \
+  --cache-dir /tmp/pip_cache \
+  -r "${REQUIREMENTS_FILE}"
+
+# Copy result venv to result output.
+cp -a "${VENV_DIR}" "${STEP_OUTPUT_PATH}"

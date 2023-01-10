@@ -758,7 +758,7 @@ class Runner:
             the `REQUIRED_STEPS` class attribute is used.
         """
 
-        self.base_environment = type(self).BASE_ENVIRONMENT
+        self.base_environment = type(self).get_base_environment()
         self.required_steps = required_steps or type(self).REQUIRED_STEPS[:]
         self.required_runners = {}
 
@@ -767,6 +767,10 @@ class Runner:
         self.output_path = self.work_dir / "runner_outputs" / output_name
 
         self._input_values = {}
+
+    @classmethod
+    def get_base_environment(cls) -> Optional[EnvironmentRunnerStep]:
+        return cls.BASE_ENVIRONMENT
 
     @classmethod
     def get_all_required_steps(cls) -> List[RunnerStep]:
@@ -778,9 +782,9 @@ class Runner:
         Gather all (including nested) RunnerSteps from all possible plases which are used by this runner.
         """
         result = []
-
-        if cls.BASE_ENVIRONMENT:
-            result.extend(cls.BASE_ENVIRONMENT.get_all_cacheable_steps())
+        base_environment = cls.get_base_environment()
+        if base_environment:
+            result.extend(base_environment.get_all_cacheable_steps())
 
         for req_step in cls.get_all_required_steps():
             result.extend(req_step.get_all_cacheable_steps())
@@ -988,10 +992,18 @@ class Runner:
                 return None
 
             # Get EC2 AMI image according to step's architecture.
+
             ec2_image = DOCKER_EC2_BUILDERS.get(step.architecture)
             # If image is not found then just run in local docker engine.
-            if ec2_image is None:
-                return None
+            if ec2_image is None and step.architecture != Architecture.X86_64:
+                ec2_image = EC2DistroImage(
+                    image_id="ami-09d56f8956ab235b3",
+                    image_name="Ubuntu Server 22.04 (HVM), SSD Volume Type",
+                    short_name="ubuntu2204",
+                    #size_id="t2.2xlarge",
+                    size_id="m5.metal",
+                    ssh_username="ubuntu",
+                )
 
             # Try to find already created node if it is created by previous steps.
             remote_docker_host = existing_ec2_hosts.get(step.architecture)
@@ -1100,6 +1112,9 @@ class Runner:
         """
         Handle parsed command line arguments and perform needed actions.
         """
+
+        cleanup()
+
         if args.get_all_cacheable_steps:
             steps = cls.get_all_cacheable_steps()
             steps_ids = [step.id for step in steps]
@@ -1154,6 +1169,7 @@ def run_docker_command(
     if return_output:
         return subprocess.check_output(
             final_command,
+            env=env
         )
 
     subprocess.check_call(

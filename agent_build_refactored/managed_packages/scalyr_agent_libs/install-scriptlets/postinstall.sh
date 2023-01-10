@@ -1,5 +1,5 @@
-#!/usr/bin/env bash
-# Copyright 2014-2022 Scalyr Inc.
+#!/bin/bash
+# Copyright 2014-2023 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,5 +13,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-exec /usr/lib/scalyr-agent-2-dependencies/bin/python3 -E "/usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py" "$@"
+# Run this script in order to initialize newly installed/upgraded package.
+/opt/scalyr-agent-2-dependencies/bin/agent-libs-config initialize

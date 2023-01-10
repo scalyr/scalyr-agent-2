@@ -25,8 +25,7 @@ import sys
 from agent_build_refactored.tools.constants import SOURCE_ROOT, Architecture
 from agent_build_refactored.tools.runner import Runner
 from agent_build_refactored.managed_packages.managed_packages_builders import (
-    PREPARE_TOOLSET_GLIBC_X86_64,
-    PREPARE_TOOLSET_GLIBC_ARM64,
+    PREPARE_TOOLSET_STEPS
 )
 
 PORTABLE_RUNNER_NAME = "portable_runner"
@@ -36,10 +35,6 @@ class PortablePytestRunnerBuilder(Runner):
     """
     Builder class that builds pytest runner executable by using PyInstaller.
     """
-
-    # This builder has to run in docker with using this environment, since this environment
-    # already has PyInstaller and other required tools..
-    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
 
     def build(self):
 
@@ -70,6 +65,8 @@ class PortablePytestRunnerBuilder(Runner):
                 f"agent_build_refactored{os.pathsep}agent_build_refactored",
                 "--add-data",
                 f"VERSION{os.pathsep}.",
+                "--add-data",
+                f"dev-requirements-new.txt{os.pathsep}.",
                 # As an entry point we use this file itself because it also acts like a script which invokes pytest.
                 __file__,
             ],
@@ -91,11 +88,11 @@ class PortablePytestRunnerBuilder(Runner):
 
 
 class PortablePytestRunnerBuilderX86_64(PortablePytestRunnerBuilder):
-    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_X86_64
+    BASE_ENVIRONMENT = PREPARE_TOOLSET_STEPS[Architecture.X86_64]
 
 
 class PortablePytestRunnerBuilderARM64(PortablePytestRunnerBuilder):
-    BASE_ENVIRONMENT = PREPARE_TOOLSET_GLIBC_ARM64
+    BASE_ENVIRONMENT = PREPARE_TOOLSET_STEPS[Architecture.ARM64]
 
 
 PORTABLE_PYTEST_RUNNER_BUILDERS = {

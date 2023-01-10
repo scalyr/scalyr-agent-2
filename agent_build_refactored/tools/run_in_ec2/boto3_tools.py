@@ -129,46 +129,51 @@ def create_and_deploy_ec2_instance(
         root_volume_size=root_volume_size
     )
 
-    # Try to establish SSH connection.
-    attempts = 10
-    while True:
-        try:
-            ssh = create_ssh_connection(
-                ip=instance.public_ip_address,
-                username=ec2_image.ssh_username,
-                private_key_path=aws_settings.private_key_path,
-            )
-            break
-        except paramiko.ssh_exception.NoValidConnectionsError:
-            logger.info(f"Can not establish SSH connection with {instance.public_ip_address}")
-            if attempts == 0:
-                logger.exception("Giving up. Error: ")
-                raise
+    try:
+        # Try to establish SSH connection.
+        attempts = 10
+        while True:
+            try:
+                ssh = create_ssh_connection(
+                    ip=instance.public_ip_address,
+                    username=ec2_image.ssh_username,
+                    private_key_path=aws_settings.private_key_path,
+                )
+                break
+            except paramiko.ssh_exception.NoValidConnectionsError:
+                logger.info(f"Can not establish SSH connection with {instance.public_ip_address}")
+                if attempts == 0:
+                    logger.exception("Giving up. Error: ")
+                    raise
 
-            attempts -= 1
-            logger.info("    retry in 10 seconds.")
-            time.sleep(10)
+                attempts -= 1
+                logger.info("    retry in 10 seconds.")
+                time.sleep(10)
 
-    files_to_upload = files_to_upload or {}
+        files_to_upload = files_to_upload or {}
 
-    deployment_command = None
-    if deployment_script:
-        remote_deployment_script_path = pl.Path("/tmp") / deployment_script.name
-        files_to_upload[str(deployment_script)] = str(remote_deployment_script_path)
-        deployment_command = ["bash", str(remote_deployment_script_path)]
+        deployment_command = None
+        if deployment_script:
+            remote_deployment_script_path = pl.Path("/tmp") / deployment_script.name
+            files_to_upload[str(deployment_script)] = str(remote_deployment_script_path)
+            deployment_command = ["bash", str(remote_deployment_script_path)]
 
-    if files_to_upload:
-        ssh_put_files(
-            ssh_connection=ssh,
-            files=files_to_upload
-        )
-        if deployment_command:
-            ssh_run_command(
+        if files_to_upload:
+            ssh_put_files(
                 ssh_connection=ssh,
-                command=deployment_command
+                files=files_to_upload
             )
+            if deployment_command:
+                ssh_run_command(
+                    ssh_connection=ssh,
+                    command=deployment_command
+                )
 
-    ssh.close()
+        ssh.close()
+    except Exception as e:
+        logger.exception("Error occurred during instance deployment.")
+        instance.terminate()
+        raise e
 
     return instance
 
@@ -341,7 +346,7 @@ def ssh_run_command(
 
     logger.info(f"STDERR: {sterr.read().decode()}")
 
-    exit_status = stdout.channel.exit_status
+    exit_status = stdout.channel.recv_exit_status()
     if exit_status != 0:
         raise Exception(
             f"SSH command '{command_str}' returned {exit_status}."

@@ -1,0 +1,230 @@
+#!/opt/scalyr-agent-2-dependencies/bin/python3
+# Copyright 2014-2023 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+This script provide some configuration options for the Agent's Python3 dependency package.
+"""
+
+import argparse
+import pathlib as pl
+import subprocess
+import shutil
+import sys
+import re
+from typing import List
+
+OPENSSL_1_1_1_VERSION = "1_1_1"
+OPENSSL_3_VERSION = "3"
+DEFAULT_FALLBACK_OPENSSL_VERSION = OPENSSL_1_1_1_VERSION
+
+DEPENDENCIES_PACKAGE_ROOT = pl.Path("/opt/scalyr-agent-2-dependencies")
+OPENSSL_LIBS_PATH = DEPENDENCIES_PACKAGE_ROOT / "lib/openssl"
+
+
+PYTHON_SHORT_VERSION = ".".join([str(n) for n in sys.version_info[:2]])
+
+PYTHON_LIB_DYNLOAD_PATH = DEPENDENCIES_PACKAGE_ROOT / f"lib/python{PYTHON_SHORT_VERSION}/lib-dynload"
+
+SSL_C_BINDING_FILENAME = list(PYTHON_LIB_DYNLOAD_PATH.glob("_ssl.*-*-*-*-*.so"))[0].name
+HASHLIB_C_BINDING_FILENAME = list(PYTHON_LIB_DYNLOAD_PATH.glob("_hashlib.*-*-*-*-*.so"))[0].name
+
+
+PREFERRED_OPENSSL_FILE_PATH = DEPENDENCIES_PACKAGE_ROOT / "etc/preferred_openssl"
+
+
+def initialize():
+    """
+    Initialize package. For example, look for a system OpenSSl to use. If not found, then
+    embedded OpenSSL library is used.
+    :return:
+    """
+    preferred_openssl = None
+
+    if PREFERRED_OPENSSL_FILE_PATH.exists():
+        preferred_openssl = PREFERRED_OPENSSL_FILE_PATH.read_text().strip()
+
+    if not preferred_openssl:
+        preferred_openssl = "auto"
+
+    if preferred_openssl == "auto":
+        try:
+            print("Looking for system OpenSSL >= 3", file=sys.stderr)
+            if look_for_system_openssl(OPENSSL_3_VERSION):
+                return
+
+            print("Looking for system OpenSSL >= 1.1.1", file=sys.stderr)
+            if look_for_system_openssl(OPENSSL_1_1_1_VERSION):
+                return
+        except Exception as e:
+            print(
+                f"Warning: Could not determine system OpenSSL version due to error: {str(e)}",
+                file=sys.stderr
+            )
+
+    if preferred_openssl != "embedded":
+        print(f"Unknown 'preferred_openssl' - {preferred_openssl}", file=sys.stderr)
+        exit(1)
+
+    version_to_use = DEFAULT_FALLBACK_OPENSSL_VERSION
+    # Could not find any valid system OpenSSL, fallback to embedded one.
+    copy_bindings(version_type=version_to_use)
+    openssl_version_path = OPENSSL_LIBS_PATH / version_to_use
+
+    libssl_filename = list(openssl_version_path.glob("libssl.so.*"))[0].name
+    libcrypto_filename = list(openssl_version_path.glob("libcrypto.so.*"))[0].name
+
+    # Patch '_ssl' module's C bindings and hardcode embedded OpenSSL libraries as a dependencies.
+    replace_elf_dependencies(
+        elf_path=PYTHON_LIB_DYNLOAD_PATH / SSL_C_BINDING_FILENAME,
+        dependency_names=[libssl_filename, libcrypto_filename],
+        new_dependency_dir=openssl_version_path
+    )
+
+    # Do the same with the '_hashlib' module.
+    replace_elf_dependencies(
+        elf_path=PYTHON_LIB_DYNLOAD_PATH / HASHLIB_C_BINDING_FILENAME,
+        dependency_names=[libssl_filename, libcrypto_filename],
+        new_dependency_dir=openssl_version_path
+    )
+
+    embedded_openssl_version = get_current_openssl_version(version_type=version_to_use)
+
+    print(f"Using embedded OpenSSL == {embedded_openssl_version}")
+
+
+def look_for_system_openssl(version_type: str) -> bool:
+    """
+    Check if OpenSSL library with given version is presented in system.
+    :param version_type: version type to use.
+    :return:
+    """
+    copy_bindings(version_type=version_type)
+
+    system_openssl_version = get_current_openssl_version(version_type=version_type)
+
+    if not system_openssl_version:
+        print(f"    Unknown OpenSSL version format: '{system_openssl_version}'", file=sys.stderr)
+        return False
+
+    print(f"    Using system OpenSSL {system_openssl_version}", file=sys.stderr)
+    return True
+
+
+def copy_bindings(version_type: str):
+    """
+    Copy openssl related Python C bindings with specified version to Python directory.
+    :param version_type:  version of the OpenSSL to use.
+    :return:
+    """
+    openssl_version_path = OPENSSL_LIBS_PATH / version_type
+
+    for binding_filename in [
+        SSL_C_BINDING_FILENAME,
+        HASHLIB_C_BINDING_FILENAME,
+    ]:
+        binding_src_path = openssl_version_path / "bindings" / binding_filename
+        binding_dst_path = PYTHON_LIB_DYNLOAD_PATH / binding_filename
+
+        shutil.copy(
+            binding_src_path,
+            binding_dst_path,
+        )
+
+
+def get_current_openssl_version(version_type: str):
+    """
+    Determine current system OpenSSL version, if presented.
+    :param version_type: version of the OpenSSL to use.
+    :return:
+    """
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import ssl; print(ssl.OPENSSL_VERSION);"
+        ],
+        capture_output=True,
+    )
+
+    if result.returncode != 0:
+        print("    Not found.")
+        return None
+
+    version_output = result.stdout.decode()
+
+    if version_type == OPENSSL_1_1_1_VERSION:
+        pattern = r"OpenSSL (\d+\.\d+\.\d+[a-zA-Z]).*"
+    else:
+        pattern = r"OpenSSL (\d+\.\d+\.\d+).*"
+
+    m = re.match(pattern, version_output)
+
+    if not m:
+        return None
+
+    return m.group(1)
+
+
+def replace_elf_dependencies(
+    elf_path: pl.Path,
+    dependency_names: List[str],
+    new_dependency_dir: pl.Path,
+):
+    """
+    Patch given ELF binary and replace its dependencies.
+    :param elf_path: Path to target ELF
+    :param dependency_names: List of dependencies to replace.
+    :param new_dependency_dir: Directory with new dependencies.
+    :return:
+    """
+    for dependency_name in dependency_names:
+        new_dependency_path = new_dependency_dir / dependency_name
+        subprocess.run(
+            [
+                str(DEPENDENCIES_PACKAGE_ROOT / "bin/patchelf"),
+                "--replace-needed",
+                dependency_name,
+                str(new_dependency_path),
+                str(elf_path)
+            ],
+            capture_output=True
+        )
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    initialize_parser = subparsers.add_parser("initialize")
+
+    set_option_parser = subparsers.add_parser("set")
+    set_option_subparsers = set_option_parser.add_subparsers(dest="option_name", required=True)
+    preferred_openssl_parser = set_option_subparsers.add_parser("preferred_openssl")
+    preferred_openssl_parser.add_argument(
+        "value",
+        choices=["auto", "embedded"]
+    )
+
+    args = parser.parse_args()
+
+    if args.command == "initialize":
+        initialize()
+        exit(0)
+    elif args.command == "set":
+        if args.option_name == "preferred_openssl":
+            PREFERRED_OPENSSL_FILE_PATH.write_text(args.value)
+            print(f"The 'preferred_openssl' option is set to '{args.value}'")
+            initialize()
+            exit(0)
