@@ -31,6 +31,7 @@ jobs:
       version: ${{ steps.init-matrices.outputs.version }}
       aws_private_key_name: ${{ steps.init_common_options.outputs.aws_private_key_name }}
       aws_security_group: ${{ steps.init_common_options.outputs.aws_security_group }}
+      aws_prefix_list_name: ${{ steps.init_common_options.outputs.aws_prefix_list_name }}
       aws_region: ${{ steps.init_common_options.outputs.aws_region }}
       aws_objects_name_prefix: ${{ steps.init_common_options.outputs.aws_objects_name_prefix }}
       # The following outputs will be used by the other jobs below as their strategy matrices.
@@ -56,6 +57,7 @@ jobs:
         run: |
           echo "aws_private_key_name=CT_SCALYR_AGENT_GHA" >> $GITHUB_OUTPUT
           echo "aws_security_group=github-actions-remote-access" >> $GITHUB_OUTPUT
+          echo "aws_prefix_list_name=pl-04a16228a97704d23" >> $GITHUB_OUTPUT
           echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
           echo "aws_objects_name_prefix=${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}" >> $GITHUB_OUTPUT
 
@@ -182,7 +184,7 @@ jobs:
           aws_private_key_name: ${{ needs.pre_job.outputs.aws_private_key_name }}
           aws_region: ${{ needs.pre_job.outputs.aws_region }}
           aws_security_group: ${{ needs.pre_job.outputs.aws_security_group }}
-          aws_security_groups_prefix_list_id: ${{ secrets.AWS_SECURITY_GROUPS_NAMED_PREFIX_ID }}
+          aws_security_groups_prefix_list_id: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
           aws_objects_name_prefix: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
 
 
@@ -314,7 +316,7 @@ jobs:
           aws_private_key_name: ${{ needs.pre_job.outputs.aws_private_key_name }}
           aws_region: ${{ needs.pre_job.outputs.aws_region }}
           aws_security_group: ${{ needs.pre_job.outputs.aws_security_group }}
-          aws_security_groups_prefix_list_id: ${{ secrets.AWS_SECURITY_GROUPS_NAMED_PREFIX_ID }}
+          aws_security_groups_prefix_list_id: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
           aws_objects_name_prefix: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
 
       # Before we build needed packages, we check if the target repo already contains dependency
@@ -412,7 +414,7 @@ jobs:
           AWS_PRIVATE_KEY_PATH: "/tmp/private_key.pem"
           AWS_REGION: ${{ needs.pre_job.outputs.aws_region }}
           AWS_SECURITY_GROUP: ${{ needs.pre_job.outputs.aws_security_group }}
-          AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ secrets.AWS_SECURITY_GROUPS_NAMED_PREFIX_ID }}
+          AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
           AWS_OBJECTS_NAME_PREFIX: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
         run: |
             echo "Changing build version to ${{ needs.pre_job.outputs.version }}"
@@ -498,7 +500,7 @@ jobs:
           AWS_PRIVATE_KEY_PATH: "/tmp/private_key.pem"
           AWS_REGION: ${{ needs.pre_job.outputs.aws_region }}
           AWS_SECURITY_GROUP: ${{ needs.pre_job.outputs.aws_security_group }}
-          AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ secrets.AWS_SECURITY_GROUPS_NAMED_PREFIX_ID }}
+          AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
           AWS_OBJECTS_NAME_PREFIX: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
         run: |
           
@@ -610,7 +612,7 @@ jobs:
           AWS_PRIVATE_KEY_PATH: "/tmp/private_key.pem"
           AWS_REGION: ${{ needs.pre_job.outputs.aws_region }}
           AWS_SECURITY_GROUP: ${{ needs.pre_job.outputs.aws_security_group }}
-          AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ secrets.AWS_SECURITY_GROUPS_NAMED_PREFIX_ID }}
+          AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
           AWS_OBJECTS_NAME_PREFIX: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
         run: |
           python3 agent_build_refactored/tools/run_in_ec2/cleanup_ec2_objects.py
