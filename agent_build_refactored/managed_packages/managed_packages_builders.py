@@ -268,6 +268,7 @@ class LinuxDependencyPackagesBuilder(Runner):
             install_root_executable_path,
         )
 
+        # Also link agent executable to usr/sbin
         usr_sbin_executable = agent_package_root / "usr/sbin/scalyr-agent-2"
         usr_sbin_executable.unlink()
         usr_sbin_executable.symlink_to("../share/scalyr-agent-2/bin/scalyr-agent-2-new")
@@ -411,6 +412,11 @@ class LinuxDependencyPackagesBuilder(Runner):
         return sha256.hexdigest()
 
     def build(self, stable_versions_file: str = None):
+        """
+        Build agent package and its dependency packages.
+        # TODO this param for now is always None, this should be chaged after the first stable release.
+        :param stable_versions_file: Path to JSON file with stable versions to reuse.
+        """
 
         self.run_required()
 
@@ -1047,6 +1053,7 @@ class LinuxDependencyPackagesBuilder(Runner):
             exit(1)
 
 
+# Version of the  Python build dependencies.
 _PYTHON_BUILD_DEPENDENCIES_VERSIONS = {
     "XZ_VERSION": "5.2.6",
     "OPENSSL_1_1_1_VERSION": PYTHON_PACKAGE_SSL_1_1_1_VERSION,
@@ -1083,6 +1090,11 @@ DOWNLOAD_PYTHON_DEPENDENCIES = ArtifactRunnerStep(
 def create_build_openssl_steps(
         openssl_version_type: str
 ) -> Dict[Architecture, ArtifactRunnerStep]:
+    """
+    Create steps that build openssl library with given version.
+    :param openssl_version_type: type of the OpenSSL, eg. 1_1_1, or 3
+    :return:
+    """
     steps = {}
 
     if openssl_version_type == OPENSSL_VERSION_TYPE_3:
@@ -1134,7 +1146,6 @@ def create_install_build_environment_steps() -> Dict[Architecture, EnvironmentRu
             github_actions_settings=GitHubActionsSettings(
                 run_in_remote_docker=run_in_remote_docker,
                 cacheable=True,
-                pre_build_in_separate_job=True
             )
         )
         steps[architecture] = step
@@ -1146,7 +1157,6 @@ def create_build_python_dependencies_steps(
 ) -> Dict[Architecture, ArtifactRunnerStep]:
     """
     This function creates step that builds Python dependencies.
-    :return: Result step.
     """
 
     steps = {}
@@ -1212,6 +1222,31 @@ def create_build_python_steps(
     return steps
 
 
+# Simple dataclass to store information about base environment step.
+@dataclasses.dataclass
+class BuildEnvInfo:
+    # Script to run.
+    script_name: str
+    # Docker image to use.
+    image: str
+
+
+BUILD_ENV_CENTOS_6 = BuildEnvInfo(
+        script_name="install_gcc_centos_6.sh",
+        image="centos:6"
+    )
+BUILD_ENV_CENTOS_7 = BuildEnvInfo(
+        script_name="install_gcc_centos_7.sh",
+        image="centos:7"
+    )
+
+
+_SUPPORTED_ARCHITECTURES_TO_BUILD_ENVIRONMENTS = {
+    Architecture.X86_64: BUILD_ENV_CENTOS_6,
+    Architecture.ARM64: BUILD_ENV_CENTOS_7,
+}
+
+
 def create_build_python_package_root_steps() -> Dict[Architecture, ArtifactRunnerStep]:
     """
     Function that creates step instances that build Python interpreter.
@@ -1221,7 +1256,6 @@ def create_build_python_package_root_steps() -> Dict[Architecture, ArtifactRunne
 
     for architecture in SUPPORTED_ARCHITECTURES:
         build_env_info = _SUPPORTED_ARCHITECTURES_TO_BUILD_ENVIRONMENTS[architecture]
-
         if "ubuntu" in build_env_info.image:
             libssl_dir = "/usr/local/lib"
         else:
@@ -1258,6 +1292,9 @@ def create_build_python_package_root_steps() -> Dict[Architecture, ArtifactRunne
 
 
 def create_build_dev_requirements_steps() -> Dict[Architecture, ArtifactRunnerStep]:
+    """
+    Create steps that build all agent project requirements.
+    """
     steps = {}
     for architecture in SUPPORTED_ARCHITECTURES:
         run_in_remote_docker = architecture != Architecture.X86_64
@@ -1359,27 +1396,6 @@ def create_build_agent_libs_package_root_steps() -> Dict[Architecture, ArtifactR
     return steps
 
 
-@dataclasses.dataclass
-class BuildEnvInfo:
-    script_name: str
-    image: str
-
-
-BUILD_ENV_CENTOS_6 = BuildEnvInfo(
-        script_name="install_gcc_centos_6.sh",
-        image="centos:6"
-    )
-BUILD_ENV_CENTOS_7 = BuildEnvInfo(
-        script_name="install_gcc_centos_7.sh",
-        image="centos:7"
-    )
-
-
-_SUPPORTED_ARCHITECTURES_TO_BUILD_ENVIRONMENTS = {
-    Architecture.X86_64: BUILD_ENV_CENTOS_6,
-    Architecture.ARM64: BUILD_ENV_CENTOS_7,
-}
-
 # Steps that prepares build environment.
 INSTALL_BUILD_ENVIRONMENT_STEPS = create_install_build_environment_steps()
 
@@ -1432,7 +1448,7 @@ def create_prepare_toolset_steps() -> Dict[Architecture, EnvironmentRunnerStep]:
             },
             github_actions_settings=GitHubActionsSettings(
                 cacheable=True,
-                #pre_build_in_separate_job=True,
+                pre_build_in_separate_job=True,
             )
         )
 
@@ -1452,6 +1468,7 @@ BUILD_AGENT_LIBS_PACKAGE_ROOT_STEPS = create_build_agent_libs_package_root_steps
 
 ALL_MANAGED_PACKAGE_BUILDERS: Dict[str, Type[LinuxDependencyPackagesBuilder]] = {}
 
+# Iterate through all supported architectures and create package builders classes for each.
 for arch in SUPPORTED_ARCHITECTURES:
     class DebLinuxDependencyPackagesBuilder(LinuxDependencyPackagesBuilder):
         PACKAGE_TYPE = "deb"
@@ -1466,6 +1483,8 @@ for arch in SUPPORTED_ARCHITECTURES:
         PACKAGECLOUD_DISTRO_VERSION = "rpm_any"
         DEPENDENCY_PACKAGES_ARCHITECTURE = arch
 
+    # Since we create builders "dynamically" we should assign name to each of them, so
+    # they can be accessible later.
     for cls in [DebLinuxDependencyPackagesBuilder, RpmLinuxDependencyPackagesBuilder]:
         cls.assign_fully_qualified_name(
             class_name=cls.__name__,
@@ -1477,6 +1496,9 @@ for arch in SUPPORTED_ARCHITECTURES:
 
 
 def _calculate_all_packages_checksum(package_name: str):
+    """
+    Calculate checksum for ALL packages with given name.
+    """
     sha256 = hashlib.sha256()
     for builder_name in sorted(ALL_MANAGED_PACKAGE_BUILDERS.keys()):
         builder_cls = ALL_MANAGED_PACKAGE_BUILDERS[builder_name]
@@ -1486,8 +1508,10 @@ def _calculate_all_packages_checksum(package_name: str):
     return sha256.hexdigest()
 
 
+# We calculate checksum of packages for all architectures, so they can have common version.
 _ALL_PYTHON_PACKAGES_CHECKSUM = _calculate_all_packages_checksum(package_name=PYTHON_PACKAGE_NAME)
 
+# The same with agent libs package.
 _ALL_AGENT_LIBS_PACKAGES_CHECKSUM = _calculate_all_packages_checksum(package_name=AGENT_LIBS_PACKAGE_NAME)
 
 
@@ -1496,6 +1520,14 @@ def _get_dependency_package_version_to_use(
         package_name: str,
         stable_versions_file_path: str = None
 ) -> Tuple[str, bool]:
+    """
+    This function determines if package with given name has been changed or not.
+    :param checksum: checksum of package's all architectures.
+    :param package_name: name of package to check.
+    :param stable_versions_file_path: If None path to JSON file with stable package version that may be reused.
+    :return Tuple where first element is a version, and second boolean flag that indicates whether package should be
+        rebuilt or not.
+    """
     stable_version = None
     if stable_versions_file_path:
         versions = json.loads(pl.Path(stable_versions_file_path).read_text())

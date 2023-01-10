@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+This script provide some configuration options for the Agent's Python3 dependency package.
+"""
 
 import argparse
 import pathlib as pl
@@ -42,6 +45,11 @@ PREFERRED_OPENSSL_FILE_PATH = DEPENDENCIES_PACKAGE_ROOT / "etc/preferred_openssl
 
 
 def initialize():
+    """
+    Initialize package. For example, look for a system OpenSSl to use. If not found, then
+    embedded OpenSSL library is used.
+    :return:
+    """
     preferred_openssl = None
 
     if PREFERRED_OPENSSL_FILE_PATH.exists():
@@ -71,7 +79,7 @@ def initialize():
 
     version_to_use = DEFAULT_FALLBACK_OPENSSL_VERSION
     # Could not find any valid system OpenSSL, fallback to embedded one.
-    copy_bindings(version=version_to_use)
+    copy_bindings(version_type=version_to_use)
     openssl_version_path = OPENSSL_LIBS_PATH / version_to_use
 
     libssl_filename = list(openssl_version_path.glob("libssl.so.*"))[0].name
@@ -91,16 +99,20 @@ def initialize():
         new_dependency_dir=openssl_version_path
     )
 
-    embedded_openssl_version = get_current_openssl_version(version=version_to_use)
+    embedded_openssl_version = get_current_openssl_version(version_type=version_to_use)
 
     print(f"Using embedded OpenSSL == {embedded_openssl_version}")
 
 
-def look_for_system_openssl(version: str):
+def look_for_system_openssl(version_type: str) -> bool:
+    """
+    Check if OpenSSL library with given version is presented in system.
+    :param version_type: version type to use.
+    :return:
+    """
+    copy_bindings(version_type=version_type)
 
-    copy_bindings(version=version)
-
-    system_openssl_version = get_current_openssl_version(version=version)
+    system_openssl_version = get_current_openssl_version(version_type=version_type)
 
     if not system_openssl_version:
         print(f"    Unknown OpenSSL version format: '{system_openssl_version}'", file=sys.stderr)
@@ -110,8 +122,13 @@ def look_for_system_openssl(version: str):
     return True
 
 
-def copy_bindings(version: str):
-    openssl_version_path = OPENSSL_LIBS_PATH / version
+def copy_bindings(version_type: str):
+    """
+    Copy openssl related Python C bindings with specified version to Python directory.
+    :param version_type:  version of the OpenSSL to use.
+    :return:
+    """
+    openssl_version_path = OPENSSL_LIBS_PATH / version_type
 
     for binding_filename in [
         SSL_C_BINDING_FILENAME,
@@ -126,7 +143,12 @@ def copy_bindings(version: str):
         )
 
 
-def get_current_openssl_version(version: str):
+def get_current_openssl_version(version_type: str):
+    """
+    Determine current system OpenSSL version, if presented.
+    :param version_type: version of the OpenSSL to use.
+    :return:
+    """
     result = subprocess.run(
         [
             sys.executable,
@@ -142,7 +164,7 @@ def get_current_openssl_version(version: str):
 
     version_output = result.stdout.decode()
 
-    if version == OPENSSL_1_1_1_VERSION:
+    if version_type == OPENSSL_1_1_1_VERSION:
         pattern = r"OpenSSL (\d+\.\d+\.\d+[a-zA-Z]).*"
     else:
         pattern = r"OpenSSL (\d+\.\d+\.\d+).*"
@@ -160,6 +182,13 @@ def replace_elf_dependencies(
     dependency_names: List[str],
     new_dependency_dir: pl.Path,
 ):
+    """
+    Patch given ELF binary and replace its dependencies.
+    :param elf_path: Path to target ELF
+    :param dependency_names: List of dependencies to replace.
+    :param new_dependency_dir: Directory with new dependencies.
+    :return:
+    """
     for dependency_name in dependency_names:
         new_dependency_path = new_dependency_dir / dependency_name
         subprocess.run(

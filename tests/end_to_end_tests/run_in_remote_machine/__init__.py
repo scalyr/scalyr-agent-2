@@ -161,9 +161,6 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
         },
         "docker": "amazonlinux:2",
     },
-    "rockylinux9": {
-        "docker": "rockylinux:9",
-    },
 }
 
 
