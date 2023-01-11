@@ -306,7 +306,7 @@ commands:
     steps:
       - add_ssh_keys:
           fingerprints:
-            - "7b:26:91:6b:a0:9d:31:50:4c:8d:31:a3:a6:b8:f2:7a"
+            - "18:2d:c0:70:b1:f9:31:22:49:14:d8:3a:08:01:3d:2c"
       - checkout
       - attach_workspace:
           at: /tmp/workspace
@@ -333,7 +333,7 @@ commands:
           name: Clean Up Old Stray EC2 Instances
           environment:
             KEY_NAME: "circleci"
-            PRIVATE_KEY_PATH: "~/.ssh/id_rsa_7b26916ba09d31504c8d31a3a6b8f27a"
+            PRIVATE_KEY_PATH: "~/.ssh/id_rsa_182dc070b1f931224914d83a08013d2c"
             PYTHONPATH: "."
           command: |
             export ACCESS_KEY=${AWS_ACCESS_KEY}
@@ -344,7 +344,7 @@ commands:
           name: "Run package tests on EC2 instances (<< parameters.test_os >>)"
           environment:
             KEY_NAME: "circleci"
-            PRIVATE_KEY_PATH: "~/.ssh/id_rsa_7b26916ba09d31504c8d31a3a6b8f27a"
+            PRIVATE_KEY_PATH: "~/.ssh/id_rsa_182dc070b1f931224914d83a08013d2c"
             PYTHONPATH: "."
           no_output_timeout: 25m
           command: |
