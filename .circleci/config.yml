@@ -692,7 +692,8 @@ jobs:
           path: artifacts
 
   ami-tests-stable-windows:
-    circleci_ip_ranges: true # opt into this functionlity for whitelisting purposes
+    # TODO As of Jan 2023, this feature requires a plan upgrade
+    #circleci_ip_ranges: true # opt into this functionlity for whitelisting purposes
     description: "Run scalyr agent packages install sanity tests for the stable packages from the Scalyr repository."
     working_directory: ~/scalyr-agent-2
     docker:
@@ -706,7 +707,7 @@ jobs:
           test_os: "windows"
 
   ami-tests-stable-linux:
-    circleci_ip_ranges: true # opt into tlinuxhis functionlity for whitelisting purposes
+    #circleci_ip_ranges: true # opt into tlinuxhis functionlity for whitelisting purposes
     description: "Run scalyr agent packages install sanity tests for the stable packages from the Scalyr repository."
     working_directory: ~/scalyr-agent-2
     docker:
@@ -720,7 +721,7 @@ jobs:
           test_os: "linux"
 
   ami-tests-development-windows:
-    circleci_ip_ranges: true # opt into this functionlity for whitelisting purposes
+    #circleci_ip_ranges: true # opt into this functionlity for whitelisting purposes
     description: "Run scalyr agent packages sanity tests for the new packages which are built on the current revision."
     working_directory: ~/scalyr-agent-2
     docker:
@@ -734,7 +735,7 @@ jobs:
           test_os: "windows"
 
   ami-tests-development-linux:
-    circleci_ip_ranges: true # opt into this functionlity for whitelisting purposes
+    #circleci_ip_ranges: true # opt into this functionlity for whitelisting purposes
     description: "Run scalyr agent packages sanity tests for the new packages which are built on the current revision."
     working_directory: ~/scalyr-agent-2
     docker:
