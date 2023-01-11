@@ -53,7 +53,7 @@ pushd build
 	--with-readline=edit \
 	--prefix="${INSTALL_PREFIX}" \
 	--exec-prefix="${INSTALL_PREFIX}" \
-	--with-ensurepip=upgrade \
+	--with-ensurepip=upgrade
 
 #		--enable-optimizations \
 #	--with-lto \
@@ -65,17 +65,3 @@ make DESTDIR="${STEP_OUTPUT_PATH}" install
 popd
 popd
 popd
-
-# Install the 'patchelf' tool in order to be able to patch Python modules and libraries.
-cp -a "${STEP_OUTPUT_PATH}/." /
-LD_LIBRARY_PATH="${INSTALL_PREFIX}/lib" "${INSTALL_PREFIX}/bin/python3" -m pip install \
-  --root "/tmp/patchelf_root" "patchelf==0.17.0.0"
-
-cp -a "/tmp/patchelf_root/." "${STEP_OUTPUT_PATH}"
-cp -a "/tmp/patchelf_root/." /
-
-# Patch Python executable and hardcode libpython.so, so runtime linker does not have to search for it.
-"${INSTALL_PREFIX}/bin/patchelf" --replace-needed \
-  "libpython${PYTHON_SHORT_VERSION}.so.1.0" \
-  "${INSTALL_PREFIX}/lib/libpython${PYTHON_SHORT_VERSION}.so.1.0" \
-  "${STEP_OUTPUT_PATH}${INSTALL_PREFIX}/bin/python${PYTHON_SHORT_VERSION}"

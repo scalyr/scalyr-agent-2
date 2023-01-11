@@ -52,35 +52,63 @@ mkdir -p "${OPENSSL_LIBS_DIR}"
 
 
 # This function copies Python's ssl module related files.
-function copy_openssl_libs() {
+function copy_and_patch_openssl_libs() {
   local openssl_libs_dir="$1"
   local python_step_output_dir="$2"
   local dst_dir="$3"
 
+  local libssl_path="$(find "${openssl_libs_dir}" -name "libssl.so.*")"
+  local libcrypto_path="$(find "${openssl_libs_dir}" -name "libcrypto.so.*")"
+  local libssl_filename="$(basename "${libssl_path}")"
+  local libcrypto_filename="$(basename "${libcrypto_path}")"
+
   mkdir -p "${dst_dir}"
-
   # Copy shared objects and other files of the OpenSSL library.
-  cp "${openssl_libs_dir}"/libssl.so* "${dst_dir}"
-  cp "${openssl_libs_dir}"/libcrypto.so* "${dst_dir}"
-  cp -a "${openssl_libs_dir}"/engines-* "${dst_dir}"
+  cp "${libssl_path}" "${dst_dir}"
+  cp "${libcrypto_path}" "${dst_dir}"
 
-  local bindings_dir="${dst_dir}/bindings"
-  mkdir -p "${bindings_dir}"
   local python_step_bindings_dir="${python_step_output_dir}${INSTALL_PREFIX}/lib/python${PYTHON_SHORT_VERSION}/lib-dynload"
 
   # Copy _ssl and _hashlib modules.
   local ssl_binding_path="$(get_standard_c_binding_path "${python_step_bindings_dir}" _ssl.cpython-*-*-*-*.so)"
   local hashlib_binding_path="$(get_standard_c_binding_path "${python_step_bindings_dir}" _hashlib.cpython-*-*-*-*.so)"
 
-  mkdir -p "${dst_dir}"
-  cp "${ssl_binding_path}" "${bindings_dir}"
-  cp "${hashlib_binding_path}" "${bindings_dir}"
+  local bindings_dir="${dst_dir}/bindings"
+
+  # Copy original ssl and hashlib C bindings. They will be used in case if appropriate OpenSSL version is
+  # found on system.
+  local original_bindings_dir="${bindings_dir}/original"
+  mkdir -p "${original_bindings_dir}"
+  cp "${ssl_binding_path}" "${original_bindings_dir}"
+  cp "${hashlib_binding_path}" "${original_bindings_dir}"
+
+  # In case if there is no appropriate system OpenSSL, we also copy the same C bindings, but which are hardcoded
+  # to use OpenSSL shared objects that are shipped with the package.
+  local patched_bindings_dir="${bindings_dir}/patched"
+  mkdir -p "${patched_bindings_dir}"
+  local patched_ssl_binding_path="${patched_bindings_dir}/$(basename "${ssl_binding_path}")"
+  local patched_hashlib_binding_path="${patched_bindings_dir}/$(basename "${hashlib_binding_path}")"
+  cp "${ssl_binding_path}" "${patched_bindings_dir}"
+  cp "${hashlib_binding_path}" "${patched_bindings_dir}"
+
+  new_dependencies_dir="$(realpath --relative-to "${PACKAGE_ROOT}" "${dst_dir}")"
+  # Patch ssl and hashlib C bindings and hardcode package's shared objects as dependencies.
+  patchelf --replace-needed "${libssl_filename}" "/${new_dependencies_dir}/${libssl_filename}" "${patched_ssl_binding_path}"
+  patchelf --replace-needed "${libcrypto_filename}" "/${new_dependencies_dir}/${libcrypto_filename}" "${patched_ssl_binding_path}"
+  patchelf --replace-needed "${libcrypto_filename}" "/${new_dependencies_dir}/${libcrypto_filename}" "${patched_hashlib_binding_path}"
 }
 
 # Copy ssl modules and libraries which are compiled for OpenSSL 1.1.1
-copy_openssl_libs "${BUILD_OPENSSL_1_1_1}${LIBSSL_DIR}" "${BUILD_PYTHON_WITH_OPENSSL_1_1_1}" "${OPENSSL_LIBS_DIR}/1_1_1"
+copy_and_patch_openssl_libs "${BUILD_OPENSSL_1_1_1}${LIBSSL_DIR}" "${BUILD_PYTHON_WITH_OPENSSL_1_1_1}" "${OPENSSL_LIBS_DIR}/1_1_1"
 # Copy ssl modules and libraries which are compiled for OpenSSL 3
-copy_openssl_libs "${BUILD_OPENSSL_3}${LIBSSL_DIR}" "${BUILD_PYTHON_WITH_OPENSSL_3}" "${OPENSSL_LIBS_DIR}/3"
+copy_and_patch_openssl_libs "${BUILD_OPENSSL_3}${LIBSSL_DIR}" "${BUILD_PYTHON_WITH_OPENSSL_3}" "${OPENSSL_LIBS_DIR}/3"
+
+
+# Patch Python executable and hardcode libpython.so, so runtime linker does not have to search for it.
+patchelf --replace-needed \
+  "libpython${PYTHON_SHORT_VERSION}.so.1.0" \
+  "${INSTALL_PREFIX}/lib/libpython${PYTHON_SHORT_VERSION}.so.1.0" \
+  "${PACKAGE_ROOT}${INSTALL_PREFIX}/bin/python${PYTHON_SHORT_VERSION}"
 
 # Copy package scriptlets
 cp -a "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_python3/install-scriptlets" "${STEP_OUTPUT_PATH}/scriptlets"

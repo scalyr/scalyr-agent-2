@@ -235,7 +235,6 @@ class LinuxDependencyPackagesBuilder(Runner):
             "-a", package_arch,
             "-t", cls.PACKAGE_TYPE,
             "-n", AGENT_LIBS_PACKAGE_NAME,
-            "--config-files", "etc/scalyr-agent-2/additional-requirements.txt",
             "--license", '"Apache 2.0"',
             "--vendor", "Scalyr",
             "--provides", "scalyr-agent-2-dependencies",
@@ -477,7 +476,7 @@ class LinuxDependencyPackagesBuilder(Runner):
                 [
                     *self.get_agent_libs_build_command_args(),
                     "--depends", f"{PYTHON_PACKAGE_NAME} = {python_version}",
-                    "--config-files", f"/opt/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/etc/additional-requirements.txt",
+                    "--config-files",  f"/opt/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/etc/additional-requirements.txt",
                     "--after-install", str(scriptlets_dir / "postinstall.sh"),
                     "-v", agent_libs_version,
                     "-C", str(build_agent_libs_step_output / "root"),
@@ -1118,7 +1117,8 @@ def create_build_openssl_steps(
                 "OPENSSL_VERSION": openssl_version,
             },
             github_actions_settings=GitHubActionsSettings(
-                run_in_remote_docker=run_in_remote_docker
+                run_in_remote_docker=run_in_remote_docker,
+                cacheable=True
             )
         )
         steps[architecture] = step
@@ -1174,7 +1174,8 @@ def create_build_python_dependencies_steps(
                 **_PYTHON_BUILD_DEPENDENCIES_VERSIONS,
             },
             github_actions_settings=GitHubActionsSettings(
-                run_in_remote_docker=run_in_remote_docker
+                run_in_remote_docker=run_in_remote_docker,
+                cacheable=True
             )
         )
         steps[architecture] = step
@@ -1213,7 +1214,8 @@ def create_build_python_steps(
 
             },
             github_actions_settings=GitHubActionsSettings(
-                run_in_remote_docker=run_in_remote_docker
+                run_in_remote_docker=run_in_remote_docker,
+                cacheable=True
             )
         )
 
@@ -1256,10 +1258,10 @@ def create_build_python_package_root_steps() -> Dict[Architecture, ArtifactRunne
 
     for architecture in SUPPORTED_ARCHITECTURES:
         build_env_info = _SUPPORTED_ARCHITECTURES_TO_BUILD_ENVIRONMENTS[architecture]
-        if "ubuntu" in build_env_info.image:
-            libssl_dir = "/usr/local/lib"
-        else:
+        if "centos:6" in build_env_info.image:
             libssl_dir = "/usr/local/lib64"
+        else:
+            libssl_dir = "/usr/local/lib"
 
         step = ArtifactRunnerStep(
             name="build_python_package_root",
@@ -1269,21 +1271,21 @@ def create_build_python_package_root_steps() -> Dict[Architecture, ArtifactRunne
                 "agent_build_refactored/managed_packages/scalyr_agent_python3/install-scriptlets/postinstall.sh",
                 "agent_build_refactored/managed_packages/scalyr_agent_python3/install-scriptlets/preuninstall.sh"
             ],
-            base=PREPARE_TOOLSET_STEPS[architecture],
+            base=PREPARE_TOOLSET_STEPS[Architecture.X86_64],
             required_steps={
                 "BUILD_OPENSSL_1_1_1": BUILD_OPENSSL_STEPS[OPENSSL_VERSION_TYPE_1_1_1][architecture],
                 "BUILD_OPENSSL_3": BUILD_OPENSSL_STEPS[OPENSSL_VERSION_TYPE_3][architecture],
                 "BUILD_PYTHON_WITH_OPENSSL_1_1_1": BUILD_PYTHON_STEPS[OPENSSL_VERSION_TYPE_1_1_1][architecture],
                 "BUILD_PYTHON_WITH_OPENSSL_3": BUILD_PYTHON_STEPS[OPENSSL_VERSION_TYPE_3][architecture],
-
-
             },
             environment_variables={
                 "PYTHON_SHORT_VERSION": EMBEDDED_PYTHON_SHORT_VERSION,
                 "INSTALL_PREFIX": "/opt/scalyr-agent-2-dependencies",
                 "LIBSSL_DIR": libssl_dir
             },
-
+            github_actions_settings=GitHubActionsSettings(
+                cacheable=True
+            )
         )
 
         steps[architecture] = step
@@ -1379,7 +1381,7 @@ def create_build_agent_libs_package_root_steps() -> Dict[Architecture, ArtifactR
                 "agent_build_refactored/managed_packages/scalyr_agent_libs/agent-libs-config",
                 "agent_build_refactored/managed_packages/scalyr_agent_libs/install-scriptlets/postinstall.sh",
             ],
-            base=PREPARE_TOOLSET_STEPS[architecture],
+            base=PREPARE_TOOLSET_STEPS[Architecture.X86_64],
             required_steps={
                 "BUILD_AGENT_LIBS": BUILD_AGENT_LIBS_VENV_STEPS[architecture],
             },

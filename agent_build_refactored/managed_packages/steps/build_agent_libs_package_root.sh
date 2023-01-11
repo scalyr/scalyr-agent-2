@@ -39,8 +39,8 @@ mkdir -p "${PACKAGE_ROOT}/opt/${SUBDIR_NAME}/etc"
 echo "${REQUIREMENTS}" > "${PACKAGE_ROOT}/opt/${SUBDIR_NAME}/core-requirements.txt"
 
 # Copy additional requirements file.
-mkdir -p "${PACKAGE_ROOT}/etc/scalyr-agent-2"
-cp "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_libs/additional-requirements.txt" "${PACKAGE_ROOT}/etc/scalyr-agent-2"
+mkdir -p "${PACKAGE_ROOT}/opt/${SUBDIR_NAME}/etc"
+cp "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_libs/additional-requirements.txt" "${PACKAGE_ROOT}/opt/${SUBDIR_NAME}/etc"
 
 # Copy executable that allows configure the package.
 mkdir -p "${PACKAGE_ROOT}/opt/${SUBDIR_NAME}/bin"

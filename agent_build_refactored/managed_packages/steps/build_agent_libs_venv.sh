@@ -37,7 +37,7 @@ ldconfig
 REQUIREMENTS_FILE=/tmp/requirements.txt
 echo "${REQUIREMENTS}" > "${REQUIREMENTS_FILE}"
 
-
+export LD_LIBRARY_PATH="/opt/scalyr-agent-2-dependencies/lib:${LD_LIBRARY_PATH}"
 # Create venv.
 VENV_DIR="/var/opt/${SUBDIR_NAME}/venv"
 "/opt/${SUBDIR_NAME}/bin/python3" -m venv "${VENV_DIR}"

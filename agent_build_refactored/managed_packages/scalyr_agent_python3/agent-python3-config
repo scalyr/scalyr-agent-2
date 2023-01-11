@@ -20,7 +20,6 @@ This script provide some configuration options for the Agent's Python3 dependenc
 import argparse
 import pathlib as pl
 import subprocess
-import shutil
 import sys
 import re
 from typing import List
@@ -73,31 +72,10 @@ def initialize():
                 file=sys.stderr
             )
 
-    if preferred_openssl != "embedded":
-        print(f"Unknown 'preferred_openssl' - {preferred_openssl}", file=sys.stderr)
-        exit(1)
-
+    print("Use embedded OpenSSL.", file=sys.stderr)
     version_to_use = DEFAULT_FALLBACK_OPENSSL_VERSION
     # Could not find any valid system OpenSSL, fallback to embedded one.
-    copy_bindings(version_type=version_to_use)
-    openssl_version_path = OPENSSL_LIBS_PATH / version_to_use
-
-    libssl_filename = list(openssl_version_path.glob("libssl.so.*"))[0].name
-    libcrypto_filename = list(openssl_version_path.glob("libcrypto.so.*"))[0].name
-
-    # Patch '_ssl' module's C bindings and hardcode embedded OpenSSL libraries as a dependencies.
-    replace_elf_dependencies(
-        elf_path=PYTHON_LIB_DYNLOAD_PATH / SSL_C_BINDING_FILENAME,
-        dependency_names=[libssl_filename, libcrypto_filename],
-        new_dependency_dir=openssl_version_path
-    )
-
-    # Do the same with the '_hashlib' module.
-    replace_elf_dependencies(
-        elf_path=PYTHON_LIB_DYNLOAD_PATH / HASHLIB_C_BINDING_FILENAME,
-        dependency_names=[libssl_filename, libcrypto_filename],
-        new_dependency_dir=openssl_version_path
-    )
+    link_bindings(version_type=version_to_use, bindings_type="patched")
 
     embedded_openssl_version = get_current_openssl_version(version_type=version_to_use)
 
@@ -110,37 +88,37 @@ def look_for_system_openssl(version_type: str) -> bool:
     :param version_type: version type to use.
     :return:
     """
-    copy_bindings(version_type=version_type)
+    link_bindings(version_type=version_type, bindings_type="original")
 
     system_openssl_version = get_current_openssl_version(version_type=version_type)
 
     if not system_openssl_version:
-        print(f"    Unknown OpenSSL version format: '{system_openssl_version}'", file=sys.stderr)
         return False
 
     print(f"    Using system OpenSSL {system_openssl_version}", file=sys.stderr)
     return True
 
 
-def copy_bindings(version_type: str):
+def link_bindings(version_type: str, bindings_type: str):
     """
-    Copy openssl related Python C bindings with specified version to Python directory.
+    Link openssl related Python C bindings with their specified versions.
     :param version_type:  version of the OpenSSL to use.
     :return:
     """
-    openssl_version_path = OPENSSL_LIBS_PATH / version_type
+
+    openssl_version_path = OPENSSL_LIBS_PATH / version_type / "bindings" / bindings_type
 
     for binding_filename in [
         SSL_C_BINDING_FILENAME,
         HASHLIB_C_BINDING_FILENAME,
     ]:
-        binding_src_path = openssl_version_path / "bindings" / binding_filename
-        binding_dst_path = PYTHON_LIB_DYNLOAD_PATH / binding_filename
+        symlink_path = PYTHON_LIB_DYNLOAD_PATH / binding_filename
 
-        shutil.copy(
-            binding_src_path,
-            binding_dst_path,
-        )
+        if symlink_path.exists():
+            symlink_path.unlink()
+
+        binding_path = openssl_version_path / binding_filename
+        symlink_path.symlink_to(binding_path)
 
 
 def get_current_openssl_version(version_type: str):
@@ -159,7 +137,7 @@ def get_current_openssl_version(version_type: str):
     )
 
     if result.returncode != 0:
-        print("    Not found.")
+        print("    Not found.", file=sys.stderr)
         return None
 
     version_output = result.stdout.decode()
@@ -172,6 +150,7 @@ def get_current_openssl_version(version_type: str):
     m = re.match(pattern, version_output)
 
     if not m:
+        print(f"    Unknown OpenSSL version format: '{version_output}'", file=sys.stderr)
         return None
 
     return m.group(1)

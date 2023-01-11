@@ -26,7 +26,7 @@ DEPENDENCIES_PACKAGE_ROOT = pl.Path("/opt/scalyr-agent-2-dependencies")
 
 def initialize():
     core_requirements_path = DEPENDENCIES_PACKAGE_ROOT / "core-requirements.txt"
-    additional_requirements_path = pl.Path("/etc/scalyr-agent-2/additional-requirements.txt")
+    additional_requirements_path = DEPENDENCIES_PACKAGE_ROOT / "etc/additional-requirements.txt"
 
     venv_source_dir = DEPENDENCIES_PACKAGE_ROOT / "venv"
     venv_dst_dir = pl.Path("/var/opt/scalyr-agent-2-dependencies/venv")

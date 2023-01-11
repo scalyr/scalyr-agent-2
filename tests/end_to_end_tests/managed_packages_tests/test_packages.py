@@ -457,7 +457,7 @@ def _perform_ssl_checks(
 
 # Additional paths to add in case if tests run within "frozen" pytest executable.
 _ADDITIONAL_ENVIRONMENT = {
-    "LD_LIBRARY_PATH": "/lib",
+    "LD_LIBRARY_PATH": "/lib:/lib64",
     "PATH": "/bin:/sbin:/usr/bin:/usr/sbin",
 }
 

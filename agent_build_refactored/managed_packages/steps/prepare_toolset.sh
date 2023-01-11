@@ -34,6 +34,8 @@ set -e
 cp -a "${BUILD_PYTHON}/." /
 cp -a "${BUILD_OPENSSL}/." /
 cp -a "${BUILD_DEV_REQUIREMENTS}/root/." /
+
+echo "/opt/scalyr-agent-2-dependencies/lib" >> /etc/ld.so.conf.d/scalyr-agent-python3.conf
 ldconfig
 
 # shellcheck disable=SC1090
