@@ -364,7 +364,10 @@ class LinuxDependencyPackagesBuilder(Runner):
 
     @classmethod
     def _get_build_package_root_step(cls, package_name: str) -> ArtifactRunnerStep:
-
+        """
+        Return runner step that builds root for a given package.
+        :param package_name: name of the package.
+        """
         package_to_steps = {
             PYTHON_PACKAGE_NAME: BUILD_PYTHON_PACKAGE_ROOT_STEPS,
             AGENT_LIBS_PACKAGE_NAME: BUILD_AGENT_LIBS_PACKAGE_ROOT_STEPS
@@ -435,7 +438,7 @@ class LinuxDependencyPackagesBuilder(Runner):
         )
 
         if should_build_agent_libs:
-            # build python package
+            # build python package, if needed
             python_version, should_build_python = _get_dependency_package_version_to_use(
                 checksum=_ALL_PYTHON_PACKAGES_CHECKSUM,
                 package_name=PYTHON_PACKAGE_NAME,

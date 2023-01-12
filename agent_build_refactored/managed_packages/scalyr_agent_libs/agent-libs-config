@@ -25,29 +25,36 @@ DEPENDENCIES_PACKAGE_ROOT = pl.Path("/opt/scalyr-agent-2-dependencies")
 
 
 def initialize():
+    """
+    Initialize agent requirement libraries by creating virtual environment with them.
+    :return:
+    """
     core_requirements_path = DEPENDENCIES_PACKAGE_ROOT / "core-requirements.txt"
-    additional_requirements_path = DEPENDENCIES_PACKAGE_ROOT / "etc/additional-requirements.txt"
 
+    # This is pre-created venv that is shipped with package.
     venv_source_dir = DEPENDENCIES_PACKAGE_ROOT / "venv"
-    venv_dst_dir = pl.Path("/var/opt/scalyr-agent-2-dependencies/venv")
 
+    venv_dst_dir = pl.Path("/var/opt/scalyr-agent-2-dependencies/venv")
     if venv_dst_dir.exists():
         shutil.rmtree(venv_dst_dir)
 
+    # Copy venv that is shipped with the package.
     shutil.copytree(
         venv_source_dir,
         venv_dst_dir,
     )
-
-    python_executable = venv_dst_dir / "bin/python3"
+    # Run pip install for additional agent requirements that may be specified by the user.
     subprocess.check_call(
         [
-            str(python_executable),
+            str(venv_dst_dir / "bin/python3"),
             "-m",
             "pip",
             "install",
+            # Core agent requirements are already installed in this "pre-created" venv, but
+            # we still add their requirements file to be sure that pip will throw an error if
+            # additional requirements conflict with core ones.
             "-r", str(core_requirements_path),
-            "-r", str(additional_requirements_path),
+            "-r", str(DEPENDENCIES_PACKAGE_ROOT / "etc/additional-requirements.txt"),
         ]
     )
 
