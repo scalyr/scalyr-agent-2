@@ -46,11 +46,49 @@ These packages are needed to make agent package completely independent of a targ
 The 'scalyr-agent-python3' package provides Python interpreter that is specially built to be used by the agent.
     Its main feature that it is built against the oldest possible version of gLibc, so it has to be enough to maintain
     only one build of the package in order to support all target systems.
+    
+    One of the features on the package, is that is can use system's OpenSSL if it has appropriate version, or 
+    fallback to the OpenSSL library which is shipped with the package. To achieve that, the Python interpreter from the 
+    package contains multiple versions of it's 'OpenSSL-related' C bindings - _ssl.cpython*.so and _hashlib.cpython.so
+    On each new installation/upgrade of the package or user's manual run of the command 
+    `/opt/scalyr-agent-2-dependencies/bin/agent-python3-config initialize`, the package follows next steps in order to 
+    resolve OpenSSL library to use:
+        - 1: Make Python interpreter to use original ssl C bindings. In this case when 'ssl' or 'hashlib' module is 
+            imported, the originally compiled '_ssl.cpython*.so' and '_hashlib.cpython.so' bindings are used.
+            Those bindings, from the default, use system's dynamic linker in order to find and link appropriate OpenSLL
+            library if it is presented on system. First it tries to find OpenSSL version - 3+.
+        - 2: If first step is not successful and system does not have appropriate OpenSSL 3, then 
+            we replace previous  '_ssl.cpython*.so' and '_hashlib.cpython.so' C bindings with the same bindings, but
+            that are compiled and linked against the OpenSSL 1.1.1+, and will look for OpenSSL 1.1.1+. Even though the 
+            _ssh and _hashlib modules may resolve multiple variants of the OpenSSL libraries, they are able to resolve 
+            them only for the specific major version they were compiled for. So we have to have multiple variants of the
+            ssl C bindings that are compiled and linked against both OpenSSL 1.1.1+ and 3.0+.
+        
+        -3: If OpenSSL 1.1.1+ is also not presented in a system, then we fallback to the 'embedded' OpenSSL library that
+            is shipped with the package. To achieve that we again use a special variant of the ssl C bindings.
+            Those binding basically the same as previous ones, except they are parched to links directly against OpenSSl
+            shared objects from the package instead of linking to system's libraries. 
 
 
 The 'scalyr-agent-libs' package provides requirement libraries for the agent, for example Python 'requests' or
     'orjson' libraries. It is intended to ship it separately from the 'scalyr-agent-python3' because we update
-    agent's requirements much more often than Python interpreter. Agent requirements are shipped in form of venv.
+    agent's requirements much more often than Python interpreter. Agent requirements are shipped in form of 
+    virtualenv (or just venv). The venv with agent's 'core' requirements is shipped with this packages.
+    User can also install their own additional requirements by specifying them in the package's config file -
+    /opt/scalyr-agent-2-dependencies/etc/additional-requirements.txt. 
+    The original venv that is shipped with the package is never used directly by the agent. Instead of that, the package
+    follows the next steps:
+        - 1: The original venv is copied to the `/var/opt/scalyr-agent-dependencies/venv` directory, the path that is 
+               expected to be used by the agent. 
+        - 2: The requirements from the additional-requirements.txt file are installed to a copied venv. The core 
+                requirements are already there, so it has to install only additional ones.
+        
+    This new venv initialization process is triggered every time by the package's 'postinstall' script, guaranteeing 
+    that venv is up to date on each install-upgrade. For the same purpose, the `additional-requirements.txt` file is 
+    set as package's config file, to be able to 'survive' upgrades. User also can 're-initialize' agent requirements 
+    manually by running the command `/opt/scalyr-agent-2-dependencies/bin/agent-libs-config initialize` 
+    
+
 
 The structure of the mentioned packages has to guarantee that files of these packages does not interfere with
     files of local system Python interpreter. To achieve that, the dependency packages files are installed in the 
@@ -74,12 +112,15 @@ AGENT_PACKAGE_NAME = "scalyr-agent-2"
 EMBEDDED_PYTHON_VERSION = "3.11.0"
 EMBEDDED_PYTHON_SHORT_VERSION = ".".join(EMBEDDED_PYTHON_VERSION.split(".")[:2])
 
-PYTHON_PACKAGE_SSL_1_1_1_VERSION = "1.1.1k"
+PYTHON_PACKAGE_SSL_1_1_1_VERSION = "1.1.1s"
 PYTHON_PACKAGE_SSL_3_VERSION = "3.0.7"
 
 
 OPENSSL_VERSION_TYPE_1_1_1 = "1_1_1"
 OPENSSL_VERSION_TYPE_3 = "3"
+
+# Version of rust that is needed to build some of the agent's requirements, such as orjson.
+RUST_VERSION = "1.63.0"
 
 DEFAULT_OPENSSL_VERSION = OPENSSL_VERSION_TYPE_1_1_1
 
@@ -1317,7 +1358,7 @@ def create_build_dev_requirements_steps() -> Dict[Architecture, ArtifactRunnerSt
                 "BUILD_PYTHON": BUILD_PYTHON_STEPS[DEFAULT_OPENSSL_VERSION][architecture],
             },
             environment_variables={
-                "RUST_VERSION": "1.63.0",
+                "RUST_VERSION": RUST_VERSION,
                 "SUBDIR_NAME": AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME
             },
             github_actions_settings=GitHubActionsSettings(
