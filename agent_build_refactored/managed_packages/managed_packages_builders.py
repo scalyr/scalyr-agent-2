@@ -22,7 +22,8 @@ import argparse
 import pathlib as pl
 from typing import List, Tuple, Optional, Dict, Type
 
-
+from agent_build_refactored.managed_packages.build_dependencies_versions import EMBEDDED_PYTHON_VERSION, \
+    PYTHON_PACKAGE_SSL_1_1_1_VERSION, PYTHON_PACKAGE_SSL_3_VERSION, RUST_VERSION
 from agent_build_refactored.tools.runner import Runner, RunnerStep, ArtifactRunnerStep, RunnerMappedPath, EnvironmentRunnerStep, DockerImageSpec,GitHubActionsSettings, IN_DOCKER
 from agent_build_refactored.tools.constants import SOURCE_ROOT, DockerPlatform, Architecture, REQUIREMENTS_COMMON, REQUIREMENTS_COMMON_PLATFORM_DEPENDENT
 from agent_build_refactored.tools import check_call_with_log
@@ -108,19 +109,10 @@ AGENT_LIBS_PACKAGE_NAME = "scalyr-agent-libs"
 
 AGENT_PACKAGE_NAME = "scalyr-agent-2"
 
-
-EMBEDDED_PYTHON_VERSION = "3.11.0"
 EMBEDDED_PYTHON_SHORT_VERSION = ".".join(EMBEDDED_PYTHON_VERSION.split(".")[:2])
-
-PYTHON_PACKAGE_SSL_1_1_1_VERSION = "1.1.1s"
-PYTHON_PACKAGE_SSL_3_VERSION = "3.0.7"
-
 
 OPENSSL_VERSION_TYPE_1_1_1 = "1_1_1"
 OPENSSL_VERSION_TYPE_3 = "3"
-
-# Version of rust that is needed to build some of the agent's requirements, such as orjson.
-RUST_VERSION = "1.63.0"
 
 DEFAULT_OPENSSL_VERSION = OPENSSL_VERSION_TYPE_1_1_1
 

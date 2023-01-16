@@ -25,7 +25,6 @@ import site
 
 from agent_build_refactored.tools.constants import SOURCE_ROOT
 from agent_build_refactored.managed_packages.managed_packages_builders import (
-    PYTHON_PACKAGE_SSL_1_1_1_VERSION,
     AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME as SUBDIR,
 )
 
