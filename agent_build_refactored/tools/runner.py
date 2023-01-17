@@ -128,7 +128,9 @@ class RunnerStep:
             a step.
         :param base: Another 'EnvironmentRunnerStep' or docker image that will be used as base environment where this
             step will run.
-        :param required_steps: List of other steps that has to be executed in order to run this step.
+        :param required_steps: Collection (dict) of other steps that has to be executed in order to run this step.
+            Key - Name of the env. variable that points to step's output directory with it;s result artifacts.
+            Value - Step instance.
         :param environment_variables: Dist with environment variables to pass to step's script.
         :param user: Name of the user under which name run the step's script.
         :param github_actions_settings: Additional setting on how step has to be executed on GitHub Actions CI/CD
@@ -992,18 +994,7 @@ class Runner:
                 return None
 
             # Get EC2 AMI image according to step's architecture.
-
             ec2_image = DOCKER_EC2_BUILDERS.get(step.architecture)
-            # If image is not found then just run in local docker engine.
-            if ec2_image is None and step.architecture != Architecture.X86_64:
-                ec2_image = EC2DistroImage(
-                    image_id="ami-09d56f8956ab235b3",
-                    image_name="Ubuntu Server 22.04 (HVM), SSD Volume Type",
-                    short_name="ubuntu2204",
-                    #size_id="t2.2xlarge",
-                    size_id="m5.metal",
-                    ssh_username="ubuntu",
-                )
 
             # Try to find already created node if it is created by previous steps.
             remote_docker_host = existing_ec2_hosts.get(step.architecture)
