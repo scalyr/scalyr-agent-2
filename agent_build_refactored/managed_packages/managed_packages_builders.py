@@ -1070,6 +1070,7 @@ class LinuxDependencyPackagesBuilder(Runner):
                 shutil.copytree(
                     builder.output_path,
                     output_path,
+                    symlinks=True,
                     dirs_exist_ok=True,
                 )
         elif args.command == "publish":
