@@ -464,8 +464,9 @@ def _install_from_convenience_script(
     try:
         result = subprocess.run(
             ["bash", str(script_path), "--verbose"],
-            capture_output=True,
             check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             env=_ADDITIONAL_ENVIRONMENT
         )
     except subprocess.CalledProcessError as e:
