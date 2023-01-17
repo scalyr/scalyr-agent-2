@@ -388,7 +388,7 @@ class RunnerStep:
                 if output_directory.is_symlink():
                     output_directory.unlink()
                 else:
-                    shutil.rmtree(output_directory)
+                    remove_directory_in_docker(output_directory)
 
             symlink_rel_path = pl.Path("../step_cache") / output_directory.name
             output_directory.symlink_to(symlink_rel_path)
