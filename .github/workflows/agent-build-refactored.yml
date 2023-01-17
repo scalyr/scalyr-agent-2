@@ -7,6 +7,10 @@ on:
     types: [ opened ]
     branches:
       - 'master'
+      - 'arthur/dev-release'
+  workflow_dispatch:
+
+
   schedule:
     - cron: '0 4 * * *'
 
