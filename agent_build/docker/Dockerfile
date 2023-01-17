@@ -40,7 +40,7 @@ RUN tar -xf /tmp/build/scalyr-agent.tar.gz
 WORKDIR /
 
 # Copy result files to a new base stage.
-FROM python:3.8-$BASE_IMAGE_SUFFIX as scalyr-base
+FROM python:3.8.16-$BASE_IMAGE_SUFFIX as scalyr-base
 MAINTAINER Scalyr Inc <support@scalyr.com>
 # Copy Agent's Python dependencies. Those dependencies were built in the base image,
 # which is given by 'BASE_IMAGE' arg.
@@ -91,3 +91,7 @@ CMD ["coverage", "run", "--branch", "/usr/share/scalyr-agent-2/py/scalyr_agent/a
 # Use stage with needed mode as a final image.
 FROM scalyr-$MODE as scalyr
 MAINTAINER Scalyr Inc <support@scalyr.com>
+
+RUN apt-get update ; apt-get dist-upgrade -y
+RUN python3 -m pip install --upgrade setuptools
+RUN apt-get clean

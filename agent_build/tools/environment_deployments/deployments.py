@@ -687,7 +687,7 @@ class BuildDebianDockerBaseImageStep(BuildDockerBaseImageStep):
     Subclass that builds agent's base docker image based on debian (slim)
     """
 
-    BASE_DOCKER_IMAGE_TAG_SUFFIX = "slim"
+    BASE_DOCKER_IMAGE_TAG_SUFFIX = "slim-bullseye"
 
 
 class BuildAlpineDockerBaseImageStep(BuildDockerBaseImageStep):
