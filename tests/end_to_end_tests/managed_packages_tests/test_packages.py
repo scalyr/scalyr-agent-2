@@ -37,6 +37,7 @@ from agent_build_refactored.managed_packages.managed_packages_builders import (
     PYTHON_PACKAGE_NAME,
     AGENT_LIBS_PACKAGE_NAME,
     AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME,
+    DEFAULT_PYTHON_PACKAGE_OPENSSL_VERSION
 )
 from tests.end_to_end_tests.tools import AgentPaths, AgentCommander, TimeoutTracker
 from tests.end_to_end_tests.verify import (
@@ -157,17 +158,10 @@ def test_packages(
     )
 
     logger.info("Install agent from install script.")
-    try:
-        _install_from_convenience_script(
-            script_path=convenience_script_path,
-        )
-    except subprocess.CalledProcessError:
-        install_log_path = pl.Path("scalyr_install.log")
-        if install_log_path.exists():
-            logger.error(f"Install log:\n{install_log_path.read_text()}\n")
-
-        logger.exception("Install script has failed.")
-        raise
+    _install_from_convenience_script(
+        script_path=convenience_script_path,
+        distro_name=distro_name
+    )
 
     logger.info(
         "Execute simple sanity test script for the python interpreter and its libraries."
@@ -464,9 +458,38 @@ _ADDITIONAL_ENVIRONMENT = {
 
 def _install_from_convenience_script(
     script_path: pl.Path,
+    distro_name: str,
 ):
     """Install agent using convenience script."""
-    subprocess.check_call(["bash", str(script_path)], env=_ADDITIONAL_ENVIRONMENT)
+    try:
+        result = subprocess.run(
+            ["bash", str(script_path), "--verbose"],
+            capture_output=True,
+            check=True,
+            env=_ADDITIONAL_ENVIRONMENT
+        )
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Install script has failed.\nOutput:\n{e.stdout.decode()}")
+        raise
+
+    output = result.stdout.decode()
+    logger.info(f"Install script has finished.\nOutput:\n{output}")
+
+    # Verify which variant of OpenSSL has been chosen by the package, system's one or embedded.
+    # NOTE: Expected results of this check may eventually become outdated, because of distribution's EOL
+    # or changes in version requirements for OpenSSL in Python.
+    # If system's OpenSSL is not used anymore on some distro, it may be due to this distro has become
+    # outdated enough, so Python just does not accept its version of OpenSSL and package falls back to
+    # embedded OpenSSL.
+    if distro_name == "ubuntu2204":
+        assert "Looking for system OpenSSL >= 3: found OpenSSL 3.0." in output
+    elif distro_name == "ubuntu2004":
+        assert "Looking for system OpenSSL >= 3: Not found" in output
+        assert "Looking for system OpenSSL >= 1.1.1: found OpenSSL 1.1.1" in output
+    elif distro_name in ["ubuntu1404", "centos6"]:
+        assert "Looking for system OpenSSL >= 3: Not found" in output
+        assert "Looking for system OpenSSL >= 1.1.1: Not found" in output
+        assert f"Using embedded OpenSSL == {DEFAULT_PYTHON_PACKAGE_OPENSSL_VERSION}" in output
 
 
 def _prepare_environment(
