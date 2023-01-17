@@ -150,6 +150,14 @@ class LinuxDependencyPackagesBuilder(Runner):
         """
         return self.output_path / "packages"
 
+
+    @property
+    def managed_packages_output_path(self) -> pl.Path:
+        """
+        Directory with result managed packages.
+        """
+        return self.packages_output_path / self.PACKAGE_TYPE / "managed"
+
     @staticmethod
     def _parse_package_version_parts(version: str) -> Tuple[int, str]:
         """
@@ -312,7 +320,7 @@ class LinuxDependencyPackagesBuilder(Runner):
         changelogs_path.mkdir()
         create_change_logs(output_dir=changelogs_path)
 
-        subprocess.check_call(
+        check_call_with_log(
             [
                 # fmt: off
                 "fpm",
@@ -335,8 +343,8 @@ class LinuxDependencyPackagesBuilder(Runner):
                 "--rpm-group", "root",
                 "--deb-changelog", str(changelogs_path / "changelog-deb"),
                 "--rpm-changelog", str(changelogs_path / "changelog-rpm"),
-                "--after-install", scriptlets_path / "postinstall.sh",
-                "--before-remove", scriptlets_path / "preuninstall.sh",
+                "--after-install", str(scriptlets_path / "postinstall.sh"),
+                "--before-remove", str(scriptlets_path / "preuninstall.sh"),
                 "--deb-no-default-config-files",
                 "--no-deb-auto-config-files",
                 "--config-files", "/etc/scalyr-agent-2/agent.json",
@@ -348,7 +356,7 @@ class LinuxDependencyPackagesBuilder(Runner):
                 "--verbose",
                 # fmt: on
             ],
-            cwd=str(self.packages_output_path)
+            cwd=str(self.managed_packages_output_path)
         )
         if self.PACKAGE_TYPE == "deb":
             package_glob = f"{AGENT_PACKAGE_NAME}_{version}_{self.agent_package_arch}.{self.PACKAGE_TYPE}"
@@ -357,7 +365,7 @@ class LinuxDependencyPackagesBuilder(Runner):
         else:
             raise Exception(f"Unknown package type {self.PACKAGE_TYPE}")
 
-        found = list(self.packages_output_path.glob(package_glob))
+        found = list(self.managed_packages_output_path.glob(package_glob))
         assert len(found) == 1, f"Number of result agent packages has to be 1, got {len(found)}"
         return found[0].name
 
@@ -428,7 +436,7 @@ class LinuxDependencyPackagesBuilder(Runner):
             self.run_in_docker(command_args=command_args)
             return
 
-        self.packages_output_path.mkdir(parents=True)
+        self.managed_packages_output_path.mkdir(parents=True)
 
         # Build agent libs package
         agent_libs_version, should_build_agent_libs = _get_dependency_package_version_to_use(
@@ -463,7 +471,7 @@ class LinuxDependencyPackagesBuilder(Runner):
                         "--before-remove", str(scriptlets_dir / "preuninstall.sh"),
                         "--verbose"
                     ],
-                    cwd=str(self.packages_output_path),
+                    cwd=str(self.managed_packages_output_path),
                 )
 
             build_agent_libs_package_root_step = self._get_build_package_root_step(
@@ -485,7 +493,7 @@ class LinuxDependencyPackagesBuilder(Runner):
                     "-C", str(build_agent_libs_step_output / "root"),
                     "--verbose"
                 ],
-                cwd=str(self.packages_output_path),
+                cwd=str(self.managed_packages_output_path),
             )
 
         self._build_agent_package(

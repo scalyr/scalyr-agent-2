@@ -266,7 +266,7 @@ def server_root(request, tmp_path_factory, package_builder):
             # Build packages now.
             builder = package_builder()
             builder.build()
-            packages_dir = builder.output_path / "packages"
+            packages_dir = builder.output_path / "packages" / package_builder.PACKAGE_TYPE / "managed"
         else:
             packages_dir = pl.Path(request.config.option.packages_source)
 
