@@ -424,6 +424,7 @@ jobs:
 
   test_managed_packages:
     name: Test package on ${{ matrix.distro-name }}-${{ matrix.remote-machine-type }}, ${{ matrix.name }}
+    if: github.ref_type == 'branch' && github.ref_name != '_release_build'
     needs:
       - pre_job
       - build-managed-packages

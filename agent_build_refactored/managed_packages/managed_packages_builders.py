@@ -1068,7 +1068,7 @@ class LinuxDependencyPackagesBuilder(Runner):
                 if output_path.exists():
                     shutil.rmtree(output_path)
                 shutil.copytree(
-                    builder.packages_output_path,
+                    builder.output_path,
                     output_path,
                     dirs_exist_ok=True,
                 )

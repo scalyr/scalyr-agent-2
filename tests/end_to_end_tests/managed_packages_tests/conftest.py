@@ -266,9 +266,11 @@ def server_root(request, tmp_path_factory, package_builder):
             # Build packages now.
             builder = package_builder()
             builder.build()
-            packages_dir = builder.output_path / "packages" / package_builder.PACKAGE_TYPE / "managed"
+            builder_output = builder.output_path
         else:
-            packages_dir = pl.Path(request.config.option.packages_source)
+            builder_output = pl.Path(request.config.option.packages_source)
+
+        packages_dir = builder_output / "packages" / package_builder.PACKAGE_TYPE / "managed"
 
         # Build mock repo from packages.
         repo_builder = RepoBuilder()
