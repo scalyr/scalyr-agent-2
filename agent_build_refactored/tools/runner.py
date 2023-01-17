@@ -931,6 +931,21 @@ class Runner:
             *final_command_args
         ])
 
+        # Run chmod for the output directory of the runner, in order to fix possible permission
+        # error that can be due to using root user inside the docker.
+        run_docker_command([
+            "run",
+            "-i",
+            "--rm",
+            "-v",
+            f"{self.output_path}:/tmp/data",
+            "ubuntu:22.04",
+            "chown",
+            "-R",
+            f"{os.getuid()}:{os.getgid()}",
+            "/tmp/data"
+        ])
+
     def run_required(self):
         """
         Function where Runner performs its main actions.

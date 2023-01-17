@@ -1067,6 +1067,7 @@ class LinuxDependencyPackagesBuilder(Runner):
                 output_path = SOURCE_ROOT / "build"
                 if output_path.exists():
                     shutil.rmtree(output_path)
+
                 shutil.copytree(
                     builder.output_path,
                     output_path,
