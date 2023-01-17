@@ -1,6 +1,14 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.40 "TBD" - December 15, 2022
+<!---
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Dec 15, 2022 00:00 -0800
+--->
+
+Docker Images:
+* Docker images now are built against Python:3.8.16 image.
+
 ## 2.1.39 "Hroderich" - December 15, 2022
 <!---
 Packaged by Dominic LoBue <dominicl@sentinelone.com> on Dec 15, 2022 00:00 -0800
