@@ -114,7 +114,16 @@ EMBEDDED_PYTHON_SHORT_VERSION = ".".join(EMBEDDED_PYTHON_VERSION.split(".")[:2])
 OPENSSL_VERSION_TYPE_1_1_1 = "1_1_1"
 OPENSSL_VERSION_TYPE_3 = "3"
 
-DEFAULT_OPENSSL_VERSION = OPENSSL_VERSION_TYPE_1_1_1
+
+PYTHON_PACKAGE_SSL_VERSIONS = {
+    OPENSSL_VERSION_TYPE_1_1_1: PYTHON_PACKAGE_SSL_1_1_1_VERSION,
+    OPENSSL_VERSION_TYPE_3: PYTHON_PACKAGE_SSL_3_VERSION
+}
+
+DEFAULT_OPENSSL_VERSION_TYPE = OPENSSL_VERSION_TYPE_1_1_1
+
+DEFAULT_PYTHON_PACKAGE_OPENSSL_VERSION = PYTHON_PACKAGE_SSL_VERSIONS[DEFAULT_OPENSSL_VERSION_TYPE]
+
 
 AGENT_LIBS_REQUIREMENTS_CONTENT = f"{REQUIREMENTS_COMMON}\n" \
                                   f"{REQUIREMENTS_COMMON_PLATFORM_DEPENDENT}"
@@ -1091,8 +1100,8 @@ class LinuxDependencyPackagesBuilder(Runner):
 # Version of the  Python build dependencies.
 _PYTHON_BUILD_DEPENDENCIES_VERSIONS = {
     "XZ_VERSION": "5.2.6",
-    "OPENSSL_1_1_1_VERSION": PYTHON_PACKAGE_SSL_1_1_1_VERSION,
-    "OPENSSL_3_VERSION": PYTHON_PACKAGE_SSL_3_VERSION,
+    "OPENSSL_1_1_1_VERSION": PYTHON_PACKAGE_SSL_VERSIONS[OPENSSL_VERSION_TYPE_1_1_1],
+    "OPENSSL_3_VERSION": PYTHON_PACKAGE_SSL_VERSIONS[OPENSSL_VERSION_TYPE_3],
     "LIBFFI_VERSION": "3.4.2",
     "UTIL_LINUX_VERSION": "2.38",
     "NCURSES_VERSION": "6.3",
@@ -1134,10 +1143,8 @@ def create_build_openssl_steps(
 
     if openssl_version_type == OPENSSL_VERSION_TYPE_3:
         script_name = "build_openssl_3.sh"
-        openssl_version = PYTHON_PACKAGE_SSL_3_VERSION
     else:
         script_name = "build_openssl_1_1_1.sh"
-        openssl_version = PYTHON_PACKAGE_SSL_1_1_1_VERSION
 
     for architecture in SUPPORTED_ARCHITECTURES:
         run_in_remote_docker = architecture != Architecture.X86_64
@@ -1150,7 +1157,7 @@ def create_build_openssl_steps(
                 "DOWNLOAD_BUILD_DEPENDENCIES": DOWNLOAD_PYTHON_DEPENDENCIES,
             },
             environment_variables={
-                "OPENSSL_VERSION": openssl_version,
+                "OPENSSL_VERSION": PYTHON_PACKAGE_SSL_VERSIONS[openssl_version_type],
             },
             github_actions_settings=GitHubActionsSettings(
                 run_in_remote_docker=run_in_remote_docker,
@@ -1346,8 +1353,8 @@ def create_build_dev_requirements_steps() -> Dict[Architecture, ArtifactRunnerSt
             base=INSTALL_BUILD_ENVIRONMENT_STEPS[architecture],
             required_steps={
                 "BUILD_PYTHON_DEPENDENCIES": BUILD_PYTHON_DEPENDENCIES_STEPS[architecture],
-                "BUILD_OPENSSL": BUILD_OPENSSL_STEPS[DEFAULT_OPENSSL_VERSION][architecture],
-                "BUILD_PYTHON": BUILD_PYTHON_STEPS[DEFAULT_OPENSSL_VERSION][architecture],
+                "BUILD_OPENSSL": BUILD_OPENSSL_STEPS[DEFAULT_OPENSSL_VERSION_TYPE][architecture],
+                "BUILD_PYTHON": BUILD_PYTHON_STEPS[DEFAULT_OPENSSL_VERSION_TYPE][architecture],
             },
             environment_variables={
                 "RUST_VERSION": RUST_VERSION,
@@ -1382,8 +1389,8 @@ def create_build_agent_libs_venv_steps() -> Dict[Architecture, ArtifactRunnerSte
             ],
             base=INSTALL_BUILD_ENVIRONMENT_STEPS[architecture],
             required_steps={
-                "BUILD_OPENSSL": BUILD_OPENSSL_STEPS[DEFAULT_OPENSSL_VERSION][architecture],
-                "BUILD_PYTHON": BUILD_PYTHON_STEPS[DEFAULT_OPENSSL_VERSION][architecture],
+                "BUILD_OPENSSL": BUILD_OPENSSL_STEPS[DEFAULT_OPENSSL_VERSION_TYPE][architecture],
+                "BUILD_PYTHON": BUILD_PYTHON_STEPS[DEFAULT_OPENSSL_VERSION_TYPE][architecture],
                 "BUILD_DEV_REQUIREMENTS": BUILD_DEV_REQUIREMENTS_STEPS[architecture]
             },
             environment_variables={
@@ -1475,8 +1482,8 @@ def create_prepare_toolset_steps() -> Dict[Architecture, EnvironmentRunnerStep]:
             script_path="agent_build_refactored/managed_packages/steps/prepare_toolset.sh",
             base=base_image,
             required_steps={
-                "BUILD_OPENSSL": BUILD_OPENSSL_STEPS[DEFAULT_OPENSSL_VERSION][architecture],
-                "BUILD_PYTHON": BUILD_PYTHON_STEPS[DEFAULT_OPENSSL_VERSION][architecture],
+                "BUILD_OPENSSL": BUILD_OPENSSL_STEPS[DEFAULT_OPENSSL_VERSION_TYPE][architecture],
+                "BUILD_PYTHON": BUILD_PYTHON_STEPS[DEFAULT_OPENSSL_VERSION_TYPE][architecture],
                 "BUILD_DEV_REQUIREMENTS": BUILD_DEV_REQUIREMENTS_STEPS[architecture],
             },
             environment_variables={
