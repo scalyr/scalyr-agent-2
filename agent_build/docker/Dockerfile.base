@@ -17,6 +17,7 @@ RUN ln -s /usr/bin/dpkg-deb /usr/sbin/dpkg-deb
 RUN ln -s /bin/rm /usr/sbin/rm
 RUN ln -s /bin/tar /usr/sbin/tar
 
+# We upgrade current packages in order to keep everything up to date, including security updates.
 RUN apt-get update ; apt-get dist-upgrade -y
 RUN python3 -m pip install --upgrade setuptools
 RUN apt-get clean
@@ -97,6 +98,7 @@ RUN ln -s /bin/tar /usr/sbin/tar
 
 RUN apt-get update && apt-get install -y git tar curl
 
+# We upgrade current packages in order to keep everything up to date, including security updates.
 RUN apt-get update ; apt-get dist-upgrade -y
 RUN python3 -m pip install --upgrade setuptools
 RUN apt-get clean

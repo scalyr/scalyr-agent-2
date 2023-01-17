@@ -41,6 +41,8 @@ WORKDIR /
 
 FROM python:3.8.16-slim-bullseye as scalyr-base-slim-bullseye
 MAINTAINER Scalyr Inc <support@scalyr.com>
+
+# We upgrade current packages in order to keep everything up to date, including security updates.
 RUN apt-get update ; apt-get dist-upgrade -y
 RUN python3 -m pip install --upgrade setuptools
 RUN apt-get clean
