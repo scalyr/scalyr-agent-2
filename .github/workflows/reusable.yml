@@ -1,0 +1,25 @@
+name: Reusable
+
+on:
+  workflow_call:
+
+
+
+jobs:
+  pre_job:
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Run
+        run: |
+          echo "hello" > artifact.txt
+            - name: Save packages as artifact
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: artifact
+          path: artifact.txt
+          retention-days: 1
