@@ -6,8 +6,8 @@ Scalyr Agent 2 Changes By Release
 Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Dec 15, 2022 00:00 -0800
 --->
 
-Docker Images:
-* Docker images now are built against Python:3.8.16 image.
+Docker Images / Kubernetes:
+* Docker images now are built against Python:3.8.16 image. Debian and Alpine based Docker images have also been updated to include all the latest security updates for the system packages.
 
 ## 2.1.39 "Hroderich" - December 15, 2022
 <!---

@@ -71,6 +71,9 @@ RUN echo 'manylinux2014_compatible = True' > /usr/local/lib/python3.8/_manylinux
 RUN pip3 install --upgrade pip
 RUN pip3 --no-cache-dir install --root /tmp/dependencies -r agent_build/requirement-files/docker-image-requirements.txt
 
+# We upgrade current packages in order to keep everything up to date, including security updates.
+RUN python3 -m pip install --upgrade setuptools==66.0.0
+
 # Install coverage if its version if specified. Only used in testing.
 RUN if [ -n "${COVERAGE_VERSION}" ]; then pip3 install --root /tmp/dependencies coverage=="${COVERAGE_VERSION}"; fi
 
@@ -100,7 +103,7 @@ RUN apt-get update && apt-get install -y git tar curl
 
 # We upgrade current packages in order to keep everything up to date, including security updates.
 RUN apt-get update ; apt-get dist-upgrade -y
-RUN python3 -m pip install --upgrade setuptools
+RUN python3 -m pip install --upgrade setuptools==66.0.0
 RUN apt-get clean
 
 # Create a final base stage from one of the prefious OS-specific stages.
