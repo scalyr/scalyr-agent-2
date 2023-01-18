@@ -27,7 +27,7 @@ env:
 #  size according to that information.
 jobs:
   call-reusable:
-    uses: .github/workflows/reusable.yml
+    uses: ./.github/workflows/reusable.yml
 
   pre_job:
     runs-on: ubuntu-20.04
