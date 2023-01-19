@@ -1,0 +1,54 @@
+name: Agent Build Refactored
+
+on:
+  push:
+  pull_request:
+    # Trigger only for opened pull request. Other has to be handled by the 'push' event
+    types: [ opened ]
+    branches:
+      - 'master'
+      - 'arthur/dev-release'
+  workflow_dispatch:
+
+
+  schedule:
+    - cron: '0 4 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  build_linux_packages:
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - uses: ./.github/workflows/reusable.yml
+
+  build_tarball:
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.8.13"
+
+      - name: Build tarball
+        run: |
+          mkdir -p tarball/noarch
+          pushd tarball/noarch
+          python3 build_package.py tarball
+          popd
+
+      - name: Save tarball as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: tarball-noarch
+          path: tarball
+          retention-days: 1

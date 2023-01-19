@@ -1,18 +1,5 @@
-name: Agent Build Refactored
+name: Agent Linux Packages Build Refactored
 
-on:
-  push:
-  pull_request:
-    # Trigger only for opened pull request. Other has to be handled by the 'push' event
-    types: [ opened ]
-    branches:
-      - 'master'
-      - 'arthur/dev-release'
-  workflow_dispatch:
-
-
-  schedule:
-    - cron: '0 4 * * *'
 
 permissions:
   contents: read
