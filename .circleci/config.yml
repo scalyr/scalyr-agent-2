@@ -49,7 +49,7 @@ skip_release_build_branch_push: &skip_release_build_branch_push
   unless:
     and:
       - equal: [ false, << pipeline.parameters.is_release_build >>]
-      - equal: [ release_build,  << pipeline.git.branch >>]
+      - equal: [ _release_build,  << pipeline.git.branch >>]
 
 version: 2.1
 
