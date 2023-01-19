@@ -18,14 +18,8 @@ permissions:
   contents: read
 
 jobs:
-  build_linux_packages:
-    runs-on: ubuntu-20.04
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - uses: ./.github/workflows/agent-build-linux-packages-new.yml
+  call-reusable:
+    uses: ./.github/workflows/agent-build-linux-packages-new.yml
 
   build_tarball:
     runs-on: ubuntu-20.04
