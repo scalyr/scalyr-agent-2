@@ -1,8 +1,7 @@
 name: Agent Linux Packages Build Refactored
 
-
-permissions:
-  contents: read
+on:
+  workflow_call:
 
 env:
   DOCKER_BUILDKIT: 1
