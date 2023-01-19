@@ -13,9 +13,6 @@ env:
 # Since we can do a "master" run (on push and PR to a master branch) and "non-master" run, it generates matrices with different
 #  size according to that information.
 jobs:
-  call-reusable:
-    uses: ./.github/workflows/reusable.yml
-
   pre_job:
     runs-on: ubuntu-20.04
     outputs:
