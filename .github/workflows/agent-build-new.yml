@@ -19,6 +19,7 @@ permissions:
 
 jobs:
   call-reusable:
+    name: "Build Linux packages"
     uses: ./.github/workflows/agent-build-linux-packages-new.yml
 
   build_tarball:
