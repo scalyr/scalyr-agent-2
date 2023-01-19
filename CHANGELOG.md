@@ -1,9 +1,9 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.1.40 "TBD" - December 15, 2022
+## 2.1.40 "Onone" - Jan 19, 2023
 <!---
-Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Dec 15, 2022 00:00 -0800
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Jan 19, 2023 00:00 -0800
 --->
 
 Docker Images / Kubernetes:
