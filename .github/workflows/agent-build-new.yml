@@ -38,7 +38,7 @@ jobs:
         run: |
           mkdir -p tarball/noarch
           pushd tarball/noarch
-          python3 build_package.py tarball
+          python3 ../../build_package.py tarball
           popd
 
       - name: Save tarball as artifact
