@@ -747,6 +747,14 @@ jobs:
           test_type: "development"
           test_os: "linux"
 
+
+workflows:
+ version: 2
+ package-tests:
+   <<: *skip_release_build_branch_push
+   jobs:
+     - build-windows-package
+
 #workflows:
 # version: 2
 # package-tests:
