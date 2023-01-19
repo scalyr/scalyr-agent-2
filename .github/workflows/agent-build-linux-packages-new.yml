@@ -183,6 +183,8 @@ jobs:
 
   build-images:
     name: Build image '${{ matrix.name }}'
+    # Since we do not use those images for now, disable this job, to reduce noise.
+    if: ${{ 'true' == 'false' }}
     needs:
       - pre_job
       - pre-build-cached-step
