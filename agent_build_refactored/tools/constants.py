@@ -127,6 +127,4 @@ class PackageType(enum.Enum):
     DOCKER_SYSLOG = "docker-syslog"
     DOCKER_API = "docker-api"
     K8S = "k8s"
-    K8S_WITH_OPENMETRICS = "k8s-with-openmetrics"
-    K8S_RESTART_AGENT_ON_MONITOR_DEATH = "k8s-restart-agent-on-monitor-death"
     MSI = "msi"

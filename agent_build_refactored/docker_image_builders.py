@@ -659,25 +659,6 @@ AGENT_K8S_SPEC = AgentImageTypeSpec(
     image_type_stage_name="k8s",
 )
 
-# An image for running the agent on Kubernetes with Kubernetes Open Metrics monitor enabled.
-AGENT_K8S_WITH_OPENMETRICS_SPEC = AgentImageTypeSpec(
-    name="k8s-with-openmetrics",
-    base_config_path=SOURCE_ROOT / "docker" / "k8s-config-with-openmetrics-monitor",
-    result_image_name="scalyr-k8s-agent-with-openmetrics-monitor",
-    image_type_stage_name="k8s",
-)
-
-# An image with enabled feature to shut down the agent if kubernetes monitor is also down.
-AGENT_K8S_RESTART_AGENT_ON_MONITOR_DEATH_SPEC = AgentImageTypeSpec(
-    name="k8s-restart-agent-on-monitor-death",
-    base_config_path=SOURCE_ROOT / "docker" / "k8s-config-with-openmetrics-monitor",
-    result_image_name="scalyr-k8s-agent-with-openmetrics-monitor",
-    additional_config_paths=[
-        SOURCE_ROOT / "docker" / "k8s-config-restart-agent-on-monitor-death"
-    ],
-    image_type_stage_name="k8s",
-)
-
 
 # Final image builder classes for Debian-based images.
 class DockerJsonDebian(ContainerImageBuilderDebian):
