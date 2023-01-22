@@ -61,7 +61,7 @@ class DockerPlatformInfo:
             return Architecture.ARMV7
 
         if "s390x" in name:
-             return Architecture.S390X
+            return Architecture.S390X
 
         if "mips64le" in name:
             return Architecture.MIPS64LE
@@ -122,7 +122,7 @@ class Architecture(enum.Enum):
             Architecture.PPC64LE: "ppc64el",
             Architecture.S390X: "s390x",
             Architecture.MIPS64LE: "mips64el",
-            Architecture.UNKNOWN: "all"
+            Architecture.UNKNOWN: "all",
         }
 
         return mapping[self]
@@ -136,7 +136,7 @@ class Architecture(enum.Enum):
             Architecture.PPC64LE: "ppc64le",
             Architecture.S390X: "s390x",
             Architecture.MIPS64LE: "mips64el",
-            Architecture.UNKNOWN: "noarch"
+            Architecture.UNKNOWN: "noarch",
         }
         return mapping[self]
 
@@ -172,8 +172,6 @@ class PackageType(enum.Enum):
     DOCKER_SYSLOG = "docker-syslog"
     DOCKER_API = "docker-api"
     K8S = "k8s"
-    K8S_WITH_OPENMETRICS = "k8s-with-openmetrics"
-    K8S_RESTART_AGENT_ON_MONITOR_DEATH = "k8s-restart-agent-on-monitor-death"
     MSI = "msi"
 
 
@@ -216,4 +214,6 @@ def _parse_requirements_file():
 _REQUIREMENT_FILE_COMPONENTS = _parse_requirements_file()
 
 REQUIREMENTS_COMMON = _REQUIREMENT_FILE_COMPONENTS["COMMON"]
-REQUIREMENTS_COMMON_PLATFORM_DEPENDENT = _REQUIREMENT_FILE_COMPONENTS["COMMON_PLATFORM_DEPENDENT"]
+REQUIREMENTS_COMMON_PLATFORM_DEPENDENT = _REQUIREMENT_FILE_COMPONENTS[
+    "COMMON_PLATFORM_DEPENDENT"
+]

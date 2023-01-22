@@ -306,7 +306,7 @@ commands:
     steps:
       - add_ssh_keys:
           fingerprints:
-            - "7b:26:91:6b:a0:9d:31:50:4c:8d:31:a3:a6:b8:f2:7a"
+            - "18:2d:c0:70:b1:f9:31:22:49:14:d8:3a:08:01:3d:2c"
       - checkout
       - attach_workspace:
           at: /tmp/workspace
@@ -333,7 +333,7 @@ commands:
           name: Clean Up Old Stray EC2 Instances
           environment:
             KEY_NAME: "circleci"
-            PRIVATE_KEY_PATH: "~/.ssh/id_rsa_7b26916ba09d31504c8d31a3a6b8f27a"
+            PRIVATE_KEY_PATH: "~/.ssh/id_rsa_182dc070b1f931224914d83a08013d2c"
             PYTHONPATH: "."
           command: |
             export ACCESS_KEY=${AWS_ACCESS_KEY}
@@ -344,7 +344,7 @@ commands:
           name: "Run package tests on EC2 instances (<< parameters.test_os >>)"
           environment:
             KEY_NAME: "circleci"
-            PRIVATE_KEY_PATH: "~/.ssh/id_rsa_7b26916ba09d31504c8d31a3a6b8f27a"
+            PRIVATE_KEY_PATH: "~/.ssh/id_rsa_182dc070b1f931224914d83a08013d2c"
             PYTHONPATH: "."
           no_output_timeout: 25m
           command: |
@@ -692,7 +692,8 @@ jobs:
           path: artifacts
 
   ami-tests-stable-windows:
-    circleci_ip_ranges: true # opt into this functionlity for whitelisting purposes
+    # TODO As of Jan 2023, this feature requires a plan upgrade
+    #circleci_ip_ranges: true # opt into this functionlity for whitelisting purposes
     description: "Run scalyr agent packages install sanity tests for the stable packages from the Scalyr repository."
     working_directory: ~/scalyr-agent-2
     docker:
@@ -706,7 +707,7 @@ jobs:
           test_os: "windows"
 
   ami-tests-stable-linux:
-    circleci_ip_ranges: true # opt into tlinuxhis functionlity for whitelisting purposes
+    #circleci_ip_ranges: true # opt into tlinuxhis functionlity for whitelisting purposes
     description: "Run scalyr agent packages install sanity tests for the stable packages from the Scalyr repository."
     working_directory: ~/scalyr-agent-2
     docker:
@@ -720,7 +721,7 @@ jobs:
           test_os: "linux"
 
   ami-tests-development-windows:
-    circleci_ip_ranges: true # opt into this functionlity for whitelisting purposes
+    #circleci_ip_ranges: true # opt into this functionlity for whitelisting purposes
     description: "Run scalyr agent packages sanity tests for the new packages which are built on the current revision."
     working_directory: ~/scalyr-agent-2
     docker:
@@ -734,7 +735,7 @@ jobs:
           test_os: "windows"
 
   ami-tests-development-linux:
-    circleci_ip_ranges: true # opt into this functionlity for whitelisting purposes
+    #circleci_ip_ranges: true # opt into this functionlity for whitelisting purposes
     description: "Run scalyr agent packages sanity tests for the new packages which are built on the current revision."
     working_directory: ~/scalyr-agent-2
     docker:
@@ -747,97 +748,94 @@ jobs:
           test_type: "development"
           test_os: "linux"
 
+# NOTE: ami-tests have been disabled since Circle CI recently moved whitelist IP functionality
+# to a different paid plan type to which we don't have access. Without using whitelisted IPs
+# we can't access EC2 instances in our testing environment. In the near future those tests will be
+# moved to GHA.
 
 workflows:
  version: 2
  package-tests:
    <<: *skip_release_build_branch_push
    jobs:
+     - build-linux-packages-and-installer-script
      - build-windows-package
-
-#workflows:
-# version: 2
-# package-tests:
-#   <<: *skip_release_build_branch_push
-#   jobs:
-#     - build-linux-packages-and-installer-script
-#     - build-windows-package
-#     - package-test-rpm:
-#         context: scalyr-agent
-#         <<: *master_and_release_only
-#     - package-test-deb:
-#         context: scalyr-agent
-#         <<: *master_and_release_only
-#     - smoke-rpm-package-py2:
-#         context: scalyr-agent
-#         requires:
-#           - package-test-rpm
-#         <<: *master_and_release_only
-#     - smoke-rpm-package-py3:
-#         context: scalyr-agent
-#         requires:
-#           - package-test-rpm
-#         <<: *master_and_release_only
-#     - smoke-deb-package-py2:
-#         context: scalyr-agent
-#         requires:
-#           - package-test-deb
-#         <<: *master_and_release_only
-#     - smoke-deb-package-py3:
-#         context: scalyr-agent
-#         requires:
-#           - package-test-deb
-#         <<: *master_and_release_only
-#     - ami-tests-development-windows:
-#          context: scalyr-agent
-#          requires:
-#            - build-windows-package
-#     - ami-tests-development-linux:
-#          context: scalyr-agent
-#          requires:
-#            - build-linux-packages-and-installer-script
-#     - ami-tests-stable-windows:
-#          context: scalyr-agent
-#          <<: *master_and_release_only
-#     - ami-tests-stable-linux:
-#          context: scalyr-agent
-#          <<: *master_and_release_only
-# # We run AMI based package install tests which utilize installer script on
-# # daily basis.
-# # This helps us detect various installer script and other potential upstream
-# # issues.
-# daily-stable-ami-package-install-tests:
-#   triggers:
-#     - schedule:
-#         cron: "0 2 * * *"
-#         filters:
-#           branches:
-#             only:
-#               - master
-#   jobs:
-#     - ami-tests-stable-windows:
-#         context: scalyr-agent
-#     - ami-tests-stable-linux:
-#         context: scalyr-agent
-#     - build-linux-packages-and-installer-script
-#     - build-windows-package
-#     - package-test-rpm:
-#         context: scalyr-agent
-#     - package-test-deb:
-#         context: scalyr-agent
-#     - smoke-rpm-package-py2:
-#         context: scalyr-agent
-#         requires:
-#           - package-test-rpm
-#     - smoke-rpm-package-py3:
-#         context: scalyr-agent
-#         requires:
-#           - package-test-rpm
-#     - smoke-deb-package-py2:
-#         context: scalyr-agent
-#         requires:
-#           - package-test-deb
-#     - smoke-deb-package-py3:
-#         context: scalyr-agent
-#         requires:
-#           - package-test-deb
+     - package-test-rpm:
+         context: scalyr-agent
+         <<: *master_and_release_only
+     - package-test-deb:
+         context: scalyr-agent
+         <<: *master_and_release_only
+     - smoke-rpm-package-py2:
+         context: scalyr-agent
+         requires:
+           - package-test-rpm
+         <<: *master_and_release_only
+     - smoke-rpm-package-py3:
+         context: scalyr-agent
+         requires:
+           - package-test-rpm
+         <<: *master_and_release_only
+     - smoke-deb-package-py2:
+         context: scalyr-agent
+         requires:
+           - package-test-deb
+         <<: *master_and_release_only
+     - smoke-deb-package-py3:
+         context: scalyr-agent
+         requires:
+           - package-test-deb
+         <<: *master_and_release_only
+    # - ami-tests-development-windows:
+    #      context: scalyr-agent
+    #      requires:
+    #        - build-windows-package
+    # - ami-tests-development-linux:
+    #      context: scalyr-agent
+    #      requires:
+    #        - build-linux-packages-and-installer-script
+    # - ami-tests-stable-windows:
+    #      context: scalyr-agent
+    #      <<: *master_and_release_only
+    # - ami-tests-stable-linux:
+    #      context: scalyr-agent
+    #      <<: *master_and_release_only
+ # We run AMI based package install tests which utilize installer script on
+ # daily basis.
+ # This helps us detect various installer script and other potential upstream
+ # issues.
+ daily-stable-ami-package-install-tests:
+   triggers:
+     - schedule:
+         cron: "0 2 * * *"
+         filters:
+           branches:
+             only:
+               - master
+   jobs:
+     #- ami-tests-stable-windows:
+     #   context: scalyr-agent
+     #- ami-tests-stable-linux:
+     #   context: scalyr-agent
+     - build-linux-packages-and-installer-script
+     - build-windows-package
+     - package-test-rpm:
+         context: scalyr-agent
+     - package-test-deb:
+         context: scalyr-agent
+     - smoke-rpm-package-py2:
+         context: scalyr-agent
+         requires:
+           - package-test-rpm
+     - smoke-rpm-package-py3:
+         context: scalyr-agent
+         requires:
+           - package-test-rpm
+     - smoke-deb-package-py2:
+         context: scalyr-agent
+         requires:
+           - package-test-deb
+     - smoke-deb-package-py3:
+         context: scalyr-agent
+         requires:
+           - package-test-deb

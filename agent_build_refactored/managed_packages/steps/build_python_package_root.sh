@@ -43,6 +43,7 @@ rm -r "${PYTHON_LIBS_PATH}/lib2to3"
 function get_standard_c_binding_path() {
   dir_path="$1"
   name="$2"
+  # shellcheck disable=SC2206
   files=( "$dir_path"/$name )
   echo "${files[0]}"
 }
@@ -57,10 +58,14 @@ function copy_and_patch_openssl_libs() {
   local python_step_output_dir="$2"
   local dst_dir="$3"
 
-  local libssl_path="$(find "${openssl_libs_dir}" -name "libssl.so.*")"
-  local libcrypto_path="$(find "${openssl_libs_dir}" -name "libcrypto.so.*")"
-  local libssl_filename="$(basename "${libssl_path}")"
-  local libcrypto_filename="$(basename "${libcrypto_path}")"
+  local libssl_path
+  libssl_path="$(find "${openssl_libs_dir}" -name "libssl.so.*")"
+  local libcrypto_path
+  libcrypto_path="$(find "${openssl_libs_dir}" -name "libcrypto.so.*")"
+  local libssl_filename
+  libssl_filename="$(basename "${libssl_path}")"
+  local libcrypto_filename
+  libcrypto_filename="$(basename "${libcrypto_path}")"
 
   mkdir -p "${dst_dir}"
   # Copy shared objects and other files of the OpenSSL library.
@@ -70,8 +75,10 @@ function copy_and_patch_openssl_libs() {
   local python_step_bindings_dir="${python_step_output_dir}${INSTALL_PREFIX}/lib/python${PYTHON_SHORT_VERSION}/lib-dynload"
 
   # Copy _ssl and _hashlib modules.
-  local ssl_binding_path="$(get_standard_c_binding_path "${python_step_bindings_dir}" _ssl.cpython-*-*-*-*.so)"
-  local hashlib_binding_path="$(get_standard_c_binding_path "${python_step_bindings_dir}" _hashlib.cpython-*-*-*-*.so)"
+  local ssl_binding_path
+  ssl_binding_path="$(get_standard_c_binding_path "${python_step_bindings_dir}" _ssl.cpython-*-*-*-*.so)"
+  local hashlib_binding_path
+  hashlib_binding_path="$(get_standard_c_binding_path "${python_step_bindings_dir}" _hashlib.cpython-*-*-*-*.so)"
 
   local bindings_dir="${dst_dir}/bindings"
 
@@ -86,8 +93,10 @@ function copy_and_patch_openssl_libs() {
   # to use OpenSSL shared objects that are shipped with the package.
   local patched_bindings_dir="${bindings_dir}/patched"
   mkdir -p "${patched_bindings_dir}"
-  local patched_ssl_binding_path="${patched_bindings_dir}/$(basename "${ssl_binding_path}")"
-  local patched_hashlib_binding_path="${patched_bindings_dir}/$(basename "${hashlib_binding_path}")"
+  local patched_ssl_binding_path
+  patched_ssl_binding_path="${patched_bindings_dir}/$(basename "${ssl_binding_path}")"
+  local patched_hashlib_binding_path
+  patched_hashlib_binding_path="${patched_bindings_dir}/$(basename "${hashlib_binding_path}")"
   cp "${ssl_binding_path}" "${patched_bindings_dir}"
   cp "${hashlib_binding_path}" "${patched_bindings_dir}"
 

@@ -22,4 +22,4 @@
 # source main library, all needed functions are in there.
 . "$SOURCE_ROOT/agent_build/tools/environment_deployments/steps/build_base_docker_image/build_base_images_common_lib.sh"
 
-build_all_base_images slim
+build_all_base_images slim-bullseye
