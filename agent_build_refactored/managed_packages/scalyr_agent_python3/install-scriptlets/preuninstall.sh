@@ -1,4 +1,5 @@
-# Copyright 2014-2022 Scalyr Inc.
+#!/bin/bash
+# Copyright 2014-2023 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,18 +13,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-import dataclasses
-
-
-@dataclasses.dataclass
-class EC2DistroImage:
-    """
-    Simple specification of the ec2 AMI image.
-    """
-
-    image_id: str
-    image_name: str
-    short_name: str
-    size_id: str
-    ssh_username: str
+# Always remove the .pyc files and __pycache__ directories
+find /opt/scalyr-agent-2-dependencies -type f -name '*.py[co]' -delete -o -type d -name __pycache__ -exec rm -r {} \;

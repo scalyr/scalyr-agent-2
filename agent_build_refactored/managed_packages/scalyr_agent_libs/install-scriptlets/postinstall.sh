@@ -1,5 +1,5 @@
-#!/usr/bin/env bash
-# Copyright 2014-2022 Scalyr Inc.
+#!/bin/bash
+# Copyright 2014-2023 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,12 +13,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script is a wrapper executable for Python interpreter form the agent's 'scalyr-agent-python3' dependency
-# package.
-
-
-PYTHON_SUBDIR_NAME="scalyr-agent-2-dependencies"
-
-# Override some variables in order to run dependency Python interpreter correctly.
-export LD_LIBRARY_PATH="/usr/lib/${PYTHON_SUBDIR_NAME}/lib"
-exec /usr/lib/scalyr-agent-2-dependencies/bin/python3-orig "$@"
+# Run this script in order to initialize newly installed/upgraded package.
+/opt/scalyr-agent-2-dependencies/bin/agent-libs-config initialize

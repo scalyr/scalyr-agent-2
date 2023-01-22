@@ -1,4 +1,5 @@
-# Copyright 2014-2022 Scalyr Inc.
+#!/usr/bin/env bash
+# Copyright 2014-2023 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,17 +14,4 @@
 # limitations under the License.
 
 
-import dataclasses
-
-
-@dataclasses.dataclass
-class EC2DistroImage:
-    """
-    Simple specification of the ec2 AMI image.
-    """
-
-    image_id: str
-    image_name: str
-    short_name: str
-    size_id: str
-    ssh_username: str
+exec "/var/opt/scalyr-agent-2-dependencies/venv/bin/python3" "/usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py" "$@"

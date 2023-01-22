@@ -82,6 +82,6 @@ def test_remotely(
             pytest_runner_path=pytest_runner_builder.result_runner_path,
             file_mappings={str(packages_archive_path): "/tmp/packages.tar"},
         )
-    except Exception:
-        logger.exception("Remote test has failed.")
+    except Exception as e:
+        logger.error(f"Remote test failed. Error: {str(e)}")
         pytest.exit(1)

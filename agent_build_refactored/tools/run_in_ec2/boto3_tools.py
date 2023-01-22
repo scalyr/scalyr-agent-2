@@ -52,6 +52,7 @@ class AWSSettings:
     """
     Dataclass that stores all settings that are required to manipulate AWS objects.
     """
+
     access_key: str
     secret_key: str
     private_key_path: str
@@ -81,8 +82,10 @@ class AWSSettings:
             private_key_name=_validate_setting("AWS_PRIVATE_KEY_NAME"),
             region=_validate_setting("AWS_REGION"),
             security_group=_validate_setting("AWS_SECURITY_GROUP"),
-            security_groups_prefix_list_id=_validate_setting("AWS_SECURITY_GROUPS_PREFIX_LIST_ID"),
-            ec2_objects_name_prefix=_validate_setting("AWS_OBJECTS_NAME_PREFIX")
+            security_groups_prefix_list_id=_validate_setting(
+                "AWS_SECURITY_GROUPS_PREFIX_LIST_ID"
+            ),
+            ec2_objects_name_prefix=_validate_setting("AWS_OBJECTS_NAME_PREFIX"),
         )
 
     def create_boto3_session(self):
@@ -94,13 +97,13 @@ class AWSSettings:
 
 
 def create_and_deploy_ec2_instance(
-        boto3_session: boto3.session.Session,
-        ec2_image: EC2DistroImage,
-        name_prefix: str,
-        aws_settings: AWSSettings,
-        root_volume_size: int = None,
-        files_to_upload: Dict = None,
-        deployment_script: pl.Path = None
+    boto3_session: boto3.session.Session,
+    ec2_image: EC2DistroImage,
+    name_prefix: str,
+    aws_settings: AWSSettings,
+    root_volume_size: int = None,
+    files_to_upload: Dict = None,
+    deployment_script: pl.Path = None,
 ):
     """
     Create AWS EC2 instance and additional deploy files or scripts.
@@ -116,7 +119,7 @@ def create_and_deploy_ec2_instance(
     add_current_ip_to_prefix_list(
         boto3_session=boto3_session,
         prefix_list_id=aws_settings.security_groups_prefix_list_id,
-        ec2_objects_name_prefix=aws_settings.ec2_objects_name_prefix
+        ec2_objects_name_prefix=aws_settings.ec2_objects_name_prefix,
     )
 
     name = f"{INSTANCE_NAME_STRING}-{ec2_image.short_name}-{aws_settings.ec2_objects_name_prefix}-{name_prefix}"
@@ -126,69 +129,74 @@ def create_and_deploy_ec2_instance(
         ec2_image=ec2_image,
         name=name,
         aws_settings=aws_settings,
-        root_volume_size=root_volume_size
+        root_volume_size=root_volume_size,
     )
 
-    # Try to establish SSH connection.
-    attempts = 10
-    while True:
-        try:
-            ssh = create_ssh_connection(
-                ip=instance.public_ip_address,
-                username=ec2_image.ssh_username,
-                private_key_path=aws_settings.private_key_path,
-            )
-            break
-        except paramiko.ssh_exception.NoValidConnectionsError:
-            logger.info(f"Can not establish SSH connection with {instance.public_ip_address}")
-            if attempts == 0:
-                logger.exception("Giving up. Error: ")
-                raise
+    try:
+        # Try to establish SSH connection.
+        attempts = 10
+        while True:
+            try:
+                ssh = create_ssh_connection(
+                    ip=instance.public_ip_address,
+                    username=ec2_image.ssh_username,
+                    private_key_path=aws_settings.private_key_path,
+                )
+                break
+            except paramiko.ssh_exception.NoValidConnectionsError:
+                logger.info(
+                    f"Can not establish SSH connection with {instance.public_ip_address}"
+                )
+                if attempts == 0:
+                    logger.exception("Giving up. Error: ")
+                    raise
 
-            attempts -= 1
-            logger.info("    retry in 10 seconds.")
-            time.sleep(10)
+                attempts -= 1
+                logger.info("    retry in 10 seconds.")
+                time.sleep(10)
 
-    files_to_upload = files_to_upload or {}
+        files_to_upload = files_to_upload or {}
 
-    deployment_command = None
-    if deployment_script:
-        remote_deployment_script_path = pl.Path("/tmp") / deployment_script.name
-        files_to_upload[str(deployment_script)] = str(remote_deployment_script_path)
-        deployment_command = ["bash", str(remote_deployment_script_path)]
+        deployment_command = None
+        if deployment_script:
+            remote_deployment_script_path = pl.Path("/tmp") / deployment_script.name
+            files_to_upload[str(deployment_script)] = str(remote_deployment_script_path)
+            deployment_command = ["bash", str(remote_deployment_script_path)]
 
-    if files_to_upload:
-        ssh_put_files(
-            ssh_connection=ssh,
-            files=files_to_upload
-        )
-        if deployment_command:
-            ssh_run_command(
-                ssh_connection=ssh,
-                command=deployment_command
-            )
+        if files_to_upload:
+            ssh_put_files(ssh_connection=ssh, files=files_to_upload)
+            if deployment_command:
+                ssh_run_command(ssh_connection=ssh, command=deployment_command)
 
-    ssh.close()
+        ssh.close()
+    except Exception as e:
+        logger.exception("Error occurred during instance deployment.")
+        instance.terminate()
+        raise e
 
     return instance
 
 
 def create_ec2_instance(
-        boto3_session: boto3.session.Session,
-        ec2_image: EC2DistroImage,
-        name: str,
-        aws_settings: AWSSettings,
-        root_volume_size: int = None,
+    boto3_session: boto3.session.Session,
+    ec2_image: EC2DistroImage,
+    name: str,
+    aws_settings: AWSSettings,
+    root_volume_size: int = None,
 ):
     """
     Create AWS EC2 instance.
     """
     ec2 = boto3_session.resource("ec2")
 
-    security_groups = list(ec2.security_groups.filter(GroupNames=[aws_settings.security_group]))
+    security_groups = list(
+        ec2.security_groups.filter(GroupNames=[aws_settings.security_group])
+    )
 
     if len(security_groups) != 1:
-        raise Exception(f"Number of security groups has to be 1, got '{security_groups}'")
+        raise Exception(
+            f"Number of security groups has to be 1, got '{security_groups}'"
+        )
 
     security_group = security_groups[0]
 
@@ -201,37 +209,31 @@ def create_ec2_instance(
                 "Ebs": {
                     "VolumeSize": root_volume_size,
                     "DeleteOnTermination": True,
-                }
+                },
             }
         ]
         kwargs.update(dict(BlockDeviceMappings=block_device_mappings))
 
     tag_specifications = [
-            {
-                'ResourceType': 'instance',
-                'Tags': [
-                    {
-                        'Key': 'Name',
-                        'Value': name
-                    },
-                ]
-            },
-            {
-                'ResourceType': 'volume',
-                'Tags': [
-                    {
-                        'Key': 'Name',
-                        'Value': name
-                    },
-                ]
-            },
-        ]
+        {
+            "ResourceType": "instance",
+            "Tags": [
+                {"Key": "Name", "Value": name},
+            ],
+        },
+        {
+            "ResourceType": "volume",
+            "Tags": [
+                {"Key": "Name", "Value": name},
+            ],
+        },
+    ]
 
-    kwargs.update(
-        dict(TagSpecifications=tag_specifications)
+    kwargs.update(dict(TagSpecifications=tag_specifications))
+
+    logger.info(
+        f"Start new EC2 instance using image '{ec2_image.image_id}', size '{ec2_image.size_id}'"
     )
-
-    logger.info(f"Start new EC2 instance using image '{ec2_image.image_id}', size '{ec2_image.size_id}'")
     attempts = 10
     while True:
         try:
@@ -242,7 +244,7 @@ def create_ec2_instance(
                 InstanceType=ec2_image.size_id,
                 KeyName=aws_settings.private_key_name,
                 SecurityGroupIds=[security_group.id],
-                **kwargs
+                **kwargs,
             )
             break
         except botocore.exceptions.ClientError as e:
@@ -252,15 +254,17 @@ def create_ec2_instance(
 
             message = str(e)
             # We may catch capacity limit error from AWS, so just retry.
-            no_capacity_error = f"We currently do not have sufficient {ec2_image.size_id} capacity in zones with " \
-                                f"support for 'gp2' volumes. Our system will be working on provisioning additional " \
-                                f"capacity."
+            no_capacity_error = (
+                f"We currently do not have sufficient {ec2_image.size_id} capacity in zones with "
+                f"support for 'gp2' volumes. Our system will be working on provisioning additional "
+                f"capacity."
+            )
             if no_capacity_error not in message:
                 logger.exception("Unrecoverable error has occurred.")
                 raise
 
             logger.info(f"    {e}")
-            logger.info(f"    Retry...")
+            logger.info("    Retry...")
             attempts -= 1
             time.sleep(random.randint(10, 20))
 
@@ -279,9 +283,7 @@ def create_ec2_instance(
 
 
 def create_ssh_connection(
-        ip: str,
-        username: str,
-        private_key_path: str
+    ip: str, username: str, private_key_path: str
 ) -> paramiko.SSHClient:
     """
     Create SSH connection with host.
@@ -289,19 +291,11 @@ def create_ssh_connection(
 
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(
-        ip,
-        username=username,
-        key_filename=str(private_key_path),
-        timeout=100
-    )
+    ssh.connect(ip, username=username, key_filename=str(private_key_path), timeout=100)
     return ssh
 
 
-def ssh_put_files(
-        ssh_connection: paramiko.SSHClient,
-        files: Dict
-):
+def ssh_put_files(ssh_connection: paramiko.SSHClient, files: Dict):
     """
     Put files to server.
     """
@@ -317,9 +311,7 @@ def ssh_put_files(
 
 
 def ssh_run_command(
-        ssh_connection: paramiko.SSHClient,
-        command: List[str],
-        run_as_root: bool = False
+    ssh_connection: paramiko.SSHClient, command: List[str], run_as_root: bool = False
 ):
     """
     Run command though SSH.
@@ -343,15 +335,13 @@ def ssh_run_command(
 
     exit_status = stdout.channel.recv_exit_status()
     if exit_status != 0:
-        raise Exception(
-            f"SSH command '{command_str}' returned {exit_status}."
-        )
+        raise Exception(f"SSH command '{command_str}' returned {exit_status}.")
 
 
 def add_current_ip_to_prefix_list(
-        boto3_session: boto3.Session,
-        prefix_list_id: str,
-        ec2_objects_name_prefix: str = None
+    boto3_session: boto3.Session,
+    prefix_list_id: str,
+    ec2_objects_name_prefix: str = None,
 ):
     """
     Add new CIDR entry with current public IP in to the prefix list. We also additionally store json object in the
@@ -403,7 +393,10 @@ def add_current_ip_to_prefix_list(
                     {
                         "Cidr": new_cidr,
                         "Description": json.dumps(
-                            {"time": time.time(), "workflow_id": ec2_objects_name_prefix}
+                            {
+                                "time": time.time(),
+                                "workflow_id": ec2_objects_name_prefix,
+                            }
                         ),
                     },
                 ],
@@ -440,5 +433,3 @@ def get_prefix_list_version(client, prefix_list_id: str):
     ), f"Number of found prefix lists has to be 1, got {len(found)}"
     prefix_list = found[0]
     return int(prefix_list["Version"])
-
-

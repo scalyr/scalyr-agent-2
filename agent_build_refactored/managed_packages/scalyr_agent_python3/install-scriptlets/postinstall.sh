@@ -1,4 +1,5 @@
-# Copyright 2014-2022 Scalyr Inc.
+#!/bin/bash
+# Copyright 2014-2020 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,18 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Run this script in order to initialize newly installed/upgraded package.
+/opt/scalyr-agent-2-dependencies/bin/agent-python3-config initialize
 
-import dataclasses
-
-
-@dataclasses.dataclass
-class EC2DistroImage:
-    """
-    Simple specification of the ec2 AMI image.
-    """
-
-    image_id: str
-    image_name: str
-    short_name: str
-    size_id: str
-    ssh_username: str

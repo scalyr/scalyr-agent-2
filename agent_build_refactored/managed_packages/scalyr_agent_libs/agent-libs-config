@@ -1,0 +1,75 @@
+#!/opt/scalyr-agent-2-dependencies/bin/python3
+# Copyright 2014-2022 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+This script serves as executable that allows to create/recreate venv for the Linux Agent requirements.
+"""
+import argparse
+import pathlib as pl
+import shutil
+import subprocess
+
+DEPENDENCIES_PACKAGE_ROOT = pl.Path("/opt/scalyr-agent-2-dependencies")
+
+
+def initialize():
+    """
+    Initialize agent requirement libraries by creating virtual environment with them.
+    :return:
+    """
+    core_requirements_path = DEPENDENCIES_PACKAGE_ROOT / "core-requirements.txt"
+
+    # This is pre-created venv that is shipped with package.
+    venv_source_dir = DEPENDENCIES_PACKAGE_ROOT / "venv"
+
+    venv_dst_dir = pl.Path("/var/opt/scalyr-agent-2-dependencies/venv")
+    if venv_dst_dir.exists():
+        shutil.rmtree(venv_dst_dir)
+
+    # Copy venv that is shipped with the package.
+    shutil.copytree(
+        venv_source_dir,
+        venv_dst_dir,
+    )
+    # Run pip install for additional agent requirements that may be specified by the user.
+    subprocess.check_call(
+        [
+            str(venv_dst_dir / "bin/python3"),
+            "-m",
+            "pip",
+            "install",
+            # Core agent requirements are already installed in this "pre-created" venv, but
+            # we still add their requirements file to be sure that pip will throw an error if
+            # additional requirements conflict with core ones.
+            "-r", str(core_requirements_path),
+            "-r", str(DEPENDENCIES_PACKAGE_ROOT / "etc/additional-requirements.txt"),
+        ]
+    )
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    initialize_parser = subparsers.add_parser("initialize")
+
+    args = parser.parse_args()
+
+    if args.command == "initialize":
+        initialize()
+
+
+

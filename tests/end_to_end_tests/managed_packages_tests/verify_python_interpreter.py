@@ -17,21 +17,18 @@ This script performs set of simple sanity checks for a Python interpreter that i
 Linux dependency packages.
 """
 
-import re
-import os
 import sys
 import pathlib as pl
 import site
 
 from agent_build_refactored.tools.constants import SOURCE_ROOT
 from agent_build_refactored.managed_packages.managed_packages_builders import (
-    PYTHON_PACKAGE_SSL_VERSION,
     AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME as SUBDIR,
 )
 
 # Make sure that current interpreter prefixes are withing subdirectories.
-assert sys.prefix == f"/usr/share/{SUBDIR}"
-assert sys.exec_prefix == f"/usr/lib/{SUBDIR}"
+assert sys.prefix == f"/var/opt/{SUBDIR}/venv"
+assert sys.exec_prefix == sys.prefix
 
 # Check that only verified prefixes are used.
 assert set(site.PREFIXES) == {sys.prefix, sys.exec_prefix}
@@ -50,24 +47,23 @@ assert set(site.getsitepackages()) == {
 assert sys.path == [
     str(pl.Path(__file__).parent),
     str(SOURCE_ROOT),
-    f"{sys.prefix}/lib/python{PYTHON_MAJOR_VERSION}{PYTHON_MINOR_VERSION}.zip",
-    f"{sys.prefix}/lib/python{PYTHON_X_Y_VERSION}",
-    f"{sys.exec_prefix}/lib/python{PYTHON_X_Y_VERSION}/lib-dynload",
+    f"{sys.base_prefix}/lib/python{PYTHON_MAJOR_VERSION}{PYTHON_MINOR_VERSION}.zip",
+    f"{sys.base_prefix}/lib/python{PYTHON_X_Y_VERSION}",
+    f"{sys.base_prefix}/lib/python{PYTHON_X_Y_VERSION}/lib-dynload",
     f"{sys.prefix}/lib/python{PYTHON_X_Y_VERSION}/site-packages",
-    f"{sys.exec_prefix}/lib/python{PYTHON_X_Y_VERSION}/site-packages",
 ]
 
-# Check that only libraries from the previously verified prefix are used.
-assert os.environ["LD_LIBRARY_PATH"] == f"{sys.exec_prefix}/lib"
-
 print("Check OpenSSL")
-import ssl
+import ssl  # noqa
 
-escaped_open_ssl_version = re.escape(PYTHON_PACKAGE_SSL_VERSION)
-assert re.match(
-    rf"OpenSSL {escaped_open_ssl_version}\s+\d+ [A-Za-z]+ \d+", ssl.OPENSSL_VERSION
-), f"Current version of OpenSSL does not match expected {PYTHON_PACKAGE_SSL_VERSION}"
+import hashlib
 
+sha256 = hashlib.sha256()
+sha256.update("123456789".encode())
+assert (
+    sha256.hexdigest()
+    == "15e2b0d3c33891ebb0f1ef609ec419420c20e320ce94c65fbc8c3312448eb225"
+)
 
 print("Check uuid")
 import uuid

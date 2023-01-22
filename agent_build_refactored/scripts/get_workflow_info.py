@@ -46,13 +46,19 @@ def is_branch_has_pull_requests() -> bool:
     """
     Determine if current branch has at least one opened pull request.
     """
-    data = subprocess.check_output([
-        "curl",
-        "-s",
-        "-H",
-        f"Authorization: Bearer {GITHUB_TOKEN}",
-        f"https://api.github.com/repos/ArthurKamalov/scalyr-agent-2/pulls?head=ArthurKamalov:{GITHUB_REF_NAME}&base=master",
-    ]).decode().strip()
+    data = (
+        subprocess.check_output(
+            [
+                "curl",
+                "-s",
+                "-H",
+                f"Authorization: Bearer {GITHUB_TOKEN}",
+                f"https://api.github.com/repos/scalyr/scalyr-agent-2/pulls?head=ArthurKamalov:{GITHUB_REF_NAME}&base=master",
+            ]
+        )
+        .decode()
+        .strip()
+    )
 
     pull_requests = json.loads(data)
     return len(pull_requests) > 0
@@ -62,12 +68,8 @@ def determine_last_prod_version() -> str:
     """
     Get the latest agent production version by looking for git tags.
     """
-    subprocess.check_call([
-            "git", "fetch", "--unshallow", "--tags"
-    ])
-    output = subprocess.check_output([
-        "git", "--no-pager", "tag", "-l"
-    ]).decode()
+    subprocess.check_call(["git", "fetch", "--unshallow", "--tags"])
+    output = subprocess.check_output(["git", "--no-pager", "tag", "-l"]).decode()
 
     production_tags = []
     for tag in output.splitlines():
@@ -127,10 +129,7 @@ else:
 
 def main():
     run_type_name = "master" if master_run else "non-master"
-    print(
-        f"Doing {run_type_name} workflow run.",
-        file=sys.stderr
-    )
+    print(f"Doing {run_type_name} workflow run.", file=sys.stderr)
     print(
         f"event_name: {GITHUB_EVENT_NAME}\n"
         f"base_ref: {GITHUB_BASE_REF}\n"
@@ -143,7 +142,7 @@ def main():
         "is_master_run": master_run,
         "to_publish": to_publish,
         "is_production": is_production,
-        "version": version
+        "version": version,
     }
 
     print(json.dumps(result))
@@ -151,4 +150,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

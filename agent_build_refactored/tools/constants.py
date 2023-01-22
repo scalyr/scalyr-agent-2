@@ -14,6 +14,7 @@
 import dataclasses
 import enum
 import os
+import re
 import pathlib as pl
 
 SOURCE_ROOT = pl.Path(__file__).parent.parent.parent.absolute()
@@ -46,14 +47,27 @@ class DockerPlatformInfo:
 
     @property
     def as_architecture(self):
-        if "amd64" in str(self):
+        name = str(self)
+        if "amd64" in name:
             return Architecture.X86_64
 
-        if "arm64" in str(self) or "arm/v8" in str(self):
+        if "arm64" in name or "arm/v8" in name:
             return Architecture.ARM64
 
-        if "arm/v7" in str(self):
+        if "arm/v7" in name:
             return Architecture.ARMV7
+
+        if "s390x" in name:
+            return Architecture.S390X
+
+        if "mips64le" in name:
+            return Architecture.MIPS64LE
+
+        if "riscv64" in name:
+            return Architecture.RISCV
+
+        if "ppc64le" in name:
+            return Architecture.PPC64LE
 
         return Architecture.UNKNOWN
 
@@ -65,6 +79,10 @@ class DockerPlatform(enum.Enum):
     ARM = DockerPlatformInfo("linux", "arm")
     ARMV7 = DockerPlatformInfo("linux", "arm", "v7")
     ARMV8 = DockerPlatformInfo("linux", "arm", "v8")
+    RISCV = DockerPlatformInfo("linux", "riscv64")
+    PPC64LE = DockerPlatformInfo("linux", "ppc64le")
+    S390X = DockerPlatformInfo("linux", "s390x")
+    MIPS64LE = DockerPlatformInfo("linux", "mips64le")
 
 
 class Architecture(enum.Enum):
@@ -77,6 +95,10 @@ class Architecture(enum.Enum):
     ARM = "arm"
     ARMV7 = "armv7"
     ARMV8 = "armv8"
+    RISCV = "riscv64"
+    PPC64LE = "ppc64le"
+    S390X = "s390x"
+    MIPS64LE = "mips64le"
     UNKNOWN = "unknown"
 
     @property
@@ -93,7 +115,11 @@ class Architecture(enum.Enum):
         mapping = {
             Architecture.X86_64: "amd64",
             Architecture.ARM64: "arm64",
-            Architecture.UNKNOWN: "all"
+            Architecture.RISCV: "riscv64",
+            Architecture.PPC64LE: "ppc64el",
+            Architecture.S390X: "s390x",
+            Architecture.MIPS64LE: "mips64el",
+            Architecture.UNKNOWN: "all",
         }
 
         return mapping[self]
@@ -103,9 +129,21 @@ class Architecture(enum.Enum):
         mapping = {
             Architecture.X86_64: "x86_64",
             Architecture.ARM64: "aarch64",
-            Architecture.UNKNOWN: "noarch"
+            Architecture.RISCV: "riscv64",
+            Architecture.PPC64LE: "ppc64le",
+            Architecture.S390X: "s390x",
+            Architecture.MIPS64LE: "mips64el",
+            Architecture.UNKNOWN: "noarch",
         }
         return mapping[self]
+
+    def get_package_arch(self, package_type: str):
+        if package_type == "deb":
+            return self.as_deb_package_arch
+        elif package_type == "rpm":
+            return self.as_rpm_package_arch
+        else:
+            raise Exception(f"Unknown package type: {package_type}")
 
 
 _ARCHITECTURE_TO_DOCKER_PLATFORM = {
@@ -114,6 +152,10 @@ _ARCHITECTURE_TO_DOCKER_PLATFORM = {
     Architecture.ARM: DockerPlatform.ARM,
     Architecture.ARMV7: DockerPlatform.ARMV7,
     Architecture.ARMV8: DockerPlatform.ARMV8,
+    Architecture.RISCV: DockerPlatform.RISCV,
+    Architecture.MIPS64LE: DockerPlatform.MIPS64LE,
+    Architecture.PPC64LE: DockerPlatform.PPC64LE,
+    Architecture.S390X: DockerPlatform.S390X,
     # Handle unknown architecture value as x86_64
     Architecture.UNKNOWN: DockerPlatform.AMD64,
 }
@@ -128,3 +170,47 @@ class PackageType(enum.Enum):
     DOCKER_API = "docker-api"
     K8S = "k8s"
     MSI = "msi"
+
+
+def _parse_requirements_file():
+    """
+    Parse requirements file and get requirments that are grouped by "Components".
+    :return:
+    """
+    requirements_file_path = SOURCE_ROOT / "dev-requirements-new.txt"
+    requirements_file_content = requirements_file_path.read_text()
+
+    current_component_name = None
+
+    all_components = dict()
+
+    for line in requirements_file_content.splitlines():
+        if line == "":
+            continue
+
+        if line.rstrip().startswith("#"):
+            m = re.match(r"^# <COMPONENT:([^>]+)>$", line)
+
+            if m:
+                current_component_name = m.group(1)
+            else:
+                continue
+        else:
+            if current_component_name is None:
+                raise Exception(f"Requirement '{line}' is outside of any COMPONENT")
+
+            component = all_components.get(current_component_name)
+            if component:
+                all_components[current_component_name] = "\n".join([component, line])
+            else:
+                all_components[current_component_name] = line
+
+    return all_components
+
+
+_REQUIREMENT_FILE_COMPONENTS = _parse_requirements_file()
+
+REQUIREMENTS_COMMON = _REQUIREMENT_FILE_COMPONENTS["COMMON"]
+REQUIREMENTS_COMMON_PLATFORM_DEPENDENT = _REQUIREMENT_FILE_COMPONENTS[
+    "COMMON_PLATFORM_DEPENDENT"
+]

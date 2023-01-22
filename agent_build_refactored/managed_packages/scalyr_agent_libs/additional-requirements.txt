@@ -1,0 +1,2 @@
+# Here additional requirements for the agent can be specified.
+# To install newly added requirements run command '/opt/scalyr-agent-2-dependencies/bin/agent-libs-config initialize'

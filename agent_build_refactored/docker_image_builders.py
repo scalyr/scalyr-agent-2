@@ -31,9 +31,7 @@ import json
 import logging
 import pathlib as pl
 import re
-import tarfile
 import shutil
-import os
 from typing import List, Type, Dict
 
 from agent_build_refactored.prepare_agent_filesystem import (

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copyright 2014-2022 Scalyr Inc.
+# Copyright 2014-2023 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,26 +13,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+#
 # This script is meant to be executed by the instance of the 'agent_build_refactored.tools.runner.RunnerStep' class.
 # Every RunnerStep provides common environment variables to its script:
 #   SOURCE_ROOT: Path to the projects root.
 #   STEP_OUTPUT_PATH: Path to the step's output directory.
 #
-# This script prepares base build environment for the ARM64 linux GLIBC binary packages, it expects to be run in
-# Centos 7 to compile against lower GLIBS (2.17).
+# This script builds from source the OpenSSL 3+ library.
+#
+
 
 set -e
 
-# RHSCL is installed, so we can install newer tools, such as gcc-7
-yum install -y centos-release-scl
-yum install -y devtoolset-7
 
-# Remove this preinstalled packages, since we build and install those libraries from source.
-yum remove -y help2man m4 perl
+mkdir /tmp/build-openssl_3
+pushd /tmp/build-openssl_3
+tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/openssl_3/openssl.tar.gz"
+pushd "openssl-${OPENSSL_VERSION}"
+./config
+make -j "$(nproc)"
+make DESTDIR="${STEP_OUTPUT_PATH}" install_sw
+popd
+popd
 
-echo "source /opt/rh/devtoolset-7/enable" >> ~/.bashrc
-# shellcheck disable=SC2016
-echo 'export LD_LIBRARY_PATH="/usr/local/lib:/usr/local/lib64:${LD_LIBRARY_PATH}"' >> ~/.bashrc
-
-yum clean all
-rm -rf /var/cache/yum
+mkdir -p "${STEP_OUTPUT_PATH}/etc/ld.so.conf.d"
+echo "/usr/local/lib" >> "${STEP_OUTPUT_PATH}/etc/ld.so.conf.d/local.conf"
+echo "/usr/local/lib64" >> "${STEP_OUTPUT_PATH}/etc/ld.so.conf.d/local.conf"
