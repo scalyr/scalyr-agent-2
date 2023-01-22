@@ -58,7 +58,7 @@ class DockerPlatformInfo:
             return Architecture.ARMV7
 
         if "s390x" in name:
-             return Architecture.S390X
+            return Architecture.S390X
 
         if "mips64le" in name:
             return Architecture.MIPS64LE
@@ -119,7 +119,7 @@ class Architecture(enum.Enum):
             Architecture.PPC64LE: "ppc64el",
             Architecture.S390X: "s390x",
             Architecture.MIPS64LE: "mips64el",
-            Architecture.UNKNOWN: "all"
+            Architecture.UNKNOWN: "all",
         }
 
         return mapping[self]
@@ -133,7 +133,7 @@ class Architecture(enum.Enum):
             Architecture.PPC64LE: "ppc64le",
             Architecture.S390X: "s390x",
             Architecture.MIPS64LE: "mips64el",
-            Architecture.UNKNOWN: "noarch"
+            Architecture.UNKNOWN: "noarch",
         }
         return mapping[self]
 
@@ -211,4 +211,6 @@ def _parse_requirements_file():
 _REQUIREMENT_FILE_COMPONENTS = _parse_requirements_file()
 
 REQUIREMENTS_COMMON = _REQUIREMENT_FILE_COMPONENTS["COMMON"]
-REQUIREMENTS_COMMON_PLATFORM_DEPENDENT = _REQUIREMENT_FILE_COMPONENTS["COMMON_PLATFORM_DEPENDENT"]
+REQUIREMENTS_COMMON_PLATFORM_DEPENDENT = _REQUIREMENT_FILE_COMPONENTS[
+    "COMMON_PLATFORM_DEPENDENT"
+]

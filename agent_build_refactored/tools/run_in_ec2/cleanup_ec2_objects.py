@@ -32,8 +32,13 @@ import boto3
 
 sys.path.append(str(pl.Path(__file__).parent.parent.parent.parent))
 
-from agent_build_refactored.tools.run_in_ec2.boto3_tools import AWSSettings, PREFIX_LIST_ENTRY_REMOVE_THRESHOLD, \
-    INSTANCE_NAME_STRING, DELETE_OLD_NODES_THRESHOLD_DT, get_prefix_list_version
+from agent_build_refactored.tools.run_in_ec2.boto3_tools import (
+    AWSSettings,
+    PREFIX_LIST_ENTRY_REMOVE_THRESHOLD,
+    INSTANCE_NAME_STRING,
+    DELETE_OLD_NODES_THRESHOLD_DT,
+    get_prefix_list_version,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -42,7 +47,7 @@ logger = logging.getLogger(__name__)
 def cleanup_old_prefix_list_entries(
     boto3_session: boto3.Session,
     prefix_list_id: str,
-    ec2_objects_name_prefix: str = None
+    ec2_objects_name_prefix: str = None,
 ):
     """
     Cleanup ec2 test related prefix lists entries.
@@ -71,7 +76,10 @@ def cleanup_old_prefix_list_entries(
     if ec2_objects_name_prefix:
         for entry in entries:
             description = _parse_entry_description(entry)
-            if description["workflow_id"] and description["workflow_id"] == ec2_objects_name_prefix:
+            if (
+                description["workflow_id"]
+                and description["workflow_id"] == ec2_objects_name_prefix
+            ):
                 entries_to_remove[entry["Cidr"]] = entry
 
     if not entries_to_remove:
@@ -86,8 +94,7 @@ def cleanup_old_prefix_list_entries(
 
 
 def cleanup_old_ec2_instances(
-        boto3_session: boto3.Session,
-        ec2_objects_name_prefix: str = None
+    boto3_session: boto3.Session, ec2_objects_name_prefix: str = None
 ):
     """
     Cleanup old ec2 instances.
@@ -108,7 +115,9 @@ def cleanup_old_ec2_instances(
 
         # Remove instances which are created by the current workflow immediately.
         if ec2_objects_name_prefix and ec2_objects_name_prefix in name:
-            logger.info(f"Remove ec2 instance {name} with prefix {ec2_objects_name_prefix}")
+            logger.info(
+                f"Remove ec2 instance {name} with prefix {ec2_objects_name_prefix}"
+            )
             instance.terminate()
             continue
 
@@ -124,7 +133,7 @@ def cleanup_old_ec2_instances(
 
 
 def cleanup_volumes(
-        boto3_session: boto3.Session,
+    boto3_session: boto3.Session,
 ):
     ec2 = boto3_session.resource("ec2")
     volumes = list(ec2.volumes.all())
@@ -187,6 +196,7 @@ def _remove_entries(client, entries: List, prefix_list_id: str):
     :return:
     """
     import botocore.exceptions
+
     attempts = 20
     # Since there may be multiple running ec2 tests, we have to add the retry
     # logic to overcome the prefix list concurrent access issues.
@@ -230,7 +240,7 @@ if __name__ == "__main__":
 
     cleanup_old_ec2_instances(
         boto3_session=boto3_session,
-        ec2_objects_name_prefix=aws_settings.ec2_objects_name_prefix
+        ec2_objects_name_prefix=aws_settings.ec2_objects_name_prefix,
     )
 
     cleanup_volumes(

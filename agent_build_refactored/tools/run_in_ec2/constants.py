@@ -21,6 +21,7 @@ class EC2DistroImage:
     """
     Simple specification of the ec2 AMI image.
     """
+
     image_id: str
     image_name: str
     short_name: str

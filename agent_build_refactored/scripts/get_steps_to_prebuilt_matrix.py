@@ -61,15 +61,12 @@ for name, runner_cls in ALL_USED_BUILDERS.items():
         builders_to_prebuilt_runners[name][fqdn] = StepWrapperRunner
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     DEFAULT_OS = os.environ["DEFAULT_OS"]
     DEFAULT_PYTHON_VERSION = os.environ["DEFAULT_PYTHON_VERSION"]
 
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--matrices_path",
-        required=True
-    )
+    parser.add_argument("--matrices_path", required=True)
     args = parser.parse_args()
     matrices_path = pl.Path(args.matrices_path)
 
@@ -82,7 +79,9 @@ if __name__ == '__main__':
         for job in matrix["include"]:
             builder_name = job["name"]
 
-            for runner_fqdn, runner in builders_to_prebuilt_runners[builder_name].items():
+            for runner_fqdn, runner in builders_to_prebuilt_runners[
+                builder_name
+            ].items():
                 pre_built_runners[runner_fqdn] = runner
 
     # Create prebuilt steps matrix.
