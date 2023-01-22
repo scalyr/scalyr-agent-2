@@ -25,7 +25,7 @@ import sys
 from agent_build_refactored.tools.constants import SOURCE_ROOT, Architecture
 from agent_build_refactored.tools.runner import Runner
 from agent_build_refactored.managed_packages.managed_packages_builders import (
-    PREPARE_TOOLSET_STEPS
+    PREPARE_TOOLSET_STEPS,
 )
 
 PORTABLE_RUNNER_NAME = "portable_runner"

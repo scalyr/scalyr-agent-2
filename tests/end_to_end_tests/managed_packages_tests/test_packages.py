@@ -20,13 +20,11 @@ are changing system state and must be aware of risks.
 """
 
 import json
-import os
 import pathlib as pl
 import shlex
 import subprocess
 import logging
 import functools
-import sys
 import time
 from typing import List, Dict
 
@@ -38,7 +36,7 @@ from agent_build_refactored.managed_packages.managed_packages_builders import (
     AGENT_LIBS_PACKAGE_NAME,
     AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME,
     DEFAULT_PYTHON_PACKAGE_OPENSSL_VERSION,
-    AGENT_PACKAGE_NAME
+    AGENT_PACKAGE_NAME,
 )
 from tests.end_to_end_tests.tools import AgentPaths, AgentCommander, TimeoutTracker
 from tests.end_to_end_tests.verify import (
@@ -126,7 +124,7 @@ def test_dependency_packages(
         output_dir=tmp_path,
         expected_folders=[
             f"opt/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/",
-            f"etc/scalyr-agent-2",
+            "etc/scalyr-agent-2",
             # Depending on its type, a package also may install its own "metadata", so we have to take it into
             # account too.
             f"usr/share/doc/{AGENT_LIBS_PACKAGE_NAME}/"
@@ -161,8 +159,7 @@ def test_packages(
 
     logger.info("Install agent from install script.")
     _install_from_convenience_script(
-        script_path=convenience_script_path,
-        distro_name=distro_name
+        script_path=convenience_script_path, distro_name=distro_name
     )
 
     logger.info(
@@ -253,9 +250,7 @@ def test_packages(
     # TODO: Add actual agent package testing here.
 
     logger.info("Cleanup")
-    _remove_all_agent_files(
-        package_type=package_builder.PACKAGE_TYPE
-    )
+    _remove_all_agent_files(package_type=package_builder.PACKAGE_TYPE)
 
 
 def test_agent_package_config_ownership(package_builder, agent_package_path, tmp_path):
@@ -314,14 +309,25 @@ def test_agent_package_config_ownership(package_builder, agent_package_path, tmp
 def test_upgrade(package_builder, repo_url):
     if package_builder.PACKAGE_TYPE == "deb":
         repo_source_list_path = pl.Path("/etc/apt/sources.list.d/scalyr.list")
-        repo_source_list_path.write_text(f"deb [allow-insecure=yes] {repo_url} scalyr main")
+        repo_source_list_path.write_text(
+            f"deb [allow-insecure=yes] {repo_url} scalyr main"
+        )
         _call_apt(["update"])
 
         _call_apt(["install", "-y", "python3"])
-        _call_apt(["install", "-y", "--allow-unauthenticated", f"{AGENT_PACKAGE_NAME}=2.1.40"])
+        _call_apt(
+            ["install", "-y", "--allow-unauthenticated", f"{AGENT_PACKAGE_NAME}=2.1.40"]
+        )
 
-        _call_apt(["install", "-y", "--only-upgrade", "--allow-unauthenticated", AGENT_PACKAGE_NAME])
-
+        _call_apt(
+            [
+                "install",
+                "-y",
+                "--only-upgrade",
+                "--allow-unauthenticated",
+                AGENT_PACKAGE_NAME,
+            ]
+        )
 
 
 def _perform_ssl_checks(
@@ -487,7 +493,7 @@ def _install_from_convenience_script(
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            env=_ADDITIONAL_ENVIRONMENT
+            env=_ADDITIONAL_ENVIRONMENT,
         )
     except subprocess.CalledProcessError as e:
         logger.error(f"Install script has failed.\nOutput:\n{e.stdout.decode()}")
@@ -510,7 +516,10 @@ def _install_from_convenience_script(
     elif distro_name in ["ubuntu1404", "centos6"]:
         assert "Looking for system OpenSSL >= 3: Not found" in output
         assert "Looking for system OpenSSL >= 1.1.1: Not found" in output
-        assert f"Using embedded OpenSSL == {DEFAULT_PYTHON_PACKAGE_OPENSSL_VERSION}" in output
+        assert (
+            f"Using embedded OpenSSL == {DEFAULT_PYTHON_PACKAGE_OPENSSL_VERSION}"
+            in output
+        )
 
 
 def _prepare_environment(
@@ -630,9 +639,7 @@ def _extract_package(package_type: str, package_path: pl.Path, output_path: pl.P
         raise Exception(f"Unknown package type {package_type}.")
 
 
-def _remove_all_agent_files(
-        package_type: str
-):
+def _remove_all_agent_files(package_type: str):
     """
     Cleanup system from everything that related with agent, trying to bring
     system into state before agent was installed.

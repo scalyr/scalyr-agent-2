@@ -17,8 +17,6 @@ This script performs set of simple sanity checks for a Python interpreter that i
 Linux dependency packages.
 """
 
-import re
-import os
 import sys
 import pathlib as pl
 import site
@@ -56,12 +54,16 @@ assert sys.path == [
 ]
 
 print("Check OpenSSL")
-import ssl
+import ssl  # noqa
 
 import hashlib
+
 sha256 = hashlib.sha256()
 sha256.update("123456789".encode())
-assert sha256.hexdigest() == "15e2b0d3c33891ebb0f1ef609ec419420c20e320ce94c65fbc8c3312448eb225"
+assert (
+    sha256.hexdigest()
+    == "15e2b0d3c33891ebb0f1ef609ec419420c20e320ce94c65fbc8c3312448eb225"
+)
 
 print("Check uuid")
 import uuid

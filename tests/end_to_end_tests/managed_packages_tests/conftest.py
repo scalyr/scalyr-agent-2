@@ -8,7 +8,6 @@ import socketserver
 import tarfile
 import threading
 import time
-import textwrap
 
 import pytest
 import requests
@@ -178,15 +177,19 @@ class RepoBuilder(Runner):
             aptly_root = workdir / "aptly"
             aptly_config_path = workdir / "aptly.conf"
 
-            aptly_config = {
-                "rootDir": str(aptly_root)
-            }
+            aptly_config = {"rootDir": str(aptly_root)}
 
-            aptly_config_path.write_text(
-                json.dumps(aptly_config)
-            )
+            aptly_config_path.write_text(json.dumps(aptly_config))
             subprocess.run(
-                ["aptly", "-config", str(aptly_config_path), "repo", "create", "-distribution=scalyr", "scalyr"],
+                [
+                    "aptly",
+                    "-config",
+                    str(aptly_config_path),
+                    "repo",
+                    "create",
+                    "-distribution=scalyr",
+                    "scalyr",
+                ],
                 check=True,
             )
 
@@ -204,14 +207,18 @@ class RepoBuilder(Runner):
                 )
 
             subprocess.run(
-                ["aptly", "-config", str(aptly_config_path), "publish", "-distribution=scalyr", "repo", "scalyr"],
+                [
+                    "aptly",
+                    "-config",
+                    str(aptly_config_path),
+                    "publish",
+                    "-distribution=scalyr",
+                    "repo",
+                    "scalyr",
+                ],
                 check=True,
             )
-            shutil.copytree(
-                aptly_root / "public",
-                repo_path,
-                dirs_exist_ok=True
-            )
+            shutil.copytree(aptly_root / "public", repo_path, dirs_exist_ok=True)
 
         elif package_type == "rpm":
             # Create rpm repository using 'createrepo_c'.
@@ -261,8 +268,11 @@ class RepoBuilder(Runner):
 def stable_agent_package_version():
     return "2.1.40"
 
+
 @pytest.fixture(scope="session")
-def stable_version_packages(package_builder, tmp_path_factory, stable_agent_package_version):
+def stable_version_packages(
+    package_builder, tmp_path_factory, stable_agent_package_version
+):
     stable_repo_url = "https://scalyr-repo.s3.amazonaws.com/stable"
     if package_builder.PACKAGE_TYPE == "deb":
         file_name = f"scalyr-agent-2_{stable_agent_package_version}_all.deb"
@@ -308,18 +318,12 @@ def server_root(request, tmp_path_factory, package_builder, stable_version_packa
         else:
             builder_output = pl.Path(request.config.option.packages_source)
 
-        packages_dir = builder_output / "packages" / package_builder.PACKAGE_TYPE / "managed"
+        packages_dir = (
+            builder_output / "packages" / package_builder.PACKAGE_TYPE / "managed"
+        )
         repo_packages = tmp_path_factory.mktemp("repo_packages")
-        shutil.copytree(
-            packages_dir,
-            repo_packages,
-            dirs_exist_ok=True
-        )
-        shutil.copytree(
-            stable_version_packages,
-            repo_packages,
-            dirs_exist_ok=True
-        )
+        shutil.copytree(packages_dir, repo_packages, dirs_exist_ok=True)
+        shutil.copytree(stable_version_packages, repo_packages, dirs_exist_ok=True)
 
         # Build mock repo from packages.
         repo_builder = RepoBuilder()
@@ -386,13 +390,12 @@ def convenience_script_path(server_url, repo_url):
     yield convenience_script_builder.output_path / "install-agent.sh"
 
 
-
 def _get_package_path_from_repo(
     package_filename_glob: str, package_type: str, repo_root: pl.Path
 ):
     """Helper function that finds package inside repo root."""
     if package_type == "deb":
-        packages_dir = repo_root / f"pool/main/s"
+        packages_dir = repo_root / "pool/main/s"
     elif package_type == "rpm":
         packages_dir = repo_root
     else:
@@ -433,7 +436,9 @@ def agent_package_path(repo_root, package_builder):
         return None
 
     if package_builder.PACKAGE_TYPE == "deb":
-        package_filename_glob = f"{AGENT_PACKAGE_NAME}_{AGENT_VERSION}_all.{package_builder.PACKAGE_TYPE}"
+        package_filename_glob = (
+            f"{AGENT_PACKAGE_NAME}_{AGENT_VERSION}_all.{package_builder.PACKAGE_TYPE}"
+        )
     else:
         raise Exception(f"Unknown package type: {package_builder.PACKAGE_TYPE}")
 
