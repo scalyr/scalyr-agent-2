@@ -1,6 +1,14 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.40 "Onone" - Jan 19, 2023
+<!---
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Jan 19, 2023 00:00 -0800
+--->
+
+Docker Images / Kubernetes:
+* Docker images now are built against Python:3.8.16 image. Debian and Alpine based Docker images have also been updated to include all the latest security updates for the system packages.
+
 ## 2.1.39 "Hroderich" - December 15, 2022
 <!---
 Packaged by Dominic LoBue <dominicl@sentinelone.com> on Dec 15, 2022 00:00 -0800

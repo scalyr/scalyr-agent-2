@@ -39,8 +39,20 @@ RUN tar -xf /tmp/build/scalyr-agent.tar.gz
 
 WORKDIR /
 
+FROM python:3.8.16-slim-bullseye as scalyr-base-slim-bullseye
+MAINTAINER Scalyr Inc <support@scalyr.com>
+
+# We upgrade current packages in order to keep everything up to date, including security updates.
+RUN apt-get update ; apt-get dist-upgrade -y
+RUN python3 -m pip install --upgrade setuptools
+RUN apt-get clean
+
+FROM python:3.8.16-alpine as scalyr-base-alpine
+MAINTAINER Scalyr Inc <support@scalyr.com>
+
+
 # Copy result files to a new base stage.
-FROM python:3.8.13-$BASE_IMAGE_SUFFIX as scalyr-base
+FROM scalyr-base-$BASE_IMAGE_SUFFIX as scalyr-base
 MAINTAINER Scalyr Inc <support@scalyr.com>
 # Copy Agent's Python dependencies. Those dependencies were built in the base image,
 # which is given by 'BASE_IMAGE' arg.

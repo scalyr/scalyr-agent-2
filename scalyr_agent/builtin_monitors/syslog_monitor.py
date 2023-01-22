@@ -1,4 +1,4 @@
-# Copyright 2017-2022 Scalyr Inc.
+# Copyright 2017-2023 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -391,6 +391,15 @@ define_config_option(
 )
 
 # TODO Merge the *{check_for_unused_logs_mins,delete_unused_logs_hours,check_rotated_timestamps,expire_log} options
+
+define_config_option(
+    __monitor__,
+    "max_log_files",
+    "Optional (defaults to `1000`). The maximum number of log files to support simultaneously, "
+    "as the use of `message_log_template` may generate many log files depending on its input.",
+    default=1000,
+    convert_to=int,
+)
 
 define_config_option(
     __monitor__,
@@ -1242,6 +1251,7 @@ class SyslogHandler(object):
                 substitutions=["PROTO", "SRCIP", "DESTPORT", "HOSTNAME", "APPNAME"],
             )
         self.__syslog_expire_log = config.get("expire_log")
+        self.__syslog_max_log_files = config.get("max_log_files")
         self.__syslog_loggers = {}
         self.__syslog_parser = config.get("parser")
         self.__syslog_attributes = JsonObject(config.get("attributes") or {})
@@ -1571,34 +1581,45 @@ class SyslogHandler(object):
                 self.__syslog_file_template.safe_substitute(**extra),
             )
             if path not in self.__syslog_loggers:
-                logfile = AutoFlushingRotatingFile(
-                    filename=path,
-                    max_bytes=self.__max_log_size,
-                    backup_count=self.__max_log_rotations,
-                    flush_delay=self.__flush_delay,
-                )
+                if len(self.__syslog_loggers) >= self.__syslog_max_log_files:
+                    global_log.warning(
+                        "Adding another log file would exceed max_log_files limit "
+                        "(will instead write to the base syslog file)",
+                        limit_once_per_x_secs=600,
+                        limit_key="syslog-max-log-files",
+                    )
+                else:
+                    logfile = AutoFlushingRotatingFile(
+                        filename=path,
+                        max_bytes=self.__max_log_size,
+                        backup_count=self.__max_log_rotations,
+                        flush_delay=self.__flush_delay,
+                    )
 
-                attribs = self.__syslog_attributes.copy()
-                attribs.update(
-                    {k.lower(): v for k, v in extra.items() if v is not None}
-                )
+                    attribs = self.__syslog_attributes.copy()
+                    attribs.update(
+                        {k.lower(): v for k, v in extra.items() if v is not None}
+                    )
 
-                log_config = {
-                    "parser": self.__syslog_parser,
-                    "attributes": attribs,
-                    "path": path,
-                }
+                    log_config = {
+                        "parser": self.__syslog_parser,
+                        "attributes": attribs,
+                        "path": path,
+                    }
 
-                if watcher and module:
-                    log_config = watcher.add_log_config(module.module_name, log_config)
+                    if watcher and module:
+                        log_config = watcher.add_log_config(
+                            module.module_name, log_config
+                        )
 
-                self.__syslog_loggers[path] = {
-                    "log_config": log_config,
-                    "logger": logfile,
-                }
+                    self.__syslog_loggers[path] = {
+                        "log_config": log_config,
+                        "logger": logfile,
+                    }
 
-            logger = self.__syslog_loggers[path]
-            logger["last_seen"] = time.time()
+            if path in self.__syslog_loggers:
+                logger = self.__syslog_loggers[path]
+                logger["last_seen"] = time.time()
 
             if self.__expire_count >= RUN_EXPIRE_COUNT:
                 self.__expire_count = 0
