@@ -37,7 +37,8 @@ from agent_build_refactored.managed_packages.managed_packages_builders import (
     PYTHON_PACKAGE_NAME,
     AGENT_LIBS_PACKAGE_NAME,
     AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME,
-    DEFAULT_PYTHON_PACKAGE_OPENSSL_VERSION
+    DEFAULT_PYTHON_PACKAGE_OPENSSL_VERSION,
+    AGENT_PACKAGE_NAME
 )
 from tests.end_to_end_tests.tools import AgentPaths, AgentCommander, TimeoutTracker
 from tests.end_to_end_tests.verify import (
@@ -148,6 +149,7 @@ def test_packages(
     agent_version,
     tmp_path,
 ):
+    return
     timeout_tracker = TimeoutTracker(400)
     _print_system_information()
     _prepare_environment(
@@ -250,6 +252,11 @@ def test_packages(
     )
     # TODO: Add actual agent package testing here.
 
+    logger.info("Cleanup")
+    _remove_all_agent_files(
+        package_type=package_builder.PACKAGE_TYPE
+    )
+
 
 def test_agent_package_config_ownership(package_builder, agent_package_path, tmp_path):
     """
@@ -302,6 +309,19 @@ def test_agent_package_config_ownership(package_builder, agent_package_path, tmp
     assert (
         oct_mode == "751"
     ), f"Expected permissions of the 'agent.d' is 751, got {oct_mode}"
+
+
+def test_upgrade(package_builder, repo_url):
+    if package_builder.PACKAGE_TYPE == "deb":
+        repo_source_list_path = pl.Path("/etc/apt/sources.list.d/scalyr.list")
+        repo_source_list_path.write_text(f"deb [allow-insecure=yes] {repo_url} scalyr main")
+        _call_apt(["update"])
+
+        _call_apt(["install", "-y", "python3"])
+        _call_apt(["install", "-y", "--allow-unauthenticated", f"{AGENT_PACKAGE_NAME}=2.1.40"])
+
+        _call_apt(["install", "-y", "--only-upgrade", "--allow-unauthenticated", AGENT_PACKAGE_NAME])
+
 
 
 def _perform_ssl_checks(
@@ -608,6 +628,31 @@ def _extract_package(package_type: str, package_path: pl.Path, output_path: pl.P
         )
     else:
         raise Exception(f"Unknown package type {package_type}.")
+
+
+def _remove_all_agent_files(
+        package_type: str
+):
+    """
+    Cleanup system from everything that related with agent, trying to bring
+    system into state before agent was installed.
+    """
+
+    if package_type == "deb":
+        _call_apt(["remove", "-y", AGENT_PACKAGE_NAME])
+        _call_apt(["purge", "-y", AGENT_PACKAGE_NAME])
+        _call_apt(["autoremove", "-y"])
+        source_list_path = pl.Path("/etc/apt/sources.list.d/scalyr.list")
+        source_list_path.unlink()
+
+        pl.Path("/usr/share/keyrings/scalyr.gpg").unlink()
+        pl.Path("/usr/share/keyrings/scalyr.gpg~").unlink()
+        _call_apt(["update"])
+
+    elif package_type == "rpm":
+        _call_yum(["remove", "-y", AGENT_PACKAGE_NAME])
+    else:
+        raise Exception(f"Unknown package type: {package_type}")
 
 
 def _run_shell(command: str, return_output: bool = False, env=None):

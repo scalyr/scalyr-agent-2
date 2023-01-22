@@ -18,6 +18,9 @@ import re
 import pathlib as pl
 
 SOURCE_ROOT = pl.Path(__file__).parent.parent.parent.absolute()
+
+AGENT_VERSION = (SOURCE_ROOT / "VERSION").read_text().strip()
+
 AGENT_BUILD_PATH = SOURCE_ROOT / "agent_build"
 
 IN_CICD = bool(os.environ.get("AGENT_BUILD_IN_CICD"))

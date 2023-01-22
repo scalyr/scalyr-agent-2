@@ -25,7 +25,7 @@ from typing import List, Tuple, Optional, Dict, Type
 from agent_build_refactored.managed_packages.build_dependencies_versions import EMBEDDED_PYTHON_VERSION, \
     PYTHON_PACKAGE_SSL_1_1_1_VERSION, PYTHON_PACKAGE_SSL_3_VERSION, RUST_VERSION
 from agent_build_refactored.tools.runner import Runner, RunnerStep, ArtifactRunnerStep, RunnerMappedPath, EnvironmentRunnerStep, DockerImageSpec,GitHubActionsSettings, IN_DOCKER
-from agent_build_refactored.tools.constants import SOURCE_ROOT, DockerPlatform, Architecture, REQUIREMENTS_COMMON, REQUIREMENTS_COMMON_PLATFORM_DEPENDENT
+from agent_build_refactored.tools.constants import SOURCE_ROOT, DockerPlatform, Architecture, REQUIREMENTS_COMMON, REQUIREMENTS_COMMON_PLATFORM_DEPENDENT, AGENT_VERSION
 from agent_build_refactored.tools import check_call_with_log
 from agent_build_refactored.prepare_agent_filesystem import build_linux_fhs_agent_files, add_config, create_change_logs
 
@@ -166,6 +166,22 @@ class LinuxDependencyPackagesBuilder(Runner):
             cls._get_build_package_root_step(package_name=AGENT_LIBS_PACKAGE_NAME)
         ])
         return steps
+
+    @classmethod
+    def _get_package_file_name(cls, package_name: str, version: str, architecture: str):
+        if cls.PACKAGE_TYPE == "deb":
+            return f"{package_name}_{version}_{architecture}.deb"
+        elif cls.PACKAGE_TYPE == "rpm":
+            pass
+        else:
+            raise Exception(f"Unknown package type: '{cls.PACKAGE_TYPE}'")
+
+    @classmethod
+    def agent_agent_package_filename(cls):
+        return cls._get_package_file_name(
+            package_name=PYTHON_PACKAGE_NAME,
+            version=AGENT_VERSION,architecture="all"
+        )
 
     @property
     def dependency_packages_arch(self) -> str:
