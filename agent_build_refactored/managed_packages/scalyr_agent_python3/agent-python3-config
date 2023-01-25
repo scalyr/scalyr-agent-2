@@ -15,8 +15,8 @@
 
 #
 # This script is used to configure the agent's Python package. Basically this is just a wrapper that
-# call real python script that does all work, we have to call it from the wrapper because we need to provide
-# additional path for  'LD_LIBRARY_PATH' variable in order make Python work.
+# calls real python script that does all work, we have to call it from the wrapper because we need to provide
+# additional path for the 'LD_LIBRARY_PATH' variable in order make Python work.
 #
 
 set -e
@@ -24,5 +24,6 @@ set -e
 DEPENDENCIES_ROOT="/opt/scalyr-agent-2-dependencies"
 DEPENDENCIES_LIBS="${DEPENDENCIES_ROOT}/lib"
 
+# Since this executable has to work in any circumstances, we run it directly with embedded OpenSSL.
 export LD_LIBRARY_PATH="${DEPENDENCIES_LIBS}:${DEPENDENCIES_LIBS}/openssl/1_1_1/libs:${LD_LIBRARY_PATH}"
-exec "${DEPENDENCIES_ROOT}/bin/python3" "${DEPENDENCIES_ROOT}/bin/internal/agent-python3-config.py"  "$@"
+exec "${DEPENDENCIES_ROOT}/bin/python3-original" "${DEPENDENCIES_ROOT}/bin/internal/agent-python3-config.py"  "$@"

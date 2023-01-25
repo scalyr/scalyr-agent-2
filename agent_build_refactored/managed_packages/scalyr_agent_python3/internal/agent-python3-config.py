@@ -164,7 +164,7 @@ def get_current_openssl_version(version_type: str) -> Tuple[bool, str]:
 
     result = subprocess.run(
         [
-            str(BIN_DIR / "python_wrapper"),
+            str(BIN_DIR / "python3"),
             "-c",
             "import ssl; print(ssl.OPENSSL_VERSION);"
         ],

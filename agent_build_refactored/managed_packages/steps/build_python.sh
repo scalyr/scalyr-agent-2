@@ -53,8 +53,7 @@ pushd build
 	--with-readline=edit \
 	--prefix="${INSTALL_PREFIX}" \
 	--exec-prefix="${INSTALL_PREFIX}" \
-	--with-ensurepip=upgrade \
-	--with-suffix=original
+	--with-ensurepip=upgrade
 
 #		--enable-optimizations \
 #	--with-lto \

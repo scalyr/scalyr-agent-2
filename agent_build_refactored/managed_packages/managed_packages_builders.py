@@ -1386,7 +1386,7 @@ def create_build_python_package_root_steps() -> Dict[Architecture, ArtifactRunne
             tracked_files_globs=[
                 "agent_build_refactored/managed_packages/scalyr_agent_python3/internal/agent-python3-config.py",
                 "agent_build_refactored/managed_packages/scalyr_agent_python3/agent-python3-config",
-                "agent_build_refactored/managed_packages/scalyr_agent_python3/python_wrapper",
+                "agent_build_refactored/managed_packages/scalyr_agent_python3/python3",
                 "agent_build_refactored/managed_packages/scalyr_agent_python3/install-scriptlets/postinstall.sh",
                 "agent_build_refactored/managed_packages/scalyr_agent_python3/install-scriptlets/preuninstall.sh",
             ],
@@ -1521,7 +1521,10 @@ def create_build_agent_libs_package_root_steps() -> Dict[
             required_steps={
                 "BUILD_AGENT_LIBS": BUILD_AGENT_LIBS_VENV_STEPS[architecture],
             },
-            environment_variables={"REQUIREMENTS": AGENT_LIBS_REQUIREMENTS_CONTENT},
+            environment_variables={
+                "PYTHON_SHORT_VERSION": EMBEDDED_PYTHON_SHORT_VERSION,
+                "REQUIREMENTS": AGENT_LIBS_REQUIREMENTS_CONTENT,
+            },
             github_actions_settings=GitHubActionsSettings(
                 cacheable=True,
             ),

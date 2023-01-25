@@ -30,4 +30,4 @@ DEPENDENCIES_ROOT="/opt/scalyr-agent-2-dependencies"
 DEPENDENCIES_LIBS="${DEPENDENCIES_ROOT}/lib"
 
 export LD_LIBRARY_PATH="${DEPENDENCIES_LIBS}:${DEPENDENCIES_LIBS}/openssl/current:${LD_LIBRARY_PATH}"
-exec "${DEPENDENCIES_ROOT}/bin/python3 " "$@"
+exec "${DEPENDENCIES_ROOT}/bin/python3-original" "$@"

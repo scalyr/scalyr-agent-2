@@ -99,10 +99,20 @@ rm "$(get_standard_c_binding_path "${RESULT_PYTHON_SSL_BINDINGS_DIR}" _hashlib.c
 # Copy package scriptlets
 cp -a "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_python3/install-scriptlets" "${STEP_OUTPUT_PATH}/scriptlets"
 
+BIN_DIR="${PACKAGE_ROOT}${INSTALL_PREFIX}/bin"
 # Copy executables that allows configure the package.
-cp "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_python3/agent-python3-config" "${PACKAGE_ROOT}${INSTALL_PREFIX}/bin"
-cp "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_python3/python_wrapper" "${PACKAGE_ROOT}${INSTALL_PREFIX}/bin"
-cp -r "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_python3/internal" "${PACKAGE_ROOT}${INSTALL_PREFIX}/bin"
+cp "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_python3/agent-python3-config" "${BIN_DIR}"
+cp -r "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_python3/internal" "${BIN_DIR}"
+
+# Rename main Python executable to be 'python3-original' and copy our wrapper script instead of it
+mv "${PACKAGE_ROOT}${INSTALL_PREFIX}/bin/python${PYTHON_SHORT_VERSION}" "${PACKAGE_ROOT}${INSTALL_PREFIX}/bin/python3-original"
+cp "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_python3/python3" "${BIN_DIR}/python${PYTHON_SHORT_VERSION}"
+
+# Remove other executables
+rm "${BIN_DIR}"/pip*
+rm "${BIN_DIR}"/idle*
+rm "${BIN_DIR}"/2to3*
+rm "${BIN_DIR}"/pydoc*
 
 
 # Copy package's configuration files.

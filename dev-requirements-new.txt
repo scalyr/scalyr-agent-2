@@ -20,6 +20,12 @@ PyMySQL==0.9.3
 # Required for snmp monitor
 pysnmp==4.3.0
 
+docker==6.0.0; python_version >= '3.7'
+# Used for performance optimized versions of rfc3339_to_* functions
+# NOTE: Not supported on windows
+udatetime==0.0.17; platform_system != 'Windows'
+psutil==5.7.0
+
 
 # Agent's common requirements, but only for platform-dependent types of agent.
 # <COMPONENT:COMMON_PLATFORM_DEPENDENT>
@@ -38,7 +44,6 @@ boto3==1.26.17
 # <COMPONENT:DEV>
 # Testing tools and libraries
 mock==3.0.5
-psutil==5.7.0
 pytest==7.1.2
 pytest-coverage
 pytest-timeout==1.3.4
