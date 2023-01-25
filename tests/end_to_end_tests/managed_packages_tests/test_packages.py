@@ -173,7 +173,7 @@ def test_packages(
     )
     subprocess.check_call(
         [
-            f"/var/opt/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/venv/bin/python_wrapper",
+            f"/var/opt/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/venv/bin/python3",
             "tests/end_to_end_tests/managed_packages_tests/verify_python_interpreter.py",
         ],
         env={

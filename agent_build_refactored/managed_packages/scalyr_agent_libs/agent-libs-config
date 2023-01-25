@@ -46,7 +46,7 @@ def initialize():
     # Run pip install for additional agent requirements that may be specified by the user.
     subprocess.check_call(
         [
-            str(venv_dst_dir / "bin/python_wrapper"),
+            str(venv_dst_dir / "bin/python3"),
             "-m",
             "pip",
             "install",

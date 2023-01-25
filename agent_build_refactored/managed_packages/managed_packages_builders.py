@@ -1514,7 +1514,7 @@ def create_build_agent_libs_package_root_steps() -> Dict[
             tracked_files_globs=[
                 "agent_build_refactored/managed_packages/scalyr_agent_libs/additional-requirements.txt",
                 "agent_build_refactored/managed_packages/scalyr_agent_libs/agent-libs-config",
-                "agent_build_refactored/managed_packages/scalyr_agent_libs/python_wrapper",
+                "agent_build_refactored/managed_packages/scalyr_agent_libs/python3",
                 "agent_build_refactored/managed_packages/scalyr_agent_libs/install-scriptlets/postinstall.sh",
             ],
             base=PREPARE_TOOLSET_STEPS[Architecture.X86_64],

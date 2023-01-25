@@ -238,9 +238,20 @@ You should not have to restart the agent to have the new monitor to begin runnin
 seconds.  However, if you have changed the contents of your Python module, you may wish to restart the agent to ensure
 the changes the Python files are picked up.
 
+If you use agent from the package (e.g. `deb` or `rpm`) and your monitor depends on third-party libraries, they can be 
+specified in the requirements file located in `/opt/scalyr-agent-2-dependencies/etc/additional-requirements.txt`
+To make those requirements be installed immediately run command `/opt/scalyr-agent-2-dependencies/bin/agent-libs-config initialize`
+which has to re-initialize agent's internal venv and to install specified libraries. Please do not install
+additional libraries manually, by using Agent's internal Python executables. Since venv with all requirement is 
+re-initializes on each package installation and your manually installed libraries will not survive next upgrade.
+The `/opt/scalyr-agent-2-dependencies/etc/additional-requirements.txt` is treated by the package as a configuration
+file, so it is not removed on package removal/upgrade. 
+NOTE: Also take into account that agent has its own "core" requirements, and make sure that you don't add a conflicting
+one. You can see those core requirements in the file `/opt/scalyr-agent-2-dependencies/venv/core-requirements.txt`. 
+
 ## Suggestions for writing Monitor Plugins
 
-Here are are a few tips on writing high quality plugins that can be easily reused by other Scalyr customers.
+Here are a few tips on writing high quality plugins that can be easily reused by other Scalyr customers.
 
   * Minimize your dependencies on non-standard libraries.  Scalyr customers should not need to use 'pip' to install
     other Python packages to run your plugin.  If you require a pure Python library, see if it can be included in the
