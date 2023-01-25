@@ -377,7 +377,7 @@ def verify_agent_status(
 
         assert (
             last_response_status == "success"
-        ), "last_response_status is not successful"
+        ), f"last_response_status is not successful, status:{last_response_status}"
         break
 
     string_status = agent_commander.get_status()

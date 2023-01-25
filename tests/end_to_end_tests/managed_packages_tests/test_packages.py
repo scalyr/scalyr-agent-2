@@ -36,6 +36,7 @@ from agent_build_refactored.managed_packages.managed_packages_builders import (
     AGENT_LIBS_PACKAGE_NAME,
     AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME,
     DEFAULT_PYTHON_PACKAGE_OPENSSL_VERSION,
+    AGENT_PACKAGE_NAME,
 )
 from tests.end_to_end_tests.tools import AgentPaths, AgentCommander, TimeoutTracker
 from tests.end_to_end_tests.verify import (
@@ -133,6 +134,13 @@ def test_dependency_packages(
     )
 
 
+LINUX_PACKAGE_AGENT_PATHS = AgentPaths(
+    configs_dir=pl.Path("/etc/scalyr-agent-2"),
+    logs_dir=pl.Path("/var/log/scalyr-agent-2"),
+    install_root=pl.Path("/usr/share/scalyr-agent-2"),
+)
+
+
 def test_packages(
     package_builder_name,
     package_builder,
@@ -165,24 +173,21 @@ def test_packages(
     )
     subprocess.check_call(
         [
-            f"/var/opt/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/venv/bin/python3",
+            f"/var/opt/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/venv/bin/python_wrapper",
             "tests/end_to_end_tests/managed_packages_tests/verify_python_interpreter.py",
         ],
         env={
             # It's important to override the 'LD_LIBRARY_PATH' to be sure that libraries paths from the test runner
             # frozen binary are not leaked to a script's process.
+            "LD_LIBRARY_PATH": "/lib",
             "PYTHONPATH": str(SOURCE_ROOT),
         },
     )
 
-    agent_paths = AgentPaths(
-        configs_dir=pl.Path("/etc/scalyr-agent-2"),
-        logs_dir=pl.Path("/var/log/scalyr-agent-2"),
-        install_root=pl.Path("/usr/share/scalyr-agent-2"),
-    )
-
     logger.info("Verifying install_info.json file exists")
-    install_info_path = agent_paths.install_root / "py/scalyr_agent/install_info.json"
+    install_info_path = (
+        LINUX_PACKAGE_AGENT_PATHS.install_root / "py/scalyr_agent/install_info.json"
+    )
     assert install_info_path.is_file(), f"The {install_info_path} file is missing."
 
     logger.info("Verifying rc.d symlinks exist")
@@ -193,7 +198,7 @@ def test_packages(
         f"package-{package_builder_name}-test-{test_session_suffix}-{int(time.time())}"
     )
 
-    upload_test_log_path = agent_paths.logs_dir / "test.log"
+    upload_test_log_path = LINUX_PACKAGE_AGENT_PATHS.logs_dir / "test.log"
 
     config = {
         "api_key": scalyr_api_key,
@@ -202,7 +207,7 @@ def test_packages(
     }
 
     agent_commander = AgentCommander(
-        executable_args=["scalyr-agent-2"], agent_paths=agent_paths
+        executable_args=["scalyr-agent-2"], agent_paths=LINUX_PACKAGE_AGENT_PATHS
     )
 
     agent_commander.agent_paths.agent_config_path.write_text(json.dumps(config))
@@ -242,10 +247,13 @@ def test_packages(
     _perform_ssl_checks(
         default_config=config,
         agent_commander=agent_commander,
-        agent_paths=agent_paths,
+        agent_paths=LINUX_PACKAGE_AGENT_PATHS,
         timeout_tracker=timeout_tracker,
     )
     # TODO: Add actual agent package testing here.
+
+    logger.info("Cleanup")
+    _remove_all_agent_files(package_type=package_builder.PACKAGE_TYPE)
 
 
 def test_agent_package_config_ownership(package_builder, agent_package_path, tmp_path):
@@ -610,6 +618,33 @@ def _extract_package(package_type: str, package_path: pl.Path, output_path: pl.P
         raise Exception(f"Unknown package type {package_type}.")
 
 
+def _remove_all_agent_files(package_type: str):
+    """
+    Cleanup system from everything that related with agent, trying to bring
+    system into state before agent was installed.
+    """
+
+    if package_type == "deb":
+        _call_apt(["remove", "-y", AGENT_PACKAGE_NAME])
+        _call_apt(["purge", "-y", AGENT_PACKAGE_NAME])
+        _call_apt(["autoremove", "-y"])
+        source_list_path = pl.Path("/etc/apt/sources.list.d/scalyr.list")
+        source_list_path.unlink()
+
+        keyring_path = pl.Path("/usr/share/keyrings/scalyr.gpg")
+        if keyring_path.exists():
+            keyring_path.unlink()
+        tmp_keyring_path = pl.Path("/usr/share/keyrings/scalyr.gpg~")
+        if tmp_keyring_path.exists():
+            tmp_keyring_path.unlink()
+        _call_apt(["update"])
+
+    elif package_type == "rpm":
+        _call_yum(["remove", "-y", AGENT_PACKAGE_NAME])
+    else:
+        raise Exception(f"Unknown package type: {package_type}")
+
+
 def _run_shell(command: str, return_output: bool = False, env=None):
     env = env or {}
     if return_output:
@@ -621,7 +656,7 @@ def _run_shell(command: str, return_output: bool = False, env=None):
 def _call_apt(command: List[str]):
     """Run apt command"""
     subprocess.check_call(
-        ["apt", *command],
+        ["apt-get", *command],
         # Since test may run in "frozen" pytest executable, add missing variables.
         env={"LD_LIBRARY_PATH": "/lib", "PATH": "/usr/sbin:/sbin:/usr/bin:/bin"},
     )

@@ -32,6 +32,7 @@ mkdir -p "${PACKAGE_ROOT}"
 VENV_DIR="${PACKAGE_ROOT}/opt/${SUBDIR_NAME}/venv"
 mkdir -p "${VENV_DIR}"
 cp -a "${BUILD_AGENT_LIBS}/venv/." "${VENV_DIR}"
+cp "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_libs/python_wrapper" "${VENV_DIR}/bin"
 
 
 # Create core requirements file.

@@ -1,4 +1,4 @@
-#!/opt/scalyr-agent-2-dependencies/bin/python3
+#!/opt/scalyr-agent-2-dependencies/bin/python_wrapper
 # Copyright 2014-2022 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -46,7 +46,7 @@ def initialize():
     # Run pip install for additional agent requirements that may be specified by the user.
     subprocess.check_call(
         [
-            str(venv_dst_dir / "bin/python3"),
+            str(venv_dst_dir / "bin/python_wrapper"),
             "-m",
             "pip",
             "install",

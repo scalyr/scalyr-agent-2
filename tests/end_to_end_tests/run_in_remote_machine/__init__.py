@@ -35,7 +35,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
                 image_id="ami-09d56f8956ab235b3",
                 image_name="Ubuntu Server 22.04 (HVM), SSD Volume Type",
                 short_name="ubuntu2204",
-                size_id="m1.small",
+                size_id="t2.small",
                 ssh_username="ubuntu",
             )
         },
@@ -47,7 +47,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
                 image_id="ami-0149b2da6ceec4bb0",
                 image_name="Ubuntu Server 20.04 LTS (HVM), SSD Volume Type",
                 short_name="ubuntu2004",
-                size_id="m1.small",
+                size_id="t2.small",
                 ssh_username="ubuntu",
             )
         },
@@ -59,7 +59,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
                 image_id="ami-07ebfd5b3428b6f4d",
                 image_name="Ubuntu Server 18.04 LTS (HVM), SSD Volume Type",
                 short_name="ubuntu1804",
-                size_id="m1.small",
+                size_id="t2.small",
                 ssh_username="ubuntu",
             )
         },
@@ -71,7 +71,7 @@ DISTROS: Dict[str, Dict[str, Dict[Architecture, EC2DistroImage]]] = {
                 image_id="ami-08bc77a2c7eb2b1da",
                 image_name="Ubuntu Server 16.04 LTS (HVM), SSD Volume Type",
                 short_name="ubuntu1604",
-                size_id="m1.small",
+                size_id="t2.small",
                 ssh_username="ubuntu",
             )
         },
