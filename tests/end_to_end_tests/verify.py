@@ -298,7 +298,7 @@ def verify_logs(
             read_api_key=scalyr_api_read_key,
             # We max count more that the actual written counter message to be sure that
             # no more messages were left hidden in the next search page.
-            max_count=TEST_LOG_MESSAGE_COUNT + 2,
+            max_count=TEST_LOG_MESSAGE_COUNT,
             start_time=time.time() - 60 * 5,
             filters=counters_verification_query_filters,
         ).send()

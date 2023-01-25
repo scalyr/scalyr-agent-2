@@ -100,7 +100,7 @@ rm "$(get_standard_c_binding_path "${RESULT_PYTHON_SSL_BINDINGS_DIR}" _hashlib.c
 cp -a "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_python3/install-scriptlets" "${STEP_OUTPUT_PATH}/scriptlets"
 
 BIN_DIR="${PACKAGE_ROOT}${INSTALL_PREFIX}/bin"
-# Copy executables that allows configure the package.
+# Copy executables that allows to configure the package.
 cp "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_python3/agent-python3-config" "${BIN_DIR}"
 cp -r "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_python3/internal" "${BIN_DIR}"
 

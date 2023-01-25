@@ -423,6 +423,8 @@ class LinuxDependencyPackagesBuilder(Runner):
                 "--deb-no-default-config-files",
                 "--no-deb-auto-config-files",
                 "--config-files", "/etc/scalyr-agent-2/agent.json",
+                "--config-files", "/etc/scalyr-agent-2/agent.d",
+                "--config-files", "/usr/share/scalyr-agent-2/monitors",
                 "--directories", "/usr/share/scalyr-agent-2",
                 "--directories", "/var/lib/scalyr-agent-2",
                 "--directories", "/var/log/scalyr-agent-2",

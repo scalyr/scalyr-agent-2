@@ -17,6 +17,9 @@ redis==2.10.5
 # Required for mysql monitor
 PyMySQL==0.9.3
 
+# Required for postgres monitor
+pg8000==1.10.6
+
 # Required for snmp monitor
 pysnmp==4.3.0
 
