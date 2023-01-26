@@ -466,7 +466,7 @@ class StandaloneSmokeTestActor(SmokeTestActor):
                         "$verifier_type": self.VERIFIER_TYPE,
                         "$python_version": "python{}".format(self._python_version),
                         "$hostname": self._localhostname,
-                        "$count": expected_count * 2,
+                        "$count": expected_count,
                     }
                 )
             )
