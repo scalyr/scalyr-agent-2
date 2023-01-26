@@ -251,7 +251,7 @@ def test_packages(
         timeout_tracker=timeout_tracker,
     )
 
-    # Verify that custom monitors are not gone after package removal.
+    logger.info("Verify that custom monitors are not gone after package removal")
     monitor_file_path = LINUX_PACKAGE_AGENT_PATHS.install_root / "monitors" / "dummy.txt"
     monitor_file_path.write_text("test")
 
