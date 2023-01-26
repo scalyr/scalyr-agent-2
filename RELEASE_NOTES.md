@@ -13,7 +13,7 @@ https://github.com/scalyr/scalyr-agent-2/blob/master/CHANGELOG.md.
 
 * This release significantly changes the Agent's `deb` and `rpm` packages. Agent now is shipped with its own, independent 
   version of the Python interpreter and does not rely on system Python. The upgrade process to the new packages has to be 
-  seamless for the majority of cases, but you use custom monitors that require additional libraries, you will need to
+  seamless for the majority of cases, but if you use custom monitors that require additional libraries, you will need to
   specify those requirements in new agent's configuration.
   
   After upgrading to a new version, add required libraries to the file `/opt/scalyr-agent-2-dependencies/etc/additional-requirements.txt` 
