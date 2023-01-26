@@ -250,10 +250,16 @@ def test_packages(
         agent_paths=LINUX_PACKAGE_AGENT_PATHS,
         timeout_tracker=timeout_tracker,
     )
-    # TODO: Add actual agent package testing here.
+
+    # Verify that custom monitors are not gone after package removal.
+    monitor_file_path = LINUX_PACKAGE_AGENT_PATHS.install_root / "monitors" / "dummy.txt"
+    monitor_file_path.write_text("test")
 
     logger.info("Cleanup")
     _remove_all_agent_files(package_type=package_builder.PACKAGE_TYPE)
+
+    assert monitor_file_path.exists()
+    assert monitor_file_path.read_text() == "test"
 
 
 def test_agent_package_config_ownership(package_builder, agent_package_path, tmp_path):
