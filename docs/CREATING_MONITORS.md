@@ -238,6 +238,7 @@ You should not have to restart the agent to have the new monitor to begin runnin
 seconds.  However, if you have changed the contents of your Python module, you may wish to restart the agent to ensure
 the changes the Python files are picked up.
 
+## Installing additional requirements for plugin
 If you use agent from the package (e.g. `deb` or `rpm`) and your monitor depends on third-party libraries, they can be 
 specified in the requirements file located in `/opt/scalyr-agent-2-dependencies/etc/additional-requirements.txt`
 To make those requirements be installed immediately run command `/opt/scalyr-agent-2-dependencies/bin/agent-libs-config initialize`
