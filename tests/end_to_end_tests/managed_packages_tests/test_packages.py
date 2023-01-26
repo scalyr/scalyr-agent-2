@@ -168,21 +168,7 @@ def test_packages(
         script_path=convenience_script_path, distro_name=distro_name
     )
 
-    logger.info(
-        "Execute simple sanity test script for the python interpreter and its libraries."
-    )
-    subprocess.check_call(
-        [
-            f"/var/opt/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/venv/bin/python3",
-            "tests/end_to_end_tests/managed_packages_tests/verify_python_interpreter.py",
-        ],
-        env={
-            # It's important to override the 'LD_LIBRARY_PATH' to be sure that libraries paths from the test runner
-            # frozen binary are not leaked to a script's process.
-            "LD_LIBRARY_PATH": "/lib",
-            "PYTHONPATH": str(SOURCE_ROOT),
-        },
-    )
+    _verify_python_and_libraries()
 
     logger.info("Verifying install_info.json file exists")
     install_info_path = (
@@ -239,6 +225,28 @@ def test_packages(
         verify_ssl=True,
         timeout_tracker=timeout_tracker,
     )
+
+    logger.info("Look in to the agent's log to verify that correct version of the OpenSSL is used by the package")
+    agent_log = agent_commander.agent_paths.agent_log_path.read_text()
+    for line in agent_log.splitlines():
+        if "Starting scalyr agent..." in line:
+            starting_agent_message = line
+            break
+    else:
+        raise Exception("Starting agent message is not found.")
+
+    # On Ubuntu 22.04 agent can use its OpenSSL 3 version.
+    if distro_name == "ubuntu2204":
+        assert "OpenSSL version=OpenSSL 3.0.2" in starting_agent_message
+
+    # On Ubuntu 20.04 it can be OpenSSL 1.1.1
+    elif distro_name == "ubuntu2004":
+        assert "OpenSSL version=OpenSSL 1.1.1" in starting_agent_message
+
+    # On Ubuntu 14.04 there's no "modern" version OpenSSl, but it still has to use 1.1.1 that is shipped with
+    # the package.
+    elif distro_name == "ubuntu1404":
+        assert "OpenSSL version=OpenSSL 1.1.1" in starting_agent_message
 
     _stop_agent_and_remove_logs_and_data(
         agent_commander=agent_commander,
@@ -458,6 +466,54 @@ def _perform_ssl_checks(
         in agent_status
     )
     _stop_agent_and_remove_logs_and_data(agent_commander)
+
+
+def _verify_python_and_libraries():
+    """Verify agent python and libs dependency packages installation."""
+
+    logger.info("Check installation of the additional requirements")
+    additional_requirements_path = pl.Path("/opt/scalyr-agent-2-dependencies/etc/additional-requirements.txt")
+
+    additional_requirements_content = additional_requirements_path.read_text()
+    additional_requirements_content += "\nflask==2.2.2"
+
+    additional_requirements_path.write_text(additional_requirements_content)
+
+    subprocess.run(
+        ["/opt/scalyr-agent-2-dependencies/bin/agent-libs-config", "initialize"],
+        check=True
+    )
+
+    venv_python_executable = f"/var/opt/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/venv/bin/python3"
+
+    result = subprocess.run(
+        [
+            str(venv_python_executable),
+            "-m",
+            "pip",
+            "freeze",
+        ],
+        capture_output=True,
+        check=True
+    )
+
+    assert "Flask==2.2.2" in result.stdout.decode()
+
+    logger.info(
+        "Execute simple sanity test script for the python interpreter and its libraries."
+    )
+    subprocess.check_call(
+        [
+            str(venv_python_executable),
+            "tests/end_to_end_tests/managed_packages_tests/verify_python_interpreter.py",
+        ],
+        env={
+            # It's important to override the 'LD_LIBRARY_PATH' to be sure that libraries paths from the test runner
+            # frozen binary are not leaked to a script's process.
+            "LD_LIBRARY_PATH": "/lib",
+            "PYTHONPATH": str(SOURCE_ROOT),
+        },
+    )
 
 
 # Additional paths to add in case if tests run within "frozen" pytest executable.
