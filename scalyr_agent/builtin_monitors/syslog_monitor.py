@@ -1523,6 +1523,9 @@ class SyslogHandler(object):
                 logger["last_seen"] = current_time
 
             if self.__expire_count >= RUN_EXPIRE_COUNT:
+                # TODO (Tomaz): We run this function on every single log line so running this check
+                # every 100 iterations / log lines seems excesive. We should likely do it less
+                # often.
                 self.__expire_count = 0
 
                 # find out which if any of the loggers in __docker_loggers have
@@ -1622,6 +1625,9 @@ class SyslogHandler(object):
                 logger["last_seen"] = time.time()
 
             if self.__expire_count >= RUN_EXPIRE_COUNT:
+                # TODO (Tomaz): We run this function on every single log line so running this check
+                # every 100 iterations / log lines seems excesive. We should likely do it less
+                # often.
                 self.__expire_count = 0
 
                 now = time.time()
