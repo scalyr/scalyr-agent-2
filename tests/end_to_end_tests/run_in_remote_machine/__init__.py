@@ -20,7 +20,7 @@ import dataclasses
 import logging
 import pathlib as pl
 import subprocess
-from typing import List, Dict
+from typing import List, Dict, Union
 
 from agent_build_refactored.tools.constants import Architecture
 from agent_build_refactored.tools.run_in_ec2.constants import EC2DistroImage
@@ -36,7 +36,7 @@ class TargetDistro:
     docker_image: str
     ec2_images: Dict[Architecture, EC2DistroImage]
     # Expected version (in int representation) of the OpenSSL library that has to be picked by the agent.
-    expected_openssl: int = 3
+    expected_openssl: Union[int, List[int]] = 3
 
 
 # Collection of remote machine distro specifications for end to end remote tests.
@@ -153,7 +153,8 @@ DISTROS = {
                 )
             },
             docker_image="centos:8",
-            expected_openssl=269488319
+            # EC2 and docker openssl versions are different, so we need to track them all.
+            expected_openssl=[269488319, 269488255]
         ),
         TargetDistro(
             name="centos7",

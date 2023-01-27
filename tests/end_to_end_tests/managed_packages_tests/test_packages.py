@@ -21,6 +21,7 @@ are changing system state and must be aware of risks.
 
 import json
 import pathlib as pl
+import re
 import shlex
 import subprocess
 import logging
@@ -238,7 +239,15 @@ def test_packages(
     else:
         raise Exception("Starting agent message is not found.")
 
-    assert f"OpenSSL version_number={target_distro.expected_openssl}" in starting_agent_message
+    m = re.search(r"OpenSSL version_number=(\d+)", starting_agent_message)
+    openssl_version = int(m.group(1))
+
+    if isinstance(target_distro.expected_openssl, list):
+        expected_openssl_versions = target_distro.expected_openssl
+    else:
+        expected_openssl_versions = [target_distro.expected_openssl]
+
+    assert openssl_version in expected_openssl_versions
 
     _stop_agent_and_remove_logs_and_data(
         agent_commander=agent_commander,
