@@ -33,7 +33,8 @@ class TargetDistro:
     name: str
     docker_image: str
     ec2_images: Dict[Architecture, EC2DistroImage]
-    expected_openssl: str = "wegfgertererge"
+    # Expected version (in int representation) of the OpenSSL library that has to be picked by the agent.
+    expected_openssl: int = 3
 
 
 # Collection of remote machine distro specifications for end to end remote tests.
@@ -52,7 +53,6 @@ DISTROS = {
                 )
             },
             docker_image="ubuntu:22.04",
-            expected_openssl="OpenSSL 3.0.2"
         ),
         TargetDistro(
             name="ubuntu2004",
@@ -66,7 +66,6 @@ DISTROS = {
                 )
             },
             docker_image="ubuntu:20.04",
-            expected_openssl="1.1.1f"
         ),
         TargetDistro(
             name="ubuntu1804",
@@ -106,6 +105,7 @@ DISTROS = {
                 )
             },
             docker_image="ubuntu:14.04",
+            expected_openssl="1.1.1s"
         ),
         TargetDistro(
             name="debian11",

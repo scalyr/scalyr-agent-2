@@ -238,7 +238,7 @@ def test_packages(
     else:
         raise Exception("Starting agent message is not found.")
 
-    assert target_distro.expected_openssl in starting_agent_message
+    assert f"OpenSSL version_number={target_distro.expected_openssl}" in starting_agent_message
 
     _stop_agent_and_remove_logs_and_data(
         agent_commander=agent_commander,
