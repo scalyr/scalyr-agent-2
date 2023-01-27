@@ -1,3 +1,4 @@
+#!/bin/bash
 # Copyright 2014-2023 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");

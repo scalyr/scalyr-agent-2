@@ -37,7 +37,7 @@ cd ~
 export PATH="/usr/local/bin:/root/.cargo/bin:${PATH}"
 export PKG_CONFIG_PATH="/usr/local/lib64/pkgconfig:/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH}"
 curl --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain "${RUST_VERSION}"
-# cargo install cargo-update -v
+cargo install cargo-update -v
 
 export LD_LIBRARY_PATH="/opt/scalyr-agent-2-dependencies/lib:${LD_LIBRARY_PATH}"
 # Install all requirements and save them and their cache.
