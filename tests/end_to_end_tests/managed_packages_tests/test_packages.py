@@ -226,7 +226,9 @@ def test_packages(
         timeout_tracker=timeout_tracker,
     )
 
-    logger.info("Look in to the agent's log to verify that correct version of the OpenSSL is used by the package")
+    logger.info(
+        "Look in to the agent's log to verify that correct version of the OpenSSL is used by the package"
+    )
     agent_log = agent_commander.agent_paths.agent_log_path.read_text()
     for line in agent_log.splitlines():
         if "Starting scalyr agent..." in line:
@@ -260,7 +262,9 @@ def test_packages(
     )
 
     logger.info("Verify that custom monitors are not gone after package removal")
-    monitor_file_path = LINUX_PACKAGE_AGENT_PATHS.install_root / "monitors" / "dummy.txt"
+    monitor_file_path = (
+        LINUX_PACKAGE_AGENT_PATHS.install_root / "monitors" / "dummy.txt"
+    )
     monitor_file_path.write_text("test")
 
     logger.info("Cleanup")
@@ -472,7 +476,9 @@ def _verify_python_and_libraries():
     """Verify agent python and libs dependency packages installation."""
 
     logger.info("Check installation of the additional requirements")
-    additional_requirements_path = pl.Path("/opt/scalyr-agent-2-dependencies/etc/additional-requirements.txt")
+    additional_requirements_path = pl.Path(
+        "/opt/scalyr-agent-2-dependencies/etc/additional-requirements.txt"
+    )
 
     additional_requirements_content = additional_requirements_path.read_text()
     additional_requirements_content += "\nflask==2.2.2"
@@ -481,10 +487,12 @@ def _verify_python_and_libraries():
 
     subprocess.run(
         ["/opt/scalyr-agent-2-dependencies/bin/agent-libs-config", "initialize"],
-        check=True
+        check=True,
     )
 
-    venv_python_executable = f"/var/opt/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/venv/bin/python3"
+    venv_python_executable = (
+        f"/var/opt/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/venv/bin/python3"
+    )
 
     result = subprocess.run(
         [
@@ -494,7 +502,7 @@ def _verify_python_and_libraries():
             "freeze",
         ],
         capture_output=True,
-        check=True
+        check=True,
     )
 
     assert "Flask==2.2.2" in result.stdout.decode()
