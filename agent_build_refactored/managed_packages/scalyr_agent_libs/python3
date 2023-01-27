@@ -13,7 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This is main executable for the agent for Linux, it expects that the dependency package 'scalyr-agent-libs' is
-# installed, and its virtualenv (or venv) is initialized, so it can use it as a base Python interpreter.
+#
+# This script is a wrapper for the virtualenv's Python executable in the package. We need to wrap it in order
+# to run it with additional path in 'LD_LIBRARY_PATH' variable.
+#
+set -e
 
-exec "/var/opt/scalyr-agent-2-dependencies/venv/bin/python3" "/usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py" "$@"
+DEPENDENCIES_ROOT="/opt/scalyr-agent-2-dependencies"
+DEPENDENCIES_LIBS="${DEPENDENCIES_ROOT}/lib"
+
+export LD_LIBRARY_PATH="${DEPENDENCIES_LIBS}:${DEPENDENCIES_LIBS}/openssl/current:${LD_LIBRARY_PATH}"
+exec "/var/opt/scalyr-agent-2-dependencies/venv/bin/python3-original" "$@"
+

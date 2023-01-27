@@ -33,6 +33,15 @@ VENV_DIR="${PACKAGE_ROOT}/opt/${SUBDIR_NAME}/venv"
 mkdir -p "${VENV_DIR}"
 cp -a "${BUILD_AGENT_LIBS}/venv/." "${VENV_DIR}"
 
+VENV_BIN="${VENV_DIR}/bin"
+
+# Recreate Python executables in venv and delete everything except them, since they are not needed.
+rm -r "${VENV_BIN:?}"/*
+ln -s "/opt/scalyr-agent-2-dependencies/bin/python3-original" "${VENV_BIN}/python3-original"
+cp "${SOURCE_ROOT}/agent_build_refactored/managed_packages/scalyr_agent_libs/python3" "${VENV_BIN}/python3"
+ln -s "python3" "${VENV_BIN}/python"
+ln -s "python3" "${VENV_BIN}/python${PYTHON_SHORT_VERSION}"
+
 
 # Create core requirements file.
 mkdir -p "${PACKAGE_ROOT}/opt/${SUBDIR_NAME}/etc"

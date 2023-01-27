@@ -14,4 +14,9 @@
 # limitations under the License.
 
 # Always remove the .pyc files and __pycache__ directories
+
+# Remove dynamically generated venv.
+rm -r "/var/opt/scalyr-agent-2-dependencies/venv"
+
+# Collect garbage after Python.
 find /opt/scalyr-agent-2-dependencies -type f -name '*.py[co]' -delete -o -type d -name __pycache__ -exec rm -r {} \;

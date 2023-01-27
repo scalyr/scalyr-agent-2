@@ -89,9 +89,11 @@ The 'scalyr-agent-python3' package provides Python interpreter that is specially
             ssl C bindings that are compiled and linked against both OpenSSL 1.1.1+ and 3.0+.
 
         -3: If OpenSSL 1.1.1+ is also not presented in a system, then we fallback to the 'embedded' OpenSSL library that
-            is shipped with the package. To achieve that we again use a special variant of the ssl C bindings.
-            Those binding basically the same as previous ones, except they are parched to links directly against OpenSSl
-            shared objects from the package instead of linking to system's libraries.
+            is shipped with the package. This is achieved by adding a special directory path to Python's LD_LIBRARY_PATH 
+            environment variable. When Python package uses system's OpenSSL, this directory is missing and system's 
+            dynamic linker has to look for OpenSSL shared object in other places. But when the package is configured to 
+            use embedded OpenSLL, it creates a symlink in this path, which points to a directory with shared objects
+            of the embedded OpenSLL, so the linker has to find it earlier than system's shared objects.
 
 
 The 'scalyr-agent-libs' package provides requirement libraries for the agent, for example Python 'requests' or
@@ -356,7 +358,7 @@ class LinuxDependencyPackagesBuilder(Runner):
             SOURCE_ROOT
             / "agent_build_refactored/managed_packages/scalyr_agent_2/init.d",
             agent_package_root / "etc/init.d",
-            dirs_exist_ok=True
+            dirs_exist_ok=True,
         )
 
         # Also remove third party libraries except tcollector.
@@ -421,6 +423,8 @@ class LinuxDependencyPackagesBuilder(Runner):
                 "--deb-no-default-config-files",
                 "--no-deb-auto-config-files",
                 "--config-files", "/etc/scalyr-agent-2/agent.json",
+                "--config-files", "/etc/scalyr-agent-2/agent.d",
+                "--config-files", "/usr/share/scalyr-agent-2/monitors",
                 "--directories", "/usr/share/scalyr-agent-2",
                 "--directories", "/var/lib/scalyr-agent-2",
                 "--directories", "/var/log/scalyr-agent-2",
@@ -1382,7 +1386,9 @@ def create_build_python_package_root_steps() -> Dict[Architecture, ArtifactRunne
             name="build_python_package_root",
             script_path="agent_build_refactored/managed_packages/steps/build_python_package_root.sh",
             tracked_files_globs=[
+                "agent_build_refactored/managed_packages/scalyr_agent_python3/internal/agent-python3-config.py",
                 "agent_build_refactored/managed_packages/scalyr_agent_python3/agent-python3-config",
+                "agent_build_refactored/managed_packages/scalyr_agent_python3/python3",
                 "agent_build_refactored/managed_packages/scalyr_agent_python3/install-scriptlets/postinstall.sh",
                 "agent_build_refactored/managed_packages/scalyr_agent_python3/install-scriptlets/preuninstall.sh",
             ],
@@ -1510,13 +1516,17 @@ def create_build_agent_libs_package_root_steps() -> Dict[
             tracked_files_globs=[
                 "agent_build_refactored/managed_packages/scalyr_agent_libs/additional-requirements.txt",
                 "agent_build_refactored/managed_packages/scalyr_agent_libs/agent-libs-config",
+                "agent_build_refactored/managed_packages/scalyr_agent_libs/python3",
                 "agent_build_refactored/managed_packages/scalyr_agent_libs/install-scriptlets/postinstall.sh",
             ],
             base=PREPARE_TOOLSET_STEPS[Architecture.X86_64],
             required_steps={
                 "BUILD_AGENT_LIBS": BUILD_AGENT_LIBS_VENV_STEPS[architecture],
             },
-            environment_variables={"REQUIREMENTS": AGENT_LIBS_REQUIREMENTS_CONTENT},
+            environment_variables={
+                "PYTHON_SHORT_VERSION": EMBEDDED_PYTHON_SHORT_VERSION,
+                "REQUIREMENTS": AGENT_LIBS_REQUIREMENTS_CONTENT,
+            },
             github_actions_settings=GitHubActionsSettings(
                 cacheable=True,
             ),

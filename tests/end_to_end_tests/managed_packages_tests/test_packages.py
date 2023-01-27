@@ -36,6 +36,7 @@ from agent_build_refactored.managed_packages.managed_packages_builders import (
     AGENT_LIBS_PACKAGE_NAME,
     AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME,
     DEFAULT_PYTHON_PACKAGE_OPENSSL_VERSION,
+    AGENT_PACKAGE_NAME,
 )
 from tests.end_to_end_tests.tools import AgentPaths, AgentCommander, TimeoutTracker
 from tests.end_to_end_tests.verify import (
@@ -133,6 +134,13 @@ def test_dependency_packages(
     )
 
 
+LINUX_PACKAGE_AGENT_PATHS = AgentPaths(
+    configs_dir=pl.Path("/etc/scalyr-agent-2"),
+    logs_dir=pl.Path("/var/log/scalyr-agent-2"),
+    install_root=pl.Path("/usr/share/scalyr-agent-2"),
+)
+
+
 def test_packages(
     package_builder_name,
     package_builder,
@@ -160,29 +168,12 @@ def test_packages(
         script_path=convenience_script_path, distro_name=distro_name
     )
 
-    logger.info(
-        "Execute simple sanity test script for the python interpreter and its libraries."
-    )
-    subprocess.check_call(
-        [
-            f"/var/opt/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/venv/bin/python3",
-            "tests/end_to_end_tests/managed_packages_tests/verify_python_interpreter.py",
-        ],
-        env={
-            # It's important to override the 'LD_LIBRARY_PATH' to be sure that libraries paths from the test runner
-            # frozen binary are not leaked to a script's process.
-            "PYTHONPATH": str(SOURCE_ROOT),
-        },
-    )
-
-    agent_paths = AgentPaths(
-        configs_dir=pl.Path("/etc/scalyr-agent-2"),
-        logs_dir=pl.Path("/var/log/scalyr-agent-2"),
-        install_root=pl.Path("/usr/share/scalyr-agent-2"),
-    )
+    _verify_python_and_libraries()
 
     logger.info("Verifying install_info.json file exists")
-    install_info_path = agent_paths.install_root / "py/scalyr_agent/install_info.json"
+    install_info_path = (
+        LINUX_PACKAGE_AGENT_PATHS.install_root / "py/scalyr_agent/install_info.json"
+    )
     assert install_info_path.is_file(), f"The {install_info_path} file is missing."
 
     logger.info("Verifying rc.d symlinks exist")
@@ -193,7 +184,7 @@ def test_packages(
         f"package-{package_builder_name}-test-{test_session_suffix}-{int(time.time())}"
     )
 
-    upload_test_log_path = agent_paths.logs_dir / "test.log"
+    upload_test_log_path = LINUX_PACKAGE_AGENT_PATHS.logs_dir / "test.log"
 
     config = {
         "api_key": scalyr_api_key,
@@ -202,7 +193,7 @@ def test_packages(
     }
 
     agent_commander = AgentCommander(
-        executable_args=["scalyr-agent-2"], agent_paths=agent_paths
+        executable_args=["scalyr-agent-2"], agent_paths=LINUX_PACKAGE_AGENT_PATHS
     )
 
     agent_commander.agent_paths.agent_config_path.write_text(json.dumps(config))
@@ -235,6 +226,30 @@ def test_packages(
         timeout_tracker=timeout_tracker,
     )
 
+    logger.info(
+        "Look in to the agent's log to verify that correct version of the OpenSSL is used by the package"
+    )
+    agent_log = agent_commander.agent_paths.agent_log_path.read_text()
+    for line in agent_log.splitlines():
+        if "Starting scalyr agent..." in line:
+            starting_agent_message = line
+            break
+    else:
+        raise Exception("Starting agent message is not found.")
+
+    # On Ubuntu 22.04 agent can use its OpenSSL 3 version.
+    if distro_name == "ubuntu2204":
+        assert "OpenSSL version=OpenSSL 3.0.2" in starting_agent_message
+
+    # On Ubuntu 20.04 it can be OpenSSL 1.1.1
+    elif distro_name == "ubuntu2004":
+        assert "OpenSSL version=OpenSSL 1.1.1" in starting_agent_message
+
+    # On Ubuntu 14.04 there's no "modern" version OpenSSl, but it still has to use 1.1.1 that is shipped with
+    # the package.
+    elif distro_name == "ubuntu1404":
+        assert "OpenSSL version=OpenSSL 1.1.1" in starting_agent_message
+
     _stop_agent_and_remove_logs_and_data(
         agent_commander=agent_commander,
     )
@@ -242,10 +257,21 @@ def test_packages(
     _perform_ssl_checks(
         default_config=config,
         agent_commander=agent_commander,
-        agent_paths=agent_paths,
+        agent_paths=LINUX_PACKAGE_AGENT_PATHS,
         timeout_tracker=timeout_tracker,
     )
-    # TODO: Add actual agent package testing here.
+
+    logger.info("Verify that custom monitors are not gone after package removal")
+    monitor_file_path = (
+        LINUX_PACKAGE_AGENT_PATHS.install_root / "monitors" / "dummy.txt"
+    )
+    monitor_file_path.write_text("test")
+
+    logger.info("Cleanup")
+    _remove_all_agent_files(package_type=package_builder.PACKAGE_TYPE)
+
+    assert monitor_file_path.exists()
+    assert monitor_file_path.read_text() == "test"
 
 
 def test_agent_package_config_ownership(package_builder, agent_package_path, tmp_path):
@@ -446,6 +472,58 @@ def _perform_ssl_checks(
     _stop_agent_and_remove_logs_and_data(agent_commander)
 
 
+def _verify_python_and_libraries():
+    """Verify agent python and libs dependency packages installation."""
+
+    logger.info("Check installation of the additional requirements")
+    additional_requirements_path = pl.Path(
+        "/opt/scalyr-agent-2-dependencies/etc/additional-requirements.txt"
+    )
+
+    additional_requirements_content = additional_requirements_path.read_text()
+    additional_requirements_content += "\nflask==2.2.2"
+
+    additional_requirements_path.write_text(additional_requirements_content)
+
+    subprocess.run(
+        ["/opt/scalyr-agent-2-dependencies/bin/agent-libs-config", "initialize"],
+        check=True,
+    )
+
+    venv_python_executable = (
+        f"/var/opt/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/venv/bin/python3"
+    )
+
+    result = subprocess.run(
+        [
+            str(venv_python_executable),
+            "-m",
+            "pip",
+            "freeze",
+        ],
+        capture_output=True,
+        check=True,
+    )
+
+    assert "Flask==2.2.2" in result.stdout.decode()
+
+    logger.info(
+        "Execute simple sanity test script for the python interpreter and its libraries."
+    )
+    subprocess.check_call(
+        [
+            str(venv_python_executable),
+            "tests/end_to_end_tests/managed_packages_tests/verify_python_interpreter.py",
+        ],
+        env={
+            # It's important to override the 'LD_LIBRARY_PATH' to be sure that libraries paths from the test runner
+            # frozen binary are not leaked to a script's process.
+            "LD_LIBRARY_PATH": "/lib",
+            "PYTHONPATH": str(SOURCE_ROOT),
+        },
+    )
+
+
 # Additional paths to add in case if tests run within "frozen" pytest executable.
 _ADDITIONAL_ENVIRONMENT = {
     "LD_LIBRARY_PATH": "/lib:/lib64",
@@ -610,6 +688,33 @@ def _extract_package(package_type: str, package_path: pl.Path, output_path: pl.P
         raise Exception(f"Unknown package type {package_type}.")
 
 
+def _remove_all_agent_files(package_type: str):
+    """
+    Cleanup system from everything that related with agent, trying to bring
+    system into state before agent was installed.
+    """
+
+    if package_type == "deb":
+        _call_apt(["remove", "-y", AGENT_PACKAGE_NAME])
+        _call_apt(["purge", "-y", AGENT_PACKAGE_NAME])
+        _call_apt(["autoremove", "-y"])
+        source_list_path = pl.Path("/etc/apt/sources.list.d/scalyr.list")
+        source_list_path.unlink()
+
+        keyring_path = pl.Path("/usr/share/keyrings/scalyr.gpg")
+        if keyring_path.exists():
+            keyring_path.unlink()
+        tmp_keyring_path = pl.Path("/usr/share/keyrings/scalyr.gpg~")
+        if tmp_keyring_path.exists():
+            tmp_keyring_path.unlink()
+        _call_apt(["update"])
+
+    elif package_type == "rpm":
+        _call_yum(["remove", "-y", AGENT_PACKAGE_NAME])
+    else:
+        raise Exception(f"Unknown package type: {package_type}")
+
+
 def _run_shell(command: str, return_output: bool = False, env=None):
     env = env or {}
     if return_output:
@@ -621,7 +726,7 @@ def _run_shell(command: str, return_output: bool = False, env=None):
 def _call_apt(command: List[str]):
     """Run apt command"""
     subprocess.check_call(
-        ["apt", *command],
+        ["apt-get", *command],
         # Since test may run in "frozen" pytest executable, add missing variables.
         env={"LD_LIBRARY_PATH": "/lib", "PATH": "/usr/sbin:/sbin:/usr/bin:/bin"},
     )

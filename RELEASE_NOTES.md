@@ -9,6 +9,16 @@ incompatible changes have been made in that release.
 For a list of all the changes in a particular release, please refer to the changelog file -
 https://github.com/scalyr/scalyr-agent-2/blob/master/CHANGELOG.md.
 
+## 2.2.1 "TBD"
+
+* This release significantly changes the Agent's `deb` and `rpm` packages. Agent now is shipped with its own, independent 
+  version of the Python interpreter and does not rely on system Python. The upgrade process to the new packages has to be 
+  seamless for the majority of cases, but if you use custom monitors that require additional libraries, you will need to
+  specify those requirements in new agent's configuration.
+  
+  After upgrading to a new version, add required libraries to the file `/opt/scalyr-agent-2-dependencies/etc/additional-requirements.txt` 
+  and run command `/opt/scalyr-agent-2-dependencies/bin/agent-libs-config initialize` to re-initialize requirements.
+
 ## 2.1.38 "Zaotune" - Dec 1, 2022
 
 * This release changes the Kubernetes monitor leader election algorithm to use the pods in the owning ReplicaSet or

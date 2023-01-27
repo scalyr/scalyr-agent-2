@@ -141,6 +141,9 @@ assert (
     in resp.content.decode()
 )
 
+# This is just installed by the tests as an additional requirement to test it out.
+import flask  # noqa
+
 
 # Since we may run package tests with using "frozen" pytest runner, it is important to check
 # that the interpreter from tested package does not interfere with anything from that frozen test runner.
