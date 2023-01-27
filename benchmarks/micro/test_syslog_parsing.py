@@ -17,7 +17,11 @@ Benchmarks which measure how long it takes to parse syslog data in the syslog mo
 extended parsing (message templates) enabled.
 """
 
+import os
+import tempfile
+
 import mock
+import random
 import pytest
 
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogHandler
@@ -38,8 +42,20 @@ class MockConfig(object):
 # TODO: Also exercise the following scenarios
 # * Different syslog messages
 # * Log watcher management, file creation, expiration
+TEMP_DIRECTORY = tempfile.gettempdir()
 
-@pytest.mark.submit_result_to_codespeed
+# TODO: Use fully deterministic value for consistently reproducible results
+MOCK_EXTRAS = []
+
+for i in range(0, 1000):
+    extra = {
+        "proto": random.choice(["tcp", "udp"]),
+        "srcip": "127.0.0." + str(random.randint(0, 250)),
+        "destport": str(random.randint(10000, 50000))
+    }
+    MOCK_EXTRAS.append(extra)
+
+
 # fmt: off
 @pytest.mark.parametrize(
     "message_template",
@@ -60,12 +76,6 @@ def test_handle_syslog_logs(benchmark, message_template):
     doesn't really measure how much overhead other things such as logging, managing log watchers,
     etc. add.
     """
-    extra = {
-        "protoc": "tcp",
-        "srcip": "127.0.0.1",
-        "destport": 6000
-    }
-
     if message_template:
         message_log_template = "test-$PROTO-$SRCIP.txt"
     else:
@@ -85,12 +95,26 @@ def test_handle_syslog_logs(benchmark, message_template):
         }
     )
 
-    handler = SyslogHandler(logger=mock_logger, line_reporter=mock_line_reporter, config=mock_config,
-                            server_host="localhost", log_path="/tmp/", get_log_watcher=mock.Mock(),
-                            rotate_options=(2, 200000), docker_options=mock.Mock())
-    handler._SyslogHandler__get_log_watcher.return_value = mock.Mock(), mock.Mock()
+    with tempfile.TemporaryDirectory() as tmp_directory:
+        handler = SyslogHandler(logger=mock_logger, line_reporter=mock_line_reporter, config=mock_config,
+                                server_host="localhost", log_path=tmp_directory, get_log_watcher=mock.Mock(),
+                                rotate_options=(2, 200000), docker_options=mock.Mock())
+        handler._SyslogHandler__get_log_watcher.return_value = mock.Mock(), mock.Mock()
 
-    def run_benchmark():
-        handler.handle(MOCK_MESSAGE, extra=extra)
+        assert len(os.listdir(tmp_directory)) == 0
 
-    benchmark.pedantic(run_benchmark, iterations=100, rounds=100)
+        def run_benchmark():
+            extra = random.choice(MOCK_EXTRAS)
+            handler.handle(MOCK_MESSAGE, extra=extra)
+
+        benchmark.pedantic(run_benchmark, iterations=100, rounds=100)
+
+        # Verify that files which match message template notation have been created
+        file_names = os.listdir(tmp_directory)
+
+        if message_template:
+            assert len(file_names) >= 100
+            for file_name in file_names:
+                assert (file_name.startswith("test-tcp-") or file_name.startswith("test-udp-"))
+        else:
+            assert len(file_names) == 0
