@@ -12,7 +12,11 @@ import time
 import pytest
 import requests
 
-from agent_build_refactored.tools.constants import Architecture, AGENT_VERSION, SOURCE_ROOT
+from agent_build_refactored.tools.constants import (
+    Architecture,
+    AGENT_VERSION,
+    SOURCE_ROOT,
+)
 from agent_build_refactored.tools.runner import Runner, RunnerMappedPath
 from agent_build_refactored.managed_packages.managed_packages_builders import (
     ALL_MANAGED_PACKAGE_BUILDERS,
@@ -387,7 +391,9 @@ def repo_public_key_url(server_url):
 
 
 @pytest.fixture(scope="session")
-def convenience_script_path(server_url, repo_url, repo_public_key_url, tmp_path_factory):
+def convenience_script_path(
+    server_url, repo_url, repo_public_key_url, tmp_path_factory
+):
     """
     Path to the convenience install script.
     We also start web server that serves mock repo with packages that have to be installed by the
@@ -395,9 +401,14 @@ def convenience_script_path(server_url, repo_url, repo_public_key_url, tmp_path_
     """
 
     # Build convenience script with current repo and public key urls.
-    render_install_script_path = SOURCE_ROOT / "agent_build_refactored/managed_packages/convenience_install_script/render_install_agent_script.sh"
+    render_install_script_path = (
+        SOURCE_ROOT
+        / "agent_build_refactored/managed_packages/convenience_install_script/render_install_agent_script.sh"
+    )
 
-    install_script_path = tmp_path_factory.mktemp("install_script") / "install-scalyr-agent-2.sh"
+    install_script_path = (
+        tmp_path_factory.mktemp("install_script") / "install-scalyr-agent-2.sh"
+    )
 
     subprocess.run(
         [
@@ -406,9 +417,9 @@ def convenience_script_path(server_url, repo_url, repo_public_key_url, tmp_path_
             repo_url,
             repo_url,
             repo_public_key_url,
-            str(install_script_path)
+            str(install_script_path),
         ],
-        check=True
+        check=True,
     )
 
     yield install_script_path

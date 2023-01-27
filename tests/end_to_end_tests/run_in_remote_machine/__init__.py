@@ -78,12 +78,12 @@ DISTROS = {
                     image_id="ami-07ebfd5b3428b6f4d",
                     image_name="Ubuntu Server 18.04 LTS (HVM), SSD Volume Type",
                     short_name="ubuntu1804",
-                    size_id="m1.small",
+                    size_id="t2.small",
                     ssh_username="ubuntu",
                 )
             },
             docker_image="ubuntu:18.04",
-            expected_openssl=269488143
+            expected_openssl=269488143,
         ),
         TargetDistro(
             name="ubuntu1604",
@@ -97,7 +97,7 @@ DISTROS = {
                 )
             },
             docker_image="ubuntu:16.04",
-            expected_openssl=_EMBEDDED_OPENSSL_VERSION_NUMBER
+            expected_openssl=_EMBEDDED_OPENSSL_VERSION_NUMBER,
         ),
         TargetDistro(
             name="ubuntu1404",
@@ -111,7 +111,7 @@ DISTROS = {
                 )
             },
             docker_image="ubuntu:14.04",
-            expected_openssl=_EMBEDDED_OPENSSL_VERSION_NUMBER
+            expected_openssl=_EMBEDDED_OPENSSL_VERSION_NUMBER,
         ),
         TargetDistro(
             name="debian11",
@@ -125,7 +125,7 @@ DISTROS = {
                 )
             },
             docker_image="debian:11",
-            expected_openssl=269488367
+            expected_openssl=269488367,
         ),
         TargetDistro(
             name="debian10",
@@ -139,7 +139,7 @@ DISTROS = {
                 )
             },
             docker_image="debian:10",
-            expected_openssl=269488207
+            expected_openssl=269488207,
         ),
         TargetDistro(
             name="centos8",
@@ -154,7 +154,7 @@ DISTROS = {
             },
             docker_image="centos:8",
             # EC2 and docker openssl versions are different, so we need to track them all.
-            expected_openssl=[269488319, 269488255]
+            expected_openssl=[269488319, 269488255],
         ),
         TargetDistro(
             name="centos7",
@@ -168,7 +168,7 @@ DISTROS = {
                 )
             },
             docker_image="centos:7",
-            expected_openssl=_EMBEDDED_OPENSSL_VERSION_NUMBER
+            expected_openssl=_EMBEDDED_OPENSSL_VERSION_NUMBER,
         ),
         TargetDistro(
             name="centos6",
@@ -182,7 +182,7 @@ DISTROS = {
                 )
             },
             docker_image="centos:6",
-            expected_openssl=_EMBEDDED_OPENSSL_VERSION_NUMBER
+            expected_openssl=_EMBEDDED_OPENSSL_VERSION_NUMBER,
         ),
         TargetDistro(
             name="amazonlinux2",
@@ -196,7 +196,7 @@ DISTROS = {
                 )
             },
             docker_image="amazonlinux:2",
-            expected_openssl=_EMBEDDED_OPENSSL_VERSION_NUMBER
+            expected_openssl=_EMBEDDED_OPENSSL_VERSION_NUMBER,
         ),
     ]
 }

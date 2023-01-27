@@ -327,29 +327,29 @@ def test_agent_package_config_ownership(package_builder, agent_package_path, tmp
 
 
 def test_upgrade(
-        package_builder,
-        package_builder_name,
-        repo_url,
-        repo_public_key_url,
-        remote_machine_type,
-        distro_name,
-        stable_agent_package_version,
-        scalyr_api_key,
-        test_session_suffix,
-        agent_version
+    package_builder,
+    package_builder_name,
+    repo_url,
+    repo_public_key_url,
+    remote_machine_type,
+    distro_name,
+    stable_agent_package_version,
+    scalyr_api_key,
+    test_session_suffix,
+    agent_version,
 ):
     """
     Perform an upgrade from the current stable release. The stable version of the package also has to be in the same
     repository as the tested packages.
     """
     if distro_name == "centos6":
-        pytest.skip("Can not upgrade from CentOS 6 because our previous variant of packages does not support it.")
+        pytest.skip(
+            "Can not upgrade from CentOS 6 because our previous variant of packages does not support it."
+        )
 
     timeout_tracker = TimeoutTracker(100)
 
-    distros_with_python_2 = {
-        "centos7", "ubuntu1404", "ubuntu1604"
-    }
+    distros_with_python_2 = {"centos7", "ubuntu1404", "ubuntu1604"}
 
     logger.info("Install stable version of the agent")
     if distro_name in distros_with_python_2:
@@ -366,7 +366,12 @@ def test_upgrade(
 
         _call_apt(["install", "-y", system_python_package_name])
         _call_apt(
-            ["install", "-y", "--allow-unauthenticated", f"{AGENT_PACKAGE_NAME}={stable_agent_package_version}"]
+            [
+                "install",
+                "-y",
+                "--allow-unauthenticated",
+                f"{AGENT_PACKAGE_NAME}={stable_agent_package_version}",
+            ]
         )
     elif package_builder.PACKAGE_TYPE == "rpm":
         yum_repo_file_path = pl.Path("/etc/yum.repos.d/scalyr.repo")
@@ -380,7 +385,9 @@ repo_gpgcheck=0
 """
         yum_repo_file_path.write_text(yum_repo_file_content)
         _call_yum(["install", "-y", system_python_package_name])
-        _call_yum(["install", "-y", f"{AGENT_PACKAGE_NAME}-{stable_agent_package_version}"])
+        _call_yum(
+            ["install", "-y", f"{AGENT_PACKAGE_NAME}-{stable_agent_package_version}"]
+        )
     else:
         raise Exception(f"Unknown package type: {package_builder.PACKAGE_TYPE}")
 
@@ -408,11 +415,11 @@ repo_gpgcheck=0
                 "-y",
                 "--only-upgrade",
                 "--allow-unauthenticated",
-                AGENT_PACKAGE_NAME,
+                f"{AGENT_PACKAGE_NAME}={AGENT_VERSION}",
             ]
         )
     elif package_builder.PACKAGE_TYPE == "rpm":
-        _call_yum(["install", "-y", AGENT_PACKAGE_NAME])
+        _call_yum(["install", "-y", f"{AGENT_PACKAGE_NAME}-{AGENT_VERSION}"])
     else:
         raise Exception(f"Unknown package type: {package_builder.PACKAGE_TYPE}")
 
