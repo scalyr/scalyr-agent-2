@@ -577,10 +577,13 @@ def _prepare_environment(
 
     if remote_machine_type == "docker":
         if package_type == "deb":
-            packages_to_install.append("ca-certificates")
+            packages_to_install.extend(["ca-certificates", "openssl"])
             if "debian" in target_distro.name:
                 packages_to_install.append("procps")
         elif package_type == "rpm":
+            packages_to_install.extend([
+                "openssl"
+            ])
             if target_distro.name == "amazonlinux2":
                 packages_to_install.append("procps")
 

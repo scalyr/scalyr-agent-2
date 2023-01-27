@@ -64,7 +64,20 @@ DISTROS = {
                     ssh_username="ubuntu",
                 )
             },
-            docker_image="ubuntu:18.04",
+            docker_image="ubuntu:20.04",
+        ),
+        TargetDistro(
+            name="ubuntu1804",
+            ec2_images={
+                Architecture.X86_64: EC2DistroImage(
+                    image_id="ami-07ebfd5b3428b6f4d",
+                    image_name="Ubuntu Server 18.04 LTS (HVM), SSD Volume Type",
+                    short_name="ubuntu1804",
+                    size_id="m1.small",
+                    ssh_username="ubuntu",
+                )
+            },
+            docker_image="ubuntu:18.04"
         ),
         TargetDistro(
             name="ubuntu1604",
@@ -100,7 +113,7 @@ DISTROS = {
                     image_name="Debian 11 (HVM), SSD Volume Type",
                     short_name="debian11",
                     size_id="t2.small",
-                    ssh_username="ubuntu",
+                    ssh_username="admin",
                 )
             },
             docker_image="debian:11",
