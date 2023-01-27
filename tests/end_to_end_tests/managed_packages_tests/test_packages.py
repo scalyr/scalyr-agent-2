@@ -238,18 +238,7 @@ def test_packages(
     else:
         raise Exception("Starting agent message is not found.")
 
-    # On Ubuntu 22.04 agent can use its OpenSSL 3 version.
-    if target_distro.name == "ubuntu2204":
-        assert "OpenSSL version=OpenSSL 3.0.2" in starting_agent_message
-
-    # On Ubuntu 20.04 it can be OpenSSL 1.1.1
-    elif target_distro.name == "ubuntu2004":
-        assert "OpenSSL version=OpenSSL 1.1.1" in starting_agent_message
-
-    # On Ubuntu 14.04 there's no "modern" version OpenSSl, but it still has to use 1.1.1 that is shipped with
-    # the package.
-    elif target_distro.name == "ubuntu1404":
-        assert "OpenSSL version=OpenSSL 1.1.1" in starting_agent_message
+    assert target_distro.used_openssl in starting_agent_message
 
     _stop_agent_and_remove_logs_and_data(
         agent_commander=agent_commander,
