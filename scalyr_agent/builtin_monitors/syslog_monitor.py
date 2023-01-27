@@ -1671,8 +1671,8 @@ class SyslogHandler(object):
         rv = {"hostname": None, "appname": None}
         try:
             parsed = syslogmp.parse(msg.encode("utf-8"))
-        except:
-            global_log.log(scalyr_logging.DEBUG_LEVEL_4, "Unable to parse: %s" % msg)
+        except Exception as e:
+            global_log.log(scalyr_logging.DEBUG_LEVEL_4, "Unable to parse: %s. Error: %s" % (msg, e))
             return rv
 
         rv["hostname"] = parsed.hostname
