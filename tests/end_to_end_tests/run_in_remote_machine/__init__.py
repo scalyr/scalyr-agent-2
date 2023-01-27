@@ -33,7 +33,7 @@ class TargetDistro:
     name: str
     docker_image: str
     ec2_images: Dict[Architecture, EC2DistroImage]
-    used_openssl: str = "wegfgertererge"
+    expected_openssl: str = "wegfgertererge"
 
 
 # Collection of remote machine distro specifications for end to end remote tests.
@@ -52,6 +52,7 @@ DISTROS = {
                 )
             },
             docker_image="ubuntu:22.04",
+            expected_openssl="OpenSSL 3.0.2"
         ),
         TargetDistro(
             name="ubuntu2004",
@@ -65,6 +66,7 @@ DISTROS = {
                 )
             },
             docker_image="ubuntu:20.04",
+            expected_openssl="1.1.1f"
         ),
         TargetDistro(
             name="ubuntu1804",

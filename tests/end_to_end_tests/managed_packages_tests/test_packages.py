@@ -201,7 +201,7 @@ def test_packages(
 
     logger.info("Start agent")
 
-    agent_commander.start()
+    agent_commander.start(env=_ADDITIONAL_ENVIRONMENT)
 
     verify_agent_status(
         agent_version=agent_version,
@@ -238,7 +238,7 @@ def test_packages(
     else:
         raise Exception("Starting agent message is not found.")
 
-    assert target_distro.used_openssl in starting_agent_message
+    assert target_distro.expected_openssl in starting_agent_message
 
     _stop_agent_and_remove_logs_and_data(
         agent_commander=agent_commander,
@@ -721,7 +721,7 @@ def _call_apt(command: List[str]):
     subprocess.check_call(
         ["apt-get", *command],
         # Since test may run in "frozen" pytest executable, add missing variables.
-        env={"LD_LIBRARY_PATH": "/lib", "PATH": "/usr/sbin:/sbin:/usr/bin:/bin"},
+        env=_ADDITIONAL_ENVIRONMENT,
     )
 
 
@@ -730,5 +730,5 @@ def _call_yum(command: List[str]):
     subprocess.check_call(
         ["yum", *command],
         # Since test may run in "frozen" pytest executable, add missing variables.
-        env={"LD_LIBRARY_PATH": "/lib64"},
+        env=_ADDITIONAL_ENVIRONMENT,
     )
