@@ -27,6 +27,7 @@ from agent_build_refactored.tools.run_in_ec2.constants import EC2DistroImage
 
 logger = logging.getLogger(__name__)
 
+_EMBEDDED_OPENSSL_VERSION_NUMBER = 269488447
 
 @dataclasses.dataclass
 class TargetDistro:
@@ -95,7 +96,7 @@ DISTROS = {
                 )
             },
             docker_image="ubuntu:16.04",
-            expected_openssl=269488447
+            expected_openssl=_EMBEDDED_OPENSSL_VERSION_NUMBER
         ),
         TargetDistro(
             name="ubuntu1404",
@@ -109,7 +110,7 @@ DISTROS = {
                 )
             },
             docker_image="ubuntu:14.04",
-            expected_openssl=269488207
+            expected_openssl=_EMBEDDED_OPENSSL_VERSION_NUMBER
         ),
         TargetDistro(
             name="debian11",
@@ -151,7 +152,7 @@ DISTROS = {
                 )
             },
             docker_image="centos:8",
-            expected_openssl=0
+            expected_openssl=269488319
         ),
         TargetDistro(
             name="centos7",
@@ -165,7 +166,7 @@ DISTROS = {
                 )
             },
             docker_image="centos:7",
-            expected_openssl=269488447
+            expected_openssl=_EMBEDDED_OPENSSL_VERSION_NUMBER
         ),
         TargetDistro(
             name="centos6",
@@ -179,7 +180,7 @@ DISTROS = {
                 )
             },
             docker_image="centos:6",
-            expected_openssl=0
+            expected_openssl=_EMBEDDED_OPENSSL_VERSION_NUMBER
         ),
         TargetDistro(
             name="amazonlinux2",
@@ -192,7 +193,7 @@ DISTROS = {
                     ssh_username="ec2-user",
                 )
             },
-            docker_image="amazonlinux",
+            docker_image="amazonlinux:2",
             expected_openssl=269488447
         ),
     ]
