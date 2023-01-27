@@ -30,9 +30,9 @@ jobs:
         id: get_events_to_not_skip
         run: |
           if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo '::set-output name=events_to_not_skip::["workflow_dispatch", "schedule", "pull_request"]'
+            echo 'events_to_not_skip=["workflow_dispatch", "schedule", "pull_request"]' >> $GITHUB_OUTPUT
           else
-            echo '::set-output name=events_to_not_skip::["workflow_dispatch", "schedule"]'
+            echo 'events_to_not_skip=["workflow_dispatch", "schedule"]' >> $GITHUB_OUTPUT
           fi
 
       - id: skip_check
