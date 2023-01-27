@@ -430,7 +430,6 @@ define_config_option(
     default=True,
 )
 
-
 # NOTE: On Windows on newer Python 3 versions, BlockingIOError is thrown instead of
 # socket.error with EAGAIN when there is no data to be read yet on non blocking socket. And this
 # error is not instanceof socket.error!
@@ -1672,7 +1671,12 @@ class SyslogHandler(object):
         try:
             parsed = syslogmp.parse(msg.encode("utf-8"))
         except Exception as e:
-            global_log.log(scalyr_logging.DEBUG_LEVEL_4, "Unable to parse: %s. Error: %s" % (msg, e))
+            # TODO: We should probably also track this as a counter + periodically log a warning in
+            # case we see more errors of a specific type or similar
+            global_log.log(
+                scalyr_logging.DEBUG_LEVEL_4,
+                "Unable to parse: %s. Error: %s" % (msg, e),
+            )
             return rv
 
         rv["hostname"] = parsed.hostname
