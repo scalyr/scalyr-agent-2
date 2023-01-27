@@ -25,7 +25,7 @@ TODO: Also exercise the following scenarios / code paths:
 # Workaround since this file is not Python 2 compatible
 import sys
 
-if sys.version_info < (3, 5, 0):
+if sys.version_info >= (3, 5, 0):
     import os
     import tempfile
 
@@ -126,3 +126,8 @@ if sys.version_info < (3, 5, 0):
                     assert (file_name.startswith("test-tcp-") or file_name.startswith("test-udp-"))
             else:
                 assert len(file_names) == 0
+else:
+    # Needed so pytest doesn't exit with non-zero under Python 2.7. We can get rid of this once we
+    # remove Python 2.7 support.
+    def test_noop():
+        pass
