@@ -33,7 +33,7 @@ class TargetDistro:
     name: str
     docker_image: str
     ec2_images: Dict[Architecture, EC2DistroImage]
-    used_openssl: str
+    used_openssl: str = "wegfgertererge"
 
 
 # Collection of remote machine distro specifications for end to end remote tests.
