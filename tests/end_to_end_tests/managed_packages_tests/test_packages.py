@@ -44,6 +44,7 @@ from tests.end_to_end_tests.verify import (
     write_counter_messages_to_test_log,
     verify_agent_status,
 )
+from tests.end_to_end_tests.run_in_remote_machine import TargetDistro
 
 logger = logging.getLogger(__name__)
 
@@ -92,12 +93,12 @@ def _verify_package_subdirectories(
 def test_dependency_packages(
     package_builder,
     tmp_path,
-    distro_name,
+    target_distro,
     python_package_path,
     agent_libs_package_path,
 ):
 
-    if distro_name not in ["ubuntu2204", "amazonlinux2"]:
+    if target_distro.name not in ["ubuntu2204", "amazonlinux2"]:
         pytest.skip("No need to check on all distros.")
 
     package_type = package_builder.PACKAGE_TYPE
@@ -146,7 +147,7 @@ def test_packages(
     package_builder,
     remote_machine_type,
     convenience_script_path,
-    distro_name,
+    target_distro,
     scalyr_api_key,
     scalyr_api_read_key,
     scalyr_server,
@@ -159,13 +160,13 @@ def test_packages(
     _prepare_environment(
         package_type=package_builder.PACKAGE_TYPE,
         remote_machine_type=remote_machine_type,
-        distro_name=distro_name,
+        target_distro=target_distro,
         timeout_tracker=timeout_tracker,
     )
 
     logger.info("Install agent from install script.")
     _install_from_convenience_script(
-        script_path=convenience_script_path, distro_name=distro_name
+        script_path=convenience_script_path, target_distro=target_distro
     )
 
     _verify_python_and_libraries()
@@ -226,7 +227,9 @@ def test_packages(
         timeout_tracker=timeout_tracker,
     )
 
-    logger.info("Look in to the agent's log to verify that correct version of the OpenSSL is used by the package")
+    logger.info(
+        "Look in to the agent's log to verify that correct version of the OpenSSL is used by the package"
+    )
     agent_log = agent_commander.agent_paths.agent_log_path.read_text()
     for line in agent_log.splitlines():
         if "Starting scalyr agent..." in line:
@@ -236,16 +239,16 @@ def test_packages(
         raise Exception("Starting agent message is not found.")
 
     # On Ubuntu 22.04 agent can use its OpenSSL 3 version.
-    if distro_name == "ubuntu2204":
+    if target_distro.name == "ubuntu2204":
         assert "OpenSSL version=OpenSSL 3.0.2" in starting_agent_message
 
     # On Ubuntu 20.04 it can be OpenSSL 1.1.1
-    elif distro_name == "ubuntu2004":
+    elif target_distro.name == "ubuntu2004":
         assert "OpenSSL version=OpenSSL 1.1.1" in starting_agent_message
 
     # On Ubuntu 14.04 there's no "modern" version OpenSSl, but it still has to use 1.1.1 that is shipped with
     # the package.
-    elif distro_name == "ubuntu1404":
+    elif target_distro.name == "ubuntu1404":
         assert "OpenSSL version=OpenSSL 1.1.1" in starting_agent_message
 
     _stop_agent_and_remove_logs_and_data(
@@ -260,7 +263,9 @@ def test_packages(
     )
 
     logger.info("Verify that custom monitors are not gone after package removal")
-    monitor_file_path = LINUX_PACKAGE_AGENT_PATHS.install_root / "monitors" / "dummy.txt"
+    monitor_file_path = (
+        LINUX_PACKAGE_AGENT_PATHS.install_root / "monitors" / "dummy.txt"
+    )
     monitor_file_path.write_text("test")
 
     logger.info("Cleanup")
@@ -472,7 +477,9 @@ def _verify_python_and_libraries():
     """Verify agent python and libs dependency packages installation."""
 
     logger.info("Check installation of the additional requirements")
-    additional_requirements_path = pl.Path("/opt/scalyr-agent-2-dependencies/etc/additional-requirements.txt")
+    additional_requirements_path = pl.Path(
+        "/opt/scalyr-agent-2-dependencies/etc/additional-requirements.txt"
+    )
 
     additional_requirements_content = additional_requirements_path.read_text()
     additional_requirements_content += "\nflask==2.2.2"
@@ -481,10 +488,12 @@ def _verify_python_and_libraries():
 
     subprocess.run(
         ["/opt/scalyr-agent-2-dependencies/bin/agent-libs-config", "initialize"],
-        check=True
+        check=True,
     )
 
-    venv_python_executable = f"/var/opt/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/venv/bin/python3"
+    venv_python_executable = (
+        f"/var/opt/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/venv/bin/python3"
+    )
 
     result = subprocess.run(
         [
@@ -494,7 +503,7 @@ def _verify_python_and_libraries():
             "freeze",
         ],
         capture_output=True,
-        check=True
+        check=True,
     )
 
     assert "Flask==2.2.2" in result.stdout.decode()
@@ -525,7 +534,7 @@ _ADDITIONAL_ENVIRONMENT = {
 
 def _install_from_convenience_script(
     script_path: pl.Path,
-    distro_name: str,
+    target_distro: TargetDistro,
 ):
     """Install agent using convenience script."""
     try:
@@ -549,12 +558,12 @@ def _install_from_convenience_script(
     # If system's OpenSSL is not used anymore on some distro, it may be due to this distro has become
     # outdated enough, so Python just does not accept its version of OpenSSL and package falls back to
     # embedded OpenSSL.
-    if distro_name == "ubuntu2204":
+    if target_distro.name == "ubuntu2204":
         assert "Looking for system OpenSSL >= 3: found OpenSSL 3.0." in output
-    elif distro_name == "ubuntu2004":
+    elif target_distro.name == "ubuntu2004":
         assert "Looking for system OpenSSL >= 3: Not found" in output
         assert "Looking for system OpenSSL >= 1.1.1: found OpenSSL 1.1.1" in output
-    elif distro_name in ["ubuntu1404", "centos6"]:
+    elif target_distro.name in ["ubuntu1404", "centos6"]:
         assert "Looking for system OpenSSL >= 3: Not found" in output
         assert "Looking for system OpenSSL >= 1.1.1: Not found" in output
         assert (
@@ -566,7 +575,7 @@ def _install_from_convenience_script(
 def _prepare_environment(
     package_type: str,
     remote_machine_type: str,
-    distro_name: str,
+    target_distro: TargetDistro,
     timeout_tracker: TimeoutTracker,
 ):
     """
@@ -580,10 +589,10 @@ def _prepare_environment(
     if remote_machine_type == "docker":
         if package_type == "deb":
             packages_to_install.append("ca-certificates")
-            if "debian" in distro_name:
+            if "debian" in target_distro.name:
                 packages_to_install.append("procps")
         elif package_type == "rpm":
-            if distro_name == "amazonlinux2":
+            if target_distro.name == "amazonlinux2":
                 packages_to_install.append("procps")
 
     if package_type == "deb":
@@ -604,10 +613,10 @@ def _prepare_environment(
         elif package_type == "rpm":
             _call_yum(["install", "-y", *packages_to_install])
 
-    if distro_name == "centos6":
+    if target_distro.name == "centos6":
         # for centos 6, we remove repo file for disabled repo, so it could use vault repo.
         pl.Path("/etc/yum.repos.d/CentOS-Base.repo").unlink()
-    elif distro_name == "centos8":
+    elif target_distro.name == "centos8":
         # For centos 8 we replace repo urls for vault.
         for repo_name in ["BaseOS", "AppStream"]:
             repo_file = pl.Path(f"/etc/yum.repos.d/CentOS-Linux-{repo_name}.repo")

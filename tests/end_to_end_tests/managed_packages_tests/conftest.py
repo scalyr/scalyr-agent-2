@@ -119,6 +119,11 @@ def distro_name(request):
     return request.config.option.distro_name
 
 
+@pytest.fixture(scope="session")
+def target_distro(distro_name):
+    return DISTROS[distro_name]
+
+
 class RepoBuilder(Runner):
     """
     This runner class is responsible for creating deb/rpm repositories from provided packages.
