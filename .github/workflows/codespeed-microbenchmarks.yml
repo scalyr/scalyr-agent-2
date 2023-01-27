@@ -5,7 +5,6 @@ on:
     branches:
       - master
       - release
-      - syslog_microbenchmark
   schedule:
     - cron: '0 4 * * *'
 
@@ -66,7 +65,7 @@ jobs:
         run: tox -e micro-benchmarks
 
       - name: Process and submit results to CodeSpeed
-        if: (github.ref == 'refs/heads/master' || github.head_ref == 'master' || github.ref == 'syslog_microbenchmark' || github.ref == 'refs/heads/syslog_microbenchmark')
+        if: (github.ref == 'refs/heads/master' || github.head_ref == 'master')
         env:
           PYTHONPATH: .
           CODESPEED_URL: "https://scalyr-agent-codespeed.herokuapp.com/"
