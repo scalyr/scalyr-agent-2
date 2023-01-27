@@ -21,13 +21,17 @@ import os
 import tempfile
 
 import mock
-import random
 import pytest
+from faker import Faker
 
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogHandler
 
 # TODO: Use Fixtures for various different types of syslog messages
 MOCK_MESSAGE =  "<34>Oct 11 22:14:15 mymachine su: \'su root\' failed for lonvick on /dev/pts/8"
+
+# NOTE: We use faker + same static seed to ensure the result is fully repetable / deterministic
+FAKER = Faker()
+Faker.seed(1000)
 
 class MockConfig(object):
     def __init__(self, values):
@@ -44,14 +48,13 @@ class MockConfig(object):
 # * Log watcher management, file creation, expiration
 TEMP_DIRECTORY = tempfile.gettempdir()
 
-# TODO: Use fully deterministic value for consistently reproducible results
 MOCK_EXTRAS = []
 
 for i in range(0, 1000):
     extra = {
-        "proto": random.choice(["tcp", "udp"]),
-        "srcip": "127.0.0." + str(random.randint(0, 250)),
-        "destport": str(random.randint(10000, 50000))
+        "proto": FAKER.random_element(["tcp", "udp"]),
+        "srcip": "127.0.0." + str(FAKER.random_int(0, 250)),
+        "destport": str(FAKER.random_int(10000, 50000))
     }
     MOCK_EXTRAS.append(extra)
 
@@ -104,7 +107,7 @@ def test_handle_syslog_logs(benchmark, message_template):
         assert len(os.listdir(tmp_directory)) == 0
 
         def run_benchmark():
-            extra = random.choice(MOCK_EXTRAS)
+            extra = FAKER.random_element(MOCK_EXTRAS)
             handler.handle(MOCK_MESSAGE, extra=extra)
 
         benchmark.pedantic(run_benchmark, iterations=100, rounds=100)
