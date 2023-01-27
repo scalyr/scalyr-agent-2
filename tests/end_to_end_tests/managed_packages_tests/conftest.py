@@ -7,12 +7,11 @@ import socketserver
 import tarfile
 import threading
 import time
-import textwrap
 
 import pytest
+import requests
 
-
-from agent_build_refactored.tools.constants import Architecture
+from agent_build_refactored.tools.constants import Architecture, AGENT_VERSION, SOURCE_ROOT
 from agent_build_refactored.tools.runner import Runner, RunnerMappedPath
 from agent_build_refactored.managed_packages.managed_packages_builders import (
     ALL_MANAGED_PACKAGE_BUILDERS,
@@ -20,9 +19,6 @@ from agent_build_refactored.managed_packages.managed_packages_builders import (
     PYTHON_PACKAGE_NAME,
     AGENT_LIBS_PACKAGE_NAME,
     AGENT_PACKAGE_NAME,
-)
-from agent_build_refactored.managed_packages.convenience_install_script.builder import (
-    ConvenienceScriptBuilder,
 )
 from tests.end_to_end_tests.run_in_remote_machine import DISTROS
 
@@ -176,36 +172,54 @@ class RepoBuilder(Runner):
         )
 
         if package_type == "deb":
-            # Create deb repository using 'reprepro'.
-            conf_path = repo_path / "conf"
-            conf_path.mkdir(parents=True)
+            # Create deb repository using 'aptly'.
+            workdir = self.output_path / "aptly"
+            workdir.mkdir(parents=True)
+            aptly_root = workdir / "aptly"
+            aptly_config_path = workdir / "aptly.conf"
 
-            conf_distributions_path = conf_path / "distributions"
-            conf_distributions_path.write_text(
-                textwrap.dedent(
-                    f"""
-                Origin: test_repo
-                Label: test_repo
-                Codename: scalyr
-                Architectures: amd64 arm64 source
-                Components: main
-                Description: example repo
-                SignWith: {sign_key_id}
-                """
-                )
+            aptly_config = {"rootDir": str(aptly_root)}
+
+            aptly_config_path.write_text(json.dumps(aptly_config))
+            subprocess.run(
+                [
+                    "aptly",
+                    "-config",
+                    str(aptly_config_path),
+                    "repo",
+                    "create",
+                    "-distribution=scalyr",
+                    "scalyr",
+                ],
+                check=True,
             )
 
             for package_path in packages_dir_path.glob("*.deb"):
                 subprocess.check_call(
                     [
-                        "reprepro",
-                        "-b",
-                        str(repo_path),
-                        "includedeb",
+                        "aptly",
+                        "-config",
+                        str(aptly_config_path),
+                        "repo",
+                        "add",
                         "scalyr",
                         str(package_path),
                     ]
                 )
+
+            subprocess.run(
+                [
+                    "aptly",
+                    "-config",
+                    str(aptly_config_path),
+                    "publish",
+                    "-distribution=scalyr",
+                    "repo",
+                    "scalyr",
+                ],
+                check=True,
+            )
+            shutil.copytree(aptly_root / "public", repo_path, dirs_exist_ok=True)
 
         elif package_type == "rpm":
             # Create rpm repository using 'createrepo_c'.
@@ -252,7 +266,45 @@ class RepoBuilder(Runner):
 
 
 @pytest.fixture(scope="session")
-def server_root(request, tmp_path_factory, package_builder):
+def stable_agent_package_version():
+    # TODO: For now we just hardcode the particular version, when first release is done
+    # it has to be changed to version in the repository.
+    return "2.1.40"
+
+
+@pytest.fixture(scope="session")
+def stable_version_packages(
+    package_builder, tmp_path_factory, stable_agent_package_version
+):
+    """
+    Fixture directory with packages of the current stable version of the agent.
+    Stable packages are needed to perform upgrade test and to verify that release stable
+    packages can be upgraded by current packages.
+    """
+
+    stable_repo_url = "https://scalyr-repo.s3.amazonaws.com/stable"
+    if package_builder.PACKAGE_TYPE == "deb":
+        file_name = f"scalyr-agent-2_{stable_agent_package_version}_all.deb"
+        package_url = f"{stable_repo_url}/apt/pool/main/s/scalyr-agent-2/{file_name}"
+    elif package_builder.PACKAGE_TYPE == "rpm":
+        file_name = f"scalyr-agent-2-{stable_agent_package_version}-1.noarch.rpm"
+        package_url = f"{stable_repo_url}/yum/binaries/noarch/{file_name}"
+    else:
+        raise Exception(f"Unknown package type: {package_builder.PACKAGE_TYPE}")
+
+    packages_path = tmp_path_factory.mktemp("packages")
+    agent_package_path = packages_path / file_name
+    with requests.Session() as s:
+        resp = s.get(url=package_url)
+        resp.raise_for_status()
+
+        agent_package_path.write_bytes(resp.content)
+
+    return packages_path
+
+
+@pytest.fixture(scope="session")
+def server_root(request, tmp_path_factory, package_builder, stable_version_packages):
     """
     Root directory which is served by the mock web server.
     The mock repo is located in ./repo folder, the public key is located in ./repo_public_key.gpg
@@ -271,14 +323,21 @@ def server_root(request, tmp_path_factory, package_builder):
             # Build packages now.
             builder = package_builder()
             builder.build()
-            packages_dir = builder.output_path / "packages"
+            builder_output = builder.output_path
         else:
-            packages_dir = pl.Path(request.config.option.packages_source)
+            builder_output = pl.Path(request.config.option.packages_source)
+
+        packages_dir = (
+            builder_output / "packages" / package_builder.PACKAGE_TYPE / "managed"
+        )
+        repo_packages = tmp_path_factory.mktemp("repo_packages")
+        shutil.copytree(packages_dir, repo_packages, dirs_exist_ok=True)
+        shutil.copytree(stable_version_packages, repo_packages, dirs_exist_ok=True)
 
         # Build mock repo from packages.
         repo_builder = RepoBuilder()
         repo_builder.build(
-            package_type=package_builder.PACKAGE_TYPE, packages_dir_path=packages_dir
+            package_type=package_builder.PACKAGE_TYPE, packages_dir_path=repo_packages
         )
         shutil.copytree(repo_builder.output_path, server_root, dirs_exist_ok=True)
 
@@ -292,7 +351,7 @@ def repo_root(server_root):
 
 
 @pytest.fixture(scope="session")
-def convenience_script_path(server_root):
+def server_url(server_root):
     """
     Path to the convenience install script.
     We also start web server that serves mock repo with packages that have to be installed by the
@@ -310,34 +369,62 @@ def convenience_script_path(server_root):
 
         time.sleep(1)
 
-        server_url = f"http://localhost:{httpd.socket.getsockname()[1]}"
-        repo_url = f"{server_url}/repo"
-        public_key_url = f"{server_url}/repo_public_key.gpg"
+        yield f"http://localhost:{httpd.socket.getsockname()[1]}"
 
-        # Build convenience script with current repo and public key urls.
-        convenience_script_builder = ConvenienceScriptBuilder()
-        convenience_script_builder.build(
-            repo_url=repo_url,
-            public_key_url=public_key_url,
-        )
-
-        yield convenience_script_builder.output_path / "install-agent.sh"
         httpd.shutdown()
         repo_server_thread.join()
 
 
+@pytest.fixture(scope="session")
+def repo_url(server_url):
+    return f"{server_url}/repo"
+
+
+@pytest.fixture(scope="session")
+def repo_public_key_url(server_url):
+    return f"{server_url}/repo_public_key.gpg"
+
+
+@pytest.fixture(scope="session")
+def convenience_script_path(server_url, repo_url, repo_public_key_url, tmp_path_factory):
+    """
+    Path to the convenience install script.
+    We also start web server that serves mock repo with packages that have to be installed by the
+    convenience script.
+    """
+
+    # Build convenience script with current repo and public key urls.
+    render_install_script_path = SOURCE_ROOT / "agent_build_refactored/managed_packages/convenience_install_script/render_install_agent_script.sh"
+
+    install_script_path = tmp_path_factory.mktemp("install_script") / "install-scalyr-agent-2.sh"
+
+    subprocess.run(
+        [
+            "bash",
+            str(render_install_script_path),
+            repo_url,
+            repo_url,
+            repo_public_key_url,
+            str(install_script_path)
+        ],
+        check=True
+    )
+
+    yield install_script_path
+
+
 def _get_package_path_from_repo(
-    package_name: str, package_type: str, repo_root: pl.Path
+    package_filename_glob: str, package_type: str, repo_root: pl.Path
 ):
     """Helper function that finds package inside repo root."""
     if package_type == "deb":
-        package_dir_path = repo_root / f"pool/main/s/{package_name}"
+        packages_dir = repo_root / "pool/main/s"
     elif package_type == "rpm":
-        package_dir_path = repo_root
+        packages_dir = repo_root
     else:
         raise Exception(f"Unknown package type: '{package_type}'")
 
-    found = list(package_dir_path.rglob(f"{package_name}*.{package_type}"))
+    found = list(packages_dir.rglob(package_filename_glob))
     assert len(found) == 1
     return found[0]
 
@@ -348,7 +435,7 @@ def python_package_path(repo_root, package_builder):
         return None
 
     return _get_package_path_from_repo(
-        package_name=PYTHON_PACKAGE_NAME,
+        package_filename_glob=f"{PYTHON_PACKAGE_NAME}*.{package_builder.PACKAGE_TYPE}",
         package_type=package_builder.PACKAGE_TYPE,
         repo_root=repo_root,
     )
@@ -360,7 +447,7 @@ def agent_libs_package_path(repo_root, package_builder):
         return None
 
     return _get_package_path_from_repo(
-        package_name=AGENT_LIBS_PACKAGE_NAME,
+        package_filename_glob=f"{AGENT_LIBS_PACKAGE_NAME}*.{package_builder.PACKAGE_TYPE}",
         package_type=package_builder.PACKAGE_TYPE,
         repo_root=repo_root,
     )
@@ -371,8 +458,17 @@ def agent_package_path(repo_root, package_builder):
     if repo_root is None:
         return None
 
+    if package_builder.PACKAGE_TYPE == "deb":
+        package_filename_glob = (
+            f"{AGENT_PACKAGE_NAME}_{AGENT_VERSION}_all.{package_builder.PACKAGE_TYPE}"
+        )
+    elif package_builder.PACKAGE_TYPE == "rpm":
+        package_filename_glob = f"{AGENT_PACKAGE_NAME}-{AGENT_VERSION}-1.noarch.{package_builder.PACKAGE_TYPE}"
+    else:
+        raise Exception(f"Unknown package type: {package_builder.PACKAGE_TYPE}")
+
     return _get_package_path_from_repo(
-        package_name=AGENT_PACKAGE_NAME,
+        package_filename_glob=package_filename_glob,
         package_type=package_builder.PACKAGE_TYPE,
         repo_root=repo_root,
     )

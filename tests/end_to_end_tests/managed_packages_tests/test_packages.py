@@ -30,7 +30,7 @@ from typing import List, Dict
 
 import pytest
 
-from agent_build_refactored.tools.constants import SOURCE_ROOT
+from agent_build_refactored.tools.constants import SOURCE_ROOT, AGENT_VERSION
 from agent_build_refactored.managed_packages.managed_packages_builders import (
     PYTHON_PACKAGE_NAME,
     AGENT_LIBS_PACKAGE_NAME,
@@ -275,6 +275,8 @@ def test_agent_package_config_ownership(package_builder, agent_package_path, tmp
         package_path=agent_package_path,
         output_path=tmp_path,
     )
+    print("!!!!!!!")
+    print(agent_package_path)
 
     agent_etc_path = tmp_path / "etc/scalyr-agent-2"
 
@@ -315,6 +317,111 @@ def test_agent_package_config_ownership(package_builder, agent_package_path, tmp
     assert (
         oct_mode == "751"
     ), f"Expected permissions of the 'agent.d' is 751, got {oct_mode}"
+
+
+def test_upgrade(
+        package_builder,
+        package_builder_name,
+        repo_url,
+        repo_public_key_url,
+        remote_machine_type,
+        distro_name,
+        stable_agent_package_version,
+        scalyr_api_key,
+        test_session_suffix,
+        agent_version
+):
+    if distro_name == "centos6":
+        pytest.skip("Can not upgrade from CentOS 6 because out previous variant of packages does not support it.")
+
+    timeout_tracker = TimeoutTracker(100)
+
+    distros_with_python_2 = {
+        "centos7", "ubuntu1404", "ubuntu1604"
+    }
+
+    logger.info("Install stable version of the agent")
+    if distro_name in distros_with_python_2:
+        system_python_package_name = "python"
+    else:
+        system_python_package_name = "python3"
+
+    if package_builder.PACKAGE_TYPE == "deb":
+        repo_source_list_path = pl.Path("/etc/apt/sources.list.d/scalyr.list")
+        repo_source_list_path.write_text(
+            f"deb [allow-insecure=yes] {repo_url} scalyr main"
+        )
+        _call_apt(["update"])
+
+        _call_apt(["install", "-y", system_python_package_name])
+        _call_apt(
+            ["install", "-y", "--allow-unauthenticated", f"{AGENT_PACKAGE_NAME}={stable_agent_package_version}"]
+        )
+    elif package_builder.PACKAGE_TYPE == "rpm":
+        yum_repo_file_path = pl.Path("/etc/yum.repos.d/scalyr.repo")
+        yum_repo_file_content = f"""
+[scalyr]
+name=Scalyr packages.
+baseurl={repo_url}
+enabled=1
+gpgcheck=0
+repo_gpgcheck=0
+"""
+        yum_repo_file_path.write_text(yum_repo_file_content)
+        _call_yum(["install", "-y", system_python_package_name])
+        _call_yum(["install", "-y", f"{AGENT_PACKAGE_NAME}-{stable_agent_package_version}"])
+    else:
+        raise Exception(f"Unknown package type: {package_builder.PACKAGE_TYPE}")
+
+    # Write config
+
+    server_host = (
+        f"package-{package_builder_name}-test-{test_session_suffix}-{int(time.time())}"
+    )
+
+    config = {
+        "api_key": scalyr_api_key,
+        "server_attributes": {"serverHost": server_host},
+    }
+
+    agent_commander = AgentCommander(
+        executable_args=["scalyr-agent-2"], agent_paths=LINUX_PACKAGE_AGENT_PATHS
+    )
+
+    agent_commander.agent_paths.agent_config_path.write_text(json.dumps(config))
+
+    logger.info("Upgrade agent")
+    if package_builder.PACKAGE_TYPE == "deb":
+        _call_apt(
+            [
+                "install",
+                "-y",
+                "--only-upgrade",
+                "--allow-unauthenticated",
+                AGENT_PACKAGE_NAME,
+            ]
+        )
+    elif package_builder.PACKAGE_TYPE == "rpm":
+        _call_yum(["install", "-y", AGENT_PACKAGE_NAME])
+    else:
+        raise Exception(f"Unknown package type: {package_builder.PACKAGE_TYPE}")
+
+    logger.info("Verify that agent config remains after upgrade.")
+    assert LINUX_PACKAGE_AGENT_PATHS.agent_config_path.exists()
+    assert server_host in LINUX_PACKAGE_AGENT_PATHS.agent_config_path.read_text()
+
+    agent_commander.start()
+
+    verify_agent_status(
+        agent_version=agent_version,
+        agent_commander=agent_commander,
+        timeout_tracker=timeout_tracker,
+    )
+
+    agent_commander.stop()
+
+    logger.info("Cleanup")
+    _remove_all_agent_files(package_type=package_builder.PACKAGE_TYPE)
 
 
 def _perform_ssl_checks(

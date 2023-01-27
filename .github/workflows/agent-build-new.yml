@@ -1,0 +1,54 @@
+name: Agent Build Refactored
+
+on:
+  push:
+  pull_request:
+    # Trigger only for opened pull request. Others have to be handled by the 'push' event
+    types: [ opened ]
+    branches:
+      - 'master'
+  workflow_dispatch:
+
+
+  schedule:
+    - cron: '0 4 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  call-reusable:
+    name: "Build Linux packages"
+    uses: ./.github/workflows/agent-build-linux-packages-new.yml
+    secrets:
+      CT_AWS_DEV_EC2_PRIVATE_KEY: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
+      CT_AWS_DEV_EC2_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
+      CT_AWS_DEV_EC2_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
+      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
+      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
+
+  build_tarball:
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.8.13"
+
+      - name: Build tarball
+        run: |
+          mkdir -p build/tarball/noarch
+          pushd build/tarball/noarch
+          python3 ../../../build_package.py tarball
+          popd
+
+      - name: Save tarball as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: tarball-noarch
+          path: build
+          retention-days: 1

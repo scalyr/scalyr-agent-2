@@ -221,6 +221,10 @@ class LinuxDependencyPackagesBuilder(Runner):
         """
         return self.output_path / "packages"
 
+    @property
+    def managed_packages_output_path(self) -> pl.Path:
+        return self.packages_output_path / self.PACKAGE_TYPE / "managed"
+
     @staticmethod
     def _parse_package_version_parts(version: str) -> Tuple[int, str]:
         """
@@ -433,7 +437,7 @@ class LinuxDependencyPackagesBuilder(Runner):
                 "--verbose",
                 # fmt: on
             ],
-            cwd=str(self.packages_output_path),
+            cwd=str(self.managed_packages_output_path),
         )
         if self.PACKAGE_TYPE == "deb":
             package_glob = f"{AGENT_PACKAGE_NAME}_{version}_{self.agent_package_arch}.{self.PACKAGE_TYPE}"
@@ -442,7 +446,7 @@ class LinuxDependencyPackagesBuilder(Runner):
         else:
             raise Exception(f"Unknown package type {self.PACKAGE_TYPE}")
 
-        found = list(self.packages_output_path.glob(package_glob))
+        found = list(self.managed_packages_output_path.glob(package_glob))
         assert (
             len(found) == 1
         ), f"Number of result agent packages has to be 1, got {len(found)}"
@@ -511,7 +515,7 @@ class LinuxDependencyPackagesBuilder(Runner):
             self.run_in_docker(command_args=command_args)
             return
 
-        self.packages_output_path.mkdir(parents=True)
+        self.managed_packages_output_path.mkdir(parents=True)
 
         # Build agent libs package
         (
@@ -559,7 +563,7 @@ class LinuxDependencyPackagesBuilder(Runner):
                         str(scriptlets_dir / "preuninstall.sh"),
                         "--verbose",
                     ],
-                    cwd=str(self.packages_output_path),
+                    cwd=str(self.managed_packages_output_path),
                 )
 
             build_agent_libs_package_root_step = self._get_build_package_root_step(
@@ -588,7 +592,7 @@ class LinuxDependencyPackagesBuilder(Runner):
                     str(build_agent_libs_step_output / "root"),
                     "--verbose",
                 ],
-                cwd=str(self.packages_output_path),
+                cwd=str(self.managed_packages_output_path),
             )
 
         self._build_agent_package(
@@ -1141,7 +1145,7 @@ class LinuxDependencyPackagesBuilder(Runner):
                 if output_path.exists():
                     shutil.rmtree(output_path)
                 shutil.copytree(
-                    builder.packages_output_path,
+                    builder.output_path,
                     output_path,
                     dirs_exist_ok=True,
                 )

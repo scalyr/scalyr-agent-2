@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 _EMBEDDED_OPENSSL_VERSION_NUMBER = 269488447
 
+
 @dataclasses.dataclass
 class TargetDistro:
     name: str
@@ -194,7 +195,7 @@ DISTROS = {
                 )
             },
             docker_image="amazonlinux:2",
-            expected_openssl=269488447
+            expected_openssl=_EMBEDDED_OPENSSL_VERSION_NUMBER
         ),
     ]
 }
