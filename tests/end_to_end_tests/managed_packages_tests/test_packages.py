@@ -275,8 +275,6 @@ def test_agent_package_config_ownership(package_builder, agent_package_path, tmp
         package_path=agent_package_path,
         output_path=tmp_path,
     )
-    print("!!!!!!!")
-    print(agent_package_path)
 
     agent_etc_path = tmp_path / "etc/scalyr-agent-2"
 
@@ -331,8 +329,12 @@ def test_upgrade(
         test_session_suffix,
         agent_version
 ):
+    """
+    Perform an upgrade from the current stable release. The stable version of the package also has to be in the same
+    repository as the tested packages.
+    """
     if distro_name == "centos6":
-        pytest.skip("Can not upgrade from CentOS 6 because out previous variant of packages does not support it.")
+        pytest.skip("Can not upgrade from CentOS 6 because our previous variant of packages does not support it.")
 
     timeout_tracker = TimeoutTracker(100)
 
@@ -374,7 +376,6 @@ repo_gpgcheck=0
         raise Exception(f"Unknown package type: {package_builder.PACKAGE_TYPE}")
 
     # Write config
-
     server_host = (
         f"package-{package_builder_name}-test-{test_session_suffix}-{int(time.time())}"
     )
@@ -684,13 +685,10 @@ def _prepare_environment(
 
     if remote_machine_type == "docker":
         if package_type == "deb":
-            packages_to_install.extend(["ca-certificates", "openssl"])
+            packages_to_install.extend(["ca-certificates"])
             if "debian" in target_distro.name:
                 packages_to_install.append("procps")
         elif package_type == "rpm":
-            packages_to_install.extend([
-                "openssl"
-            ])
             if target_distro.name == "amazonlinux2":
                 packages_to_install.append("procps")
 
