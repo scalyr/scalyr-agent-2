@@ -91,7 +91,7 @@ jobs:
         env:
           TZ: UTC
         run: |
-          echo "commit-date=$(git show --quiet --date='format-local:%Y-%m-%d %H:%M:%S' --format='%cd; ${{ github.sha }})" >> $GITHUB_OUTPUT
+          echo "commit-date=$(git show --quiet --date='format-local:%Y-%m-%d %H:%M:%S' --format='%cd' ${{ github.sha }})" >> $GITHUB_OUTPUT
 
       - name: Pre-Run Command
         if: inputs.agent_pre_run_command != ''
