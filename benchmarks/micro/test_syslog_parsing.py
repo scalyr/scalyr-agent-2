@@ -15,6 +15,11 @@
 """
 Benchmarks which measure how long it takes to parse syslog data in the syslog monitor with
 extended parsing (message templates) enabled.
+
+TODO: Also exercise the following scenarios / code paths:
+
+* Different syslog messages
+* Log watcher management, file creation, expiration, locking
 """
 
 import os
@@ -26,7 +31,6 @@ from faker import Faker
 
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogHandler
 
-# TODO: Use Fixtures for various different types of syslog messages
 MOCK_MESSAGE =  "<34>Oct 11 22:14:15 mymachine su: \'su root\' failed for lonvick on /dev/pts/8"
 
 # NOTE: We use faker + same static seed to ensure the result is fully repetable / deterministic
@@ -43,9 +47,6 @@ class MockConfig(object):
         except KeyError:
             return None
 
-# TODO: Also exercise the following scenarios
-# * Different syslog messages
-# * Log watcher management, file creation, expiration
 TEMP_DIRECTORY = tempfile.gettempdir()
 
 MOCK_EXTRAS = []
@@ -54,7 +55,7 @@ for i in range(0, 1000):
     extra = {
         "proto": FAKER.random_element(["tcp", "udp"]),
         "srcip": "127.0.0." + str(FAKER.random_int(0, 250)),
-        "destport": str(FAKER.random_int(10000, 50000))
+        "destport": str(FAKER.random_int(10000, 60000))
     }
     MOCK_EXTRAS.append(extra)
 
@@ -110,7 +111,7 @@ def test_handle_syslog_logs(benchmark, message_template):
             extra = FAKER.random_element(MOCK_EXTRAS)
             handler.handle(MOCK_MESSAGE, extra=extra)
 
-        benchmark.pedantic(run_benchmark, iterations=100, rounds=100)
+        benchmark.pedantic(run_benchmark, iterations=200, rounds=100)
 
         # Verify that files which match message template notation have been created
         file_names = os.listdir(tmp_directory)
