@@ -53,6 +53,7 @@ DISTROS = {
                 )
             },
             docker_image="ubuntu:22.04",
+            expected_openssl=805306400,
         ),
         TargetDistro(
             name="ubuntu2004",
@@ -66,6 +67,7 @@ DISTROS = {
                 )
             },
             docker_image="ubuntu:20.04",
+            expected_openssl=269488239,
         ),
         TargetDistro(
             name="ubuntu1804",
@@ -78,7 +80,8 @@ DISTROS = {
                     ssh_username="ubuntu",
                 )
             },
-            docker_image="ubuntu:18.04"
+            docker_image="ubuntu:18.04",
+            expected_openssl=269488143
         ),
         TargetDistro(
             name="ubuntu1604",
@@ -92,6 +95,7 @@ DISTROS = {
                 )
             },
             docker_image="ubuntu:16.04",
+            expected_openssl=269488447
         ),
         TargetDistro(
             name="ubuntu1404",
@@ -105,7 +109,7 @@ DISTROS = {
                 )
             },
             docker_image="ubuntu:14.04",
-            expected_openssl="1.1.1s"
+            expected_openssl=269488207
         ),
         TargetDistro(
             name="debian11",
@@ -119,6 +123,7 @@ DISTROS = {
                 )
             },
             docker_image="debian:11",
+            expected_openssl=269488367
         ),
         TargetDistro(
             name="debian10",
@@ -132,6 +137,7 @@ DISTROS = {
                 )
             },
             docker_image="debian:10",
+            expected_openssl=269488207
         ),
         TargetDistro(
             name="centos8",
@@ -145,6 +151,7 @@ DISTROS = {
                 )
             },
             docker_image="centos:8",
+            expected_openssl=0
         ),
         TargetDistro(
             name="centos7",
@@ -158,6 +165,7 @@ DISTROS = {
                 )
             },
             docker_image="centos:7",
+            expected_openssl=269488447
         ),
         TargetDistro(
             name="centos6",
@@ -171,19 +179,7 @@ DISTROS = {
                 )
             },
             docker_image="centos:6",
-        ),
-        TargetDistro(
-            name="centos6",
-            ec2_images={
-                Architecture.X86_64: EC2DistroImage(
-                    image_id="ami-03a941394ec9849de",
-                    image_name="CentOS 6 (x86_64) - with Updates HVM",
-                    short_name="centos7",
-                    size_id="t2.small",
-                    ssh_username="root",
-                )
-            },
-            docker_image="centos:6",
+            expected_openssl=0
         ),
         TargetDistro(
             name="amazonlinux2",
@@ -197,6 +193,7 @@ DISTROS = {
                 )
             },
             docker_image="amazonlinux",
+            expected_openssl=269488447
         ),
     ]
 }

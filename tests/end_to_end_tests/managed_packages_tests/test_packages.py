@@ -556,7 +556,7 @@ def _install_from_convenience_script(
         assert "Looking for system OpenSSL >= 3: Not found" in output
         assert "Looking for system OpenSSL >= 1.1.1: Not found" in output
         assert (
-            f"Using embedded OpenSSL == {DEFAULT_PYTHON_PACKAGE_OPENSSL_VERSION}"
+            f"Using embedded OpenSSL == OpenSSL {DEFAULT_PYTHON_PACKAGE_OPENSSL_VERSION}"
             in output
         )
 
@@ -598,13 +598,6 @@ def _prepare_environment(
             except subprocess.CalledProcessError:
                 timeout_tracker.sleep(1, "Can not update apt.")
 
-    # Install additional packages if needed.
-    if packages_to_install:
-        if package_type == "deb":
-            _call_apt(["install", "-y", *packages_to_install])
-        elif package_type == "rpm":
-            _call_yum(["install", "-y", *packages_to_install])
-
     if target_distro.name == "centos6":
         # for centos 6, we remove repo file for disabled repo, so it could use vault repo.
         pl.Path("/etc/yum.repos.d/CentOS-Base.repo").unlink()
@@ -617,6 +610,13 @@ def _prepare_environment(
             content = content.replace("#baseurl", "baseurl")
             content = content.replace("mirrorlist=", "#mirrorlist=")
             repo_file.write_text(content)
+
+    # Install additional packages if needed.
+    if packages_to_install:
+        if package_type == "deb":
+            _call_apt(["install", "-y", *packages_to_install])
+        elif package_type == "rpm":
+            _call_yum(["install", "-y", *packages_to_install])
 
 
 def _clear_agent_dirs_and_print_log(agent_commander: AgentCommander):
