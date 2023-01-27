@@ -70,7 +70,7 @@ on:
 jobs:
   codespeed-agent-benchmark:
     name: ${{ inputs.job_name }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
@@ -90,7 +90,8 @@ jobs:
         id: commit-date
         env:
           TZ: UTC
-        run: echo ::set-output name=commit-date::$(git show --quiet --date='format-local:%Y-%m-%d %H:%M:%S' --format="%cd" ${{ github.sha }} )
+        run: |
+          echo "commit-date=$(git show --quiet --date='format-local:%Y-%m-%d %H:%M:%S' --format='%cd' ${{ github.sha }})" >> $GITHUB_OUTPUT
 
       - name: Pre-Run Command
         if: inputs.agent_pre_run_command != ''
@@ -123,7 +124,8 @@ jobs:
           mkdir -p ~/scalyr-agent-dev/{log,config,data}
           # Run the agent process and capture the metrics
           ./benchmarks/scripts/start-agent-and-capture-metrics.sh "${{ github.sha }}" &
-          echo ::set-output name=bg-pid::$!
+          bg_pid=$!
+          echo "bg-pid=${bg_pid}" >> $GITHUB_OUTPUT
 
       - name: Run any post agent run script
         if: inputs.agent_post_run_command != ''
