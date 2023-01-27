@@ -70,7 +70,7 @@ on:
 jobs:
   codespeed-agent-benchmark:
     name: ${{ inputs.job_name }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3

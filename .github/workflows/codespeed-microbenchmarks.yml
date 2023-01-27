@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - release
+      - syslog_microbenchmark
   schedule:
     - cron: '0 4 * * *'
 
@@ -27,7 +28,7 @@ jobs:
           github_token: ${{ github.token }}
 
   codespeed-micro-benchmarks:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
     strategy:
