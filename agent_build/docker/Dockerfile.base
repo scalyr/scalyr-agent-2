@@ -7,7 +7,7 @@
 ARG BASE_IMAGE_SUFFIX
 
 # Install dependency packages for debian.
-FROM python:3.8.16-slim-bullseye as scalyr-dependencies-slim-bullseye
+FROM python:3.11.1-slim-bullseye as scalyr-dependencies-slim-bullseye
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
 # Workaround for weird build failure on Circle CI, see
@@ -25,7 +25,7 @@ RUN apt-get clean
 RUN apt-get update && apt-get install -y build-essential git tar curl
 
 # Install dependency packages for alpine.
-FROM python:3.8.16-alpine as scalyr-dependencies-alpine
+FROM python:3.11.11-alpine as scalyr-dependencies-alpine
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
 RUN apk update && apk add --virtual build-dependencies \
@@ -65,7 +65,7 @@ RUN sed -i '/^lz4/d' agent_build/requirement-files/compression-requirements.txt
 # If we don't that and we include orjson and zstandard, we need rust chain and building the image
 # will be very slow due to cross compilation in emulated environment (QEMU)
 # TODO: Remove once orjson and zstandard musl wheel is available - https://github.com/pypa/auditwheel/issues/305#issuecomment-922251777
-RUN echo 'manylinux2014_compatible = True' > /usr/local/lib/python3.8/_manylinux.py
+RUN echo 'manylinux2014_compatible = True' > /usr/local/lib/python3.11/_manylinux.py
 
 # Install agent dependencies.
 RUN pip3 install --upgrade pip
@@ -78,18 +78,18 @@ RUN python3 -m pip install --upgrade setuptools==66.0.0
 RUN if [ -n "${COVERAGE_VERSION}" ]; then pip3 install --root /tmp/dependencies coverage=="${COVERAGE_VERSION}"; fi
 
 # Clean up files which were installed to use manylinux2014 workaround
-RUN rm /usr/local/lib/python3.8/_manylinux.py
+RUN rm /usr/local/lib/python3.11/_manylinux.py
 
 # Install packages and tools that will be required during the final image build.
 
 # Install tools for alpine
-FROM python:3.8.16-alpine as ready-base-alpine
+FROM python:3.11.1-alpine as ready-base-alpine
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
 RUN apk update && apk add --virtual curl git
 
 # Install tools for debian.
-FROM python:3.8.16-slim-bullseye as ready-base-slim-bullseye
+FROM python:3.11.1-slim-bullseye as ready-base-slim-bullseye
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
 # Workaround for weird build failure on Circle CI, see
