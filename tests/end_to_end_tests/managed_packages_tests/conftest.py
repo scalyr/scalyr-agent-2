@@ -358,9 +358,7 @@ def repo_root(server_root):
 @pytest.fixture(scope="session")
 def server_url(server_root):
     """
-    Path to the convenience install script.
-    We also start web server that serves mock repo with packages that have to be installed by the
-    convenience script.
+    This fixture prepares http server with package repository and other needed files.
     """
 
     # Create web server which serves repo and public key file.
@@ -382,6 +380,8 @@ def server_url(server_root):
 
 @pytest.fixture(scope="session")
 def repo_url(server_url):
+    """Url to package repository"""
+
     return f"{server_url}/repo"
 
 

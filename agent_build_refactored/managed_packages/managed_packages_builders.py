@@ -1321,6 +1321,13 @@ def create_build_python_steps(
     for architecture in SUPPORTED_ARCHITECTURES:
         run_in_remote_docker = architecture != Architecture.X86_64
 
+        additional_options = ""
+
+        # TODO: find out why enabling LTO optimization of ARM ends with error.
+        # Disable it for now.
+        if architecture == Architecture.X86_64:
+            additional_options += "--with-lto"
+
         build_python = ArtifactRunnerStep(
             name=f"build_python_{openssl_version_type}_{architecture.value}",
             script_path="agent_build_refactored/managed_packages/steps/build_python.sh",
@@ -1337,6 +1344,7 @@ def create_build_python_steps(
             environment_variables={
                 "PYTHON_VERSION": EMBEDDED_PYTHON_VERSION,
                 "PYTHON_SHORT_VERSION": EMBEDDED_PYTHON_SHORT_VERSION,
+                "ADDITIONAL_OPTIONS": additional_options,
                 "INSTALL_PREFIX": install_prefix,
             },
             github_actions_settings=GitHubActionsSettings(

@@ -242,10 +242,10 @@ def test_packages(
     m = re.search(r"OpenSSL version_number=(\d+)", starting_agent_message)
     openssl_version = int(m.group(1))
 
-    if isinstance(target_distro.expected_openssl, list):
-        expected_openssl_versions = target_distro.expected_openssl
+    if isinstance(target_distro.expected_openssl_version_number, list):
+        expected_openssl_versions = target_distro.expected_openssl_version_number
     else:
-        expected_openssl_versions = [target_distro.expected_openssl]
+        expected_openssl_versions = [target_distro.expected_openssl_version_number]
 
     assert openssl_version in expected_openssl_versions
 

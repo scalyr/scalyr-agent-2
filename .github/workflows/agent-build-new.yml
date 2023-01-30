@@ -17,7 +17,7 @@ permissions:
   contents: read
 
 jobs:
-  call-reusable:
+  build-linux-packages:
     name: "Build Linux packages"
     uses: ./.github/workflows/agent-build-linux-packages-new.yml
     secrets:
