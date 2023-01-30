@@ -14,7 +14,7 @@
 
      // You can add whatever additional fields you'd like.
      // tier: "production"
-  }
+  },
 
   // Log files to upload to Scalyr. You can use '*' wildcards here.
   logs: [
