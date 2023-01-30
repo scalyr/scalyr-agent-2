@@ -22,7 +22,9 @@ import pathlib as pl
 import subprocess
 from typing import List, Dict, Union
 
-from agent_build_refactored.managed_packages.build_dependencies_versions import EMBEDDED_OPENSSL_VERSION_NUMBER
+from agent_build_refactored.managed_packages.build_dependencies_versions import (
+    EMBEDDED_OPENSSL_VERSION_NUMBER,
+)
 from agent_build_refactored.tools.constants import Architecture
 from agent_build_refactored.tools.run_in_ec2.constants import EC2DistroImage
 
@@ -70,7 +72,7 @@ DISTROS = {
                 )
             },
             docker_image="ubuntu:20.04",
-            expected_openssl_version_number=0x1010106f,
+            expected_openssl_version_number=0x1010106F,
         ),
         TargetDistro(
             name="ubuntu1804",
@@ -84,7 +86,7 @@ DISTROS = {
                 )
             },
             docker_image="ubuntu:18.04",
-            expected_openssl_version_number=0x1010100f,
+            expected_openssl_version_number=0x1010100F,
         ),
         TargetDistro(
             name="ubuntu1604",
@@ -126,7 +128,7 @@ DISTROS = {
                 )
             },
             docker_image="debian:11",
-            expected_openssl_version_number=0x101010ef,
+            expected_openssl_version_number=0x101010EF,
         ),
         TargetDistro(
             name="debian10",
@@ -140,7 +142,7 @@ DISTROS = {
                 )
             },
             docker_image="debian:10",
-            expected_openssl_version_number=0x1010104f,
+            expected_openssl_version_number=0x1010104F,
         ),
         TargetDistro(
             name="centos8",
@@ -155,7 +157,7 @@ DISTROS = {
             },
             docker_image="centos:8",
             # EC2 and docker openssl versions are different, so we need to track them all.
-            expected_openssl_version_number=[0x101010bf, 0x1010107f],
+            expected_openssl_version_number=[0x101010BF, 0x1010107F],
         ),
         TargetDistro(
             name="centos7",
