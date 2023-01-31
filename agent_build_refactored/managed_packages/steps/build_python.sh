@@ -26,6 +26,7 @@
 #   PYTHON_VERSION: Version of the Python to build.
 #   PYTHON_INSTALL_PREFIX: Install prefix for the Python installation.
 #   SUBDIR_NAME: Name of the sub-directory.
+#   ADDITIONAL_OPTIONS: Additional config options for Python building.
 
 set -e
 
@@ -53,13 +54,11 @@ pushd build
 	--with-readline=edit \
 	--prefix="${INSTALL_PREFIX}" \
 	--exec-prefix="${INSTALL_PREFIX}" \
-	--with-ensurepip=upgrade
-
-#		--enable-optimizations \
-#	--with-lto \
+	--with-ensurepip=upgrade \
+	--enable-optimizations "${ADDITIONAL_OPTIONS}"
 
 make -j "$(nproc)"
-#make test
+make test
 make DESTDIR="${STEP_OUTPUT_PATH}" install
 
 popd

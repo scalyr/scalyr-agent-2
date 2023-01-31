@@ -69,18 +69,18 @@ def initialize():
             print("Looking for system OpenSSL >= 3: ", file=sys.stderr, end='')
             link_bindings(version_type=OPENSSL_3_VERSION)
 
-            is_found, version_or_error = get_current_openssl_version(version_type=OPENSSL_3_VERSION)
+            is_found, version_or_error = get_current_openssl_version()
             if is_found:
-                print(f"found OpenSSL {version_or_error}", file=sys.stderr)
+                print(f"found {version_or_error}", file=sys.stderr)
                 return
 
             print(version_or_error, file=sys.stderr)
 
             print("Looking for system OpenSSL >= 1.1.1: ", file=sys.stderr, end='')
             link_bindings(version_type=OPENSSL_1_1_1_VERSION)
-            is_found, version_or_error = get_current_openssl_version(version_type=OPENSSL_1_1_1_VERSION)
+            is_found, version_or_error = get_current_openssl_version()
             if is_found:
-                print(f"found OpenSSL {version_or_error}", file=sys.stderr)
+                print(f"found {version_or_error}", file=sys.stderr)
                 return
 
             print(version_or_error, file=sys.stderr)
@@ -93,7 +93,7 @@ def initialize():
     print("Using embedded OpenSSL == ", file=sys.stderr, end='')
     link_bindings(version_type=OPENSSL_1_1_1_VERSION)
     link_embedded_openssl(openssl_variant=OPENSSL_1_1_1_VERSION)
-    is_found, version_or_error = get_current_openssl_version(version_type=OPENSSL_1_1_1_VERSION)
+    is_found, version_or_error = get_current_openssl_version()
     if not is_found:
         # Something very wrong happened and this is not expected.
         print(
@@ -152,10 +152,9 @@ def link_bindings(version_type: str):
         symlink_path.symlink_to(binding_path)
 
 
-def get_current_openssl_version(version_type: str) -> Tuple[bool, str]:
+def get_current_openssl_version() -> Tuple[bool, str]:
     """
     Determine current system OpenSSL version, if presented.
-    :param version_type: version of the OpenSSL to use.
     :return: Tuple where:
         First element - boolean flag that indicated whether appropriate version of OpenSSL is
             found or not.
@@ -175,19 +174,7 @@ def get_current_openssl_version(version_type: str) -> Tuple[bool, str]:
     if result.returncode != 0:
         return False, "Not found"
 
-    version_output = result.stdout.decode()
-
-    if version_type == OPENSSL_1_1_1_VERSION:
-        pattern = r"OpenSSL (\d+\.\d+\.\d+[a-zA-Z]).*"
-    else:
-        pattern = r"OpenSSL (\d+\.\d+\.\d+).*"
-
-    m = re.match(pattern, version_output)
-
-    if not m:
-        return False, f"Unknown OpenSSL version format: '{version_output}'"
-
-    return True, m.group(1)
+    return True, result.stdout.decode()
 
 
 if __name__ == '__main__':
