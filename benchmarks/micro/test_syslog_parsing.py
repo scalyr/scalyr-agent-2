@@ -47,6 +47,10 @@ class MockConfig(object):
         except KeyError:
             return None
 
+class MockGlobalConfig(object):
+    def __init__(self):
+        self.log_configs = []
+
 TEMP_DIRECTORY = tempfile.gettempdir()
 
 MOCK_EXTRAS = []
@@ -98,10 +102,12 @@ def test_handle_syslog_logs(benchmark, message_template):
             "message_log_template": message_log_template,
         }
     )
+    mock_global_config = MockGlobalConfig()
 
     with tempfile.TemporaryDirectory() as tmp_directory:
         handler = SyslogHandler(logger=mock_logger, line_reporter=mock_line_reporter, config=mock_config,
-                                server_host="localhost", log_path=tmp_directory, get_log_watcher=mock.Mock(),
+                                global_config=MockGlobalConfig(), server_host="localhost",
+                                log_path=tmp_directory, get_log_watcher=mock.Mock(),
                                 rotate_options=(2, 200000), docker_options=mock.Mock())
         handler._SyslogHandler__get_log_watcher.return_value = mock.Mock(), mock.Mock()
 

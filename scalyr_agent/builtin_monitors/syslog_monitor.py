@@ -1204,6 +1204,7 @@ class SyslogHandler(object):
         logger,
         line_reporter,
         config,
+        global_config,
         server_host,
         log_path,
         get_log_watcher,
@@ -1604,6 +1605,7 @@ class SyslogHandler(object):
                     )
 
                     log_config = {
+                        # FIXME
                         "parser": self.__syslog_parser,
                         "attributes": attribs,
                         "path": path,
@@ -1746,6 +1748,7 @@ class SyslogServer(object):
         port,
         logger,
         config,
+        global_config,
         line_reporter,
         accept_remote=False,
         server_host=None,
@@ -1853,6 +1856,7 @@ class SyslogServer(object):
             logger,
             line_reporter,
             config,
+            global_config,
             server_host,
             log_path,
             get_log_watcher,
@@ -2237,6 +2241,7 @@ From Search view, query [monitor = 'syslog_monitor'](https://app.scalyr.com/even
                 protocol[1],
                 self.__disk_logger,
                 self._config,
+                self._global_config,
                 line_reporter,
                 accept_remote=self.__accept_remote_connections,
                 server_host=self.__server_host,
@@ -2253,6 +2258,7 @@ From Search view, query [monitor = 'syslog_monitor'](https://app.scalyr.com/even
                     p[1],
                     self.__disk_logger,
                     self._config,
+                    self._global_config,
                     line_reporter,
                     accept_remote=self.__accept_remote_connections,
                     server_host=self.__server_host,
