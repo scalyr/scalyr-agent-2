@@ -26,7 +26,15 @@ SLEEP_DELAY=${SLEEP_DELAY:-"15"}
 # Script will fail if query doesn't return at least this number of results / lines
 MINIMUM_RESULTS=${MINIMUM_RESULTS:-"1"}
 
-SCALYR_TOOL_QUERY=$1
+if [ $# -eq 1 ]; then
+    # Query passed in as a single string argument
+    echo "Query passed in as a single string argument"
+    SCALYR_TOOL_QUERY=$1
+else
+    # Query passed in as multiple arguments
+    echo "Query passed in as multiple arguments"
+    SCALYR_TOOL_QUERY="$*"
+fi
 
 echo_with_date() {
     date +"[%Y-%m-%d %H:%M:%S] $*"
