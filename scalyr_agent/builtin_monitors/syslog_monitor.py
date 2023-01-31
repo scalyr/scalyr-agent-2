@@ -1255,7 +1255,7 @@ class SyslogHandler(object):
         self.__syslog_max_log_files = config.get("max_log_files")
         self.__syslog_loggers = {}
         self.__syslog_default_parser = config.get("parser")
-        self.__global_log_configs = global_config.log_configs
+        self.__global_log_configs = global_config.log_configs if global_config else []
         self.__syslog_attributes = JsonObject(config.get("attributes") or {})
 
         if docker_logging:
@@ -1613,14 +1613,19 @@ class SyslogHandler(object):
 
                         attribs = self.__syslog_attributes.copy()
                         attribs.update(
-                            {k: v for k, v in log_config_attribs.items() if k not in ["parser"]}
+                            {
+                                k: v
+                                for k, v in log_config_attribs.items()
+                                if k not in ["parser"]
+                            }
                         )
                         attribs.update(
                             {k.lower(): v for k, v in extra.items() if v is not None}
                         )
 
                         log_config = {
-                            "parser": log_config_attribs.get("parser") or self.__syslog_default_parser,
+                            "parser": log_config_attribs.get("parser")
+                            or self.__syslog_default_parser,
                             "attributes": attribs,
                             "path": path,
                         }
