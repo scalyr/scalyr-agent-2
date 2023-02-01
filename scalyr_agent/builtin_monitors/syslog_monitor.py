@@ -1605,13 +1605,13 @@ class SyslogHandler(object):
                             log_config_attribs = log_config["attributes"]
                             global_log.log(
                                 scalyr_logging.DEBUG_LEVEL_1,
-                                f"Matched {path} to {log_config['path']}",
+                                "Matched %s to %s" % (path, log_config["path"]),
                             )
                             break
 
                     if log_config_attribs is None:
                         global_log.log(
-                            scalyr_logging.DEBUG_LEVEL_1, f"No match found for {path}"
+                            scalyr_logging.DEBUG_LEVEL_1, "No match found for %s" % (path,)
                         )
 
                     if log_config_attribs is not None:
