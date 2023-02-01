@@ -1611,7 +1611,8 @@ class SyslogHandler(object):
 
                     if log_config_attribs is None:
                         global_log.log(
-                            scalyr_logging.DEBUG_LEVEL_1, "No match found for %s" % (path,)
+                            scalyr_logging.DEBUG_LEVEL_1,
+                            "No match found for %s" % (path,),
                         )
 
                     if log_config_attribs is not None:
