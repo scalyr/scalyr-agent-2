@@ -1596,13 +1596,23 @@ class SyslogHandler(object):
                 else:
                     # Match the new log path with a global log config (generally globbed).
                     # Note that in log configs, .path is required but .attributes may be empty.
+                    # If no match is found then log to the base syslog file.
+
                     log_config_attribs = None
                     for log_config in self.__global_log_configs:
                         if fnmatch(path, log_config["path"]):
                             log_config_attribs = log_config["attributes"]
+                            global_log.log(
+                                scalyr_logging.DEBUG_LEVEL_1,
+                                f"Matched {path} to {log_config['path']}",
+                            )
                             break
 
-                    # No match logs to the base syslog file
+                    if log_config_attribs is None:
+                        global_log.log(
+                            scalyr_logging.DEBUG_LEVEL_1, f"No match found for {path}"
+                        )
+
                     if log_config_attribs is not None:
                         logfile = AutoFlushingRotatingFile(
                             filename=path,
