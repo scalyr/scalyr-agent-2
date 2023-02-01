@@ -25,6 +25,7 @@ __author__ = "scalyr@sentinelone.com"
 import errno
 from fnmatch import fnmatch
 import glob
+import json
 import logging
 import logging.handlers
 import os
@@ -1619,6 +1620,21 @@ class SyslogHandler(object):
                             max_bytes=self.__max_log_size,
                             backup_count=self.__max_log_rotations,
                             flush_delay=self.__flush_delay,
+                        )
+
+                        global_log.log(
+                            scalyr_logging.DEBUG_LEVEL_1,
+                            "__syslog_attributes=%s log_config_attribs=%s extra=%s"
+                            % (
+                                json.dumps(
+                                    self.__syslog_attributes.to_dict(),
+                                    separators=(",", ":"),
+                                ),
+                                json.dumps(
+                                    log_config_attribs.to_dict(), separators=(",", ":")
+                                ),
+                                json.dumps(extra, separators=(",", ":")),
+                            ),
                         )
 
                         attribs = self.__syslog_attributes.copy()
