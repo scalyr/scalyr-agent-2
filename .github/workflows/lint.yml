@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-20.04
     needs: pre_job
     # NOTE: We always want to run job on master branch
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref_name == master' }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref_name == 'master' }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
