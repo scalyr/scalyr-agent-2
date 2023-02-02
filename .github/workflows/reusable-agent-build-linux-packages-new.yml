@@ -41,8 +41,6 @@ jobs:
       managed_packages_build_matrix_json: ${{ steps.init-matrices.outputs.managed_packages_build_matrix_json }}
       managed_packages_test_matrix_json: ${{ steps.init-matrices.outputs.managed_packages_test_matrix_json }}
 
-
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -161,7 +159,7 @@ jobs:
           echo '${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}' > /tmp/private_key.pem
           chmod 600 /tmp/private_key.pem
           eval `ssh-agent -s`
-          
+
           cat "/tmp/private_key.pem" | ssh-add -
           echo "ssh_auth_sock=${SSH_AUTH_SOCK}" >> $GITHUB_OUTPUT
 
@@ -179,7 +177,6 @@ jobs:
           aws_security_group: ${{ needs.pre_job.outputs.aws_security_group }}
           aws_security_groups_prefix_list_id: ${{ needs.pre_job.outputs.aws_prefix_list_id }}
           aws_objects_name_prefix: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
-
 
   build-images:
     name: Build image '${{ matrix.name }}'
@@ -416,7 +413,6 @@ jobs:
               build \
               --last-repo-python-package-file "${{ steps.download_python.outputs.last_repo_python_package_path }}" \
               --last-repo-agent-libs-package-file "${{ steps.download_agent_libs.outputs.last_repo_agent_libs_package_path }}"
-          
 
       - name: Save packages as artifact
         uses: actions/upload-artifact@v3
