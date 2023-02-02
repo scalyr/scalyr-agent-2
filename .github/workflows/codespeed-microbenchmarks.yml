@@ -101,7 +101,7 @@ jobs:
     name: Process Benchmark
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref_name == 'master' }}
-    uses: ./.github/workflows/reusable/codespeed-agent-benchmarks.yaml
+    uses: ./.github/workflows/reusable-codespeed-agent-benchmarks.yaml
     secrets: inherit
     with:
       job_name: benchmarks-idle-agent-py-311
@@ -117,7 +117,7 @@ jobs:
     name: Process Benchmark
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref_name == 'master' }}
-    uses: ./.github/workflows/reusable/codespeed-agent-benchmarks.yaml
+    uses: ./.github/workflows/reusable-codespeed-agent-benchmarks.yaml
     secrets: inherit
     with:
       job_name: benchmarks-idle-agent-no-monitors-py-311
@@ -133,7 +133,7 @@ jobs:
     name: Process Benchmark
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref_name == 'master' }}
-    uses: ./.github/workflows/reusable/codespeed-agent-benchmarks.yaml
+    uses: ./.github/workflows/reusable-codespeed-agent-benchmarks.yaml
     secrets: inherit
     with:
       job_name: benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-311
@@ -154,7 +154,7 @@ jobs:
     name: Process Benchmark
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref_name == 'master' }}
-    uses: ./.github/workflows/reusable/codespeed-agent-benchmarks.yaml
+    uses: ./.github/workflows/reusable-codespeed-agent-benchmarks.yaml
     secrets: inherit
     with:
       job_name: benchmarks-loaded-agent-single-growing-log-file-20mb-py-311
@@ -173,7 +173,7 @@ jobs:
     name: Process Benchmark
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref_name == 'master' }}
-    uses: ./.github/workflows/reusable/codespeed-agent-benchmarks.yaml
+    uses: ./.github/workflows/reusable-codespeed-agent-benchmarks.yaml
     secrets: inherit
     with:
       job_name: benchmarks-loaded-agent_2-growing_logs-monitors-multiprocess-2-worker-20mb-py-31
@@ -192,7 +192,7 @@ jobs:
     name: Process Benchmark
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref_name == 'master' }}
-    uses: ./.github/workflows/reusable/codespeed-agent-benchmarks.yaml
+    uses: ./.github/workflows/reusable-codespeed-agent-benchmarks.yaml
     secrets: inherit
     with:
       job_name: benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-311
