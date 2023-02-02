@@ -116,7 +116,7 @@ jobs:
       agent_server_host: "ci-codespeed-benchmarks-py311-idle-conf-1"
       capture_line_counts: true
       # We only want to send data to CodeSpeed on master branch runs
-      dry_run: ${{ ! github.ref == 'refs/heads/master' }}
+      dry_run: ${{ github.ref != 'refs/heads/master' }}
 
   benchmarks-idle-agent-no-monitors-py-311:
     name: Process Benchmark
@@ -132,7 +132,7 @@ jobs:
       agent_server_host: "ci-codespeed-benchmarks-py311-idle-conf-2"
       capture_line_counts: true
       # We only want to send data to CodeSpeed on master branch runs
-      dry_run: ${{ ! github.ref == 'refs/heads/master' }}
+      dry_run: ${{ github.ref != 'refs/heads/master' }}
 
   benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-311:
     name: Process Benchmark
@@ -150,7 +150,7 @@ jobs:
       run_time: 140
       capture_line_counts: true
       # We only want to send data to CodeSpeed on master branch runs
-      dry_run: ${{ ! github.ref == 'refs/heads/master' }}
+      dry_run: ${{ github.ref != 'refs/heads/master' }}
 
   # NOTE: For the benchmarks below to work correctly "/tmp/random.log" file
   # which is being written to during the benchmark must existing before the
@@ -172,7 +172,7 @@ jobs:
       agent_server_host: "ci-codespeed-benchmarks-py311-loaded-conf-2"
       capture_line_counts: true
       # We only want to send data to CodeSpeed on master branch runs
-      dry_run: ${{ ! github.ref == 'refs/heads/master' }}
+      dry_run: ${{ github.ref != 'refs/heads/master' }}
 
   benchmarks-loaded-agent_2-growing_logs-monitors-multiprocess-2-worker-20mb-py-311:
     name: Process Benchmark
@@ -191,7 +191,7 @@ jobs:
       agent_server_host: "ci-codespeed-benchmarks-py311-loaded-conf-4"
       capture_line_counts: true
       # We only want to send data to CodeSpeed on master branch runs
-      dry_run: ${{ ! github.ref == 'refs/heads/master' }}
+      dry_run: ${{ github.ref != 'refs/heads/master' }}
 
   benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-311:
     name: Process Benchmark
@@ -210,4 +210,4 @@ jobs:
       capture_agent_status_metrics: true
       capture_line_counts: true
       # We only want to send data to CodeSpeed on master branch runs
-      dry_run: ${{ ! github.ref == 'refs/heads/master' }}
+      dry_run: ${{ github.ref != 'refs/heads/master' }}
