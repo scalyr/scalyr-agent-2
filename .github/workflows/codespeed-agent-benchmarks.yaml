@@ -150,7 +150,8 @@ jobs:
           CAPTURE_AGENT_STATUS_METRICS: ${{ inputs.capture_agent_status_metrics }}
           DRY_RUN: ${{ inputs.dry_run }}
           PYTHONPATH: .
-        run: ./benchmarks/scripts/send-log-level-counts-to-codespeed.sh "${{ github.sha }}"
+        run: |
+          ./benchmarks/scripts/send-log-level-counts-to-codespeed.sh "${{ github.sha }}"
 
       - name: Upload log artifacts
         uses: actions/upload-artifact@v3

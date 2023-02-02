@@ -1,10 +1,13 @@
-name: Codespeed Micro Benchmarks
+name: Codespeed Benchmarks
 
 on:
   push:
     branches:
       - master
       - release
+  pull_request:
+    branches:
+      - master
   schedule:
     - cron: '0 4 * * *'
 
@@ -27,9 +30,10 @@ jobs:
           github_token: ${{ github.token }}
 
   codespeed-micro-benchmarks:
+    name: Micro Benchmarks
     runs-on: ubuntu-latest
     needs: pre_job
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref == 'refs/heads/master' }}
     strategy:
       fail-fast: false
       matrix:
@@ -63,7 +67,8 @@ jobs:
         run: tox -e micro-benchmarks
 
       - name: Process and submit results to CodeSpeed
-        if: (github.ref == 'refs/heads/master' || github.head_ref == 'master')
+        # We only want to submit results for master branch runs and not for scheduled runs
+        if: ${{ github.ref == 'refs/heads/master' && ! github.event_name == 'schedule' }}
         env:
           PYTHONPATH: .
           CODESPEED_URL: "https://scalyr-agent-codespeed.herokuapp.com/"
@@ -71,7 +76,8 @@ jobs:
           CODESPEED_EXECUTABLE: Python ${{ steps.setup-python.outputs.python-version }}
           CODESPEED_ENVIRONMENT: GitHub Hosted Action Runner
           CODESPEED_AUTH: ${{ secrets.CODESPEED_AUTH }}
-        run: python benchmarks/scripts/send_microbenchmarks_data_to_codespeed.py --data-path="benchmark_results/*.json" --debug
+        run: |
+          python benchmarks/scripts/send_microbenchmarks_data_to_codespeed.py --data-path="benchmark_results/*.json" --debug
 
       - name: Store artifacts
         uses: actions/upload-artifact@v3
@@ -97,8 +103,9 @@ jobs:
           channel: '#eng-dataset-cloud-tech'
 
   benchmarks-idle-agent-py-311:
+    name: Process Benchmark
     needs: pre_job
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref == 'refs/heads/master' }}
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
     secrets: inherit
     with:
@@ -108,10 +115,13 @@ jobs:
       agent_config: "benchmarks/configs/agent_no_monitored_logs.json"
       agent_server_host: "ci-codespeed-benchmarks-py311-idle-conf-1"
       capture_line_counts: true
+      # We only want to send data to CodeSpeed on master branch runs
+      dry_run: ${{ github.ref != 'refs/heads/master' }}
 
   benchmarks-idle-agent-no-monitors-py-311:
+    name: Process Benchmark
     needs: pre_job
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref == 'refs/heads/master' }}
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
     secrets: inherit
     with:
@@ -121,10 +131,13 @@ jobs:
       agent_config: "benchmarks/configs/agent_no_monitored_logs_no_monitors.json"
       agent_server_host: "ci-codespeed-benchmarks-py311-idle-conf-2"
       capture_line_counts: true
+      # We only want to send data to CodeSpeed on master branch runs
+      dry_run: ${{ github.ref != 'refs/heads/master' }}
 
   benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-311:
+    name: Process Benchmark
     needs: pre_job
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref == 'refs/heads/master' }}
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
     secrets: inherit
     with:
@@ -136,13 +149,16 @@ jobs:
       agent_server_host: "ci-codespeed-benchmarks-py311-loaded-conf-1"
       run_time: 140
       capture_line_counts: true
+      # We only want to send data to CodeSpeed on master branch runs
+      dry_run: ${{ github.ref != 'refs/heads/master' }}
 
   # NOTE: For the benchmarks below to work correctly "/tmp/random.log" file
   # which is being written to during the benchmark must existing before the
   # agent process is started.
   benchmarks-loaded-agent-single-growing-log-file-20mb-py-311:
+    name: Process Benchmark
     needs: pre_job
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref == 'refs/heads/master' }}
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
     secrets: inherit
     with:
@@ -155,10 +171,13 @@ jobs:
       agent_post_run_command: "benchmarks/scripts/write-random-lines.sh /tmp/random.log 2M 10 100 1"
       agent_server_host: "ci-codespeed-benchmarks-py311-loaded-conf-2"
       capture_line_counts: true
+      # We only want to send data to CodeSpeed on master branch runs
+      dry_run: ${{ github.ref != 'refs/heads/master' }}
 
   benchmarks-loaded-agent_2-growing_logs-monitors-multiprocess-2-worker-20mb-py-311:
+    name: Process Benchmark
     needs: pre_job
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref == 'refs/heads/master' }}
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
     secrets: inherit
     with:
@@ -171,10 +190,13 @@ jobs:
       agent_post_run_command: "benchmarks/scripts/write-random-lines.sh /tmp/random.log 2M 10 100 1 & benchmarks/scripts/write-random-lines.sh /tmp/random2.log 2M 10 100 1 &"
       agent_server_host: "ci-codespeed-benchmarks-py311-loaded-conf-4"
       capture_line_counts: true
+      # We only want to send data to CodeSpeed on master branch runs
+      dry_run: ${{ github.ref != 'refs/heads/master' }}
 
   benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-311:
+    name: Process Benchmark
     needs: pre_job
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref == 'refs/heads/master' }}
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
     secrets: inherit
     with:
@@ -187,3 +209,5 @@ jobs:
       run_time: 140
       capture_agent_status_metrics: true
       capture_line_counts: true
+      # We only want to send data to CodeSpeed on master branch runs
+      dry_run: ${{ github.ref != 'refs/heads/master' }}
