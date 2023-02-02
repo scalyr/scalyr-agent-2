@@ -1,4 +1,4 @@
-name: Codespeed Micro Benchmarks
+name: Codespeed Benchmarks
 
 on:
   push:
@@ -30,6 +30,7 @@ jobs:
           github_token: ${{ github.token }}
 
   codespeed-micro-benchmarks:
+    name: Micro Benchmarks
     runs-on: ubuntu-latest
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref == 'refs/heads/master' }}
@@ -102,6 +103,7 @@ jobs:
           channel: '#eng-dataset-cloud-tech'
 
   benchmarks-idle-agent-py-311:
+    name: Process Benchmark
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref == 'refs/heads/master' }}
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
@@ -117,6 +119,7 @@ jobs:
       dry_run: ${{ ! github.ref == 'refs/heads/master' }}
 
   benchmarks-idle-agent-no-monitors-py-311:
+    name: Process Benchmark
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref == 'refs/heads/master' }}
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
@@ -132,6 +135,7 @@ jobs:
       dry_run: ${{ ! github.ref == 'refs/heads/master' }}
 
   benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-311:
+    name: Process Benchmark
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref == 'refs/heads/master' }}
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
@@ -152,6 +156,7 @@ jobs:
   # which is being written to during the benchmark must existing before the
   # agent process is started.
   benchmarks-loaded-agent-single-growing-log-file-20mb-py-311:
+    name: Process Benchmark
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref == 'refs/heads/master' }}
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
@@ -170,6 +175,7 @@ jobs:
       dry_run: ${{ ! github.ref == 'refs/heads/master' }}
 
   benchmarks-loaded-agent_2-growing_logs-monitors-multiprocess-2-worker-20mb-py-311:
+    name: Process Benchmark
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref == 'refs/heads/master' }}
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
@@ -188,6 +194,7 @@ jobs:
       dry_run: ${{ ! github.ref == 'refs/heads/master' }}
 
   benchmarks-loaded-agent-single-50mb-log-file-with-500k-lines-py-311:
+    name: Process Benchmark
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref == 'refs/heads/master' }}
     uses: ./.github/workflows/codespeed-agent-benchmarks.yaml
