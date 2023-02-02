@@ -162,12 +162,7 @@ jobs:
         if: ${{ success() || failure() }}
 
       - name: Notify Slack on Failure
-        # NOTE: github.ref is set to pr ref (and not branch name, e.g. refs/pull/28/merge) for pull
-        # requests and that's why we need this special conditional and check for github.head_ref in
-        # case of PRs
-        # TODO: Temporary disable to avoid spam due to CodeSpeed issues
-        if: false
-        #  if: ${{ failure() && (github.ref == 'refs/heads/master' || github.head_ref == 'master') }}
+        if: ${{ failure() && github.ref_name == 'master' }}
         uses: act10ns/slack@ed1309ab9862e57e9e583e51c7889486b9a00b0f # v2.0.0
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

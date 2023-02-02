@@ -19,7 +19,7 @@ permissions:
 jobs:
   build-linux-packages:
     name: "Build Linux packages"
-    uses: ./.github/workflows/agent-build-linux-packages-new.yml
+    uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
     secrets:
       CT_AWS_DEV_EC2_PRIVATE_KEY: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
       CT_AWS_DEV_EC2_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
@@ -52,3 +52,13 @@ jobs:
           name: tarball-noarch
           path: build
           retention-days: 1
+
+      - name: Notify Slack on Failure
+        if: ${{ failure() && github.ref_name == 'master' }}
+        uses: act10ns/slack@ed1309ab9862e57e9e583e51c7889486b9a00b0f # v2.0.0
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          status: ${{ job.status }}
+          steps: ${{ toJson(steps) }}
+          channel: '#eng-dataset-cloud-tech'
