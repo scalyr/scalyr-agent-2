@@ -156,7 +156,11 @@ def test_packages(
     agent_version,
     tmp_path,
 ):
-    timeout_tracker = TimeoutTracker(400)
+    if "x86_64" not in package_builder_name:
+        timeout_tracker = TimeoutTracker(800)
+    else:
+        timeout_tracker = TimeoutTracker(400)
+
     _print_system_information()
     _prepare_environment(
         package_type=package_builder.PACKAGE_TYPE,
