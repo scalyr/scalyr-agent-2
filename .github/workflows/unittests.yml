@@ -30,7 +30,7 @@ jobs:
 
   coverage:
     runs-on: ubuntu-latest
-    if: (success() || failure()) && (${{ needs.pre_job.outputs.should_skip != 'true' || github.ref_name == 'master') }})
+    if: (success() || failure()) && (${{ needs.pre_job.outputs.should_skip != 'true' || github.ref_name == 'master' }})
     needs:
       - pre_job
       - unittests
