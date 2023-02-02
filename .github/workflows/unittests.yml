@@ -30,7 +30,7 @@ jobs:
 
   coverage:
     runs-on: ubuntu-latest
-    if: (success() || failure()) && (${{ needs.pre_job.outputs.should_skip != 'true' || github.ref == 'refs/heads/master') }})
+    if: (success() || failure()) && (${{ needs.pre_job.outputs.should_skip != 'true' || github.ref_name == 'master') }})
     needs:
       - pre_job
       - unittests
@@ -68,7 +68,7 @@ jobs:
 
     needs: pre_job
     # NOTE: We always want to run job on master branch
-    if: (success() || failure()) && (${{ needs.pre_job.outputs.should_skip != 'true' || github.ref == 'refs/heads/master' }})
+    if: (success() || failure()) && (${{ needs.pre_job.outputs.should_skip != 'true' || github.ref_name == 'master' }})
 
     timeout-minutes: 10
     defaults:
@@ -133,10 +133,7 @@ jobs:
         if: ${{ success() || failure() }}
 
       - name: Notify Slack on Failure
-        # NOTE: github.ref is set to pr ref (and not branch name, e.g. refs/pull/28/merge) for pull
-        # requests and that's why we need this special conditional and check for github.head_ref in
-        # case of PRs
-        if: ${{ failure() && (github.ref == 'refs/heads/master' || github.head_ref == 'master') }}
+        if: ${{ failure() && github.ref_name == 'master' }}
         uses: act10ns/slack@ed1309ab9862e57e9e583e51c7889486b9a00b0f # v2.0.0
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -151,7 +148,7 @@ jobs:
 
     needs: pre_job
     # NOTE: We always want to run job on master branch
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref == 'refs/heads/master' }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref_name == 'master' }}
 
     timeout-minutes: 15
     defaults:
@@ -209,10 +206,7 @@ jobs:
         if: ${{ success() || failure() }}
 
       - name: Notify Slack on Failure
-        # NOTE: github.ref is set to pr ref (and not branch name, e.g. refs/pull/28/merge) for pull
-        # requests and that's why we need this special conditional and check for github.head_ref in
-        # case of PRs
-        if: ${{ failure() && (github.ref == 'refs/heads/master' || github.head_ref == 'master') }}
+        if: ${{ failure() && github.ref_name == 'master' }}
         uses: act10ns/slack@ed1309ab9862e57e9e583e51c7889486b9a00b0f # v2.0.0
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -228,7 +222,7 @@ jobs:
 
     needs: pre_job
     # NOTE: We always want to run job on master branch
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref == 'refs/heads/master' }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref_name == 'master' }}
 
     defaults:
       run:
@@ -278,10 +272,7 @@ jobs:
         if: ${{ success() || failure() }}
 
       - name: Notify Slack on Failure
-        # NOTE: github.ref is set to pr ref (and not branch name, e.g. refs/pull/28/merge) for pull
-        # requests and that's why we need this special conditional and check for github.head_ref in
-        # case of PRs
-        if: ${{ failure() && (github.ref == 'refs/heads/master' || github.head_ref == 'master') }}
+        if: ${{ failure() && github.ref_name == 'master' }}
         uses: act10ns/slack@ed1309ab9862e57e9e583e51c7889486b9a00b0f # v2.0.0
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
