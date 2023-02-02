@@ -32,6 +32,8 @@ jobs:
   tox-lint:
     runs-on: ubuntu-20.04
     needs: pre_job
+    # NOTE: We always want to run job on master branch
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref == 'refs/heads/master' }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3

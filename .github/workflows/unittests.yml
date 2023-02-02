@@ -30,7 +30,7 @@ jobs:
 
   coverage:
     runs-on: ubuntu-latest
-    if: (success() || failure()) && (${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }})
+    if: (success() || failure()) && (${{ needs.pre_job.outputs.should_skip != 'true' || github.ref == 'refs/heads/master') }})
     needs:
       - pre_job
       - unittests
@@ -68,7 +68,7 @@ jobs:
 
     needs: pre_job
     # NOTE: We always want to run job on master branch
-    if: (success() || failure()) && (${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }})
+    if: (success() || failure()) && (${{ needs.pre_job.outputs.should_skip != 'true' || github.ref == 'refs/heads/master' }})
 
     timeout-minutes: 10
     defaults:
@@ -151,7 +151,7 @@ jobs:
 
     needs: pre_job
     # NOTE: We always want to run job on master branch
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref == 'refs/heads/master' }}
 
     timeout-minutes: 15
     defaults:
@@ -228,7 +228,7 @@ jobs:
 
     needs: pre_job
     # NOTE: We always want to run job on master branch
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' || (github.ref == 'refs/heads/master' || github.base_ref == 'master') }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref == 'refs/heads/master' }}
 
     defaults:
       run:
