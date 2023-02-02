@@ -156,7 +156,11 @@ def test_packages(
     agent_version,
     tmp_path,
 ):
-    timeout_tracker = TimeoutTracker(400)
+    if "x86_64" not in package_builder_name:
+        timeout_tracker = TimeoutTracker(800)
+    else:
+        timeout_tracker = TimeoutTracker(400)
+
     _print_system_information()
     _prepare_environment(
         package_type=package_builder.PACKAGE_TYPE,
@@ -182,9 +186,7 @@ def test_packages(
     _run_shell("ls -la /etc/rc*.d/ | grep scalyr-agent")
     _run_shell("ls -la /etc/rc*.d/ | grep scalyr-agent | wc -l | grep 7")
 
-    server_host = (
-        f"package-{package_builder_name}-test-{test_session_suffix}-{int(time.time())}"
-    )
+    server_host = f"package-{package_builder_name}-{target_distro.name}-test-{test_session_suffix}-{int(time.time())}"
 
     upload_test_log_path = LINUX_PACKAGE_AGENT_PATHS.logs_dir / "test.log"
 
