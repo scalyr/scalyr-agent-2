@@ -12,20 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from scalyr_agent.builtin_monitors.syslog_monitor import SyslogHandler, SyslogMonitor
+from scalyr_agent.builtin_monitors.syslog_monitor import SyslogMonitor
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.json_lib import JsonObject
+from scalyr_agent.log_watcher import LogWatcher
 from scalyr_agent import scalyr_logging 
 from scalyr_agent.test_base import ScalyrTestCase
 
 # Replace with unittest.mock when only supporting Python >= 3.3
 import mock
 
-import collections
+import copy
 import os.path
 import socket
 import threading
 import time
+from typing import Any, Dict, List
 
 class SyslogMonitorMock(SyslogMonitor):
     def __init__(self, *args, **kwargs):
@@ -34,13 +36,13 @@ class SyslogMonitorMock(SyslogMonitor):
         self.lines = 0
         self.lines_cond = threading.Condition()
 
-    def increment_counter(self, reported_lines=0, **kwargs):
+    def increment_counter(self, reported_lines: int=0, **kwargs):
         super().increment_counter(reported_lines, **kwargs)
         with self.lines_cond:
             self.lines += reported_lines
             self.lines_cond.notify()
 
-    def wait_until_count(self, count, timeout=3):
+    def wait_until_count(self, count: int, timeout: int=3):
         with self.lines_cond:
             while self.lines != count:
                 start = time.time()
@@ -48,48 +50,47 @@ class SyslogMonitorMock(SyslogMonitor):
                     raise TimeoutError
                 timeout -= time.time() - start
 
-captures = collections.defaultdict(list)
-captures_lock = threading.Lock()
-
-# SyslogHandler instances are attributes of SyslogServer instances which are private attributes of SyslogMonitor.
-# Because of this patching SyslogHandler methods and retaining original behavior isn't feasible without abusing private attribute access.
-class SyslogHandlerMock(SyslogHandler):
-    def handle(self, data, extra):
-        super().handle(data, extra)
-        # FIXME STOPPED Make the values here available for verification
-        #print('*'*10, repr(data), extra)
-
 class ConfigurationMock(Configuration):
     log_path = '.'
 
-    def __init__(self, log_configs):
+    def __init__(self, log_configs: List[Dict[str, Any]]):
         self.mock_log_configs = log_configs
 
     @property
-    def log_configs(self):
+    def log_configs(self) -> List[Dict[str, Any]]:
         return self.mock_log_configs
     
     @property
-    def agent_log_path(self):
+    def agent_log_path(self) -> str:
         return self.__class__.log_path
 
     @property
-    def server_attributes(self):
+    def server_attributes(self) -> Dict[str, Any]:
         return {"serverHost":"localhost"}
 
     @property
-    def log_rotation_backup_count(self):
+    def log_rotation_backup_count(self) -> int:
         return 2
 
     @property
-    def log_rotation_max_bytes(self):
+    def log_rotation_max_bytes(self) -> int:
         return 20 * 1024 * 1024
 
-# Capture generated log filenames and prevent file creations/writes.
+class LogWatcherMock(LogWatcher):
+    def __init__(self):
+        self.log_configs = []
+    
+    def add_log_config(self, monitor_name: str, log_config: Dict[str, Any]):
+        assert monitor_name == 'scalyr_agent.builtin_monitors.syslog_monitor'
+
+        log_config_copy = copy.deepcopy(log_config)
+        log_config_copy['attributes'] = log_config_copy['attributes'].to_dict()
+        self.log_configs.append(log_config_copy)
+
+# Mocked to prevent file creations/writes (for message_log_template log files)
 class AutoFlushingRotatingFileMock:
-    def __init__(self, filename, **kwargs):
-        with captures_lock:
-            captures['filenames'].append(filename)
+    def __init__(self, *args, **kwargs):
+        pass
 
     def write(self, message):
         pass
@@ -97,36 +98,44 @@ class AutoFlushingRotatingFileMock:
     def flush(self):
         pass
 
-# Capture main log filename and prevent file creation/writes.
+# Mocked to prevent file creations/writes (for the main log file)
 class AutoFlushingRotatingFileHandlerMock:
-    def __init__(self, filename, **kwargs):
-        with captures_lock:
-            captures['filenames'].append(filename)
+    def __init__(self, *args, **kwargs):
+        pass
     
     def flush(self):
         pass
 
 @mock.patch('scalyr_agent.builtin_monitors.syslog_monitor.AutoFlushingRotatingFile', AutoFlushingRotatingFileMock)
 @mock.patch('scalyr_agent.builtin_monitors.syslog_monitor.AutoFlushingRotatingFileHandler', AutoFlushingRotatingFileHandlerMock)
-@mock.patch('scalyr_agent.builtin_monitors.syslog_monitor.SyslogHandler', SyslogHandlerMock)
 class SyslogTemplateTest(ScalyrTestCase):
     port = 1601
 
     def setUp(self):
         super().setUp()
         self.monitor = None
-
-        global captures
-        with captures_lock:
-            captures = collections.defaultdict(list)
+        self.watcher = None
 
     def tearDown(self):
         super().tearDown()
         if self.monitor:
             self.monitor.stop()
 
+    def create_monitor(self, config: Dict[str, Any], log_configs: List[Dict[str, Any]]):
+        self.monitor = SyslogMonitorMock(
+            config,
+            scalyr_logging.getLogger(self.__class__.__name__),
+            global_config=ConfigurationMock(log_configs),
+        )
+
+        self.watcher = LogWatcherMock()
+        self.monitor.set_log_watcher(self.watcher)
+
+        self.monitor.open_metric_log()
+        self.monitor.start()
+
     @staticmethod
-    def connect_and_send(data: bytes, port: int=None, timeout=3):
+    def connect_and_send(data: bytes, port: int=None, timeout: int=3):
         port = port or SyslogTemplateTest.port
 
         timedout = time.time() + timeout
@@ -145,71 +154,73 @@ class SyslogTemplateTest(ScalyrTestCase):
         raise TimeoutError
 
     def test_no_params(self):
-        config = {
-            'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
-            'protocols': 'tcp:%d' % self.__class__.port,
-            'message_log_template': 'syslog.log',
-        }
-        global_config = ConfigurationMock([
+        self.create_monitor(
             {
-                'path': os.path.join(ConfigurationMock.log_path, 'syslog*.log'), 
-                'attributes': JsonObject({ 'parser': 'syslog-parser' }),
-            }
-        ])
-
-        logger = scalyr_logging.getLogger(self.__class__.__name__)
-        self.monitor = SyslogMonitorMock(config, logger, global_config=global_config)
-        self.monitor.open_metric_log()
-        self.monitor.start()
+                'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
+                'protocols': 'tcp:%d' % self.__class__.port,
+                'message_log_template': 'syslog.log',
+            },
+            [
+                {
+                    'path': os.path.join(ConfigurationMock.log_path, 'syslog*.log'), 
+                    'attributes': JsonObject({ 'parser': 'syslog-parser' }),
+                }
+            ],
+        )
 
         self.connect_and_send(b'<1>Jan 02 12:34:56 localhost demo[1]: hello world\n')
         self.monitor.wait_until_count(1)
 
-        with captures_lock:
-            self.assertEqual(captures['filenames'], ['agent_syslog.log', './syslog.log'])
+        self.assertEqual(len(self.watcher.log_configs), 1)
+        self.assertDictEqual(
+            self.watcher.log_configs[0], 
+            {
+                'path': './syslog.log',
+                'attributes': {
+                    'proto': 'tcp',
+                    'srcip': '127.0.0.1',
+                    'destport': 1601,
+                    'hostname': 'localhost',
+                    'appname': 'demo'
+                },
+                'parser': 'syslog-parser',
+            }
+        )
 
     def test_no_params_no_logs(self):
-        config = {
-            'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
-            'protocols': 'tcp:%d' % self.__class__.port,
-            'message_log_template': 'syslog.log',
-        }
-        global_config = ConfigurationMock([])
-
-        logger = scalyr_logging.getLogger(self.__class__.__name__)
-        self.monitor = SyslogMonitorMock(config, logger, global_config=global_config)
-        self.monitor.open_metric_log()
-        self.monitor.start()
+        self.create_monitor(
+            {
+                'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
+                'protocols': 'tcp:%d' % self.__class__.port,
+                'message_log_template': 'syslog.log',
+            },
+            [],
+        )
 
         self.connect_and_send(b'<1>Jan 02 12:34:56 localhost demo[1]: hello world\n')
         self.monitor.wait_until_count(1)
 
-        with captures_lock:
-            self.assertEqual(captures['filenames'], ['agent_syslog.log'])
+        self.assertEqual(len(self.watcher.log_configs), 0)
 
     def test_no_params_no_matching_logs(self):
-        config = {
-            'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
-            'protocols': 'tcp:%d' % self.__class__.port,
-            'message_log_template': 'syslog.log',
-        }
-        global_config = ConfigurationMock([
+        self.create_monitor(
             {
-                'path': os.path.join(ConfigurationMock.log_path, 'not-syslog*.log'), 
-                'attributes': JsonObject({ 'parser': 'not-syslog-parser' }),
-            }
-        ])
-
-        logger = scalyr_logging.getLogger(self.__class__.__name__)
-        self.monitor = SyslogMonitorMock(config, logger, global_config=global_config)
-        self.monitor.open_metric_log()
-        self.monitor.start()
+                'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
+                'protocols': 'tcp:%d' % self.__class__.port,
+                'message_log_template': 'syslog.log',
+            },
+            [
+                {
+                    'path': os.path.join(ConfigurationMock.log_path, 'not-syslog*.log'), 
+                    'attributes': JsonObject({ 'parser': 'not-syslog-parser' }),
+                }
+            ],
+        )
 
         self.connect_and_send(b'<1>Jan 02 12:34:56 localhost demo[1]: hello world\n')
         self.monitor.wait_until_count(1)
 
-        with captures_lock:
-            self.assertEqual(captures['filenames'], ['agent_syslog.log'])
+        self.assertEqual(len(self.watcher.log_configs), 0)
 
     # FIXME Options to test: message_log_template, check_for_unused_logs_mins, delete_unused_logs_hours, max_log_files
     # FIXME Test substitutions of message_log_template for "PROTO", "SRCIP", "DESTPORT", "HOSTNAME", "APPNAME"
