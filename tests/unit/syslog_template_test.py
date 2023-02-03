@@ -247,6 +247,7 @@ class SyslogTemplateTest(ScalyrTestCase):
         )
 
         self.connect_and_send(b'<1>Jan 02 12:34:56 localhost demo[1]: hello tcp\n', self.__class__.tcp_port, socket.SOCK_STREAM)
+        self.monitor.wait_until_count(1)
         self.connect_and_send(b'<1>Jan 02 12:34:56 localhost demo[1]: hello udp\n', self.__class__.udp_port, socket.SOCK_DGRAM)
         self.monitor.wait_until_count(2)
 
@@ -300,6 +301,7 @@ class SyslogTemplateTest(ScalyrTestCase):
         )
 
         self.connect_and_send(b'<1>Jan 02 12:34:56 localhost demo[1]: hello first\n', self.__class__.tcp_port)
+        self.monitor.wait_until_count(1)
         self.connect_and_send(b'<1>Jan 02 12:34:56 localhost demo[1]: hello second\n', self.__class__.tcp_port + 1)
         self.monitor.wait_until_count(2)
 
@@ -333,7 +335,7 @@ class SyslogTemplateTest(ScalyrTestCase):
             }
         )
 
-    @skip('Requires aliasing loopback interface on macOS') # FIXME Test on linux
+    @skip('Requires aliasing the loopback interface on macOS') # FIXME Test on linux
     def test_srcip_param(self):
         self.create_monitor(
             {
@@ -350,6 +352,7 @@ class SyslogTemplateTest(ScalyrTestCase):
         )
 
         self.connect_and_send(b'<1>Jan 02 12:34:56 localhost demo[1]: hello from localhost\n')
+        self.monitor.wait_until_count(1)
         self.connect_and_send(b'<1>Jan 02 12:34:56 localhost demo[1]: hello again from localhost\n', bind_addr='127.0.0.2')
         self.monitor.wait_until_count(2)
 
