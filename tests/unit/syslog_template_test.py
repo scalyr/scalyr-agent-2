@@ -17,7 +17,7 @@ from scalyr_agent.configuration import Configuration
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.log_watcher import LogWatcher
 from scalyr_agent import scalyr_logging 
-from scalyr_agent.test_base import ScalyrTestCase
+from scalyr_agent.test_base import ScalyrTestCase, skip
 
 # Replace with unittest.mock when only supporting Python >= 3.3
 import mock
@@ -109,7 +109,8 @@ class AutoFlushingRotatingFileHandlerMock:
 @mock.patch('scalyr_agent.builtin_monitors.syslog_monitor.AutoFlushingRotatingFile', AutoFlushingRotatingFileMock)
 @mock.patch('scalyr_agent.builtin_monitors.syslog_monitor.AutoFlushingRotatingFileHandler', AutoFlushingRotatingFileHandlerMock)
 class SyslogTemplateTest(ScalyrTestCase):
-    port = 1601
+    tcp_port = 1601
+    udp_port = 1514
 
     def setUp(self):
         super().setUp()
@@ -135,15 +136,23 @@ class SyslogTemplateTest(ScalyrTestCase):
         self.monitor.start()
 
     @staticmethod
-    def connect_and_send(data: bytes, port: int=None, timeout: int=3):
-        port = port or SyslogTemplateTest.port
+    def connect_and_send(
+        data: bytes,
+        port: int=None,
+        proto: socket.SocketKind=socket.SOCK_STREAM,
+        bind_addr: str=None,
+        timeout: int=3
+    ):
+        port = port or SyslogTemplateTest.tcp_port
 
         timedout = time.time() + timeout
         while time.time() < timedout:
             try:
                 # If a connect fails, the state of the socket is unspecified.
                 # Hence not attempting to reuse the socket here.
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock = socket.socket(socket.AF_INET, proto)
+                if bind_addr:
+                    sock.bind((bind_addr, 0))
                 sock.connect(('127.0.0.1', port))
                 sock.sendall(data)
                 return
@@ -157,7 +166,7 @@ class SyslogTemplateTest(ScalyrTestCase):
         self.create_monitor(
             {
                 'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
-                'protocols': 'tcp:%d' % self.__class__.port,
+                'protocols': 'tcp:%d' % self.__class__.tcp_port,
                 'message_log_template': 'syslog.log',
             },
             [
@@ -179,7 +188,7 @@ class SyslogTemplateTest(ScalyrTestCase):
                 'attributes': {
                     'proto': 'tcp',
                     'srcip': '127.0.0.1',
-                    'destport': 1601,
+                    'destport': self.__class__.tcp_port,
                     'hostname': 'localhost',
                     'appname': 'demo'
                 },
@@ -191,7 +200,7 @@ class SyslogTemplateTest(ScalyrTestCase):
         self.create_monitor(
             {
                 'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
-                'protocols': 'tcp:%d' % self.__class__.port,
+                'protocols': 'tcp:%d' % self.__class__.tcp_port,
                 'message_log_template': 'syslog.log',
             },
             [],
@@ -206,7 +215,7 @@ class SyslogTemplateTest(ScalyrTestCase):
         self.create_monitor(
             {
                 'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
-                'protocols': 'tcp:%d' % self.__class__.port,
+                'protocols': 'tcp:%d' % self.__class__.tcp_port,
                 'message_log_template': 'syslog.log',
             },
             [
@@ -222,6 +231,160 @@ class SyslogTemplateTest(ScalyrTestCase):
 
         self.assertEqual(len(self.watcher.log_configs), 0)
 
-    # FIXME Options to test: message_log_template, check_for_unused_logs_mins, delete_unused_logs_hours, max_log_files
-    # FIXME Test substitutions of message_log_template for "PROTO", "SRCIP", "DESTPORT", "HOSTNAME", "APPNAME"
-    # FIXME Test all other aspects of __handle_syslog_logs(data, extra), pull in master for previous PR change
+    def test_proto_destport_params_one_logconfig(self):
+        self.create_monitor(
+            {
+                'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
+                'protocols': 'tcp:%d, udp:%d' % (self.__class__.tcp_port, self.__class__.udp_port),
+                'message_log_template': 'syslog-${PROTO}-${DESTPORT}.log',
+            },
+            [
+                {
+                    'path': os.path.join(ConfigurationMock.log_path, 'syslog-*.log'), 
+                    'attributes': JsonObject({ 'parser': 'syslog-parser' }),
+                }
+            ],
+        )
+
+        self.connect_and_send(b'<1>Jan 02 12:34:56 localhost demo[1]: hello tcp\n', self.__class__.tcp_port, socket.SOCK_STREAM)
+        self.connect_and_send(b'<1>Jan 02 12:34:56 localhost demo[1]: hello udp\n', self.__class__.udp_port, socket.SOCK_DGRAM)
+        self.monitor.wait_until_count(2)
+
+        self.assertEqual(len(self.watcher.log_configs), 2)
+        self.assertDictEqual(
+            self.watcher.log_configs[0], 
+            {
+                'path': './syslog-tcp-%d.log' % self.__class__.tcp_port,
+                'attributes': {
+                    'proto': 'tcp',
+                    'srcip': '127.0.0.1',
+                    'destport': self.__class__.tcp_port,
+                    'hostname': 'localhost',
+                    'appname': 'demo'
+                },
+                'parser': 'syslog-parser',
+            }
+        )
+        self.assertDictEqual(
+            self.watcher.log_configs[1], 
+            {
+                'path': './syslog-udp-%d.log' % self.__class__.udp_port,
+                'attributes': {
+                    'proto': 'udp',
+                    'srcip': '127.0.0.1',
+                    'destport': self.__class__.udp_port,
+                    'hostname': 'localhost',
+                    'appname': 'demo'
+                },
+                'parser': 'syslog-parser',
+            }
+        )
+
+    def test_destport_param_two_logconfigs(self):
+        self.create_monitor(
+            {
+                'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
+                'protocols': 'tcp:%d, tcp:%d' % (self.__class__.tcp_port, self.__class__.tcp_port + 1),
+                'message_log_template': 'syslog-${PROTO}-${DESTPORT}.log',
+            },
+            [
+                {
+                    'path': os.path.join(ConfigurationMock.log_path, 'syslog-tcp-%d.log' % self.__class__.tcp_port), 
+                    'attributes': JsonObject({ 'parser': 'first-parser' }),
+                },
+                {
+                    'path': os.path.join(ConfigurationMock.log_path, 'syslog-tcp-%d.log' % (self.__class__.tcp_port + 1,)), 
+                    'attributes': JsonObject({ 'parser': 'second-parser' }),
+                },
+            ],
+        )
+
+        self.connect_and_send(b'<1>Jan 02 12:34:56 localhost demo[1]: hello first\n', self.__class__.tcp_port)
+        self.connect_and_send(b'<1>Jan 02 12:34:56 localhost demo[1]: hello second\n', self.__class__.tcp_port + 1)
+        self.monitor.wait_until_count(2)
+
+        self.assertEqual(len(self.watcher.log_configs), 2)
+        self.assertDictEqual(
+            self.watcher.log_configs[0], 
+            {
+                'path': './syslog-tcp-%d.log' % self.__class__.tcp_port,
+                'attributes': {
+                    'proto': 'tcp',
+                    'srcip': '127.0.0.1',
+                    'destport': self.__class__.tcp_port,
+                    'hostname': 'localhost',
+                    'appname': 'demo'
+                },
+                'parser': 'first-parser',
+            }
+        )
+        self.assertDictEqual(
+            self.watcher.log_configs[1], 
+            {
+                'path': './syslog-tcp-%d.log' % (self.__class__.tcp_port + 1,),
+                'attributes': {
+                    'proto': 'tcp',
+                    'srcip': '127.0.0.1',
+                    'destport': self.__class__.tcp_port + 1,
+                    'hostname': 'localhost',
+                    'appname': 'demo'
+                },
+                'parser': 'second-parser',
+            }
+        )
+
+    @skip('Requires aliasing loopback interface on macOS') # FIXME Test on linux
+    def test_srcip_param(self):
+        self.create_monitor(
+            {
+                'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
+                'protocols': 'tcp:%d' % self.__class__.tcp_port,
+                'message_log_template': 'syslog-${SRCIP}.log',
+            },
+            [
+                {
+                    'path': os.path.join(ConfigurationMock.log_path, 'syslog-*.log'), 
+                    'attributes': JsonObject({ 'parser': 'syslog-parser' }),
+                },
+            ],
+        )
+
+        self.connect_and_send(b'<1>Jan 02 12:34:56 localhost demo[1]: hello from localhost\n')
+        self.connect_and_send(b'<1>Jan 02 12:34:56 localhost demo[1]: hello again from localhost\n', bind_addr='127.0.0.2')
+        self.monitor.wait_until_count(2)
+
+        self.assertEqual(len(self.watcher.log_configs), 2)
+        self.assertDictEqual(
+            self.watcher.log_configs[0], 
+            {
+                'path': './syslog-127.0.0.1.log',
+                'attributes': {
+                    'proto': 'tcp',
+                    'srcip': '127.0.0.1',
+                    'destport': self.__class__.tcp_port,
+                    'hostname': 'localhost',
+                    'appname': 'demo'
+                },
+                'parser': 'syslog-parser',
+            }
+        )
+        self.assertDictEqual(
+            self.watcher.log_configs[1], 
+            {
+                'path': './syslog-127.0.0.2.log',
+                'attributes': {
+                    'proto': 'tcp',
+                    'srcip': '127.0.0.2',
+                    'destport': self.__class__.tcp_port,
+                    'hostname': 'localhost',
+                    'appname': 'demo'
+                },
+                'parser': 'syslog-parser',
+            }
+        )
+
+    # FIXME Test substitutions of message_log_template for "HOSTNAME", "APPNAME"
+    # FIXME Options to test: check_for_unused_logs_mins, delete_unused_logs_hours, max_log_files
+    # FIXME Test all other aspects of __handle_syslog_logs(data, extra)
+    # FIXME Test watcher.remove_log_path calls
+    # FIXME Test SyslogHandler._parse_syslog
