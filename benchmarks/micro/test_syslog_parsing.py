@@ -24,12 +24,17 @@ TODO: Also exercise the following scenarios / code paths:
 
 import os
 import tempfile
+import logging
 
 import mock
 import pytest
 from faker import Faker
 
+# Suppress very noisy faker debug logging
+logging.getLogger('faker').setLevel(logging.ERROR)
+
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogHandler
+from scalyr_agent.json_lib import JsonObject
 
 MOCK_MESSAGE =  "<34>Oct 11 22:14:15 mymachine su: \'su root\' failed for lonvick on /dev/pts/8"
 
@@ -46,6 +51,10 @@ class MockConfig(object):
             return self._values[key]
         except KeyError:
             return None
+
+class MockGlobalConfig(object):
+    def __init__(self):
+        self.log_configs = []
 
 TEMP_DIRECTORY = tempfile.gettempdir()
 
@@ -100,8 +109,17 @@ def test_handle_syslog_logs(benchmark, message_template):
     )
 
     with tempfile.TemporaryDirectory() as tmp_directory:
+        mock_global_config = MockGlobalConfig()
+        mock_global_config.log_configs = [
+            {
+                "path": os.path.join(tmp_directory, "test-*-*.txt"),
+                "attributes": JsonObject({"parser": "foobar"}),
+            }
+        ]
+
         handler = SyslogHandler(logger=mock_logger, line_reporter=mock_line_reporter, config=mock_config,
-                                server_host="localhost", log_path=tmp_directory, get_log_watcher=mock.Mock(),
+                                global_config=mock_global_config, server_host="localhost",
+                                log_path=tmp_directory, get_log_watcher=mock.Mock(),
                                 rotate_options=(2, 200000), docker_options=mock.Mock())
         handler._SyslogHandler__get_log_watcher.return_value = mock.Mock(), mock.Mock()
 
