@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from scalyr_agent.builtin_monitors.syslog_monitor import SyslogMonitor
+from scalyr_agent.builtin_monitors.syslog_monitor import RUN_EXPIRE_COUNT, SyslogMonitor
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.log_watcher import LogWatcher
@@ -87,6 +87,17 @@ class LogWatcherMock(LogWatcher):
         log_config_copy['attributes'] = log_config_copy['attributes'].to_dict()
         self.log_configs.append(log_config_copy)
 
+        return log_config
+
+    def remove_log_path(self, monitor_name: str, log_path: str):
+        assert monitor_name == 'scalyr_agent.builtin_monitors.syslog_monitor'
+
+        for idx, log_config in enumerate(self.log_configs):
+            if log_config['path'] == log_path:
+                self.log_configs.pop(idx)
+                return
+        raise Exception('not found')
+
 # Mocked to prevent file creations/writes (for message_log_template log files)
 class AutoFlushingRotatingFileMock:
     def __init__(self, *args, **kwargs):
@@ -98,6 +109,9 @@ class AutoFlushingRotatingFileMock:
     def flush(self):
         pass
 
+    def close(self):
+        pass
+
 # Mocked to prevent file creations/writes (for the main log file)
 class AutoFlushingRotatingFileHandlerMock:
     def __init__(self, *args, **kwargs):
@@ -105,6 +119,10 @@ class AutoFlushingRotatingFileHandlerMock:
     
     def flush(self):
         pass
+    
+    # FIXME
+    #def setFormatter(self, *args, **kwargs):
+    #    pass
 
 @mock.patch('scalyr_agent.builtin_monitors.syslog_monitor.AutoFlushingRotatingFile', AutoFlushingRotatingFileMock)
 @mock.patch('scalyr_agent.builtin_monitors.syslog_monitor.AutoFlushingRotatingFileHandler', AutoFlushingRotatingFileHandlerMock)
@@ -246,9 +264,9 @@ class SyslogTemplateTest(ScalyrTestCase):
             ],
         )
 
-        self.connect_and_send(b'<1>Jan 02 12:34:56 localhost demo[1]: hello tcp\n', self.__class__.tcp_port, socket.SOCK_STREAM)
+        self.connect_and_send(b'<1>Jan 02 12:34:56 localhost demo[1]: hello world\n', self.__class__.tcp_port, socket.SOCK_STREAM)
         self.monitor.wait_until_count(1)
-        self.connect_and_send(b'<1>Jan 02 12:34:56 localhost demo[1]: hello udp\n', self.__class__.udp_port, socket.SOCK_DGRAM)
+        self.connect_and_send(b'<1>Jan 02 12:34:56 localhost demo[1]: hello world\n', self.__class__.udp_port, socket.SOCK_DGRAM)
         self.monitor.wait_until_count(2)
 
         self.assertEqual(len(self.watcher.log_configs), 2)
@@ -281,7 +299,7 @@ class SyslogTemplateTest(ScalyrTestCase):
             }
         )
 
-    def test_destport_param_two_logconfigs(self):
+    def test_proto_destport_param_two_logconfigs(self):
         self.create_monitor(
             {
                 'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
@@ -300,9 +318,9 @@ class SyslogTemplateTest(ScalyrTestCase):
             ],
         )
 
-        self.connect_and_send(b'<1>Jan 02 12:34:56 localhost demo[1]: hello first\n', self.__class__.tcp_port)
+        self.connect_and_send(b'<1>Jan 02 12:34:56 localhost demo[1]: hello world\n', self.__class__.tcp_port)
         self.monitor.wait_until_count(1)
-        self.connect_and_send(b'<1>Jan 02 12:34:56 localhost demo[1]: hello second\n', self.__class__.tcp_port + 1)
+        self.connect_and_send(b'<1>Jan 02 12:34:56 localhost demo[1]: hello world\n', self.__class__.tcp_port + 1)
         self.monitor.wait_until_count(2)
 
         self.assertEqual(len(self.watcher.log_configs), 2)
@@ -351,9 +369,9 @@ class SyslogTemplateTest(ScalyrTestCase):
             ],
         )
 
-        self.connect_and_send(b'<1>Jan 02 12:34:56 localhost demo[1]: hello from localhost\n')
+        self.connect_and_send(b'<1>Jan 02 12:34:56 localhost demo[1]: hello world\n')
         self.monitor.wait_until_count(1)
-        self.connect_and_send(b'<1>Jan 02 12:34:56 localhost demo[1]: hello again from localhost\n', bind_addr='127.0.0.2')
+        self.connect_and_send(b'<1>Jan 02 12:34:56 localhost demo[1]: hello world\n', bind_addr='127.0.0.2')
         self.monitor.wait_until_count(2)
 
         self.assertEqual(len(self.watcher.log_configs), 2)
@@ -386,8 +404,449 @@ class SyslogTemplateTest(ScalyrTestCase):
             }
         )
 
-    # FIXME Test substitutions of message_log_template for "HOSTNAME", "APPNAME"
-    # FIXME Options to test: check_for_unused_logs_mins, delete_unused_logs_hours, max_log_files
-    # FIXME Test all other aspects of __handle_syslog_logs(data, extra)
-    # FIXME Test watcher.remove_log_path calls
+    def test_hostname_param_one_logconfig(self):
+        self.create_monitor(
+            {
+                'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
+                'protocols': 'tcp:%d' % self.__class__.tcp_port,
+                'message_log_template': 'syslog-${HOSTNAME}.log',
+            },
+            [
+                {
+                    'path': os.path.join(ConfigurationMock.log_path, 'syslog-*.log'), 
+                    'attributes': JsonObject({ 'parser': 'syslog-parser' }),
+                }
+            ],
+        )
+
+        self.connect_and_send(b'<1>Jan 02 12:34:56 alpha demo[1]: hello world\n')
+        self.monitor.wait_until_count(1)
+        self.connect_and_send(b'<1>Jan 02 12:34:56 bravo demo[1]: hello world\n')
+        self.monitor.wait_until_count(2)
+
+        self.assertEqual(len(self.watcher.log_configs), 2)
+        self.assertDictEqual(
+            self.watcher.log_configs[0], 
+            {
+                'path': './syslog-alpha.log',
+                'attributes': {
+                    'proto': 'tcp',
+                    'srcip': '127.0.0.1',
+                    'destport': self.__class__.tcp_port,
+                    'hostname': 'alpha',
+                    'appname': 'demo'
+                },
+                'parser': 'syslog-parser',
+            }
+        )
+        self.assertDictEqual(
+            self.watcher.log_configs[1], 
+            {
+                'path': './syslog-bravo.log',
+                'attributes': {
+                    'proto': 'tcp',
+                    'srcip': '127.0.0.1',
+                    'destport': self.__class__.tcp_port,
+                    'hostname': 'bravo',
+                    'appname': 'demo'
+                },
+                'parser': 'syslog-parser',
+            }
+        )
+
+    def test_hostname_param_two_explicit_logconfigs(self):
+        self.create_monitor(
+            {
+                'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
+                'protocols': 'tcp:%d' % self.__class__.tcp_port,
+                'message_log_template': 'syslog-${HOSTNAME}.log',
+            },
+            [
+                {
+                    'path': os.path.join(ConfigurationMock.log_path, 'syslog-alpha.log'), 
+                    'attributes': JsonObject({ 'parser': 'first-parser' }),
+                },
+                {
+                    'path': os.path.join(ConfigurationMock.log_path, 'syslog-bravo.log'), 
+                    'attributes': JsonObject({ 'parser': 'second-parser' }),
+                },
+            ],
+        )
+
+        self.connect_and_send(b'<1>Jan 02 12:34:56 alpha demo[1]: hello world\n')
+        self.monitor.wait_until_count(1)
+        self.connect_and_send(b'<1>Jan 02 12:34:56 bravo demo[1]: hello world\n')
+        self.monitor.wait_until_count(2)
+
+        self.assertEqual(len(self.watcher.log_configs), 2)
+        self.assertDictEqual(
+            self.watcher.log_configs[0], 
+            {
+                'path': './syslog-alpha.log',
+                'attributes': {
+                    'proto': 'tcp',
+                    'srcip': '127.0.0.1',
+                    'destport': self.__class__.tcp_port,
+                    'hostname': 'alpha',
+                    'appname': 'demo'
+                },
+                'parser': 'first-parser',
+            }
+        )
+        self.assertDictEqual(
+            self.watcher.log_configs[1], 
+            {
+                'path': './syslog-bravo.log',
+                'attributes': {
+                    'proto': 'tcp',
+                    'srcip': '127.0.0.1',
+                    'destport': self.__class__.tcp_port,
+                    'hostname': 'bravo',
+                    'appname': 'demo'
+                },
+                'parser': 'second-parser',
+            }
+        )
+
+    def test_hostname_param_two_globbed_logconfigs(self):
+        self.create_monitor(
+            {
+                'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
+                'protocols': 'tcp:%d' % self.__class__.tcp_port,
+                'message_log_template': 'syslog-${HOSTNAME}.log',
+            },
+            [
+                {
+                    'path': os.path.join(ConfigurationMock.log_path, 'syslog-a*.log'), 
+                    'attributes': JsonObject({ 'parser': 'first-parser' }),
+                },
+                {
+                    'path': os.path.join(ConfigurationMock.log_path, 'syslog-b*.log'), 
+                    'attributes': JsonObject({ 'parser': 'second-parser' }),
+                },
+            ],
+        )
+
+        self.connect_and_send(b'<1>Jan 02 12:34:56 alpha demo[1]: hello world\n')
+        self.monitor.wait_until_count(1)
+        self.connect_and_send(b'<1>Jan 02 12:34:56 bravo demo[1]: hello world\n')
+        self.monitor.wait_until_count(2)
+
+        self.assertEqual(len(self.watcher.log_configs), 2)
+        self.assertDictEqual(
+            self.watcher.log_configs[0], 
+            {
+                'path': './syslog-alpha.log',
+                'attributes': {
+                    'proto': 'tcp',
+                    'srcip': '127.0.0.1',
+                    'destport': self.__class__.tcp_port,
+                    'hostname': 'alpha',
+                    'appname': 'demo'
+                },
+                'parser': 'first-parser',
+            }
+        )
+        self.assertDictEqual(
+            self.watcher.log_configs[1], 
+            {
+                'path': './syslog-bravo.log',
+                'attributes': {
+                    'proto': 'tcp',
+                    'srcip': '127.0.0.1',
+                    'destport': self.__class__.tcp_port,
+                    'hostname': 'bravo',
+                    'appname': 'demo'
+                },
+                'parser': 'second-parser',
+            }
+        )
+
+    def test_hostname_param_two_logconfigs_fallthrough(self):
+        self.create_monitor(
+            {
+                'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
+                'protocols': 'tcp:%d' % self.__class__.tcp_port,
+                'message_log_template': 'syslog-${HOSTNAME}.log',
+            },
+            [
+                {
+                    'path': os.path.join(ConfigurationMock.log_path, 'syslog-alpha.log'), 
+                    'attributes': JsonObject({ 'parser': 'first-parser' }),
+                },
+                {
+                    'path': os.path.join(ConfigurationMock.log_path, 'syslog-*.log'), 
+                    'attributes': JsonObject({ 'parser': 'second-parser' }),
+                },
+            ],
+        )
+
+        self.connect_and_send(b'<1>Jan 02 12:34:56 alpha demo[1]: hello world\n')
+        self.monitor.wait_until_count(1)
+        self.connect_and_send(b'<1>Jan 02 12:34:56 bravo demo[1]: hello world\n')
+        self.monitor.wait_until_count(2)
+
+        self.assertEqual(len(self.watcher.log_configs), 2)
+        self.assertDictEqual(
+            self.watcher.log_configs[0], 
+            {
+                'path': './syslog-alpha.log',
+                'attributes': {
+                    'proto': 'tcp',
+                    'srcip': '127.0.0.1',
+                    'destport': self.__class__.tcp_port,
+                    'hostname': 'alpha',
+                    'appname': 'demo'
+                },
+                'parser': 'first-parser',
+            }
+        )
+        self.assertDictEqual(
+            self.watcher.log_configs[1], 
+            {
+                'path': './syslog-bravo.log',
+                'attributes': {
+                    'proto': 'tcp',
+                    'srcip': '127.0.0.1',
+                    'destport': self.__class__.tcp_port,
+                    'hostname': 'bravo',
+                    'appname': 'demo'
+                },
+                'parser': 'second-parser',
+            }
+        )
+
+    def test_appname_param_one_logconfig(self):
+        self.create_monitor(
+            {
+                'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
+                'protocols': 'tcp:%d' % self.__class__.tcp_port,
+                'message_log_template': 'syslog-${APPNAME}.log',
+            },
+            [
+                {
+                    'path': os.path.join(ConfigurationMock.log_path, 'syslog-*.log'), 
+                    'attributes': JsonObject({ 'parser': 'syslog-parser' }),
+                }
+            ],
+        )
+
+        self.connect_and_send(b'<1>Jan 02 12:34:56 localhost apiserver[1]: hello world\n')
+        self.monitor.wait_until_count(1)
+        self.connect_and_send(b'<1>Jan 02 12:34:56 localhost database[1]: hello world\n')
+        self.monitor.wait_until_count(2)
+
+        self.assertEqual(len(self.watcher.log_configs), 2)
+        self.assertDictEqual(
+            self.watcher.log_configs[0], 
+            {
+                'path': './syslog-apiserver.log',
+                'attributes': {
+                    'proto': 'tcp',
+                    'srcip': '127.0.0.1',
+                    'destport': self.__class__.tcp_port,
+                    'hostname': 'localhost',
+                    'appname': 'apiserver'
+                },
+                'parser': 'syslog-parser',
+            }
+        )
+        self.assertDictEqual(
+            self.watcher.log_configs[1], 
+            {
+                'path': './syslog-database.log',
+                'attributes': {
+                    'proto': 'tcp',
+                    'srcip': '127.0.0.1',
+                    'destport': self.__class__.tcp_port,
+                    'hostname': 'localhost',
+                    'appname': 'database'
+                },
+                'parser': 'syslog-parser',
+            }
+        )
+
+    def test_multiple_attribs(self):
+        self.create_monitor(
+            {
+                'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
+                'protocols': 'tcp:%d' % self.__class__.tcp_port,
+                'message_log_template': 'syslog-${APPNAME}.log',
+            },
+            [
+                {
+                    'path': os.path.join(ConfigurationMock.log_path, 'syslog-*.log'), 
+                    'attributes': JsonObject({
+                        'parser': 'syslog-parser',
+                        'source-type': 'internal',
+                    }),
+                }
+            ],
+        )
+
+        self.connect_and_send(b'<1>Jan 02 12:34:56 localhost app1[1]: hello world\n')
+        self.monitor.wait_until_count(1)
+        self.connect_and_send(b'<1>Jan 02 12:34:56 localhost app2[1]: hello world\n')
+        self.monitor.wait_until_count(2)
+
+        self.assertEqual(len(self.watcher.log_configs), 2)
+        self.assertDictEqual(
+            self.watcher.log_configs[0], 
+            {
+                'path': './syslog-app1.log',
+                'attributes': {
+                    'proto': 'tcp',
+                    'srcip': '127.0.0.1',
+                    'destport': self.__class__.tcp_port,
+                    'hostname': 'localhost',
+                    'appname': 'app1',
+                    'source-type': 'internal',
+                },
+                'parser': 'syslog-parser',
+            }
+        )
+        self.assertDictEqual(
+            self.watcher.log_configs[1], 
+            {
+                'path': './syslog-app2.log',
+                'attributes': {
+                    'proto': 'tcp',
+                    'srcip': '127.0.0.1',
+                    'destport': self.__class__.tcp_port,
+                    'hostname': 'localhost',
+                    'appname': 'app2',
+                    'source-type': 'internal',
+                },
+                'parser': 'syslog-parser',
+            }
+        )
+
+    def test_multiple_attribs_two_logconfigs(self):
+        self.create_monitor(
+            {
+                'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
+                'protocols': 'tcp:%d' % self.__class__.tcp_port,
+                'message_log_template': 'syslog-${APPNAME}.log',
+            },
+            [
+                {
+                    'path': os.path.join(ConfigurationMock.log_path, 'syslog-app1.log'), 
+                    'attributes': JsonObject({
+                        'parser': 'syslog-parser',
+                        'source-type': 'internal',
+                    }),
+                },
+                {
+                    'path': os.path.join(ConfigurationMock.log_path, 'syslog-app2.log'), 
+                    'attributes': JsonObject({
+                        'parser': 'syslog-parser',
+                        'source-type': 'external',
+                    }),
+                }
+            ],
+        )
+
+        self.connect_and_send(b'<1>Jan 02 12:34:56 localhost app1[1]: hello world\n')
+        self.monitor.wait_until_count(1)
+        self.connect_and_send(b'<1>Jan 02 12:34:56 localhost app2[1]: hello world\n')
+        self.monitor.wait_until_count(2)
+
+        self.assertEqual(len(self.watcher.log_configs), 2)
+        self.assertDictEqual(
+            self.watcher.log_configs[0], 
+            {
+                'path': './syslog-app1.log',
+                'attributes': {
+                    'proto': 'tcp',
+                    'srcip': '127.0.0.1',
+                    'destport': self.__class__.tcp_port,
+                    'hostname': 'localhost',
+                    'appname': 'app1',
+                    'source-type': 'internal',
+                },
+                'parser': 'syslog-parser',
+            }
+        )
+        self.assertDictEqual(
+            self.watcher.log_configs[1], 
+            {
+                'path': './syslog-app2.log',
+                'attributes': {
+                    'proto': 'tcp',
+                    'srcip': '127.0.0.1',
+                    'destport': self.__class__.tcp_port,
+                    'hostname': 'localhost',
+                    'appname': 'app2',
+                    'source-type': 'external',
+                },
+                'parser': 'syslog-parser',
+            }
+        )
+
+    def test_max_log_files(self):
+        self.create_monitor(
+            {
+                'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
+                'protocols': 'tcp:%d' % self.__class__.tcp_port,
+                'message_log_template': 'syslog-${APPNAME}.log',
+                'max_log_files': 3,
+            },
+            [
+                {
+                    'path': os.path.join(ConfigurationMock.log_path, 'syslog-*.log'), 
+                    'attributes': JsonObject({ 'parser': 'syslog-parser' }),
+                }
+            ],
+        )
+
+        template = '<1>Jan 02 12:34:56 localhost app%d[1]: hello world\n'
+        for i in range(5):
+            self.connect_and_send((template % i).encode('utf-8'))
+            self.monitor.wait_until_count(i + 1)
+
+        self.assertEqual(len(self.watcher.log_configs), 3)
+        for i in range(3):
+            self.assertDictEqual(
+                self.watcher.log_configs[i], 
+                {
+                    'path': './syslog-app%d.log' % i,
+                    'attributes': {
+                        'proto': 'tcp',
+                        'srcip': '127.0.0.1',
+                        'destport': self.__class__.tcp_port,
+                        'hostname': 'localhost',
+                        'appname': 'app%d' % i,
+                    },
+                    'parser': 'syslog-parser',
+                }
+            )
+
+    def test_expire_log(self):
+        self.create_monitor(
+            {
+                'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
+                'protocols': 'tcp:%d' % self.__class__.tcp_port,
+                'message_log_template': 'syslog-${APPNAME}.log',
+                'expire_log': 1,
+            },
+            [
+                {
+                    'path': os.path.join(ConfigurationMock.log_path, 'syslog-*.log'), 
+                    'attributes': JsonObject({ 'parser': 'syslog-parser' }),
+                }
+            ],
+        )
+
+        self.connect_and_send(b'<1>Jan 02 12:34:56 localhost app1[1]: hello world\n')
+        self.monitor.wait_until_count(1)
+        self.connect_and_send(b'<1>Jan 02 12:34:56 localhost app2[1]: hello world\n')
+        self.monitor.wait_until_count(2)
+        self.assertEqual(len(self.watcher.log_configs), 2)
+
+        time.sleep(1)
+        self.connect_and_send(b''.join([b'<1>Jan 02 12:34:56 localhost app2[1]: hello world\n'] * RUN_EXPIRE_COUNT))
+        self.monitor.wait_until_count(2 + RUN_EXPIRE_COUNT)
+        self.assertEqual(len(self.watcher.log_configs), 1)
+
+    # FIXME Test other aspects of __handle_syslog_logs(data, extra)
     # FIXME Test SyslogHandler._parse_syslog
