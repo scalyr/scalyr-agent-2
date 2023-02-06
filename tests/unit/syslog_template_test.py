@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import unicode_literals
+
 from scalyr_agent.builtin_monitors.syslog_monitor import (
     RUN_EXPIRE_COUNT,
     SyslogHandler,
@@ -22,8 +24,6 @@ from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.log_watcher import LogWatcher
 from scalyr_agent import scalyr_logging
 from scalyr_agent.test_base import ScalyrTestCase, skip, skipIf
-
-from __future__ import unicode_literals
 
 # Replace with unittest.mock when only supporting Python >= 3.3
 import mock
