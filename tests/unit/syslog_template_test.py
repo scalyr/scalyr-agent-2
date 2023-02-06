@@ -33,6 +33,7 @@ import logging
 import os.path
 import platform
 import socket
+import sys
 import threading
 import time
 
@@ -140,7 +141,8 @@ class AutoFlushingRotatingFileHandlerMock:
 
 
 @skipIf(
-    platform.system() == "Windows", "Skipping tests under Windows due to dependency"
+    platform.system() == "Windows" or sys.version < (3, 6, 0),
+    "Skipping tests due to dependency requirements",
 )
 @mock.patch(
     "scalyr_agent.builtin_monitors.syslog_monitor.AutoFlushingRotatingFile",
@@ -921,7 +923,8 @@ class SyslogTemplateTest(ScalyrTestCase):
 
 
 @skipIf(
-    platform.system() == "Windows", "Skipping tests under Windows due to dependency"
+    platform.system() == "Windows" or sys.version < (3, 6, 0),
+    "Skipping tests due to dependency requirements",
 )
 class SyslogParserTest(ScalyrTestCase):
     def test_rfc3164_example1(self):
