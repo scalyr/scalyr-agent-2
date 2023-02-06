@@ -356,7 +356,8 @@ class SyslogTemplateTest(ScalyrTestCase):
             }
         )
 
-    @skip('Requires aliasing the loopback interface on macOS') # FIXME Test on linux
+    # On Debian based distros `localhost 127.0.1.1` is added to /etc/hosts
+    @skip('Requires aliasing the loopback interface')
     def test_srcip_param(self):
         self.create_monitor(
             {
@@ -374,7 +375,7 @@ class SyslogTemplateTest(ScalyrTestCase):
 
         self.connect_and_send(b'<1>Jan 02 12:34:56 localhost demo[1]: hello world\n')
         self.monitor.wait_until_count(1)
-        self.connect_and_send(b'<1>Jan 02 12:34:56 localhost demo[1]: hello world\n', bind_addr='127.0.0.2')
+        self.connect_and_send(b'<1>Jan 02 12:34:56 localhost demo[1]: hello world\n', bind_addr='127.0.1.1')
         self.monitor.wait_until_count(2)
 
         self.assertEqual(len(self.watcher.log_configs), 2)
@@ -395,7 +396,7 @@ class SyslogTemplateTest(ScalyrTestCase):
         self.assertDictEqual(
             self.watcher.log_configs[1], 
             {
-                'path': './syslog-127.0.0.2.log',
+                'path': './syslog-127.0.1.1.log',
                 'attributes': {
                     'proto': 'tcp',
                     'srcip': '127.0.0.2',
