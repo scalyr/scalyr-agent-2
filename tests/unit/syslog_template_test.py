@@ -141,7 +141,7 @@ class AutoFlushingRotatingFileHandlerMock:
 
 
 @skipIf(
-    platform.system() == "Windows" or sys.version < (3, 6, 0),
+    platform.system() == "Windows" or sys.version_info < (3, 6, 0),
     "Skipping tests due to dependency requirements",
 )
 @mock.patch(
@@ -923,7 +923,7 @@ class SyslogTemplateTest(ScalyrTestCase):
 
 
 @skipIf(
-    platform.system() == "Windows" or sys.version < (3, 6, 0),
+    platform.system() == "Windows" or sys.version_info < (3, 6, 0),
     "Skipping tests due to dependency requirements",
 )
 class SyslogParserTest(ScalyrTestCase):
