@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from scalyr_agent.builtin_monitors.syslog_monitor import RUN_EXPIRE_COUNT, SyslogMonitor
+from scalyr_agent.builtin_monitors.syslog_monitor import RUN_EXPIRE_COUNT, SyslogHandler, SyslogMonitor
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.log_watcher import LogWatcher
@@ -23,6 +23,7 @@ from scalyr_agent.test_base import ScalyrTestCase, skip
 import mock
 
 import copy
+import logging
 import os.path
 import socket
 import threading
@@ -115,14 +116,16 @@ class AutoFlushingRotatingFileMock:
 # Mocked to prevent file creations/writes (for the main log file)
 class AutoFlushingRotatingFileHandlerMock:
     def __init__(self, *args, **kwargs):
-        pass
+        self.level = logging.INFO
     
     def flush(self):
         pass
     
-    # FIXME
-    #def setFormatter(self, *args, **kwargs):
-    #    pass
+    def handle(self, record):
+        pass
+    
+    def setFormatter(self, *args, **kwargs):
+        pass
 
 @mock.patch('scalyr_agent.builtin_monitors.syslog_monitor.AutoFlushingRotatingFile', AutoFlushingRotatingFileMock)
 @mock.patch('scalyr_agent.builtin_monitors.syslog_monitor.AutoFlushingRotatingFileHandler', AutoFlushingRotatingFileHandlerMock)
@@ -848,5 +851,82 @@ class SyslogTemplateTest(ScalyrTestCase):
         self.monitor.wait_until_count(2 + RUN_EXPIRE_COUNT)
         self.assertEqual(len(self.watcher.log_configs), 1)
 
-    # FIXME Test other aspects of __handle_syslog_logs(data, extra)
-    # FIXME Test SyslogHandler._parse_syslog
+class SyslogParserTest(ScalyrTestCase):
+    def test_rfc3164_example1(self):
+        self.assertDictEqual(
+            SyslogHandler._parse_syslog("<34>Oct 11 22:14:15 mymachine su: 'su root' failed for lonvick on /dev/pts/8"),
+            {'hostname':'mymachine', 'appname':'su'},
+        )
+
+    @skip('current parser does not handle a missing appname correctly')
+    def test_rfc3164_example2(self):
+        self.assertDictEqual(
+            SyslogHandler._parse_syslog('<13>Feb  5 17:32:18 10.0.0.99 Use the BFG!'),
+            {'hostname':'10.0.0.99', 'appname':None}
+        )
+
+    @skip('current parser does not parse this timestamp format correctly')
+    def test_rfc3164_example3(self):
+        self.assertDictEqual(
+            SyslogHandler._parse_syslog("<165>Aug 24 05:34:00 CST 1987 mymachine myproc[10]: %% It's time to make the do-nuts.  %%  Ingredients: Mix=OK, Jelly=OK # Devices: Mixer=OK, Jelly_Injector=OK, Frier=OK # Transport: Conveyer1=OK, Conveyer2=OK # %%"),
+            {'hostname':'mymachine', 'appname':'myproc'}
+        )
+
+    @skip('current parser does not parse this timestamp format correctly')
+    def test_rfc3164_example4(self):
+        self.assertDictEqual(
+            SyslogHandler._parse_syslog("<0>1990 Oct 22 10:52:01 TZ-6 scapegoat.dmz.example.org 10.1.2.3 sched[0]: That's All Folks!"),
+            {'hostname':'10.1.2.3', 'appname':'sched'}
+        )
+
+    @skip('current parser does not parse this timestamp format correctly nor removes leading spaces from appname')
+    def test_syslog_collector_cisco1(self):
+        self.assertDictEqual(
+            SyslogHandler._parse_syslog('<113>Nov 14 2022 09:13:13 vFTD  %FTD-1-430003: EventPriority: Low, DeviceUUID: 8792c90e-a3c8-11eb-9d9a-9813adfd688a, InstanceID: 2, FirstPacketSecond: 2022-11-14T09:13:13Z, ConnectionID: 19501, AccessControlRuleAction: Allow, SrcIP: 10.1.149.14, DstIP: 97.86.238.25, SrcPort: 59370, DstPort: 59963, Protocol: udp, IngressInterface: TG-Inside, EgressInterface: TG-Outside, IngressZone: TG-Inside, EgressZone: TG-Outside, IngressVRF: Global, EgressVRF: Global, ACPolicy: CSTA-vFTD, AccessControlRuleName: All-in-One, Prefilter Policy: Default Prefilter Policy, Client: BitTorrent, ApplicationProtocol: BitTorrent, ConnectionDuration: 0, InitiatorPackets: 1, ResponderPackets: 0, InitiatorBytes: 143, ResponderBytes: 0, NAPPolicy: Balanced Security and Connectivity'),
+            {'hostname': 'vFTD', 'appname':'%FTD-1-430003'},
+        )
+
+    def test_syslog_collector_cisco1_mod(self):
+        self.assertDictEqual(
+            SyslogHandler._parse_syslog('<113>Nov 14 09:13:13 vFTD %FTD-1-430003: EventPriority: Low, DeviceUUID: 8792c90e-a3c8-11eb-9d9a-9813adfd688a, InstanceID: 2, FirstPacketSecond: 2022-11-14T09:13:13Z, ConnectionID: 19501, AccessControlRuleAction: Allow, SrcIP: 10.1.149.14, DstIP: 97.86.238.25, SrcPort: 59370, DstPort: 59963, Protocol: udp, IngressInterface: TG-Inside, EgressInterface: TG-Outside, IngressZone: TG-Inside, EgressZone: TG-Outside, IngressVRF: Global, EgressVRF: Global, ACPolicy: CSTA-vFTD, AccessControlRuleName: All-in-One, Prefilter Policy: Default Prefilter Policy, Client: BitTorrent, ApplicationProtocol: BitTorrent, ConnectionDuration: 0, InitiatorPackets: 1, ResponderPackets: 0, InitiatorBytes: 143, ResponderBytes: 0, NAPPolicy: Balanced Security and Connectivity'),
+            {'hostname': 'vFTD', 'appname':'%FTD-1-430003'},
+        )
+
+    @skip('current parser does not parse this timestamp format correctly nor handles the extra colon')
+    def test_syslog_collector_cisco2(self):
+        self.assertDictEqual(
+            SyslogHandler._parse_syslog('<166>2022-11-14T10:03:35Z ftd : %FTD-6-302015: Built inbound UDP connection 29258504 for Inside:10.180.10.25/123 (198.18.133.254/123) to Outside:163.172.150.183/123 (163.172.150.183/123)'),
+            {'hostname': 'ftd', 'appname':'%FTD-1-302015'},
+        )
+
+    def test_syslog_collector_cisco2_mod(self):
+        self.assertDictEqual(
+            SyslogHandler._parse_syslog('<166>Nov 14 10:03:35 ftd %FTD-6-302015: Built inbound UDP connection 29258504 for Inside:10.180.10.25/123 (198.18.133.254/123) to Outside:163.172.150.183/123 (163.172.150.183/123)'),
+            {'hostname': 'ftd', 'appname':'%FTD-6-302015'},
+        )
+
+    @skip('current parser does not parse this timestamp format correctly nor handles the extra colon')
+    def test_syslog_collector_cisco3(self):
+        self.assertDictEqual(
+            SyslogHandler._parse_syslog('<166>2022-11-14T10:03:33Z ftd : %FTD-6-302014: Teardown TCP connection 29258492 for Inside:10.180.10.215/17756 to Outside:169.254.169.254/80 duration 0:00:30 bytes 0 SYN Timeout'),
+            {'hostname': 'ftd', 'appname':'%FTD-1-302015'},
+        )
+
+    def test_syslog_collector_cisco3_mod(self):
+        self.assertDictEqual(
+            SyslogHandler._parse_syslog('<166>Nov 14 10:03:33 ftd %FTD-6-302014: Teardown TCP connection 29258492 for Inside:10.180.10.215/17756 to Outside:169.254.169.254/80 duration 0:00:30 bytes 0 SYN Timeout'),
+            {'hostname': 'ftd', 'appname':'%FTD-6-302014'},
+        )
+
+    @skip('current parser does not parse this timestamp format correctly nor handles the extra colon')
+    def test_syslog_collector_cisco4(self):
+        self.assertDictEqual(
+            SyslogHandler._parse_syslog('<164>2022-11-14T10:03:26Z ftd : %FTD-4-106023: Deny tcp src Outside:198.144.159.104/50010 dst Inside:10.180.10.25/28132 by access-group "CSM_FW_ACL_" [0x97aa021a, 0x0]'),
+            {'hostname': 'ftd', 'appname':'%FTD-1-302015'},
+        )
+
+    def test_syslog_collector_cisco4_mod(self):
+        self.assertDictEqual(
+            SyslogHandler._parse_syslog('<164>Nov 14 10:03:26 ftd %FTD-4-106023: Deny tcp src Outside:198.144.159.104/50010 dst Inside:10.180.10.25/28132 by access-group "CSM_FW_ACL_" [0x97aa021a, 0x0]'),
+            {'hostname': 'ftd', 'appname':'%FTD-4-106023'},
+        )
