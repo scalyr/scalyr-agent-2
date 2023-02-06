@@ -37,13 +37,13 @@ import time
 
 class SyslogMonitorMock(SyslogMonitor):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super(SyslogMonitorMock, self).__init__(*args, **kwargs)
         assert not hasattr(self, "lines") and not hasattr(self, "lines_cond")
         self.lines = 0
         self.lines_cond = threading.Condition()
 
     def increment_counter(self, reported_lines=0, **kwargs):
-        super().increment_counter(reported_lines, **kwargs)
+        super(SyslogMonitorMock, self).increment_counter(reported_lines, **kwargs)
         with self.lines_cond:
             self.lines += reported_lines
             self.lines_cond.notify()
@@ -153,12 +153,12 @@ class SyslogTemplateTest(ScalyrTestCase):
     udp_port = 1514
 
     def setUp(self):
-        super().setUp()
+        super(SyslogTemplateTest, self).setUp()
         self.monitor = None
         self.watcher = None
 
     def tearDown(self):
-        super().tearDown()
+        super(SyslogTemplateTest, self).tearDown()
         if self.monitor:
             self.monitor.stop()
 
