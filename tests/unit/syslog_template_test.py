@@ -21,7 +21,7 @@ from scalyr_agent.configuration import Configuration
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.log_watcher import LogWatcher
 from scalyr_agent import scalyr_logging
-from scalyr_agent.test_base import ScalyrTestCase, skip
+from scalyr_agent.test_base import ScalyrTestCase, skip, skipIf
 
 # Replace with unittest.mock when only supporting Python >= 3.3
 import mock
@@ -29,10 +29,10 @@ import mock
 import copy
 import logging
 import os.path
+import platform
 import socket
 import threading
 import time
-from typing import Any, Dict, List
 
 
 class SyslogMonitorMock(SyslogMonitor):
@@ -42,13 +42,13 @@ class SyslogMonitorMock(SyslogMonitor):
         self.lines = 0
         self.lines_cond = threading.Condition()
 
-    def increment_counter(self, reported_lines: int = 0, **kwargs):
+    def increment_counter(self, reported_lines=0, **kwargs):
         super().increment_counter(reported_lines, **kwargs)
         with self.lines_cond:
             self.lines += reported_lines
             self.lines_cond.notify()
 
-    def wait_until_count(self, count: int, timeout: int = 3):
+    def wait_until_count(self, count, timeout=3):
         with self.lines_cond:
             while self.lines != count:
                 start = time.time()
@@ -60,27 +60,27 @@ class SyslogMonitorMock(SyslogMonitor):
 class ConfigurationMock(Configuration):
     log_path = "."
 
-    def __init__(self, log_configs: List[Dict[str, Any]]):
+    def __init__(self, log_configs):
         self.mock_log_configs = log_configs
 
     @property
-    def log_configs(self) -> List[Dict[str, Any]]:
+    def log_configs(self):
         return self.mock_log_configs
 
     @property
-    def agent_log_path(self) -> str:
+    def agent_log_path(self):
         return self.__class__.log_path
 
     @property
-    def server_attributes(self) -> Dict[str, Any]:
+    def server_attributes(self):
         return {"serverHost": "localhost"}
 
     @property
-    def log_rotation_backup_count(self) -> int:
+    def log_rotation_backup_count(self):
         return 2
 
     @property
-    def log_rotation_max_bytes(self) -> int:
+    def log_rotation_max_bytes(self):
         return 20 * 1024 * 1024
 
 
@@ -88,7 +88,7 @@ class LogWatcherMock(LogWatcher):
     def __init__(self):
         self.log_configs = []
 
-    def add_log_config(self, monitor_name: str, log_config: Dict[str, Any]):
+    def add_log_config(self, monitor_name, log_config):
         assert monitor_name == "scalyr_agent.builtin_monitors.syslog_monitor"
 
         log_config_copy = copy.deepcopy(log_config)
@@ -97,7 +97,7 @@ class LogWatcherMock(LogWatcher):
 
         return log_config
 
-    def remove_log_path(self, monitor_name: str, log_path: str):
+    def remove_log_path(self, monitor_name, log_path):
         assert monitor_name == "scalyr_agent.builtin_monitors.syslog_monitor"
 
         for idx, log_config in enumerate(self.log_configs):
@@ -137,6 +137,9 @@ class AutoFlushingRotatingFileHandlerMock:
         pass
 
 
+@skipIf(
+    platform.system() == "Windows", "Skipping tests under Windows due to dependency"
+)
 @mock.patch(
     "scalyr_agent.builtin_monitors.syslog_monitor.AutoFlushingRotatingFile",
     AutoFlushingRotatingFileMock,
@@ -159,7 +162,7 @@ class SyslogTemplateTest(ScalyrTestCase):
         if self.monitor:
             self.monitor.stop()
 
-    def create_monitor(self, config: Dict[str, Any], log_configs: List[Dict[str, Any]]):
+    def create_monitor(self, config, log_configs):
         self.monitor = SyslogMonitorMock(
             config,
             scalyr_logging.getLogger(self.__class__.__name__),
@@ -174,11 +177,11 @@ class SyslogTemplateTest(ScalyrTestCase):
 
     @staticmethod
     def connect_and_send(
-        data: bytes,
-        port: int = None,
-        proto: socket.SocketKind = socket.SOCK_STREAM,
-        bind_addr: str = None,
-        timeout: int = 3,
+        data,
+        port=None,
+        proto=socket.SOCK_STREAM,
+        bind_addr=None,
+        timeout=3,
     ):
         port = port or SyslogTemplateTest.tcp_port
 
@@ -915,6 +918,9 @@ class SyslogTemplateTest(ScalyrTestCase):
         self.assertEqual(len(self.watcher.log_configs), 1)
 
 
+@skipIf(
+    platform.system() == "Windows", "Skipping tests under Windows due to dependency"
+)
 class SyslogParserTest(ScalyrTestCase):
     def test_rfc3164_example1(self):
         self.assertDictEqual(
