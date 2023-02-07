@@ -26,6 +26,8 @@ jobs:
 
   build-windows-package:
     name: Build windows MSI installer
+    needs: pre_job
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref_name == 'master' }}
     runs-on: windows-latest
     steps:
       - name: Checkout Repository
@@ -44,3 +46,18 @@ jobs:
 
       - name: Build agent package and installer
         run: python build_package.py win32
+
+      - name: Save installer as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          path: ScalyrAgentInstaller-*.msi
+
+      - name: Notify Slack on Failure
+        if: ${{ failure() && github.ref_name == 'master' }}
+        uses: act10ns/slack@ed1309ab9862e57e9e583e51c7889486b9a00b0f # v2.0.0
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          status: ${{ job.status }}
+          steps: ${{ toJson(steps) }}
+          channel: '#eng-dataset-cloud-tech'
