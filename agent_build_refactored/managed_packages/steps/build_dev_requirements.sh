@@ -36,12 +36,24 @@ ldconfig
 cd ~
 export PATH="/usr/local/bin:/root/.cargo/bin:${PATH}"
 export PKG_CONFIG_PATH="/usr/local/lib64/pkgconfig:/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH}"
-curl --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain "${RUST_VERSION}"
+
+mkdir -p /tmp/rust
+pushd /tmp/rust
+curl --tlsv1.2 "https://static.rust-lang.org/dist/rust-${RUST_VERSION}-${RUST_PLATFORM}.tar.gz" > rust.tar.gz
+tar -xzvf rust.tar.gz
+
+pushd "rust-${RUST_VERSION}-${RUST_PLATFORM}"
+
+./install.sh
+
+popd
+popd
+
 cargo install cargo-update -v
 
-export LD_LIBRARY_PATH="/opt/scalyr-agent-2-dependencies/lib:${LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH="${PYTHON_INSTALL_PREFIX}/lib:${LD_LIBRARY_PATH}"
 # Install all requirements and save them and their cache.
-"/opt/${SUBDIR_NAME}/bin/python3" -m pip install \
+"${PYTHON_INSTALL_PREFIX}/bin/python3" -m pip install \
   --root "${STEP_OUTPUT_PATH}/root" \
   --cache-dir "${STEP_OUTPUT_PATH}/cache" \
   -r "${SOURCE_ROOT}/dev-requirements-new.txt"

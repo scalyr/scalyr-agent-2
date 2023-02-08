@@ -21,9 +21,11 @@
 
 set -e
 
-DEPENDENCIES_ROOT="/opt/scalyr-agent-2-dependencies"
-DEPENDENCIES_LIBS="${DEPENDENCIES_ROOT}/lib"
+PACKAGE_OPT_DIR="/opt/scalyr-agent-2"
+PACKAGE_LIBS_DIR="${PACKAGE_OPT_DIR}/libs"
+PYTHON_DIR="${PACKAGE_OPT_DIR}/python3"
+PYTHON_LIBS_DIR="${PYTHON_DIR}/lib"
 
 # Since this executable has to work in any circumstances, we run it directly with embedded OpenSSL.
-export LD_LIBRARY_PATH="${DEPENDENCIES_LIBS}:${DEPENDENCIES_LIBS}/openssl/1_1_1/libs:${LD_LIBRARY_PATH}"
-exec "${DEPENDENCIES_ROOT}/bin/python3-original" "${DEPENDENCIES_ROOT}/bin/internal/agent-python3-config.py"  "$@"
+export LD_LIBRARY_PATH="${PYTHON_LIBS_DIR}:${PACKAGE_LIBS_DIR}/openssl/1_1_1/libs:${LD_LIBRARY_PATH}"
+exec "${PYTHON_DIR}/bin/python3-original" "${PACKAGE_OPT_DIR}/bin/internal/agent-python3-config.py"  "$@"

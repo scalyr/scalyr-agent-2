@@ -2,13 +2,12 @@ name: Agent Build Refactored
 
 on:
   push:
-  pull_request:
-    # Trigger only for opened pull request. Others have to be handled by the 'push' event
-    types: [ opened ]
     branches:
-      - 'master'
+      - master
+  pull_request:
+    branches:
+      - master
   workflow_dispatch:
-
 
   schedule:
     - cron: '0 4 * * *'
@@ -17,6 +16,21 @@ permissions:
   contents: read
 
 jobs:
+  pre_job:
+    name: Skip Duplicate Jobs Pre Job
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write  # Needed for skip-duplicate-jobs job
+      contents: read
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@12aca0a884f6137d619d6a8a09fcc3406ced5281 # v4.0.0
+        with:
+          cancel_others: 'true'
+          github_token: ${{ github.token }}
+
   build-linux-packages:
     name: "Build Linux packages"
     uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
@@ -62,3 +76,30 @@ jobs:
           status: ${{ job.status }}
           steps: ${{ toJson(steps) }}
           channel: '#eng-dataset-cloud-tech'
+
+  prepare-artifacts:
+    runs-on: ubuntu-20.04
+    needs: build-linux-packages
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: /tmp/all_artifacts
+
+
+      - name: Prepare artifacts
+        run: |
+          mkdir -p /tmp/result_artifacts
+          cp -a /tmp/all_artifacts/linux-packages-*/. /tmp/result_artifacts
+          cp -a /tmp/all_artifacts/tarball-noarch/. /tmp/result_artifacts
+
+      - name: Save result artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: result-artifacts
+          path: /tmp/result_artifacts
+          retention-days: 1

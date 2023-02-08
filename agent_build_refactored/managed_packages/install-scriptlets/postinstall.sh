@@ -14,6 +14,13 @@
 # limitations under the License.
 
 
+# Initialize Python interpreter.
+/opt/scalyr-agent-2/bin/agent-python3-config initialize
+
+# Initialize agent libraries.
+/opt/scalyr-agent-2/bin/agent-libs-config initialize
+
+
 # Function which ensures that the provided file path permissions for "group" match the
 # provided permission bit in octal notation.
 # This function can operate on a file or on a directory.

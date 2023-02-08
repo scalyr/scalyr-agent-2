@@ -19,63 +19,81 @@ without Python and other dependencies.
 """
 
 import os
-import subprocess
+import shutil
+import pathlib as pl
 import sys
+from typing import Dict, List
 
 from agent_build_refactored.tools.constants import SOURCE_ROOT, Architecture
-from agent_build_refactored.tools.runner import Runner
+from agent_build_refactored.tools.runner import (
+    Runner,
+    ArtifactRunnerStep,
+    RunnerStep,
+    GitHubActionsSettings,
+)
 from agent_build_refactored.managed_packages.managed_packages_builders import (
-    PREPARE_TOOLSET_STEPS,
+    PREPARE_PYTHON_ENVIRONMENT_STEPS,
+    SUPPORTED_ARCHITECTURES,
 )
 
 PORTABLE_RUNNER_NAME = "portable_runner"
 
 
+def create_build_portable_pytest_runner_step() -> Dict[
+    Architecture, ArtifactRunnerStep
+]:
+
+    steps = {}
+    for architecture in SUPPORTED_ARCHITECTURES:
+
+        step = ArtifactRunnerStep(
+            name=f"build_portable_pytest_runner_{architecture.value}",
+            script_path="tests/end_to_end_tests/run_in_remote_machine/steps/build_pytest_runner.py",
+            tracked_files_globs=[
+                pl.Path(__file__).relative_to(SOURCE_ROOT),
+                "tests/end_to_end_tests/**/*",
+                "agent_build/**/*",
+                "agent_build_refactored/**/*",
+                "VERSION",
+                "dev-requirements-new.txt",
+            ],
+            base=PREPARE_PYTHON_ENVIRONMENT_STEPS[architecture],
+            environment_variables={
+                "PORTABLE_RUNNER_NAME": PORTABLE_RUNNER_NAME,
+            },
+            github_actions_settings=GitHubActionsSettings(cacheable=True),
+        )
+
+        steps[architecture] = step
+
+    return steps
+
+
+BUILD_PORTABLE_PYTEST_RUNNER_STEPS = create_build_portable_pytest_runner_step()
+
+
 class PortablePytestRunnerBuilder(Runner):
+    ARCHITECTURE: Architecture
     """
     Builder class that builds pytest runner executable by using PyInstaller.
     """
+
+    @classmethod
+    def get_all_required_steps(cls) -> List[RunnerStep]:
+        return [BUILD_PORTABLE_PYTEST_RUNNER_STEPS[cls.ARCHITECTURE]]
 
     def build(self):
 
         self.run_required()
 
-        if self.runs_in_docker:
-            self.run_in_docker()
-            return
+        build_step = BUILD_PORTABLE_PYTEST_RUNNER_STEPS[self.ARCHITECTURE]
+        build_step_output = build_step.get_output_directory(work_dir=self.work_dir)
 
-        dist_path = self.output_path / "dist"
-        subprocess.check_call(
-            [
-                "python3",
-                "-m",
-                "PyInstaller",
-                "--onefile",
-                "--distpath",
-                str(dist_path),
-                "--workpath",
-                str(self.output_path / "build"),
-                "--name",
-                PORTABLE_RUNNER_NAME,
-                "--add-data",
-                f"tests/end_to_end_tests{os.pathsep}tests/end_to_end_tests",
-                "--add-data",
-                f"agent_build{os.pathsep}agent_build",
-                "--add-data",
-                f"agent_build_refactored{os.pathsep}agent_build_refactored",
-                "--add-data",
-                f"VERSION{os.pathsep}.",
-                "--add-data",
-                f"dev-requirements-new.txt{os.pathsep}.",
-                # As an entry point we use this file itself because it also acts like a script which invokes pytest.
-                __file__,
-            ],
-            cwd=SOURCE_ROOT,
-        )
+        shutil.copy(build_step_output / "dist" / PORTABLE_RUNNER_NAME, self.output_path)
 
     @property
     def result_runner_path(self):
-        return self.output_path / "dist" / PORTABLE_RUNNER_NAME
+        return self.output_path / PORTABLE_RUNNER_NAME
 
     @classmethod
     def handle_command_line_arguments(
@@ -87,18 +105,22 @@ class PortablePytestRunnerBuilder(Runner):
         builder.build()
 
 
-class PortablePytestRunnerBuilderX86_64(PortablePytestRunnerBuilder):
-    BASE_ENVIRONMENT = PREPARE_TOOLSET_STEPS[Architecture.X86_64]
+PORTABLE_PYTEST_RUNNER_BUILDERS = {}
+# Iterate through all supported architectures and create package builders classes for each.
+for arch in SUPPORTED_ARCHITECTURES:
 
+    class BuilderCls(PortablePytestRunnerBuilder):
+        ARCHITECTURE = arch
 
-class PortablePytestRunnerBuilderARM64(PortablePytestRunnerBuilder):
-    BASE_ENVIRONMENT = PREPARE_TOOLSET_STEPS[Architecture.ARM64]
+    # Since we create builders "dynamically" we should assign name to each of them, so
+    # they can be accessible later.
+    BuilderCls.assign_fully_qualified_name(
+        class_name=PortablePytestRunnerBuilder.__name__,
+        module_name=__name__,
+        class_name_suffix=f"_{arch.value}",
+    )
 
-
-PORTABLE_PYTEST_RUNNER_BUILDERS = {
-    Architecture.X86_64: PortablePytestRunnerBuilderX86_64,
-    Architecture.ARM64: PortablePytestRunnerBuilderARM64,
-}
+    PORTABLE_PYTEST_RUNNER_BUILDERS[arch] = BuilderCls
 
 
 if __name__ == "__main__":

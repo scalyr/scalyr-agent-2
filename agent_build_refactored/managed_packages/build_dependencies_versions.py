@@ -31,3 +31,5 @@ EMBEDDED_OPENSSL_VERSION_NUMBER = 0x1010113F
 
 # Version of Rust to use in order to build some of agent's requirements, e.g. orjson.
 RUST_VERSION = "1.63.0"
+
+EMBEDDED_PYTHON_PIP_VERSION = "23.0"

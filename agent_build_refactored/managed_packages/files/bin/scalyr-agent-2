@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Copyright 2014-2023 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,10 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Always remove the .pyc files and __pycache__ directories
+# This is main executable for the agent for Linux, it expects that the dependency package 'scalyr-agent-libs' is
+# installed, and its virtualenv (or venv) is initialized, so it can use it as a base Python interpreter.
 
-# Remove dynamically generated venv.
-rm -r "/var/opt/scalyr-agent-2-dependencies/venv"
-
-# Collect garbage after Python.
-find /opt/scalyr-agent-2-dependencies -type f -name '*.py[co]' -delete -o -type d -name __pycache__ -exec rm -r {} \;
+exec "/var/opt/scalyr-agent-2/venv/bin/python3" "/usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py" "$@"

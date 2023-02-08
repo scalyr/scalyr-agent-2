@@ -1,7 +1,13 @@
 # The main "setup" workflow, that calls other workflows.
 name: Docker Images Build
 
-on: [push]
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
 
 permissions:
   contents: read
@@ -21,6 +27,21 @@ permissions:
 #
 # For example: https://github.com/scalyr/scalyr-agent-2/pull/804/commits/0eccf278623552b51d9289d75a47794e88f02862
 jobs:
+  pre_job:
+    name: Skip Duplicate Jobs Pre Job
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write  # Needed for skip-duplicate-jobs job
+      contents: read
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@12aca0a884f6137d619d6a8a09fcc3406ced5281 # v4.0.0
+        with:
+          cancel_others: 'true'
+          github_token: ${{ github.token }}
+
   test-images:
     runs-on: ubuntu-latest
 

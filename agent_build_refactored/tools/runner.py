@@ -221,7 +221,23 @@ class RunnerStep:
 
             found = list(SOURCE_ROOT.glob(str(file_glob)))
 
-            tracked_files.extend(found)
+            filtered = []
+            for path in found:
+                if path.is_dir():
+                    continue
+
+                skip = False
+                for to_ignore in ["__pycache__", ".pytest_cache", ".DS_Store"]:
+                    if to_ignore in path.parent.parts:
+                        skip = True
+                        break
+
+                if skip:
+                    continue
+
+                filtered.append(path)
+
+            tracked_files.extend(filtered)
 
         return sorted(list(set(tracked_files)))
 

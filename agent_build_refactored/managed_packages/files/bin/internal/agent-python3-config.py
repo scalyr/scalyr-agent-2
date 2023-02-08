@@ -28,19 +28,20 @@ OPENSSL_3_VERSION = "3"
 
 DEFAULT_FALLBACK_OPENSSL_VERSION = OPENSSL_1_1_1_VERSION
 
-DEPENDENCIES_PACKAGE_ROOT = pl.Path("/opt/scalyr-agent-2-dependencies")
-OPENSSL_LIBS_PATH = DEPENDENCIES_PACKAGE_ROOT / "lib/openssl"
+PACKAGE_OPT_DIR = pl.Path("/opt/scalyr-agent-2")
+OPENSSL_LIBS_PATH = PACKAGE_OPT_DIR / "lib/openssl"
+PYTHON_DIR = PACKAGE_OPT_DIR / "python3"
 
 
 PYTHON_SHORT_VERSION = ".".join([str(n) for n in sys.version_info[:2]])
 
-PYTHON_LIB_DYNLOAD_PATH = DEPENDENCIES_PACKAGE_ROOT / f"lib/python{PYTHON_SHORT_VERSION}/lib-dynload"
+PYTHON_LIB_DYNLOAD_PATH = PYTHON_DIR / f"lib/python{PYTHON_SHORT_VERSION}/lib-dynload"
 
 
-PREFERRED_OPENSSL_FILE_PATH = DEPENDENCIES_PACKAGE_ROOT / "etc/preferred_openssl"
+PREFERRED_OPENSSL_FILE_PATH = PACKAGE_OPT_DIR / "etc/preferred_openssl"
 
 # Bin directory of the package.
-BIN_DIR = DEPENDENCIES_PACKAGE_ROOT / "bin"
+PYTHON_BIN_DIR = PYTHON_DIR / "bin"
 
 # This directory is basically a symlink for to another directory with OpenSSL shared objects.
 # This script's work is to decide what OpenSLL shared objects to use and link directory with its shared object
@@ -163,7 +164,7 @@ def get_current_openssl_version() -> Tuple[bool, str]:
 
     result = subprocess.run(
         [
-            str(BIN_DIR / "python3"),
+            str(PYTHON_BIN_DIR / "python3"),
             "-c",
             "import ssl; print(ssl.OPENSSL_VERSION);"
         ],

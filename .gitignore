@@ -10,6 +10,7 @@ venv/
 env/
 .env/
 bin/
+!agent_build_refactored/managed_packages/files/bin/
 build/
 cover/
 develop-eggs/
