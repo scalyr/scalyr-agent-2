@@ -47,7 +47,7 @@ RUN apt-get update ; apt-get dist-upgrade -y
 RUN python3 -m pip install --upgrade setuptools
 RUN apt-get clean
 
-FROM python:3.8.16-alpine as scalyr-base-alpine
+FROM python:3.12.0a5-alpine as scalyr-base-alpine
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
 
