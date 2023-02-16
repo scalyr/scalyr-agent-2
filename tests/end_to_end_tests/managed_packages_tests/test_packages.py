@@ -212,6 +212,8 @@ def test_packages(
         timeout_tracker=timeout_tracker,
     )
 
+    _verify_compression(agent_commander=agent_commander)
+
     logger.info("Verify agent log uploads.")
     verify_logs(
         scalyr_api_read_key=scalyr_api_read_key,
@@ -441,6 +443,19 @@ repo_gpgcheck=0
 
     logger.info("Cleanup")
     _remove_all_agent_files(package_type=package_builder.PACKAGE_TYPE)
+
+
+def _verify_compression(
+        agent_commander: AgentCommander
+):
+    agent_status = agent_commander.get_status_json()
+    compression_algorithm = agent_status["compression_type"]
+    compression_level = agent_status["compression_level"]
+
+    assert compression_algorithm == "deflate", "expected deflate, got %s" % (
+        compression_algorithm
+    )
+    assert compression_level == 6
 
 
 def _perform_ssl_checks(
