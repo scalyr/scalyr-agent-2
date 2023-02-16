@@ -32,5 +32,5 @@ PYTHON_DIR="${PACKAGE_OPT_DIR}/python3"
 PYTHON_LIB_DIR="${PYTHON_DIR}/lib"
 
 
-export LD_LIBRARY_PATH="${PYTHON_LIB_DIR}:${PACKAGE_LIBS_DIR}/openssl/current:${LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH="${PYTHON_LIB_DIR}:${PACKAGE_LIBS_DIR}/openssl/current/libs:${LD_LIBRARY_PATH}"
 exec "${PYTHON_DIR}/bin/python3-original" "$@"

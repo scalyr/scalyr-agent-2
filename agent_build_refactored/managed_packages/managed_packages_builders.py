@@ -73,28 +73,30 @@ The package provides the "embedded" Python interpreter that is specially built t
     On each new installation/upgrade of the package (or user's manual run of the command
     `/opt/scalyr-agent-2/bin/agent-python3-config initialize`), the package follows next steps in order to
     resolve OpenSSL library to use:
-        - 1: There is a special directory - `/opt/scalyr-agent-2/lib/openssl` in the agent package. 
-            Agent always 
-            uses it's embedded Python interpreter with the 'LD_LIBRARY_PATH' env. variable containing this directory.
-            First, agent package, during its post-install initialization, leaves this directory empty
-            Make Python interpreter to use original ssl C bindings. In this case when Python's 'ssl' or 'hashlib' module is
-            imported, the originally compiled '_ssl.cpython*.so' and '_hashlib.cpython.so' bindings are used.
-            Those bindings, by the default, use system's dynamic linker in order to find and link appropriate OpenSLL
-            library if it is presented on system. First it tries to find OpenSSL version 3+.
-        - 2: If first step is not successful and system does not have appropriate OpenSSL 3, then
-            we replace previous  '_ssl.cpython*.so' and '_hashlib.cpython.so' C bindings with the same bindings, but
-            that are compiled and linked against the OpenSSL 1.1.1+, and will look for OpenSSL 1.1.1+. Even though the
-            _ssh and _hashlib modules may resolve multiple variants of the OpenSSL libraries, they are able to resolve
-            them only for the specific major version they were compiled for. So we have to have multiple variants of the
-            ssl C bindings that are compiled and linked against both OpenSSL 1.1.1+ and 3.0+.
+        - 1: First it tries to find system's OpenSSL 3+. It creates a symlink '/opt/scalyr-agent-2/lib/openssl/current' 
+            that points to the directory `/opt/scalyr-agent-2/lib/openssl/3`. This directory contains directory
+            named 'bindings' that, in turn, contains Python's C bindings - '_ssl' and '_hashlib' that are compiled 
+            against OpenSSL 3. The Python's OpenSSL-related C bindings in '/opt/scalyr-agent-2/python3/lib/pythonX.Y/lib-dynload'
+            are also linked to the bindings in the `current` directory, so changing the target of the `current` symlink
+            we also change OpenSSL version of the Python's C bindings. 
+            Then the package will try "probe" the system's OpenSSL. That is done basically just by running new 
+            process of the interpreter and importing the 'ssl' module. If there's no exception, then appropriate 
+            OpenSSL 3 is presented in the system and Python can use it. If there is an exception, then 
+            OpenSSL 3 can not be found and we go the the step 2.
+            
+        - 2: If first step is not successful and system does not have appropriate OpenSSL 3, then we re-create the
+            `current` symlink and link it with the `/opt/scalyr-agent-2/lib/openssl/1_1_1` which has bindings for
+            OpenSSL 1.1.1+, so we can repeat the same "probing", but now for OpenSSL 1.1.1+.
 
         - 3: If OpenSSL 1.1.1+ is also not presented in a system, then we fallback to the 'embedded' OpenSSL library that
-            is shipped with the package. This is achieved by adding a special directory path to Python's LD_LIBRARY_PATH 
-            environment variable. When Python package uses system's OpenSSL, this directory is missing and system's 
-            dynamic linker has to look for OpenSSL shared object in other places. But when the package is configured to 
-            use embedded OpenSLL, it creates a symlink in this path, which points to a directory with shared objects
-            of the embedded OpenSLL, so the linker has to find it earlier than system's shared objects.
-
+            is shipped with the package. This is achieved by making the `current` symlink to target the 
+            '/opt/scalyr-agent-2/lib/openssl/embedded' directory. This directory, as in previous steps, contains 
+            C bindings for OpenSSL (for now we use 1.1.1 for the embedded OpenSSL), but it also has another 
+            subdirectory named 'libs', and this subdirectory contains shared objects of the embedded OpenSSL.
+            Agent, when starts new process of the Python interpreter, adds '/opt/scalyr-agent-2/lib/openssl/current' to
+            the 'LD_LIBRARY_PATH' environment variable, so when the `current` directory is linked with the `embedded`
+            directory, system's dynamic linker has to find the shared objects of the embedded OpenSSL earlier that 
+            anything else that may be presented in a system. 
 
 The package also provides requirement libraries for the agent, for example Python 'requests' or 'orjson' libraries. 
     Agent requirements are shipped in form of virtualenv (or just venv). The venv with agent's 'core' requirements is shipped with this packages.
@@ -352,38 +354,17 @@ class LinuxDependencyPackagesBuilder(Runner):
         )
 
         relative_python_install_prefix = pl.Path(PYTHON_INSTALL_PREFIX).relative_to("/")
+        package_opt_dir = package_root / AGENT_OPT_DIR.relative_to("/")
+        package_openssl_dir = package_opt_dir / "lib/openssl"
 
         python_ssl_bindings_glob = "_ssl.cpython-*-*-*-*.so"
         python_hashlib_bindings_glob = "_hashlib.cpython-*-*-*-*.so"
 
         def copy_openssl_files(
-                build_openssl_step: ArtifactRunnerStep,
                 build_python_step: ArtifactRunnerStep,
-                dst_dir: pl.Path
+                openssl_variant_name: str,
         ):
             """# This function copies Python's ssl module related files."""
-
-            build_openssl_step_dir = build_openssl_step.get_output_directory(
-                work_dir=self.work_dir
-            )
-
-            build_env_info = _SUPPORTED_ARCHITECTURES_TO_BUILD_ENVIRONMENTS[step_arch]
-
-            if "centos:6" in build_env_info.image:
-                libssl_dir = "usr/local/lib64"
-            else:
-                libssl_dir = "usr/local/lib"
-
-            # Copy shared objects and other files of the OpenSSL library.
-            build_openssl_libs_dir = build_openssl_step_dir / libssl_dir
-            libssl_path = list(build_openssl_libs_dir.glob("libssl.so.*"))[0]
-            libcrypto_path = list(build_openssl_libs_dir.glob("libcrypto.so.*"))[0]
-
-            libs_dir = dst_dir / "libs"
-            libs_dir.mkdir(parents=True)
-
-            shutil.copy(libssl_path, libs_dir)
-            shutil.copy(libcrypto_path, libs_dir)
 
             # Copy _ssl and _hashlib modules.
             build_python_step_dir = build_python_step.get_output_directory(
@@ -394,32 +375,52 @@ class LinuxDependencyPackagesBuilder(Runner):
             ssl_binding_path = list(python_step_bindings_dir.glob(python_ssl_bindings_glob))[0]
             hashlib_binding_path = list(python_step_bindings_dir.glob(python_hashlib_bindings_glob))[0]
 
-            bindings_dir = dst_dir / "bindings"
-            bindings_dir.mkdir()
+            bindings_dir = package_openssl_dir / openssl_variant_name / "bindings"
+            bindings_dir.mkdir(parents=True)
 
             shutil.copy(ssl_binding_path, bindings_dir)
             shutil.copy(hashlib_binding_path, bindings_dir)
 
-        package_opt_dir = package_root / AGENT_OPT_DIR.relative_to("/")
-        package_openssl_libs_dir = package_opt_dir / "lib/openssl"
-        package_openssl_libs_dir.mkdir(parents=True)
+        # Copy ssl modules which are compiled for OpenSSL 1.1.1
+        copy_openssl_files(
+            build_python_step=build_python_with_openssl_1_1_1_step,
+            openssl_variant_name="1_1_1"
+        )
+
+        # Copy ssl modules which are compiled for OpenSSL 3
+        copy_openssl_files(
+            build_python_step=build_python_with_openssl_3_step,
+            openssl_variant_name="3"
+        )
+
+        # Create directory for the embedded OpenSSL files.
+        embedded_openssl_dir = package_openssl_dir / "embedded"
+        embedded_openssl_dir.mkdir()
+        # Since we use OpenSSL 1.1.1 for embedded, we link to the previously created C bindings of the OpenSSL 1.1.1.
+        embedded_openssl_bindings = embedded_openssl_dir / "bindings"
+        embedded_openssl_bindings.symlink_to("../1_1_1/bindings")
+        # Copy shared libraries of the embedded OpenSSL 1.1.1 from the step that builds it.
+        embedded_openssl_libs_dir = embedded_openssl_dir / "libs"
+        embedded_openssl_libs_dir.mkdir(parents=True)
 
         build_openssl_1_1_1_step = BUILD_OPENSSL_1_1_1_STEPS[step_arch]
-        build_openssl_3_step = BUILD_OPENSSL_3_STEPS[step_arch]
-
-        # Copy ssl modules and libraries which are compiled for OpenSSL 1.1.1
-        copy_openssl_files(
-            build_openssl_step=build_openssl_1_1_1_step,
-            build_python_step=build_python_with_openssl_1_1_1_step,
-            dst_dir=package_openssl_libs_dir / "1_1_1"
+        build_openssl_step_dir = build_openssl_1_1_1_step.get_output_directory(
+            work_dir=self.work_dir
         )
+        build_env_info = _SUPPORTED_ARCHITECTURES_TO_BUILD_ENVIRONMENTS[step_arch]
 
-        # Copy ssl modules and libraries which are compiled for OpenSSL 3
-        copy_openssl_files(
-            build_openssl_step=build_openssl_3_step,
-            build_python_step=build_python_with_openssl_3_step,
-            dst_dir=package_openssl_libs_dir / "3"
-        )
+        if "centos:6" in build_env_info.image:
+            libssl_dir = "usr/local/lib64"
+        else:
+            libssl_dir = "usr/local/lib"
+
+        build_openssl_libs_dir = build_openssl_step_dir / libssl_dir
+        for path in build_openssl_libs_dir.glob("*.so.*"):
+            shutil.copy(path, embedded_openssl_libs_dir)
+
+        # Create the `current` symlink which by default targets the embedded OpenSSL.
+        package_current_openssl_dir = package_openssl_dir / "current"
+        package_current_openssl_dir.symlink_to("./embedded")
 
         # Remove original bindings from Python interpreter and replace them with symlinks.
         package_python_dir = package_root / relative_python_install_prefix
@@ -429,8 +430,8 @@ class LinuxDependencyPackagesBuilder(Runner):
         hashlib_binding_path = list(package_python_bindings_dir.glob(python_hashlib_bindings_glob))[0]
         ssl_binding_path.unlink()
         hashlib_binding_path.unlink()
-        ssl_binding_path.symlink_to(AGENT_OPT_DIR / "lib/openssl/1_1_1/bindings" / ssl_binding_path.name)
-        hashlib_binding_path.symlink_to(AGENT_OPT_DIR / "lib/openssl/1_1_1/bindings" / hashlib_binding_path.name)
+        ssl_binding_path.symlink_to(f"../../../../lib/openssl/current/bindings/{ssl_binding_path.name}")
+        hashlib_binding_path.symlink_to(f"../../../../lib/openssl/current/bindings/{hashlib_binding_path.name}")
 
         # Rename main Python executable to be 'python3-original' and copy our wrapper script instead of it
         source_bin_dir = SOURCE_ROOT / "agent_build_refactored/managed_packages/files/bin"
@@ -444,7 +445,6 @@ class LinuxDependencyPackagesBuilder(Runner):
         package_opt_bin_dir = package_opt_dir / "bin"
         package_opt_bin_dir.mkdir(parents=True)
         shutil.copy(source_bin_dir / "agent-python3-config", package_opt_bin_dir)
-        shutil.copytree(source_bin_dir / "internal", package_opt_bin_dir / "internal")
 
         # Copy Python interpreter's configuration files.
         package_opt_etc_dir = package_opt_dir / "etc"
