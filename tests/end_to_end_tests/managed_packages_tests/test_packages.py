@@ -212,6 +212,7 @@ def test_packages(
         timeout_tracker=timeout_tracker,
     )
 
+    logger.info("Verify compression")
     _verify_compression(agent_commander=agent_commander)
 
     logger.info("Verify agent log uploads.")
