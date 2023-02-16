@@ -77,12 +77,12 @@ The package provides the "embedded" Python interpreter that is specially built t
             that points to the directory `/opt/scalyr-agent-2/lib/openssl/3`. This directory contains directory
             named 'bindings' that, in turn, contains Python's C bindings - '_ssl' and '_hashlib' that are compiled 
             against OpenSSL 3. The Python's OpenSSL-related C bindings in '/opt/scalyr-agent-2/python3/lib/pythonX.Y/lib-dynload'
-            are also linked to the bindings in the `current` directory, so changing the target of the `current` symlink
+            are also linked to the bindings in the `current` directory, so by changing the target of the `current` symlink
             we also change OpenSSL version of the Python's C bindings. 
             Then the package will try "probe" the system's OpenSSL. That is done basically just by running new 
             process of the interpreter and importing the 'ssl' module. If there's no exception, then appropriate 
             OpenSSL 3 is presented in the system and Python can use it. If there is an exception, then 
-            OpenSSL 3 can not be found and we go the the step 2.
+            OpenSSL 3 can not be found and we go to the step 2.
             
         - 2: If first step is not successful and system does not have appropriate OpenSSL 3, then we re-create the
             `current` symlink and link it with the `/opt/scalyr-agent-2/lib/openssl/1_1_1` which has bindings for
