@@ -69,11 +69,15 @@ The package provides the "embedded" Python interpreter that is specially built t
 
     One of the features on the package, is that is can use system's OpenSSL if it has appropriate version, or
     fallback to the OpenSSL library which is shipped with the package. To achieve that, the Python interpreter from the
-    package contains multiple versions of it's 'OpenSSL-related' C bindings - _ssl.cpython*.so and _hashlib.cpython.so.
-    On each new installation/upgrade of the package or user's manual run of the command
-    `/opt/scalyr-agent-2/bin/agent-python3-config initialize`, the package follows next steps in order to
+    package contains multiple versions of OpenSSL (1.1.1 and 3) and Python's 'OpenSSL-related' C bindings - _ssl.cpython*.so and _hashlib.cpython.so.
+    On each new installation/upgrade of the package (or user's manual run of the command
+    `/opt/scalyr-agent-2/bin/agent-python3-config initialize`), the package follows next steps in order to
     resolve OpenSSL library to use:
-        - 1: Make Python interpreter to use original ssl C bindings. In this case when 'ssl' or 'hashlib' module is
+        - 1: There is a special directory - `/opt/scalyr-agent-2/lib/openssl` in the agent package. 
+            Agent always 
+            uses it's embedded Python interpreter with the 'LD_LIBRARY_PATH' env. variable containing this directory.
+            First, agent package, during its post-install initialization, leaves this directory empty
+            Make Python interpreter to use original ssl C bindings. In this case when Python's 'ssl' or 'hashlib' module is
             imported, the originally compiled '_ssl.cpython*.so' and '_hashlib.cpython.so' bindings are used.
             Those bindings, by the default, use system's dynamic linker in order to find and link appropriate OpenSLL
             library if it is presented on system. First it tries to find OpenSSL version 3+.
