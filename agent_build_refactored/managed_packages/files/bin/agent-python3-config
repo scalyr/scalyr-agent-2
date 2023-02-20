@@ -1,3 +1,4 @@
+#!/opt/scalyr-agent-2/python3/bin/python3
 # Copyright 2014-2023 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,14 +14,13 @@
 # limitations under the License.
 
 """
-This script provide some configuration options for the Agent's Python3 dependency package.
+This script provide some configuration options for the Agent's Python3 interpreter.
 """
 
 import argparse
 import pathlib as pl
 import subprocess
 import sys
-import re
 from typing import Tuple
 
 OPENSSL_1_1_1_VERSION = "1_1_1"
@@ -28,19 +28,20 @@ OPENSSL_3_VERSION = "3"
 
 DEFAULT_FALLBACK_OPENSSL_VERSION = OPENSSL_1_1_1_VERSION
 
-DEPENDENCIES_PACKAGE_ROOT = pl.Path("/opt/scalyr-agent-2-dependencies")
-OPENSSL_LIBS_PATH = DEPENDENCIES_PACKAGE_ROOT / "lib/openssl"
+PACKAGE_OPT_DIR = pl.Path("/opt/scalyr-agent-2")
+OPENSSL_LIBS_PATH = PACKAGE_OPT_DIR / "lib/openssl"
+PYTHON_DIR = PACKAGE_OPT_DIR / "python3"
 
 
 PYTHON_SHORT_VERSION = ".".join([str(n) for n in sys.version_info[:2]])
 
-PYTHON_LIB_DYNLOAD_PATH = DEPENDENCIES_PACKAGE_ROOT / f"lib/python{PYTHON_SHORT_VERSION}/lib-dynload"
+PYTHON_LIB_DYNLOAD_PATH = PYTHON_DIR / f"lib/python{PYTHON_SHORT_VERSION}/lib-dynload"
 
 
-PREFERRED_OPENSSL_FILE_PATH = DEPENDENCIES_PACKAGE_ROOT / "etc/preferred_openssl"
+PREFERRED_OPENSSL_FILE_PATH = PACKAGE_OPT_DIR / "etc/preferred_openssl"
 
 # Bin directory of the package.
-BIN_DIR = DEPENDENCIES_PACKAGE_ROOT / "bin"
+PYTHON_BIN_DIR = PYTHON_DIR / "bin"
 
 # This directory is basically a symlink for to another directory with OpenSSL shared objects.
 # This script's work is to decide what OpenSLL shared objects to use and link directory with its shared object
@@ -64,10 +65,9 @@ def initialize():
 
     if preferred_openssl == "auto":
         try:
-            unlink_embedded_openssl()
-
             print("Looking for system OpenSSL >= 3: ", file=sys.stderr, end='')
-            link_bindings(version_type=OPENSSL_3_VERSION)
+            CURRENT_OPENSSL_LIBS_PATH.unlink()
+            CURRENT_OPENSSL_LIBS_PATH.symlink_to(f"./{OPENSSL_3_VERSION}")
 
             is_found, version_or_error = get_current_openssl_version()
             if is_found:
@@ -77,7 +77,9 @@ def initialize():
             print(version_or_error, file=sys.stderr)
 
             print("Looking for system OpenSSL >= 1.1.1: ", file=sys.stderr, end='')
-            link_bindings(version_type=OPENSSL_1_1_1_VERSION)
+            CURRENT_OPENSSL_LIBS_PATH.unlink()
+            CURRENT_OPENSSL_LIBS_PATH.symlink_to(f"./{OPENSSL_1_1_1_VERSION}")
+
             is_found, version_or_error = get_current_openssl_version()
             if is_found:
                 print(f"found {version_or_error}", file=sys.stderr)
@@ -91,8 +93,8 @@ def initialize():
             )
 
     print("Using embedded OpenSSL == ", file=sys.stderr, end='')
-    link_bindings(version_type=OPENSSL_1_1_1_VERSION)
-    link_embedded_openssl(openssl_variant=OPENSSL_1_1_1_VERSION)
+    CURRENT_OPENSSL_LIBS_PATH.unlink()
+    CURRENT_OPENSSL_LIBS_PATH.symlink_to(f"./embedded")
     is_found, version_or_error = get_current_openssl_version()
     if not is_found:
         # Something very wrong happened and this is not expected.
@@ -103,53 +105,6 @@ def initialize():
         exit(1)
 
     print(version_or_error, file=sys.stderr)
-
-
-def unlink_embedded_openssl():
-    """
-    Remove symlink to a directory with embedded OpenSSL shared objects, enabling system's
-    dynamic linker to look for OpenSSL in other places.
-    :return:
-    """
-    if CURRENT_OPENSSL_LIBS_PATH.exists():
-        CURRENT_OPENSSL_LIBS_PATH.unlink()
-
-
-def link_embedded_openssl(openssl_variant: str):
-    """
-    Create symlink in the path which is included to Python's LD_LIBRARY_PATH variable.
-    The symlink itself points to the directory with OpenSSL shared objets.
-    :param openssl_variant:
-    :return:
-    """
-    unlink_embedded_openssl()
-
-    openssl_libs_path = OPENSSL_LIBS_PATH / openssl_variant / "libs"
-    CURRENT_OPENSSL_LIBS_PATH.symlink_to(openssl_libs_path)
-
-
-def link_bindings(version_type: str):
-    """
-    Configure Python's 'ssl' and 'hashlib' modules C bindings by linking to their
-        a particular shared objects.
-    :param version_type:  version of the OpenSSL to use, 1_1_1 or 3
-    :return:
-    """
-
-    openssl_version_path = OPENSSL_LIBS_PATH / version_type / "bindings"
-
-    for binding_filename_glob in [
-        "_ssl.*-*-*-*-*.so",
-        "_hashlib.*-*-*-*-*.so",
-    ]:
-        binding_path = list(openssl_version_path.glob(binding_filename_glob))[0]
-        binding_filename = binding_path.name
-        symlink_path = PYTHON_LIB_DYNLOAD_PATH / binding_filename
-
-        if symlink_path.exists():
-            symlink_path.unlink()
-
-        symlink_path.symlink_to(binding_path)
 
 
 def get_current_openssl_version() -> Tuple[bool, str]:
@@ -163,7 +118,7 @@ def get_current_openssl_version() -> Tuple[bool, str]:
 
     result = subprocess.run(
         [
-            str(BIN_DIR / "python3"),
+            str(PYTHON_BIN_DIR / "python3"),
             "-c",
             "import ssl; print(ssl.OPENSSL_VERSION);"
         ],

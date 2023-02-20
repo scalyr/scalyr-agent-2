@@ -327,14 +327,12 @@ def server_root(request, tmp_path_factory, package_builder, stable_version_packa
         if request.config.option.packages_source is None:
             # Build packages now.
             builder = package_builder()
-            builder.build()
-            builder_output = builder.output_path
+            builder.build_agent_package()
+            builder_output = builder.packages_output_path
         else:
             builder_output = pl.Path(request.config.option.packages_source)
 
-        packages_dir = (
-            builder_output / "packages" / package_builder.PACKAGE_TYPE / "managed"
-        )
+        packages_dir = builder_output / package_builder.PACKAGE_TYPE
         repo_packages = tmp_path_factory.mktemp("repo_packages")
         shutil.copytree(packages_dir, repo_packages, dirs_exist_ok=True)
         shutil.copytree(stable_version_packages, repo_packages, dirs_exist_ok=True)
@@ -470,12 +468,13 @@ def agent_package_path(repo_root, package_builder):
     if repo_root is None:
         return None
 
+    package_arch = package_builder.DEPENDENCY_PACKAGES_ARCHITECTURE.get_package_arch(
+        package_type=package_builder.PACKAGE_TYPE
+    )
     if package_builder.PACKAGE_TYPE == "deb":
-        package_filename_glob = (
-            f"{AGENT_PACKAGE_NAME}_{AGENT_VERSION}_all.{package_builder.PACKAGE_TYPE}"
-        )
+        package_filename_glob = f"{AGENT_PACKAGE_NAME}_{AGENT_VERSION}_{package_arch}.{package_builder.PACKAGE_TYPE}"
     elif package_builder.PACKAGE_TYPE == "rpm":
-        package_filename_glob = f"{AGENT_PACKAGE_NAME}-{AGENT_VERSION}-1.noarch.{package_builder.PACKAGE_TYPE}"
+        package_filename_glob = f"{AGENT_PACKAGE_NAME}-{AGENT_VERSION}-1.{package_arch}.{package_builder.PACKAGE_TYPE}"
     else:
         raise Exception(f"Unknown package type: {package_builder.PACKAGE_TYPE}")
 

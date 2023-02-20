@@ -16,8 +16,8 @@ https://github.com/scalyr/scalyr-agent-2/blob/master/CHANGELOG.md.
   seamless for the majority of cases, but if you use custom monitors that require additional libraries, you will need to
   specify those requirements in new agent's configuration.
   
-  After upgrading to a new version, add required libraries to the file `/opt/scalyr-agent-2-dependencies/etc/additional-requirements.txt` 
-  and run command `/opt/scalyr-agent-2-dependencies/bin/agent-libs-config initialize` to re-initialize requirements.
+  When upgraded to a new version of the package, add required libraries to the file `/opt/scalyr-agent-2/etc/additional-requirements.txt` 
+  and run command `/opt/scalyr-agent-2/bin/agent-libs-config initialize` to re-initialize requirements.
 
 ## 2.1.38 "Zaotune" - Dec 1, 2022
 

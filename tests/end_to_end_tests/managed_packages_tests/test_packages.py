@@ -33,9 +33,7 @@ import pytest
 
 from agent_build_refactored.tools.constants import SOURCE_ROOT, AGENT_VERSION
 from agent_build_refactored.managed_packages.managed_packages_builders import (
-    PYTHON_PACKAGE_NAME,
-    AGENT_LIBS_PACKAGE_NAME,
-    AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME,
+    AGENT_SUBDIR_NAME,
     DEFAULT_PYTHON_PACKAGE_OPENSSL_VERSION,
     AGENT_PACKAGE_NAME,
 )
@@ -50,12 +48,12 @@ from tests.end_to_end_tests.run_in_remote_machine import TargetDistro
 logger = logging.getLogger(__name__)
 
 
-def _verify_package_subdirectories(
+def _verify_package_paths(
     package_path: pl.Path,
     package_type: str,
     package_name: str,
     output_dir: pl.Path,
-    expected_folders: List[str],
+    expected_paths: List[str],
 ):
     """
     Verify structure if the agent's dependency packages.
@@ -64,7 +62,7 @@ def _verify_package_subdirectories(
     :param package_type: Type of the package, e.g. deb, rpm.
     :param package_name: Name of the package.
     :param output_dir: Directory where to extract a package.
-    :param expected_folders: List of paths that are expected to be in this package.
+    :param expected_paths: List of paths that are expected to be in this package.
     """
 
     package_root = output_dir / package_name
@@ -78,7 +76,7 @@ def _verify_package_subdirectories(
 
     remaining_paths = set(package_root.glob("**/*"))
 
-    for expected in expected_folders:
+    for expected in expected_paths:
         expected_path = package_root / expected
         for path in list(remaining_paths):
             if str(path).startswith(str(expected_path)) or str(path) in str(
@@ -92,44 +90,31 @@ def _verify_package_subdirectories(
 
 
 def test_dependency_packages(
-    package_builder,
-    tmp_path,
-    target_distro,
-    python_package_path,
-    agent_libs_package_path,
+    package_builder, tmp_path, target_distro, agent_package_path
 ):
 
     if target_distro.name not in ["ubuntu2204", "amazonlinux2"]:
         pytest.skip("No need to check on all distros.")
 
     package_type = package_builder.PACKAGE_TYPE
-    _verify_package_subdirectories(
-        package_path=python_package_path,
+    _verify_package_paths(
+        package_path=agent_package_path,
         package_type=package_builder.PACKAGE_TYPE,
-        package_name=PYTHON_PACKAGE_NAME,
+        package_name=AGENT_PACKAGE_NAME,
         output_dir=tmp_path,
-        expected_folders=[
-            f"opt/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/",
+        expected_paths=[
+            f"opt/{AGENT_SUBDIR_NAME}/",
+            f"etc/{AGENT_SUBDIR_NAME}/",
+            "etc/init.d/scalyr-agent-2",
+            f"usr/share/{AGENT_SUBDIR_NAME}/",
+            "usr/sbin/scalyr-agent-2",
+            "usr/sbin/scalyr-agent-2-config",
+            f"var/lib/{AGENT_SUBDIR_NAME}/",
+            f"var/log/{AGENT_SUBDIR_NAME}/",
+            f"var/opt/{AGENT_SUBDIR_NAME}/",
             # Depending on its type, a package also may install its own "metadata", so we have to take it into
             # account too.
-            f"usr/share/doc/{PYTHON_PACKAGE_NAME}/"
-            if package_type == "deb"
-            else "usr/lib/.build-id/",
-        ],
-    )
-
-    # Verify structure of the agent_libs package and make sure there's no any file outside it.
-    _verify_package_subdirectories(
-        package_path=agent_libs_package_path,
-        package_type=package_builder.PACKAGE_TYPE,
-        package_name=AGENT_LIBS_PACKAGE_NAME,
-        output_dir=tmp_path,
-        expected_folders=[
-            f"opt/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/",
-            "etc/scalyr-agent-2",
-            # Depending on its type, a package also may install its own "metadata", so we have to take it into
-            # account too.
-            f"usr/share/doc/{AGENT_LIBS_PACKAGE_NAME}/"
+            f"usr/share/doc/{AGENT_PACKAGE_NAME}/"
             if package_type == "deb"
             else "usr/lib/.build-id/",
         ],
@@ -137,9 +122,9 @@ def test_dependency_packages(
 
 
 LINUX_PACKAGE_AGENT_PATHS = AgentPaths(
-    configs_dir=pl.Path("/etc/scalyr-agent-2"),
-    logs_dir=pl.Path("/var/log/scalyr-agent-2"),
-    install_root=pl.Path("/usr/share/scalyr-agent-2"),
+    configs_dir=pl.Path(f"/etc/{AGENT_SUBDIR_NAME}"),
+    logs_dir=pl.Path(f"/var/log/{AGENT_SUBDIR_NAME}"),
+    install_root=pl.Path(f"/usr/share/{AGENT_SUBDIR_NAME}"),
 )
 
 
@@ -349,7 +334,10 @@ def test_upgrade(
             "Can not upgrade from CentOS 6 because our previous variant of packages does not support it."
         )
 
-    timeout_tracker = TimeoutTracker(100)
+    if "x86_64" not in package_builder_name:
+        timeout_tracker = TimeoutTracker(400)
+    else:
+        timeout_tracker = TimeoutTracker(200)
 
     distros_with_python_2 = {"centos7", "ubuntu1404", "ubuntu1604"}
 
@@ -593,7 +581,7 @@ def _verify_python_and_libraries():
 
     logger.info("Check installation of the additional requirements")
     additional_requirements_path = pl.Path(
-        "/opt/scalyr-agent-2-dependencies/etc/additional-requirements.txt"
+        "/opt/scalyr-agent-2/etc/additional-requirements.txt"
     )
 
     additional_requirements_content = additional_requirements_path.read_text()
@@ -602,13 +590,11 @@ def _verify_python_and_libraries():
     additional_requirements_path.write_text(additional_requirements_content)
 
     subprocess.run(
-        ["/opt/scalyr-agent-2-dependencies/bin/agent-libs-config", "initialize"],
+        ["/opt/scalyr-agent-2/bin/agent-libs-config", "initialize"],
         check=True,
     )
 
-    venv_python_executable = (
-        f"/var/opt/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/venv/bin/python3"
-    )
+    venv_python_executable = f"/var/opt/{AGENT_SUBDIR_NAME}/venv/bin/python3"
 
     result = subprocess.run(
         [
