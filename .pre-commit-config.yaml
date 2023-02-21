@@ -1,5 +1,5 @@
 default_language_version:
-  python: python3.6
+  python: python3.10
 
 exclude: '(third_party.*|third_party_tls.*)'
 repos:
