@@ -376,7 +376,7 @@ repo_gpgcheck=0
         yum_repo_file_path.write_text(yum_repo_file_content)
         _call_yum(["install", "-y", system_python_package_name])
         _call_yum(
-            ["install", "-y", f"{AGENT_PACKAGE_NAME}-{stable_agent_package_version}"]
+            ["install", "-y", f"{AGENT_PACKAGE_NAME}-{stable_agent_package_version}-1"]
         )
     else:
         raise Exception(f"Unknown package type: {package_builder.PACKAGE_TYPE}")
@@ -405,11 +405,12 @@ repo_gpgcheck=0
                 "-y",
                 "--only-upgrade",
                 "--allow-unauthenticated",
-                f"{AGENT_PACKAGE_NAME}={AGENT_VERSION}",
+                f"{AGENT_PACKAGE_NAME}",
             ]
         )
     elif package_builder.PACKAGE_TYPE == "rpm":
-        _call_yum(["install", "-y", f"{AGENT_PACKAGE_NAME}-{AGENT_VERSION}"])
+        _call_yum(["install", "-y", f"{AGENT_PACKAGE_NAME}"])
+        #_call_yum(["update", "-y"])
     else:
         raise Exception(f"Unknown package type: {package_builder.PACKAGE_TYPE}")
 

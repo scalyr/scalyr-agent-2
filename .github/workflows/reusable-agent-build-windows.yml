@@ -9,7 +9,6 @@ on:
 jobs:
   build-windows-package:
     name: Build windows MSI installer
-    needs: pre_job
     runs-on: windows-latest
     steps:
       - name: Checkout Repository
