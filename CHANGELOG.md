@@ -6,7 +6,11 @@ Scalyr Agent 2 Changes By Release
 Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Jan 19, 2023 00:00 -0800
 --->
 
-Other: Linux `deb` and `rpm` packages are now shipped with its own Python interpreter, so agent does not have to rely on system Python interpreter anymore. Please refer to the RELEASE_NOTES document, for more information.
+Docker Images / Kubernetes:
+* Docker images now utilize Python:3.11.2 image.
+
+Other:
+* Linux `deb` and `rpm` packages are now shipped with its own Python interpreter, so agent does not have to rely on system Python interpreter anymore. Please refer to the RELEASE_NOTES document, for more information.
  
 ## 2.1.40 "Onone" - Jan 19, 2023
 <!---
