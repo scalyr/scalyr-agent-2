@@ -38,7 +38,7 @@ Jinja2==3.0.3; python_version ~= '3.7.0'
 # flask is unable to import Jinja2 in python 3.7. The fix is to pin Jinja2 to version prior to 3.1.0
 # https://github.com/pallets/flask/issues/4494
 itsdangerous==2.0.1; python_version ~= '3.7.0'
-Werkzeug==2.2.3; python_version ~= '3.7.0'
+Werkzeug==2.0.3; python_version ~= '3.7.0'
 # Same problem as jinja2, and also only affects python 3.7. Pinning
 # itsdangerous and Werkzeug to the same version used in python 3.6 should fix the issue.
 pathlib2==2.3.5; python_version <= '2.7'
