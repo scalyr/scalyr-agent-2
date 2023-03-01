@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 def test_remotely(
-    distro_name,
+    target_distro,
     remote_machine_type,
     package_builder_name,
     package_builder,
@@ -54,14 +54,14 @@ def test_remotely(
 
     try:
         run_test_remotely(
-            distro_name=distro_name,
+            target_distro=target_distro,
             remote_machine_type=remote_machine_type,
             command=[
                 "tests/end_to_end_tests/managed_packages_tests",
                 "--builder-name",
                 package_builder_name,
                 "--distro-name",
-                distro_name,
+                target_distro.name,
                 "--remote-machine-type",
                 remote_machine_type,
                 "--runs-locally",

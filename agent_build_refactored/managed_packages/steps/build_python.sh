@@ -26,6 +26,7 @@
 #   PYTHON_VERSION: Version of the Python to build.
 #   PYTHON_INSTALL_PREFIX: Install prefix for the Python installation.
 #   SUBDIR_NAME: Name of the sub-directory.
+#   ADDITIONAL_OPTIONS: Additional config options for Python building.
 
 set -e
 
@@ -53,15 +54,29 @@ pushd build
 	--with-readline=edit \
 	--prefix="${INSTALL_PREFIX}" \
 	--exec-prefix="${INSTALL_PREFIX}" \
-	--with-ensurepip=upgrade
-
-#		--enable-optimizations \
-#	--with-lto \
+	--with-ensurepip=upgrade \
+	--enable-optimizations "${ADDITIONAL_OPTIONS}"
 
 make -j "$(nproc)"
-#make test
-make DESTDIR="${STEP_OUTPUT_PATH}" install
+make test
+make install
 
 popd
 popd
 popd
+
+# Install version of pip that we need.
+export LD_LIBRARY_PATH="${INSTALL_PREFIX}/lib:${LD_LIBRARY_PATH}"
+"${INSTALL_PREFIX}/bin/python3" -m pip install "pip==${PIP_VERSION}"
+
+# Remove some of the files to reduce size of the interpreter
+PYTHON_LIBS_PATH="${INSTALL_PREFIX}/lib/python${PYTHON_SHORT_VERSION}"
+
+find "${PYTHON_LIBS_PATH}" -name "__pycache__" -type d -prune -exec rm -r {} \;
+
+rm -r "${PYTHON_LIBS_PATH}/test"
+rm -r "${PYTHON_LIBS_PATH}"/config-"${PYTHON_SHORT_VERSION}"-*-linux-gnu/
+rm -r "${PYTHON_LIBS_PATH}/lib2to3"
+
+mkdir -p "${STEP_OUTPUT_PATH}${INSTALL_PREFIX}"
+cp -a "${INSTALL_PREFIX}/." "${STEP_OUTPUT_PATH}${INSTALL_PREFIX}"

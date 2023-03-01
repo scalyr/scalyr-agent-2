@@ -82,12 +82,12 @@ class AgentCommander:
         )
         return output
 
-    def start(self, no_fork: bool = False):
+    def start(self, no_fork: bool = False, env=None):
         cmd = ["start"]
         if no_fork:
             cmd.append("--no-fork")
 
-        self._check_call_command(cmd)
+        self._check_call_command(cmd, env=env)
 
     def get_status(self) -> str:
         return self._check_output_command(["status", "-v"]).decode()

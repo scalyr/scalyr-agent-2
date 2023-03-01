@@ -150,7 +150,8 @@ jobs:
           CAPTURE_AGENT_STATUS_METRICS: ${{ inputs.capture_agent_status_metrics }}
           DRY_RUN: ${{ inputs.dry_run }}
           PYTHONPATH: .
-        run: ./benchmarks/scripts/send-log-level-counts-to-codespeed.sh "${{ github.sha }}"
+        run: |
+          ./benchmarks/scripts/send-log-level-counts-to-codespeed.sh "${{ github.sha }}"
 
       - name: Upload log artifacts
         uses: actions/upload-artifact@v3
@@ -161,13 +162,8 @@ jobs:
         if: ${{ success() || failure() }}
 
       - name: Notify Slack on Failure
-        # NOTE: github.ref is set to pr ref (and not branch name, e.g. refs/pull/28/merge) for pull
-        # requests and that's why we need this special conditional and check for github.head_ref in
-        # case of PRs
-        # TODO: Temporary disable to avoid spam due to CodeSpeed issues
-        if: false
-        #  if: ${{ failure() && (github.ref == 'refs/heads/master' || github.head_ref == 'master') }}
-        uses: act10ns/slack@87c73aef9f8838eb6feae81589a6b1487a4a9e08 # v1.6.0
+        if: ${{ failure() && github.ref_name == 'master' }}
+        uses: act10ns/slack@ed1309ab9862e57e9e583e51c7889486b9a00b0f # v2.0.0
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:

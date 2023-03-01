@@ -1,7 +1,13 @@
 # The main "setup" workflow, that calls other workflows.
 name: Docker Images Build
 
-on: [push]
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
 
 permissions:
   contents: read
@@ -21,6 +27,21 @@ permissions:
 #
 # For example: https://github.com/scalyr/scalyr-agent-2/pull/804/commits/0eccf278623552b51d9289d75a47794e88f02862
 jobs:
+  pre_job:
+    name: Skip Duplicate Jobs Pre Job
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write  # Needed for skip-duplicate-jobs job
+      contents: read
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@12aca0a884f6137d619d6a8a09fcc3406ced5281 # v4.0.0
+        with:
+          cancel_others: 'true'
+          github_token: ${{ github.token }}
+
   test-images:
     runs-on: ubuntu-latest
 
@@ -67,7 +88,7 @@ jobs:
           deployment-name: ${{ matrix.image-type }}-${{ matrix.image-distro-name }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8c0edbc76e98fa90f69d9a2c020dcb50019dc325 # v2.0.0
+        uses: docker/setup-buildx-action@f03ac48505955848960e80bbb68046aa35c7b9e7 # v2.0.0
         with:
           driver-opts: network=host
 
@@ -94,11 +115,8 @@ jobs:
             --name-suffix "_${{ github.run_number }}${{ github.run_attempt }}" \
 
       - name: Notify Slack on Failure
-        # NOTE: github.ref is set to pr ref (and not branch name, e.g. refs/pull/28/merge) for pull
-        # requests and that's why we need this special conditional and check for github.head_ref in
-        # case of PRs
-        if: ${{ failure() && (github.ref == 'refs/heads/master' || github.head_ref == 'master') }}
-        uses: act10ns/slack@87c73aef9f8838eb6feae81589a6b1487a4a9e08 # v1.6.0
+        if: ${{ failure() && github.ref_name == 'master' }}
+        uses: act10ns/slack@ed1309ab9862e57e9e583e51c7889486b9a00b0f # v2.0.0
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:
@@ -107,11 +125,11 @@ jobs:
           channel: '#eng-dataset-cloud-tech'
 
   publish-images:
-    if: ${{ github.ref == 'refs/heads/master' || github.ref_type == 'tag' }}
+    if: ${{ github.ref_name == 'master' || github.ref_type == 'tag' }}
     needs:
       - test-images
 
-    uses: scalyr/scalyr-agent-2/.github/workflows/publish-docker-images.yml@master
+    uses: scalyr/scalyr-agent-2/.github/workflows/reusable-publish-docker-images.yml@master
     secrets:
       SCALYR_PROD_CLOUDTECH_TESTING_WRITE_TOKEN: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
       SCALYR_CLOUDTECH_TESTING_DEV_SCALYR_READ_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}

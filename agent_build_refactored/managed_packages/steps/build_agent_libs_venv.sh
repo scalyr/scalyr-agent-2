@@ -37,15 +37,23 @@ ldconfig
 REQUIREMENTS_FILE=/tmp/requirements.txt
 echo "${REQUIREMENTS}" > "${REQUIREMENTS_FILE}"
 
-export LD_LIBRARY_PATH="/opt/scalyr-agent-2-dependencies/lib:${LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH="${PYTHON_INSTALL_PREFIX}/lib:${LD_LIBRARY_PATH}"
 # Create venv.
 VENV_DIR="/var/opt/${SUBDIR_NAME}/venv"
-"/opt/${SUBDIR_NAME}/bin/python3" -m venv "${VENV_DIR}"
+"${PYTHON_INSTALL_PREFIX}/bin/python3" -m venv "${VENV_DIR}"
+
+# Install version of pip that we need to venv
+"${VENV_DIR}/bin/python3" -m pip install -v \
+  --cache-dir /tmp/pip_cache \
+  "pip==${PIP_VERSION}"
 
 # Install requirements to venv.
-"${VENV_DIR}/bin/python3" -m pip install  -v \
+"${VENV_DIR}/bin/python3" -m pip install -v \
   --cache-dir /tmp/pip_cache \
   -r "${REQUIREMENTS_FILE}"
+
+# Remove cache files.
+find "${VENV_DIR}" -name "__pycache__" -type d -prune -exec rm -r {} \;
 
 # Copy result venv to result output.
 cp -a "${VENV_DIR}" "${STEP_OUTPUT_PATH}"

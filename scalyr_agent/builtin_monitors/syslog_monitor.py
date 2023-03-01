@@ -23,7 +23,9 @@ from scalyr_agent import compat
 __author__ = "scalyr@sentinelone.com"
 
 import errno
+from fnmatch import fnmatch
 import glob
+import json
 import logging
 import logging.handlers
 import os
@@ -1204,6 +1206,7 @@ class SyslogHandler(object):
         logger,
         line_reporter,
         config,
+        global_config,
         server_host,
         log_path,
         get_log_watcher,
@@ -1252,7 +1255,8 @@ class SyslogHandler(object):
         self.__syslog_expire_log = config.get("expire_log")
         self.__syslog_max_log_files = config.get("max_log_files")
         self.__syslog_loggers = {}
-        self.__syslog_parser = config.get("parser")
+        self.__syslog_default_parser = config.get("parser")
+        self.__global_log_configs = global_config.log_configs if global_config else []
         self.__syslog_attributes = JsonObject(config.get("attributes") or {})
 
         if docker_logging:
@@ -1591,33 +1595,77 @@ class SyslogHandler(object):
                         limit_key="syslog-max-log-files",
                     )
                 else:
-                    logfile = AutoFlushingRotatingFile(
-                        filename=path,
-                        max_bytes=self.__max_log_size,
-                        backup_count=self.__max_log_rotations,
-                        flush_delay=self.__flush_delay,
-                    )
+                    # Match the new log path with a global log config (generally globbed).
+                    # Note that in log configs, .path is required but .attributes may be empty.
+                    # If no match is found then log to the base syslog file.
 
-                    attribs = self.__syslog_attributes.copy()
-                    attribs.update(
-                        {k.lower(): v for k, v in extra.items() if v is not None}
-                    )
+                    log_config_attribs = None
+                    for log_config in self.__global_log_configs:
+                        if fnmatch(path, log_config["path"]):
+                            log_config_attribs = log_config["attributes"]
+                            global_log.log(
+                                scalyr_logging.DEBUG_LEVEL_1,
+                                "Matched %s to %s" % (path, log_config["path"]),
+                            )
+                            break
 
-                    log_config = {
-                        "parser": self.__syslog_parser,
-                        "attributes": attribs,
-                        "path": path,
-                    }
-
-                    if watcher and module:
-                        log_config = watcher.add_log_config(
-                            module.module_name, log_config
+                    if log_config_attribs is None:
+                        global_log.log(
+                            scalyr_logging.DEBUG_LEVEL_1,
+                            "No match found for %s" % (path,),
                         )
 
-                    self.__syslog_loggers[path] = {
-                        "log_config": log_config,
-                        "logger": logfile,
-                    }
+                    if log_config_attribs is not None:
+                        logfile = AutoFlushingRotatingFile(
+                            filename=path,
+                            max_bytes=self.__max_log_size,
+                            backup_count=self.__max_log_rotations,
+                            flush_delay=self.__flush_delay,
+                        )
+
+                        global_log.log(
+                            scalyr_logging.DEBUG_LEVEL_1,
+                            "__syslog_attributes=%s log_config_attribs=%s extra=%s"
+                            % (
+                                json.dumps(
+                                    self.__syslog_attributes.to_dict(),
+                                    separators=(",", ":"),
+                                ),
+                                json.dumps(
+                                    log_config_attribs.to_dict(), separators=(",", ":")
+                                ),
+                                json.dumps(extra, separators=(",", ":")),
+                            ),
+                        )
+
+                        attribs = self.__syslog_attributes.copy()
+                        attribs.update(
+                            {
+                                k: v
+                                for k, v in log_config_attribs.items()
+                                if k not in ["parser"]
+                            }
+                        )
+                        attribs.update(
+                            {k.lower(): v for k, v in extra.items() if v is not None}
+                        )
+
+                        log_config = {
+                            "parser": log_config_attribs.get("parser")
+                            or self.__syslog_default_parser,
+                            "attributes": attribs,
+                            "path": path,
+                        }
+
+                        if watcher and module:
+                            log_config = watcher.add_log_config(
+                                module.module_name, log_config
+                            )
+
+                        self.__syslog_loggers[path] = {
+                            "log_config": log_config,
+                            "logger": logfile,
+                        }
 
             if path in self.__syslog_loggers:
                 logger = self.__syslog_loggers[path]
@@ -1746,6 +1794,7 @@ class SyslogServer(object):
         port,
         logger,
         config,
+        global_config,
         line_reporter,
         accept_remote=False,
         server_host=None,
@@ -1853,6 +1902,7 @@ class SyslogServer(object):
             logger,
             line_reporter,
             config,
+            global_config,
             server_host,
             log_path,
             get_log_watcher,
@@ -2237,6 +2287,7 @@ From Search view, query [monitor = 'syslog_monitor'](https://app.scalyr.com/even
                 protocol[1],
                 self.__disk_logger,
                 self._config,
+                self._global_config,
                 line_reporter,
                 accept_remote=self.__accept_remote_connections,
                 server_host=self.__server_host,
@@ -2253,6 +2304,7 @@ From Search view, query [monitor = 'syslog_monitor'](https://app.scalyr.com/even
                     p[1],
                     self.__disk_logger,
                     self._config,
+                    self._global_config,
                     line_reporter,
                     accept_remote=self.__accept_remote_connections,
                     server_host=self.__server_host,

@@ -240,15 +240,15 @@ the changes the Python files are picked up.
 
 ## Installing additional requirements for plugin
 If you use agent from the package (e.g. `deb` or `rpm`) and your monitor depends on third-party libraries, they can be 
-specified in the requirements file located in `/opt/scalyr-agent-2-dependencies/etc/additional-requirements.txt`
-To make those requirements be installed immediately run command `/opt/scalyr-agent-2-dependencies/bin/agent-libs-config initialize`
+specified in the requirements file located in `/opt/scalyr-agent-2/etc/additional-requirements.txt`
+To make those requirements be installed immediately run command `/opt/scalyr-agent-2/bin/agent-libs-config initialize`
 which has to re-initialize agent's internal venv and to install specified libraries. Please do not install
 additional libraries manually, by using Agent's internal Python executables. Since venv with all requirement is 
 re-initializes on each package installation, your manually installed libraries will not survive the next upgrade.
-The `/opt/scalyr-agent-2-dependencies/etc/additional-requirements.txt` is treated by the package as a configuration
+The `/opt/scalyr-agent-2/etc/additional-requirements.txt` is treated by the package as a configuration
 file, so it is not removed on package removal/upgrade. 
 NOTE: Also take into account that agent has its own "core" requirements, and make sure that you don't add a conflicting
-one. You can see those core requirements in the file `/opt/scalyr-agent-2-dependencies/venv/core-requirements.txt`. 
+one. You can see those core requirements in the file `/opt/scalyr-agent-2/venv/core-requirements.txt`. 
 
 ## Suggestions for writing Monitor Plugins
 

@@ -2149,6 +2149,7 @@ def get_agent_start_up_message():
     python_version_str = sys.version.replace("\n", "")
     build_revision = get_build_revision()
     openssl_version = getattr(ssl, "OPENSSL_VERSION", "unknown")
+    openssl_version_number = getattr(ssl, "OPENSSL_VERSION_NUMBER", "unknown")
 
     # We also include used locale and LANG env variable values since this makes it
     # easier for us to troubleshoot invalid locale related issues
@@ -2167,7 +2168,7 @@ def get_agent_start_up_message():
 
     msg = (
         "Starting scalyr agent... (version=%s revision=%s) %s (hostname=%s) (Python version=%s) "
-        "(OpenSSL version=%s) (default fs encoding=%s) (locale=%s) (LANG env variable=%s) "
+        "(OpenSSL version=%s) (OpenSSL version_number=%s) (default fs encoding=%s) (locale=%s) (LANG env variable=%s) "
         "(date parsing library=%s)"
         % (
             SCALYR_VERSION,
@@ -2176,6 +2177,7 @@ def get_agent_start_up_message():
             socket.gethostname(),
             python_version_str,
             openssl_version,
+            openssl_version_number,
             sys.getfilesystemencoding(),
             used_locale,
             lang_env_var,

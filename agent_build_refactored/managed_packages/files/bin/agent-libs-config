@@ -1,4 +1,4 @@
-#!/opt/scalyr-agent-2-dependencies/bin/python3
+#!/opt/scalyr-agent-2/python3/bin/python3
 # Copyright 2014-2022 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,7 +21,7 @@ import pathlib as pl
 import shutil
 import subprocess
 
-DEPENDENCIES_PACKAGE_ROOT = pl.Path("/opt/scalyr-agent-2-dependencies")
+PACKAGE_OPT_DIR = pl.Path("/opt/scalyr-agent-2")
 
 
 def initialize():
@@ -29,12 +29,12 @@ def initialize():
     Initialize agent requirement libraries by creating virtual environment with them.
     :return:
     """
-    core_requirements_path = DEPENDENCIES_PACKAGE_ROOT / "core-requirements.txt"
+    core_requirements_path = PACKAGE_OPT_DIR / "core-requirements.txt"
 
     # This is pre-created venv that is shipped with package.
-    venv_source_dir = DEPENDENCIES_PACKAGE_ROOT / "venv"
+    venv_source_dir = PACKAGE_OPT_DIR / "venv"
 
-    venv_dst_dir = pl.Path("/var/opt/scalyr-agent-2-dependencies/venv")
+    venv_dst_dir = pl.Path("/var/opt/scalyr-agent-2/venv")
     if venv_dst_dir.exists():
         shutil.rmtree(venv_dst_dir)
 
@@ -42,6 +42,7 @@ def initialize():
     shutil.copytree(
         venv_source_dir,
         venv_dst_dir,
+        symlinks=True
     )
     # Run pip install for additional agent requirements that may be specified by the user.
     subprocess.check_call(
@@ -50,11 +51,12 @@ def initialize():
             "-m",
             "pip",
             "install",
+            "--quiet",
             # Core agent requirements are already installed in this "pre-created" venv, but
             # we still add their requirements file to be sure that pip will throw an error if
             # additional requirements conflict with core ones.
             "-r", str(core_requirements_path),
-            "-r", str(DEPENDENCIES_PACKAGE_ROOT / "etc/additional-requirements.txt"),
+            "-r", str(PACKAGE_OPT_DIR / "etc/additional-requirements.txt"),
         ]
     )
 

@@ -21,6 +21,7 @@ are changing system state and must be aware of risks.
 
 import json
 import pathlib as pl
+import re
 import shlex
 import subprocess
 import logging
@@ -30,11 +31,9 @@ from typing import List, Dict
 
 import pytest
 
-from agent_build_refactored.tools.constants import SOURCE_ROOT
+from agent_build_refactored.tools.constants import SOURCE_ROOT, AGENT_VERSION
 from agent_build_refactored.managed_packages.managed_packages_builders import (
-    PYTHON_PACKAGE_NAME,
-    AGENT_LIBS_PACKAGE_NAME,
-    AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME,
+    AGENT_SUBDIR_NAME,
     DEFAULT_PYTHON_PACKAGE_OPENSSL_VERSION,
     AGENT_PACKAGE_NAME,
 )
@@ -44,16 +43,17 @@ from tests.end_to_end_tests.verify import (
     write_counter_messages_to_test_log,
     verify_agent_status,
 )
+from tests.end_to_end_tests.run_in_remote_machine import TargetDistro
 
 logger = logging.getLogger(__name__)
 
 
-def _verify_package_subdirectories(
+def _verify_package_paths(
     package_path: pl.Path,
     package_type: str,
     package_name: str,
     output_dir: pl.Path,
-    expected_folders: List[str],
+    expected_paths: List[str],
 ):
     """
     Verify structure if the agent's dependency packages.
@@ -62,7 +62,7 @@ def _verify_package_subdirectories(
     :param package_type: Type of the package, e.g. deb, rpm.
     :param package_name: Name of the package.
     :param output_dir: Directory where to extract a package.
-    :param expected_folders: List of paths that are expected to be in this package.
+    :param expected_paths: List of paths that are expected to be in this package.
     """
 
     package_root = output_dir / package_name
@@ -76,7 +76,7 @@ def _verify_package_subdirectories(
 
     remaining_paths = set(package_root.glob("**/*"))
 
-    for expected in expected_folders:
+    for expected in expected_paths:
         expected_path = package_root / expected
         for path in list(remaining_paths):
             if str(path).startswith(str(expected_path)) or str(path) in str(
@@ -90,44 +90,31 @@ def _verify_package_subdirectories(
 
 
 def test_dependency_packages(
-    package_builder,
-    tmp_path,
-    distro_name,
-    python_package_path,
-    agent_libs_package_path,
+    package_builder, tmp_path, target_distro, agent_package_path
 ):
 
-    if distro_name not in ["ubuntu2204", "amazonlinux2"]:
+    if target_distro.name not in ["ubuntu2204", "amazonlinux2"]:
         pytest.skip("No need to check on all distros.")
 
     package_type = package_builder.PACKAGE_TYPE
-    _verify_package_subdirectories(
-        package_path=python_package_path,
+    _verify_package_paths(
+        package_path=agent_package_path,
         package_type=package_builder.PACKAGE_TYPE,
-        package_name=PYTHON_PACKAGE_NAME,
+        package_name=AGENT_PACKAGE_NAME,
         output_dir=tmp_path,
-        expected_folders=[
-            f"opt/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/",
+        expected_paths=[
+            f"opt/{AGENT_SUBDIR_NAME}/",
+            f"etc/{AGENT_SUBDIR_NAME}/",
+            "etc/init.d/scalyr-agent-2",
+            f"usr/share/{AGENT_SUBDIR_NAME}/",
+            "usr/sbin/scalyr-agent-2",
+            "usr/sbin/scalyr-agent-2-config",
+            f"var/lib/{AGENT_SUBDIR_NAME}/",
+            f"var/log/{AGENT_SUBDIR_NAME}/",
+            f"var/opt/{AGENT_SUBDIR_NAME}/",
             # Depending on its type, a package also may install its own "metadata", so we have to take it into
             # account too.
-            f"usr/share/doc/{PYTHON_PACKAGE_NAME}/"
-            if package_type == "deb"
-            else "usr/lib/.build-id/",
-        ],
-    )
-
-    # Verify structure of the agent_libs package and make sure there's no any file outside it.
-    _verify_package_subdirectories(
-        package_path=agent_libs_package_path,
-        package_type=package_builder.PACKAGE_TYPE,
-        package_name=AGENT_LIBS_PACKAGE_NAME,
-        output_dir=tmp_path,
-        expected_folders=[
-            f"opt/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/",
-            "etc/scalyr-agent-2",
-            # Depending on its type, a package also may install its own "metadata", so we have to take it into
-            # account too.
-            f"usr/share/doc/{AGENT_LIBS_PACKAGE_NAME}/"
+            f"usr/share/doc/{AGENT_PACKAGE_NAME}/"
             if package_type == "deb"
             else "usr/lib/.build-id/",
         ],
@@ -135,9 +122,9 @@ def test_dependency_packages(
 
 
 LINUX_PACKAGE_AGENT_PATHS = AgentPaths(
-    configs_dir=pl.Path("/etc/scalyr-agent-2"),
-    logs_dir=pl.Path("/var/log/scalyr-agent-2"),
-    install_root=pl.Path("/usr/share/scalyr-agent-2"),
+    configs_dir=pl.Path(f"/etc/{AGENT_SUBDIR_NAME}"),
+    logs_dir=pl.Path(f"/var/log/{AGENT_SUBDIR_NAME}"),
+    install_root=pl.Path(f"/usr/share/{AGENT_SUBDIR_NAME}"),
 )
 
 
@@ -146,7 +133,7 @@ def test_packages(
     package_builder,
     remote_machine_type,
     convenience_script_path,
-    distro_name,
+    target_distro,
     scalyr_api_key,
     scalyr_api_read_key,
     scalyr_server,
@@ -154,18 +141,22 @@ def test_packages(
     agent_version,
     tmp_path,
 ):
-    timeout_tracker = TimeoutTracker(400)
+    if "x86_64" not in package_builder_name:
+        timeout_tracker = TimeoutTracker(800)
+    else:
+        timeout_tracker = TimeoutTracker(400)
+
     _print_system_information()
     _prepare_environment(
         package_type=package_builder.PACKAGE_TYPE,
         remote_machine_type=remote_machine_type,
-        distro_name=distro_name,
+        target_distro=target_distro,
         timeout_tracker=timeout_tracker,
     )
 
     logger.info("Install agent from install script.")
     _install_from_convenience_script(
-        script_path=convenience_script_path, distro_name=distro_name
+        script_path=convenience_script_path, target_distro=target_distro
     )
 
     _verify_python_and_libraries()
@@ -180,9 +171,7 @@ def test_packages(
     _run_shell("ls -la /etc/rc*.d/ | grep scalyr-agent")
     _run_shell("ls -la /etc/rc*.d/ | grep scalyr-agent | wc -l | grep 7")
 
-    server_host = (
-        f"package-{package_builder_name}-test-{test_session_suffix}-{int(time.time())}"
-    )
+    server_host = f"package-{package_builder_name}-{target_distro.name}-test-{test_session_suffix}-{int(time.time())}"
 
     upload_test_log_path = LINUX_PACKAGE_AGENT_PATHS.logs_dir / "test.log"
 
@@ -200,7 +189,7 @@ def test_packages(
 
     logger.info("Start agent")
 
-    agent_commander.start()
+    agent_commander.start(env=_ADDITIONAL_ENVIRONMENT)
 
     verify_agent_status(
         agent_version=agent_version,
@@ -237,18 +226,15 @@ def test_packages(
     else:
         raise Exception("Starting agent message is not found.")
 
-    # On Ubuntu 22.04 agent can use its OpenSSL 3 version.
-    if distro_name == "ubuntu2204":
-        assert "OpenSSL version=OpenSSL 3.0.2" in starting_agent_message
+    m = re.search(r"OpenSSL version_number=(\d+)", starting_agent_message)
+    openssl_version = int(m.group(1))
 
-    # On Ubuntu 20.04 it can be OpenSSL 1.1.1
-    elif distro_name == "ubuntu2004":
-        assert "OpenSSL version=OpenSSL 1.1.1" in starting_agent_message
+    if isinstance(target_distro.expected_openssl_version_number, list):
+        expected_openssl_versions = target_distro.expected_openssl_version_number
+    else:
+        expected_openssl_versions = [target_distro.expected_openssl_version_number]
 
-    # On Ubuntu 14.04 there's no "modern" version OpenSSl, but it still has to use 1.1.1 that is shipped with
-    # the package.
-    elif distro_name == "ubuntu1404":
-        assert "OpenSSL version=OpenSSL 1.1.1" in starting_agent_message
+    assert openssl_version in expected_openssl_versions
 
     _stop_agent_and_remove_logs_and_data(
         agent_commander=agent_commander,
@@ -325,6 +311,124 @@ def test_agent_package_config_ownership(package_builder, agent_package_path, tmp
     assert (
         oct_mode == "751"
     ), f"Expected permissions of the 'agent.d' is 751, got {oct_mode}"
+
+
+def test_upgrade(
+    package_builder,
+    package_builder_name,
+    repo_url,
+    repo_public_key_url,
+    remote_machine_type,
+    distro_name,
+    stable_agent_package_version,
+    scalyr_api_key,
+    test_session_suffix,
+    agent_version,
+):
+    """
+    Perform an upgrade from the current stable release. The stable version of the package also has to be in the same
+    repository as the tested packages.
+    """
+    if distro_name == "centos6":
+        pytest.skip(
+            "Can not upgrade from CentOS 6 because our previous variant of packages does not support it."
+        )
+
+    if "x86_64" not in package_builder_name:
+        timeout_tracker = TimeoutTracker(400)
+    else:
+        timeout_tracker = TimeoutTracker(200)
+
+    distros_with_python_2 = {"centos7", "ubuntu1404", "ubuntu1604"}
+
+    logger.info("Install stable version of the agent")
+    if distro_name in distros_with_python_2:
+        system_python_package_name = "python"
+    else:
+        system_python_package_name = "python3"
+
+    if package_builder.PACKAGE_TYPE == "deb":
+        repo_source_list_path = pl.Path("/etc/apt/sources.list.d/scalyr.list")
+        repo_source_list_path.write_text(
+            f"deb [allow-insecure=yes] {repo_url} scalyr main"
+        )
+        _call_apt(["update"])
+
+        _call_apt(["install", "-y", system_python_package_name])
+        _call_apt(
+            [
+                "install",
+                "-y",
+                "--allow-unauthenticated",
+                f"{AGENT_PACKAGE_NAME}={stable_agent_package_version}",
+            ]
+        )
+    elif package_builder.PACKAGE_TYPE == "rpm":
+        yum_repo_file_path = pl.Path("/etc/yum.repos.d/scalyr.repo")
+        yum_repo_file_content = f"""
+[scalyr]
+name=Scalyr packages.
+baseurl={repo_url}
+enabled=1
+gpgcheck=0
+repo_gpgcheck=0
+"""
+        yum_repo_file_path.write_text(yum_repo_file_content)
+        _call_yum(["install", "-y", system_python_package_name])
+        _call_yum(
+            ["install", "-y", f"{AGENT_PACKAGE_NAME}-{stable_agent_package_version}"]
+        )
+    else:
+        raise Exception(f"Unknown package type: {package_builder.PACKAGE_TYPE}")
+
+    # Write config
+    server_host = (
+        f"package-{package_builder_name}-test-{test_session_suffix}-{int(time.time())}"
+    )
+
+    config = {
+        "api_key": scalyr_api_key,
+        "server_attributes": {"serverHost": server_host},
+    }
+
+    agent_commander = AgentCommander(
+        executable_args=["scalyr-agent-2"], agent_paths=LINUX_PACKAGE_AGENT_PATHS
+    )
+
+    agent_commander.agent_paths.agent_config_path.write_text(json.dumps(config))
+
+    logger.info("Upgrade agent")
+    if package_builder.PACKAGE_TYPE == "deb":
+        _call_apt(
+            [
+                "install",
+                "-y",
+                "--only-upgrade",
+                "--allow-unauthenticated",
+                f"{AGENT_PACKAGE_NAME}={AGENT_VERSION}",
+            ]
+        )
+    elif package_builder.PACKAGE_TYPE == "rpm":
+        _call_yum(["install", "-y", f"{AGENT_PACKAGE_NAME}-{AGENT_VERSION}"])
+    else:
+        raise Exception(f"Unknown package type: {package_builder.PACKAGE_TYPE}")
+
+    logger.info("Verify that agent config remains after upgrade.")
+    assert LINUX_PACKAGE_AGENT_PATHS.agent_config_path.exists()
+    assert server_host in LINUX_PACKAGE_AGENT_PATHS.agent_config_path.read_text()
+
+    agent_commander.start()
+
+    verify_agent_status(
+        agent_version=agent_version,
+        agent_commander=agent_commander,
+        timeout_tracker=timeout_tracker,
+    )
+
+    agent_commander.stop()
+
+    logger.info("Cleanup")
+    _remove_all_agent_files(package_type=package_builder.PACKAGE_TYPE)
 
 
 def _perform_ssl_checks(
@@ -477,7 +581,7 @@ def _verify_python_and_libraries():
 
     logger.info("Check installation of the additional requirements")
     additional_requirements_path = pl.Path(
-        "/opt/scalyr-agent-2-dependencies/etc/additional-requirements.txt"
+        "/opt/scalyr-agent-2/etc/additional-requirements.txt"
     )
 
     additional_requirements_content = additional_requirements_path.read_text()
@@ -486,13 +590,11 @@ def _verify_python_and_libraries():
     additional_requirements_path.write_text(additional_requirements_content)
 
     subprocess.run(
-        ["/opt/scalyr-agent-2-dependencies/bin/agent-libs-config", "initialize"],
+        ["/opt/scalyr-agent-2/bin/agent-libs-config", "initialize"],
         check=True,
     )
 
-    venv_python_executable = (
-        f"/var/opt/{AGENT_DEPENDENCY_PACKAGE_SUBDIR_NAME}/venv/bin/python3"
-    )
+    venv_python_executable = f"/var/opt/{AGENT_SUBDIR_NAME}/venv/bin/python3"
 
     result = subprocess.run(
         [
@@ -533,7 +635,7 @@ _ADDITIONAL_ENVIRONMENT = {
 
 def _install_from_convenience_script(
     script_path: pl.Path,
-    distro_name: str,
+    target_distro: TargetDistro,
 ):
     """Install agent using convenience script."""
     try:
@@ -557,16 +659,16 @@ def _install_from_convenience_script(
     # If system's OpenSSL is not used anymore on some distro, it may be due to this distro has become
     # outdated enough, so Python just does not accept its version of OpenSSL and package falls back to
     # embedded OpenSSL.
-    if distro_name == "ubuntu2204":
+    if target_distro.name == "ubuntu2204":
         assert "Looking for system OpenSSL >= 3: found OpenSSL 3.0." in output
-    elif distro_name == "ubuntu2004":
+    elif target_distro.name == "ubuntu2004":
         assert "Looking for system OpenSSL >= 3: Not found" in output
         assert "Looking for system OpenSSL >= 1.1.1: found OpenSSL 1.1.1" in output
-    elif distro_name in ["ubuntu1404", "centos6"]:
+    elif target_distro.name in ["ubuntu1404", "centos6"]:
         assert "Looking for system OpenSSL >= 3: Not found" in output
         assert "Looking for system OpenSSL >= 1.1.1: Not found" in output
         assert (
-            f"Using embedded OpenSSL == {DEFAULT_PYTHON_PACKAGE_OPENSSL_VERSION}"
+            f"Using embedded OpenSSL == OpenSSL {DEFAULT_PYTHON_PACKAGE_OPENSSL_VERSION}"
             in output
         )
 
@@ -574,7 +676,7 @@ def _install_from_convenience_script(
 def _prepare_environment(
     package_type: str,
     remote_machine_type: str,
-    distro_name: str,
+    target_distro: TargetDistro,
     timeout_tracker: TimeoutTracker,
 ):
     """
@@ -587,11 +689,11 @@ def _prepare_environment(
 
     if remote_machine_type == "docker":
         if package_type == "deb":
-            packages_to_install.append("ca-certificates")
-            if "debian" in distro_name:
+            packages_to_install.extend(["ca-certificates"])
+            if "debian" in target_distro.name:
                 packages_to_install.append("procps")
         elif package_type == "rpm":
-            if distro_name == "amazonlinux2":
+            if target_distro.name == "amazonlinux2":
                 packages_to_install.append("procps")
 
     if package_type == "deb":
@@ -605,17 +707,10 @@ def _prepare_environment(
             except subprocess.CalledProcessError:
                 timeout_tracker.sleep(1, "Can not update apt.")
 
-    # Install additional packages if needed.
-    if packages_to_install:
-        if package_type == "deb":
-            _call_apt(["install", "-y", *packages_to_install])
-        elif package_type == "rpm":
-            _call_yum(["install", "-y", *packages_to_install])
-
-    if distro_name == "centos6":
+    if target_distro.name == "centos6":
         # for centos 6, we remove repo file for disabled repo, so it could use vault repo.
         pl.Path("/etc/yum.repos.d/CentOS-Base.repo").unlink()
-    elif distro_name == "centos8":
+    elif target_distro.name == "centos8":
         # For centos 8 we replace repo urls for vault.
         for repo_name in ["BaseOS", "AppStream"]:
             repo_file = pl.Path(f"/etc/yum.repos.d/CentOS-Linux-{repo_name}.repo")
@@ -624,6 +719,13 @@ def _prepare_environment(
             content = content.replace("#baseurl", "baseurl")
             content = content.replace("mirrorlist=", "#mirrorlist=")
             repo_file.write_text(content)
+
+    # Install additional packages if needed.
+    if packages_to_install:
+        if package_type == "deb":
+            _call_apt(["install", "-y", *packages_to_install])
+        elif package_type == "rpm":
+            _call_yum(["install", "-y", *packages_to_install])
 
 
 def _clear_agent_dirs_and_print_log(agent_commander: AgentCommander):
@@ -728,7 +830,7 @@ def _call_apt(command: List[str]):
     subprocess.check_call(
         ["apt-get", *command],
         # Since test may run in "frozen" pytest executable, add missing variables.
-        env={"LD_LIBRARY_PATH": "/lib", "PATH": "/usr/sbin:/sbin:/usr/bin:/bin"},
+        env=_ADDITIONAL_ENVIRONMENT,
     )
 
 
@@ -737,5 +839,5 @@ def _call_yum(command: List[str]):
     subprocess.check_call(
         ["yum", *command],
         # Since test may run in "frozen" pytest executable, add missing variables.
-        env={"LD_LIBRARY_PATH": "/lib64"},
+        env=_ADDITIONAL_ENVIRONMENT,
     )
