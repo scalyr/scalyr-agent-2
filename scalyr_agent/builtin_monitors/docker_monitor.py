@@ -1636,9 +1636,12 @@ class DockerLogger(object):
                         if not dt:
                             # Under some edge cases this message can be logged a lot (which can
                             # exhaust the CPU) so we need to make sure rate limit is in place.
-                            global_log.error("No timestamp found on line: '%s'", line,
-                                             limit_once_per_x_secs=300,
-                                             limit_key="docker-monitor-line-missing-ts")
+                            global_log.error(
+                                "No timestamp found on line: '%s'",
+                                line,
+                                limit_once_per_x_secs=300,
+                                limit_key="docker-monitor-line-missing-ts",
+                            )
                         else:
                             timestamp = scalyr_util.seconds_since_epoch(dt, epoch)
 
