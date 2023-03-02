@@ -41,6 +41,12 @@ jobs:
       CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
       CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
 
+  build-windows-package:
+    name: "Build Windows package"
+    uses: ./.github/workflows/reusable-agent-build-windows.yml
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
   build_tarball:
     runs-on: ubuntu-20.04
 
@@ -99,6 +105,9 @@ jobs:
           mkdir -p /tmp/result_artifacts
           cp -a /tmp/all_artifacts/linux-packages-*/. /tmp/result_artifacts
           cp -a /tmp/all_artifacts/tarball-noarch/. /tmp/result_artifacts
+          cp -a /tmp/all_artifacts/windows-msi/. /tmp/result_artifacts
+          
+          
 
       - name: Save result artifact
         uses: actions/upload-artifact@v3

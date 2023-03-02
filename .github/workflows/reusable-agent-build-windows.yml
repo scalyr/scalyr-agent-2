@@ -1,33 +1,14 @@
 name: agent-build-windows
 
 on:
-  push:
-    branches:
-      - master
-  pull_request:
-    branches:
-      - master
+  workflow_call:
+    secrets:
+        SLACK_WEBHOOK_URL:
+          required: true
 
 jobs:
-  pre_job:
-    name: Skip Duplicate Jobs Pre Job
-    runs-on: ubuntu-latest
-    permissions:
-      actions: write  # Needed for skip-duplicate-jobs job
-      contents: read
-    outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip }}
-    steps:
-      - id: skip_check
-        uses: fkirc/skip-duplicate-actions@12aca0a884f6137d619d6a8a09fcc3406ced5281 # v4.0.0
-        with:
-          cancel_others: 'true'
-          github_token: ${{ github.token }}
-
   build-windows-package:
     name: Build windows MSI installer
-    needs: pre_job
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref_name == 'master' }}
     runs-on: windows-latest
     steps:
       - name: Checkout Repository
@@ -50,6 +31,7 @@ jobs:
       - name: Save installer as artifact
         uses: actions/upload-artifact@v3
         with:
+          name: windows-msi
           path: ScalyrAgentInstaller-*.msi
 
       - name: Notify Slack on Failure
