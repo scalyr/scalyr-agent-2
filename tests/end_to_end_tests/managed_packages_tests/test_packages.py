@@ -31,7 +31,7 @@ from typing import List, Dict
 
 import pytest
 
-from agent_build_refactored.tools.constants import SOURCE_ROOT, AGENT_VERSION
+from agent_build_refactored.tools.constants import SOURCE_ROOT
 from agent_build_refactored.managed_packages.managed_packages_builders import (
     AGENT_SUBDIR_NAME,
     DEFAULT_PYTHON_PACKAGE_OPENSSL_VERSION,
@@ -410,7 +410,6 @@ repo_gpgcheck=0
         )
     elif package_builder.PACKAGE_TYPE == "rpm":
         _call_yum(["install", "-y", f"{AGENT_PACKAGE_NAME}"])
-        #_call_yum(["update", "-y"])
     else:
         raise Exception(f"Unknown package type: {package_builder.PACKAGE_TYPE}")
 
