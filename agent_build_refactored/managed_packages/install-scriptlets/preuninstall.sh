@@ -41,12 +41,12 @@ if [ "$1" == "0" ] || [ "$1" == "remove" ]; then
 fi
 
 # Always remove the .pyc files and __pycache__ directories
-find /usr/share/scalyr-agent-2 -type d -name -prune __pycache__ -exec rm -r {} \;
+find /usr/share/scalyr-agent-2 -type f -path "*/__pycache__/*" -delete -o -type d  -name __pycache__ -exec rm -r {} \;
 
 # Remove dynamically generated venv.
 rm -r "/var/opt/scalyr-agent-2/venv"
 
 # Collect garbage after Python.
-find /opt/scalyr-agent-2 -type d -name -prune __pycache__ -exec rm -r {} \;
+find /opt/scalyr-agent-2 -type f -path "*/__pycache__/*" -delete -o -type d  -name __pycache__ -exec rm -r {} \;
 
 exit 0;
