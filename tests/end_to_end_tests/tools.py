@@ -17,7 +17,7 @@ import json
 import pathlib as pl
 import subprocess
 import time
-from typing import List, Union
+from typing import List, Union, Dict
 
 
 @dataclasses.dataclass
@@ -88,6 +88,28 @@ class AgentCommander:
             cmd.append("--no-fork")
 
         self._check_call_command(cmd, env=env)
+
+    def start_and_wait(self, env: Dict = None):
+        """
+        Start the Agent and wait for a successful status.
+        :param env: Optional environment variables for the agent process.
+        """
+        self.start(env=env)
+
+        time.sleep(0.2)
+
+        attempts = 0
+
+        while True:
+            try:
+                self.get_status_json()
+            except subprocess.CalledProcessError as e:
+                if attempts >= 10:
+                    raise e
+                time.sleep(1)
+                attempts += 1
+            else:
+                break
 
     def get_status(self) -> str:
         return self._check_output_command(["status", "-v"]).decode()
