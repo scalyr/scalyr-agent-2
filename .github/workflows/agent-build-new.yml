@@ -88,7 +88,10 @@ jobs:
   # so it's just need to download only one artifact, for example during a release process.
   prepare-artifacts:
     runs-on: ubuntu-20.04
-    needs: build-linux-packages
+    needs:
+      - build-linux-packages
+      - build-windows-package
+      - build_tarball
 
     steps:
       - name: Checkout repository
