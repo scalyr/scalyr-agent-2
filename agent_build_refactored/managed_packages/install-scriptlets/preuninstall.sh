@@ -38,16 +38,14 @@ if [ "$1" == "0" ] || [ "$1" == "remove" ]; then
       rm /etc/rc$x.d/S98scalyr-agent-2;
     done
   fi
+  # Remove dynamically generated venv.
+  rm -r "/var/opt/scalyr-agent-2/venv"
 fi
 
 # Always remove the .pyc files and __pycache__ directories
-
 # It should be more logical to remove only  the __pycache__ directories, but that causes repeated deletion,
 # which leads to warning messages, so we delete files and directories in different conditions,
 find /usr/share/scalyr-agent-2 -type f -path "*/__pycache__/*" -delete -o -type d  -name __pycache__ -delete
 find /opt/scalyr-agent-2 -type f -path "*/__pycache__/*" -delete -o -type d  -name __pycache__ -delete
-
-# Remove dynamically generated venv.
-rm -r "/var/opt/scalyr-agent-2/venv"
 
 exit 0;
