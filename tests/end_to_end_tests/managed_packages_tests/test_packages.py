@@ -189,7 +189,7 @@ def test_packages(
 
     logger.info("Start agent")
 
-    agent_commander.start_and_wait(env=_ADDITIONAL_ENVIRONMENT)
+    agent_commander.start_and_wait(env=_ADDITIONAL_ENVIRONMENT, logger=logger)
 
     verify_agent_status(
         agent_version=agent_version,
@@ -417,7 +417,7 @@ repo_gpgcheck=0
     assert LINUX_PACKAGE_AGENT_PATHS.agent_config_path.exists()
     assert server_host in LINUX_PACKAGE_AGENT_PATHS.agent_config_path.read_text()
 
-    agent_commander.start_and_wait()
+    agent_commander.start_and_wait(logger=logger)
 
     verify_agent_status(
         agent_version=agent_version,
