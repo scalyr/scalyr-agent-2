@@ -109,7 +109,9 @@ class AgentCommander:
                 if attempts >= 10:
                     agent_log = self.agent_paths.agent_log_path.read_text()
                     agent_log_tail = "".join(agent_log.splitlines()[:20])
-                    logger.error(f"Can not start agent and get it status. Give up.\nAgent log: {agent_log_tail}")
+                    logger.error(
+                        f"Can not start agent and get it status. Give up.\nAgent log: {agent_log_tail}"
+                    )
                     raise e
                 time.sleep(1)
                 attempts += 1
