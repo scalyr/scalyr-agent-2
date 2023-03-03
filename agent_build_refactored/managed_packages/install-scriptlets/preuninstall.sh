@@ -39,6 +39,8 @@ if [ "$1" == "0" ] || [ "$1" == "remove" ]; then
     done
   fi
   # Remove dynamically generated venv.
+  # It is important to remove this only during the uninstallation of the package, not the upgrade. During the upgrade,
+  # the deletion of the old venv has to be on the package's "post-install" script.
   rm -r "/var/opt/scalyr-agent-2/venv"
 fi
 
