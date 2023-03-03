@@ -610,6 +610,13 @@ class LinuxDependencyPackagesBuilder(Runner):
             third_party_libs_dir / "__init__.py",
         )
 
+        # remove Python cache directories from agent's source code.
+        for path in agent_module_path.rglob("__pycache__/"):
+            if path.is_file():
+                continue
+            shutil.rmtree(path)
+
+
         version = (SOURCE_ROOT / "VERSION").read_text().strip()
 
         scriptlets_path = (
