@@ -18,11 +18,14 @@
 # Note, this can be run in standalone mode by:
 #     python -m scalyr_agent.run_monitor -c "{ gauss_mean: 0.5 }" scalyr_agent.builtin_monitors.test_monitor
 #
-# author:  Steven Czerwinski <czerwin@scalyr.com>
+# author: Joel Mora <joelm@sentinelone.com> 
+#         Mike  McGrail <mike.mcgrail@sentinelone.com>
+#          
+#
 
 from __future__ import absolute_import
 
-__author__ = "czerwin@scalyr.com"
+__author__ = ["joel@scalyr.com","mike.mcgrail@sentinelone.com"]
 import requests
 import subprocess
 import random
@@ -35,29 +38,16 @@ import glob
 import json
 from scalyr_agent.json_lib.objects import ArrayOfStrings
 from scalyr_agent.json_lib import JsonObject
-#from scalyr_agent.json_lib.objects import ArrayOfStrings
 from scalyr_agent import ScalyrMonitor
-#import scalyr_agent.third_party.tcollector.tcollector as tcollector
-#
-#from scalyr_agent import (
-#    ScalyrMonitor,
-#    BadMonitorConfiguration,
-#    define_metric,
-#    define_log_field,
-#    define_config_option,
-#)
-#from scalyr_agent.third_party.tcollector.tcollector import ReaderThread
-#from scalyr_agent.json_lib import JsonObject
-#from scalyr_agent.json_lib.objects import ArrayOfStrings
-#from scalyr_agent import StoppableThread
+
 class LogGenerator(ScalyrMonitor):
     """A Scalyr agent monitor that records random numbers.
     """
 
     def _initialize(self):
 
-# Disable SSL verification for requests made by OpenAI API
-        #requests.packages.urllib3.disable_warnings()
+
+
         """Performs monitor-specific initialization."""
         self.__counter = 0
         # A required configuration field.
