@@ -6,8 +6,12 @@ Scalyr Agent 2 Changes By Release
 Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Jan 19, 2023 00:00 -0800
 --->
 
-Other: Linux `deb` and `rpm` packages are now shipped with its own Python interpreter, so agent does not have to rely on system Python interpreter anymore. Please refer to the RELEASE_NOTES document, for more information.
- 
+Other:
+* Linux `deb` and `rpm` packages are now shipped with its own Python interpreter, so agent does not have to rely on system Python interpreter anymore. Please refer to the RELEASE_NOTES document, for more information.
+
+Bug fixes:
+* Fix bug in the Docker monitor which would, under some edge cases, cause a specific log messages to be logged very often and as such, exhausting the CPU cycles available to the Docker monitor.
+
 ## 2.1.40 "Onone" - Jan 19, 2023
 <!---
 Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Jan 19, 2023 00:00 -0800
