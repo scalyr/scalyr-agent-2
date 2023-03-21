@@ -52,6 +52,8 @@ def initialize():
             "pip",
             "install",
             "--quiet",
+            # TODO: Do a periodical check of the available new version of the pip in the CI/CD
+            "--disable-pip-version-check",
             # Core agent requirements are already installed in this "pre-created" venv, but
             # we still add their requirements file to be sure that pip will throw an error if
             # additional requirements conflict with core ones.

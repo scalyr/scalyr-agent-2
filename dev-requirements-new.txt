@@ -62,7 +62,7 @@ docker==6.0.0
 flask==2.0.3
 Jinja2==3.0.3
 itsdangerous==2.0.1
-Werkzeug==2.2.3
+Werkzeug==2.0.3
 more-itertools==8.5.0
 distro==1.6.0
 xmltodict==0.13.0

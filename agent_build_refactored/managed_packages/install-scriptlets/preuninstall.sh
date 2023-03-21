@@ -38,15 +38,16 @@ if [ "$1" == "0" ] || [ "$1" == "remove" ]; then
       rm /etc/rc$x.d/S98scalyr-agent-2;
     done
   fi
+  # Remove dynamically generated venv.
+  # It is important to remove this only during the uninstallation of the package, not the upgrade. During the upgrade,
+  # the deletion of the old venv has to be on the package's "post-install" script.
+  rm -r "/var/opt/scalyr-agent-2/venv"
 fi
 
 # Always remove the .pyc files and __pycache__ directories
-find /usr/share/scalyr-agent-2 -type d -name __pycache__ -exec rm -r {} \;
-
-# Remove dynamically generated venv.
-rm -r "/var/opt/scalyr-agent-2/venv"
-
-# Collect garbage after Python.
-find /opt/scalyr-agent-2 -type d -name __pycache__ -exec rm -r {} \;
+# It should be more logical to remove only  the __pycache__ directories, but that causes repeated deletion,
+# which leads to warning messages, so we delete files and directories in different conditions,
+find /usr/share/scalyr-agent-2 -type f -path "*/__pycache__/*" -delete -o -type d  -name __pycache__ -delete
+find /opt/scalyr-agent-2 -type f -path "*/__pycache__/*" -delete -o -type d  -name __pycache__ -delete
 
 exit 0;
