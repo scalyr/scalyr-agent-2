@@ -73,6 +73,13 @@ define_config_option(
 )
 define_config_option(
     __monitor__,
+    "use_ssl",
+    "Optional (defaults to False). Whether to connect to PostgreSQL over SSL.",
+    convert_to=bool,
+    default=False,
+)
+define_config_option(
+    __monitor__,
     "database_name",
     "Name of the PostgreSQL database the Scalyr Agent will connect to.",
     convert_to=six.text_type,
@@ -273,6 +280,7 @@ class PostgreSQLDb(object):
             conn = pg8000.connect(
                 user=self._user,
                 host=self._host,
+                ssl=self._use_ssl,
                 port=self._port,
                 database=self._database,
                 password=self._password,
@@ -398,7 +406,7 @@ class PostgreSQLDb(object):
     def __repr__(self):
         return self.__str__()
 
-    def __init__(self, host, port, database, username, password, logger=None):
+    def __init__(self, host, port, database, username, password, use_ssl=False, logger=None):
         """Constructor:
 
         @param database: database we are connecting to
@@ -410,6 +418,7 @@ class PostgreSQLDb(object):
 
         self._host = host
         self._port = port
+        self._use_ssl = use_ssl
         self._database = database
         self._user = username
         self._password = password
@@ -515,6 +524,7 @@ For help, contact us at [support@scalyr.com](mailto:support@scalyr.com).
         database = None
         host = "localhost"
         port = 5432
+        use_ssl = self._config.get('use_ssl', False)
         username = None
         password = None
         if "database_host" in self._config:
@@ -541,6 +551,7 @@ For help, contact us at [support@scalyr.com](mailto:support@scalyr.com).
             database=database,
             host=host,
             port=port,
+            use_ssl=use_ssl,
             username=username,
             password=password,
             logger=self._logger,
