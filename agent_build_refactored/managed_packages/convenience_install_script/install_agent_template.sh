@@ -38,6 +38,8 @@ Usage $0 [options] where options are:
     --extract-packages     Extracts the embedded RPM and Debian packages to
                            install the Scalyr package repository configuration
                            and exits.
+    --use-aio-package      Use "All in one" variant of the package that does not have any system dependencies
+                           like Python or OpenSSL.
     --force-apt            Forces the script to install the Scalry APT
                            repository configuration files.
     --force-yum            Forces the script to install the Scalyr Yum
@@ -129,6 +131,8 @@ function check_for_https_error() {
 TMPDIR=`mktemp -d`;
 trap 'rm -rf $TMPDIR' EXIT;
 
+# Name of the package to install
+PACKAGE_NAME="scalyr-agent-2"
 # The repository we will install the agent against.  Either yum, apt, or
 # yum-alt.
 REPO_TYPE=
@@ -158,6 +162,10 @@ while (( $# > 0)); do
     -h|--help)
       print_usage;
       exit 0;;
+
+    --use-aio-package)
+      PACKAGE_NAME="scalyr-agent-2-aio";
+      shift;;
 
     --force-apt)
       REPO_TYPE="apt";
@@ -345,9 +353,8 @@ repo_gpgcheck=1
 gpgkey=${PUBLIC_KEY_URL}
 EOM
 
-  PACKAGE_NAME="scalyr-agent-2"
   if [[ -n "$VERSION" ]]; then
-    PACKAGE_NAME="scalyr-agent-2-$VERSION"
+    PACKAGE_NAME="${PACKAGE_NAME}-$VERSION"
   fi
 
   lecho "  Installing scalyr-agent-2 package"
@@ -394,9 +401,8 @@ else
   echo "Update scalyr repository."
   run_command "apt-get -y update";
 
-  PACKAGE_NAME="scalyr-agent-2"
   if [[ -n "$VERSION" ]]; then
-    PACKAGE_NAME="scalyr-agent-2=$VERSION"
+    PACKAGE_NAME="${PACKAGE_NAME}=$VERSION"
   fi
 
   lecho "  Installing scalyr-agent-2 package"
