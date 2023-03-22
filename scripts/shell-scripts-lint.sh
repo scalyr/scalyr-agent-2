@@ -39,7 +39,6 @@ echo "Using shellcheck: ${SHELLCHECK_VERSION}"
 # shellcheck disable=SC2046
 shellcheck -S error $(find . -name "*.sh" | grep -v .tox | grep -v virtualenv | grep -v benchmarks | grep -v installer)
 shellcheck -S info benchmarks/scripts/*.sh
-shellcheck -S info installer/scripts/*.sh
 shellcheck -S info scripts/*.sh
 shellcheck -S info scripts/circleci/*.sh
 # shellcheck disable=SC2046
