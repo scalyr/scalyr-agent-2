@@ -67,7 +67,7 @@ It defines builder classes that are responsible for the building of the Linux ag
 There are two variants of packages that can be built:
     1. All in one (aio) package named "scalyr-agent-2-aio", that contains all required dependencies, so it can run basically on any Linux 
         glibc-based distribution.
-    2. Package that depends on soe system packages, such as Python or OpenSLL, named "scalyr-agent-2". Probably will be 
+    2. Package that depends on some system packages, such as Python or OpenSLL, named "scalyr-agent-2". Probably will be 
         discontinued in the future in favour of the first one.
         
 The aio package provides the "embedded" Python interpreter that is specially built to be used by the agent.
