@@ -24,7 +24,7 @@ from agent_build_refactored.managed_packages.managed_packages_builders import (
     PYTHON_PACKAGE_NAME,
     AGENT_LIBS_PACKAGE_NAME,
     AGENT_AIO_PACKAGE_NAME,
-    AGENT_NON_AIO_AIO_PACKAGE_NAME
+    AGENT_NON_AIO_AIO_PACKAGE_NAME,
 )
 from tests.end_to_end_tests.run_in_remote_machine import DISTROS
 
@@ -485,11 +485,15 @@ def agent_package_path(repo_root, package_builder, agent_package_name, use_aio_p
         return None
 
     if use_aio_package:
-        package_arch = package_builder.DEPENDENCY_PACKAGES_ARCHITECTURE.get_package_arch(
-            package_type=package_builder.PACKAGE_TYPE
+        package_arch = (
+            package_builder.DEPENDENCY_PACKAGES_ARCHITECTURE.get_package_arch(
+                package_type=package_builder.PACKAGE_TYPE
+            )
         )
     else:
-        package_arch = Architecture.UNKNOWN.get_package_arch(package_type=package_builder.PACKAGE_TYPE)
+        package_arch = Architecture.UNKNOWN.get_package_arch(
+            package_type=package_builder.PACKAGE_TYPE
+        )
 
     if package_builder.PACKAGE_TYPE == "deb":
         package_filename_glob = f"{agent_package_name}_{AGENT_VERSION}_{package_arch}.{package_builder.PACKAGE_TYPE}"

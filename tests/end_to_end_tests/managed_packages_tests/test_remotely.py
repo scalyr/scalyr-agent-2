@@ -42,7 +42,7 @@ def test_remotely(
     scalyr_server,
     test_session_suffix,
     tmp_path,
-    use_aio_package
+    use_aio_package,
 ):
 
     if use_aio_package:

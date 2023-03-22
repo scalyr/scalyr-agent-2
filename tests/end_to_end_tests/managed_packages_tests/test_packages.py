@@ -145,7 +145,7 @@ def test_packages(
     agent_version,
     tmp_path,
     use_aio_package,
-    agent_package_name
+    agent_package_name,
 ):
     if "x86_64" not in package_builder_name:
         timeout_tracker = TimeoutTracker(800)
@@ -158,12 +158,14 @@ def test_packages(
         remote_machine_type=remote_machine_type,
         target_distro=target_distro,
         timeout_tracker=timeout_tracker,
-        use_aio_package=use_aio_package
+        use_aio_package=use_aio_package,
     )
 
     logger.info("Install agent from install script.")
     _install_from_convenience_script(
-        script_path=convenience_script_path, target_distro=target_distro, use_aio_package=use_aio_package
+        script_path=convenience_script_path,
+        target_distro=target_distro,
+        use_aio_package=use_aio_package,
     )
 
     if use_aio_package:
@@ -235,7 +237,9 @@ def test_packages(
         raise Exception("Starting agent message is not found.")
 
     if use_aio_package:
-        logger.info("Verify which version of OpenSSL has been picked up by the AIO package.")
+        logger.info(
+            "Verify which version of OpenSSL has been picked up by the AIO package."
+        )
 
         m = re.search(r"OpenSSL version_number=(\d+)", starting_agent_message)
         openssl_version = int(m.group(1))
@@ -265,7 +269,9 @@ def test_packages(
     monitor_file_path.write_text("test")
 
     logger.info("Cleanup")
-    _remove_all_agent_files(package_name=agent_package_name, package_type=package_builder.PACKAGE_TYPE)
+    _remove_all_agent_files(
+        package_name=agent_package_name, package_type=package_builder.PACKAGE_TYPE
+    )
 
     assert monitor_file_path.exists()
     assert monitor_file_path.read_text() == "test"
@@ -336,7 +342,7 @@ def test_upgrade(
     test_session_suffix,
     agent_version,
     use_aio_package,
-    agent_package_name
+    agent_package_name,
 ):
     """
     Perform an upgrade from the current stable release. The stable version of the package also has to be in the same
@@ -345,7 +351,9 @@ def test_upgrade(
 
     if use_aio_package:
         # TODO: Remove this skip when we have first stable AIO package.
-        pytest.skip("We only test the upgrade process of the non AIO packages, because there are no stable packages for AIO.")
+        pytest.skip(
+            "We only test the upgrade process of the non AIO packages, because there are no stable packages for AIO."
+        )
 
     if distro_name == "centos6":
         pytest.skip(
@@ -444,7 +452,9 @@ repo_gpgcheck=0
     agent_commander.stop()
 
     logger.info("Cleanup")
-    _remove_all_agent_files(package_name=agent_package_name, package_type=package_builder.PACKAGE_TYPE)
+    _remove_all_agent_files(
+        package_name=agent_package_name, package_type=package_builder.PACKAGE_TYPE
+    )
 
 
 def _perform_ssl_checks(
@@ -650,9 +660,7 @@ _ADDITIONAL_ENVIRONMENT = {
 
 
 def _install_from_convenience_script(
-    script_path: pl.Path,
-    target_distro: TargetDistro,
-    use_aio_package: bool
+    script_path: pl.Path, target_distro: TargetDistro, use_aio_package: bool
 ):
     """Install agent using convenience script."""
 
@@ -702,7 +710,7 @@ def _prepare_environment(
     remote_machine_type: str,
     target_distro: TargetDistro,
     timeout_tracker: TimeoutTracker,
-    use_aio_package: bool
+    use_aio_package: bool,
 ):
     """
     If needed, do some preparation before agent installation.
@@ -824,7 +832,10 @@ def _extract_package(package_type: str, package_path: pl.Path, output_path: pl.P
         raise Exception(f"Unknown package type {package_type}.")
 
 
-def _remove_all_agent_files(package_name: str, package_type: str,):
+def _remove_all_agent_files(
+    package_name: str,
+    package_type: str,
+):
     """
     Cleanup system from everything that related with agent, trying to bring
     system into state before agent was installed.
