@@ -430,6 +430,7 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
                 "--before-remove", scriptlets_path / "preuninstall.sh",
                 "--deb-changelog", str(changelogs_path / "changelog-deb"),
                 "--rpm-changelog", str(changelogs_path / "changelog-rpm"),
+                "--conflicts", AGENT_AIO_PACKAGE_NAME
                 # fmt: on
             ],
             cwd=str(package_output_dir),
@@ -897,6 +898,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
                 "--directories", f"/var/opt/{AGENT_SUBDIR_NAME}",
                 "--deb-changelog", str(changelogs_path / "changelog-deb"),
                 "--rpm-changelog", str(changelogs_path / "changelog-rpm"),
+                "--conflicts", AGENT_NON_AIO_AIO_PACKAGE_NAME
                 # fmt: on
             ],
             cwd=str(package_output_dir),
