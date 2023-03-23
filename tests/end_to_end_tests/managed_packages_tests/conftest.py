@@ -23,7 +23,8 @@ from agent_build_refactored.managed_packages.managed_packages_builders import (
     PREPARE_TOOLSET_STEPS,
     PYTHON_PACKAGE_NAME,
     AGENT_LIBS_PACKAGE_NAME,
-    AGENT_PACKAGE_NAME,
+    AGENT_AIO_PACKAGE_NAME,
+    AGENT_NON_AIO_AIO_PACKAGE_NAME,
 )
 from tests.end_to_end_tests.run_in_remote_machine import DISTROS
 
@@ -125,6 +126,20 @@ def target_distro(distro_name):
     return DISTROS[distro_name]
 
 
+@pytest.fixture(scope="session")
+def use_aio_package(package_builder_name):
+    """Fixture flag that tells that a tested package is AIO"""
+    return "non-aio" not in package_builder_name
+
+
+@pytest.fixture(scope="session")
+def agent_package_name(use_aio_package):
+    if use_aio_package:
+        return AGENT_AIO_PACKAGE_NAME
+    else:
+        return AGENT_NON_AIO_AIO_PACKAGE_NAME
+
+
 class RepoBuilder(Runner):
     """
     This runner class is responsible for creating deb/rpm repositories from provided packages.
@@ -218,6 +233,7 @@ class RepoBuilder(Runner):
                     "-config",
                     str(aptly_config_path),
                     "publish",
+                    "-architectures=amd64,arm64,all",
                     "-distribution=scalyr",
                     "repo",
                     "scalyr",
@@ -464,17 +480,25 @@ def agent_libs_package_path(repo_root, package_builder):
 
 
 @pytest.fixture(scope="session")
-def agent_package_path(repo_root, package_builder):
+def agent_package_path(repo_root, package_builder, agent_package_name, use_aio_package):
     if repo_root is None:
         return None
 
-    package_arch = package_builder.DEPENDENCY_PACKAGES_ARCHITECTURE.get_package_arch(
-        package_type=package_builder.PACKAGE_TYPE
-    )
+    if use_aio_package:
+        package_arch = (
+            package_builder.DEPENDENCY_PACKAGES_ARCHITECTURE.get_package_arch(
+                package_type=package_builder.PACKAGE_TYPE
+            )
+        )
+    else:
+        package_arch = Architecture.UNKNOWN.get_package_arch(
+            package_type=package_builder.PACKAGE_TYPE
+        )
+
     if package_builder.PACKAGE_TYPE == "deb":
-        package_filename_glob = f"{AGENT_PACKAGE_NAME}_{AGENT_VERSION}_{package_arch}.{package_builder.PACKAGE_TYPE}"
+        package_filename_glob = f"{agent_package_name}_{AGENT_VERSION}_{package_arch}.{package_builder.PACKAGE_TYPE}"
     elif package_builder.PACKAGE_TYPE == "rpm":
-        package_filename_glob = f"{AGENT_PACKAGE_NAME}-{AGENT_VERSION}-1.{package_arch}.{package_builder.PACKAGE_TYPE}"
+        package_filename_glob = f"{agent_package_name}-{AGENT_VERSION}-1.{package_arch}.{package_builder.PACKAGE_TYPE}"
     else:
         raise Exception(f"Unknown package type: {package_builder.PACKAGE_TYPE}")
 

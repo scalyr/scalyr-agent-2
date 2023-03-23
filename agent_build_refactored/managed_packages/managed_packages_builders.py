@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import abc
 import dataclasses
 import hashlib
 import json
@@ -21,6 +22,7 @@ import shutil
 import subprocess
 import argparse
 import pathlib as pl
+import re
 from typing import List, Tuple, Optional, Dict, Type
 
 from agent_build_refactored.managed_packages.build_dependencies_versions import (
@@ -59,11 +61,16 @@ logger = logging.getLogger(__name__)
 """
 This module is responsible for building Python agent for Linux distributions with package managers.
 
-It defines builder class that is responsible for the building of the Linux agent deb and rpm packages that are
+It defines builder classes that are responsible for the building of the Linux agent deb and rpm packages that are
     managed by package managers such as apt and yum.
 
-
-The package provides the "embedded" Python interpreter that is specially built to be used by the agent.
+There are two variants of packages that can be built:
+    1. All in one (aio) package named "scalyr-agent-2-aio", that contains all required dependencies, so it can run basically on any Linux 
+        glibc-based distribution.
+    2. Package that depends on some system packages, such as Python or OpenSLL, named "scalyr-agent-2". Probably will be 
+        discontinued in the future in favour of the first one.
+        
+The aio package provides the "embedded" Python interpreter that is specially built to be used by the agent.
     It is built against the oldest possible version of gLibc, so it has to be enough to maintain
     only one build of the package in order to support all target systems.
 
@@ -131,9 +138,10 @@ PYTHON_PACKAGE_NAME = "scalyr-agent-python3"
 # name of the dependency package with agent requirement libraries.
 AGENT_LIBS_PACKAGE_NAME = "scalyr-agent-libs"
 
-AGENT_PACKAGE_NAME = "scalyr-agent-2"
+AGENT_AIO_PACKAGE_NAME = "scalyr-agent-2-aio"
+AGENT_NON_AIO_AIO_PACKAGE_NAME = "scalyr-agent-2"
 
-AGENT_OPT_DIR = pl.Path("/opt") / AGENT_PACKAGE_NAME
+AGENT_OPT_DIR = pl.Path("/opt") / AGENT_SUBDIR_NAME
 
 PYTHON_INSTALL_PREFIX = f"{AGENT_OPT_DIR}/python3"
 
@@ -166,14 +174,274 @@ SUPPORTED_ARCHITECTURES = [
 ]
 
 
-class LinuxDependencyPackagesBuilder(Runner):
+class LinuxPackageBuilder(Runner, abc.ABC):
     """
-    Builder class that is responsible for the building of the Linux agent deb and rpm packages that are managed by package
-        managers such as apt and yum.
+    This is a base class that is responsible for the building of the Linux agent deb and rpm packages that are managed
+        by package managers such as apt and yum.
     """
-
     # type of the package, aka 'deb' or 'rpm'
     PACKAGE_TYPE: str
+
+    @classmethod
+    def get_base_environment(cls) -> EnvironmentRunnerStep:
+        """Packages should be built inside our "toolset" image."""
+        return PREPARE_TOOLSET_STEPS[Architecture.X86_64]
+
+    @property
+    def packages_output_path(self) -> pl.Path:
+        """
+        Directory path with result packages.
+        """
+        return self.output_path / "packages"
+
+    @property
+    def common_agent_package_build_args(self) -> List[str]:
+        """
+        Set of common arguments for the final fpm command.
+        """
+        version = (SOURCE_ROOT / "VERSION").read_text().strip()
+        return [
+                # fmt: off
+                "fpm",
+                "--license", "Apache 2.0",
+                "--vendor", "Scalyr",
+                "--depends", "bash >= 3.2",
+                "--url", "https://www.scalyr.com",
+                "--deb-user", "root",
+                "--deb-group", "root",
+                "--rpm-user", "root",
+                "--rpm-group", "root",
+                "--deb-no-default-config-files",
+                "--no-deb-auto-config-files",
+                "-v", version,
+                "--config-files", f"/etc/{AGENT_SUBDIR_NAME}/agent.json",
+                "--config-files", f"/etc/{AGENT_SUBDIR_NAME}/agent.d",
+                "--config-files", f"/usr/share/{AGENT_SUBDIR_NAME}/monitors",
+                "--directories", f"/usr/share/{AGENT_SUBDIR_NAME}",
+                "--directories", f"/var/lib/{AGENT_SUBDIR_NAME}",
+                "--directories", f"/var/log/{AGENT_SUBDIR_NAME}",
+                "--rpm-use-file-permissions",
+                "--deb-use-file-permissions",
+                "--verbose",
+                # fmt: on
+            ]
+
+    @abc.abstractmethod
+    def build_agent_package(self):
+        pass
+
+    @staticmethod
+    def _build_packages_common_files(package_root_path: pl.Path):
+        """
+        Build files that are common for all types of linux packages.
+        :param package_root_path: Path with package root.
+        """
+        build_linux_fhs_agent_files(
+            output_path=package_root_path, copy_agent_source=True
+        )
+
+        # remove Python cache directories from agent's source code.
+        for path in package_root_path.rglob("__pycache__/"):
+            if path.is_file():
+                continue
+            shutil.rmtree(path)
+
+        # Copy init.d folder.
+        shutil.copytree(
+            SOURCE_ROOT
+            / "agent_build_refactored/managed_packages/files/init.d",
+            package_root_path / "etc/init.d",
+            dirs_exist_ok=True,
+        )
+
+        # Add config file
+        add_config(SOURCE_ROOT / "config", package_root_path / "etc/scalyr-agent-2")
+
+    @classmethod
+    def add_command_line_arguments(cls, parser: argparse.ArgumentParser):
+        super(LinuxPackageBuilder, cls).add_command_line_arguments(
+            parser=parser
+        )
+
+        subparsers = parser.add_subparsers(dest="command")
+
+        subparsers.add_parser(
+            "build", help="Build needed packages."
+        )
+
+    @classmethod
+    def handle_command_line_arguments(
+        cls,
+        args,
+    ):
+        super(LinuxPackageBuilder, cls).handle_command_line_arguments(
+            args=args
+        )
+
+        work_dir = pl.Path(args.work_dir)
+
+        builder = cls(work_dir=work_dir)
+
+        if args.command == "build":
+            builder.build_agent_package()
+            if not IN_DOCKER:
+                output_path = SOURCE_ROOT / "build"
+                if output_path.exists():
+                    shutil.rmtree(output_path)
+                shutil.copytree(
+                    builder.packages_output_path,
+                    output_path,
+                    dirs_exist_ok=True,
+                )
+
+        else:
+            logging.error(f"Unknown command {args.command}.")
+            exit(1)
+
+
+class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
+    """
+    This class builds non-aio (all in one) version of the package, meaning that this package has some system dependencies,
+    such as Python and OpenSSL.
+    """
+    @staticmethod
+    def _create_non_aio_package_scriptlets(output_dir: pl.Path):
+        """Copy three scriptlets required by the RPM and Debian non-aio packages.
+
+        These are the preinstall.sh, preuninstall.sh, and postuninstall.sh scripts.
+        """
+
+        source_scriptlets_path = SOURCE_ROOT / "agent_build_refactored/managed_packages/non-aio/install-scriptlets"
+
+        pre_install_scriptlet = output_dir / "preinstall.sh"
+        post_install_scriptlet = output_dir / "postinstall.sh"
+        pre_uninstall_scriptlet = output_dir / "preuninstall.sh"
+
+        shutil.copy(source_scriptlets_path / "preinstall.sh", pre_install_scriptlet)
+        shutil.copy(source_scriptlets_path / "postinstall.sh", post_install_scriptlet)
+        shutil.copy(source_scriptlets_path / "preuninstall.sh", pre_uninstall_scriptlet)
+
+        check_python_script_path = source_scriptlets_path / "check-python.sh"
+        check_python_file_content = check_python_script_path.read_text()
+
+        code_to_paste = re.search(
+            r"# {{ start }}\n(.+)# {{ end }}", check_python_file_content, re.S
+        ).group(1)
+
+        def replace_code(script_path: pl.Path):
+            """
+            Replace placeholders in the package install scripts with the common code that checks python version.
+            This is needed to avoid duplication of the python check code in the pre and post install scripts.
+            """
+            content = script_path.read_text()
+
+            final_content = re.sub(
+                r"# {{ check-python }}[^\n]*",
+                code_to_paste,
+                content,
+            )
+
+            if "\\n" in code_to_paste:
+                raise Exception(
+                    "code_to_paste (%s) shouldn't contain new line character since re.sub "
+                    "will replace it with actual new line character"
+                    % (check_python_script_path)
+                )
+
+            script_path.write_text(final_content)
+
+        replace_code(pre_install_scriptlet)
+        replace_code(post_install_scriptlet)
+
+    def build_agent_package(self):
+        self.run_required()
+
+        # Run inside the docker if needed.
+        if self.runs_in_docker:
+            command_args = ["build"]
+            self.run_in_docker(command_args=command_args)
+            return
+
+        agent_package_root = self.output_path / "agent_package_root"
+
+        self._build_packages_common_files(package_root_path=agent_package_root)
+
+        # Copy switch python executable script to package's bin
+        switch_python_source = SOURCE_ROOT / "agent_build_refactored/managed_packages/non-aio/files/bin/scalyr-switch-python.sh"
+
+        switch_python_executable_name = "scalyr-switch-python"
+        package_bin_path = agent_package_root / f"usr/share/{AGENT_SUBDIR_NAME}/bin"
+        package_switch_python_executable = package_bin_path / switch_python_executable_name
+        shutil.copy(
+            switch_python_source,
+            package_switch_python_executable
+        )
+        sbin_python_switch_executable = agent_package_root / "usr/sbin" / switch_python_executable_name
+        sbin_python_switch_executable.symlink_to(f"/usr/share/{AGENT_SUBDIR_NAME}/bin/{switch_python_executable_name}")
+
+        # Create copies of the agent_main.py with python2 and python3 shebang.
+        agent_main_path = SOURCE_ROOT / "scalyr_agent/agent_main.py"
+        agent_package_path = agent_package_root / f"usr/share/{AGENT_SUBDIR_NAME}/py/scalyr_agent"
+        agent_main_py2_path = agent_package_path / "agent_main_py2.py"
+        agent_main_py3_path = agent_package_path / "agent_main_py3.py"
+
+        agent_main_content = agent_main_path.read_text()
+        agent_main_py2_path.write_text(
+            agent_main_content.replace("#!/usr/bin/env python", "#!/usr/bin/env python2")
+        )
+        agent_main_py3_path.write_text(
+            agent_main_content.replace("#!/usr/bin/env python", "#!/usr/bin/env python3")
+        )
+        main_permissions = os.stat(agent_main_path).st_mode
+        os.chmod(agent_main_py2_path, main_permissions)
+        os.chmod(agent_main_py3_path, main_permissions)
+
+        # Create package installation scriptlets
+        scriptlets_path = self.output_path / "scriptlets"
+        scriptlets_path.mkdir()
+        self._create_non_aio_package_scriptlets(output_dir=scriptlets_path)
+
+        description = (
+            "Scalyr Agent 2 is the daemon process Scalyr customers run on their servers to collect metrics"
+            " and log files and transmit them to Scalyr."
+        )
+
+        # prepare packages changelogs
+        changelogs_path = self.output_path / "changelogs"
+        changelogs_path.mkdir()
+        create_change_logs(output_dir=changelogs_path)
+
+        package_output_dir = self.packages_output_path / self.PACKAGE_TYPE
+        package_output_dir.mkdir(parents=True, exist_ok=True)
+
+        subprocess.check_call(
+            [
+                # fmt: off
+                *self.common_agent_package_build_args,
+                "-s", "dir",
+                "-a", "all",
+                "-t", self.PACKAGE_TYPE,
+                "-C", str(agent_package_root),
+                "-n", AGENT_NON_AIO_AIO_PACKAGE_NAME,
+                "--provides", AGENT_NON_AIO_AIO_PACKAGE_NAME,
+                "--description", description,
+                "--before-install", scriptlets_path / "preinstall.sh",
+                "--after-install", scriptlets_path / "postinstall.sh",
+                "--before-remove", scriptlets_path / "preuninstall.sh",
+                "--deb-changelog", str(changelogs_path / "changelog-deb"),
+                "--rpm-changelog", str(changelogs_path / "changelog-rpm"),
+                "--conflicts", AGENT_AIO_PACKAGE_NAME
+                # fmt: on
+            ],
+            cwd=str(package_output_dir),
+        )
+
+
+class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
+    """
+    This builder creates "all in one" (aio) version of the agent package.
+    That means that this package does not have any system dependencies, except glibc.
+    """
 
     # package architecture, for example: amd64 for deb.
     DEPENDENCY_PACKAGES_ARCHITECTURE: Architecture
@@ -185,12 +453,8 @@ class LinuxDependencyPackagesBuilder(Runner):
     PACKAGECLOUD_DISTRO_VERSION: str
 
     @classmethod
-    def get_base_environment(cls) -> EnvironmentRunnerStep:
-        return PREPARE_TOOLSET_STEPS[Architecture.X86_64]
-
-    @classmethod
     def get_all_required_steps(cls) -> List[RunnerStep]:
-        steps = super(LinuxDependencyPackagesBuilder, cls).get_all_required_steps()
+        steps = super(LinuxAIOPackagesBuilder, cls).get_all_required_steps()
 
         steps.extend(
             [
@@ -220,13 +484,6 @@ class LinuxDependencyPackagesBuilder(Runner):
             return Architecture.UNKNOWN.as_rpm_package_arch
         else:
             raise ValueError(f"Unknown package type: {self.PACKAGE_TYPE}")
-
-    @property
-    def packages_output_path(self) -> pl.Path:
-        """
-        Directory path with result packages.
-        """
-        return self.output_path / "packages"
 
     @property
     def managed_packages_output_path(self) -> pl.Path:
@@ -561,13 +818,13 @@ class LinuxDependencyPackagesBuilder(Runner):
             package_root=agent_package_root
         )
 
-        build_linux_fhs_agent_files(
-            output_path=agent_package_root, copy_agent_source=True
+        self._build_packages_common_files(
+            package_root_path=agent_package_root
         )
 
         install_root_executable_path = (
             agent_package_root
-            / f"usr/share/{AGENT_PACKAGE_NAME}/bin/scalyr-agent-2-new"
+            / f"usr/share/{AGENT_SUBDIR_NAME}/bin/scalyr-agent-2-new"
         )
         # Add agent's executable script.
         shutil.copy(
@@ -580,17 +837,6 @@ class LinuxDependencyPackagesBuilder(Runner):
         usr_sbin_executable = agent_package_root / "usr/sbin/scalyr-agent-2"
         usr_sbin_executable.unlink()
         usr_sbin_executable.symlink_to("../share/scalyr-agent-2/bin/scalyr-agent-2-new")
-
-        # Add config file
-        add_config(SOURCE_ROOT / "config", agent_package_root / "etc/scalyr-agent-2")
-
-        # Copy init.d folder.
-        shutil.copytree(
-            SOURCE_ROOT
-            / "agent_build_refactored/managed_packages/files/init.d",
-            agent_package_root / "etc/init.d",
-            dirs_exist_ok=True,
-        )
 
         # Also remove third party libraries except tcollector.
         agent_module_path = (
@@ -610,91 +856,53 @@ class LinuxDependencyPackagesBuilder(Runner):
             third_party_libs_dir / "__init__.py",
         )
 
-        # remove Python cache directories from agent's source code.
-        for path in agent_module_path.rglob("__pycache__/"):
-            if path.is_file():
-                continue
-            shutil.rmtree(path)
-
-
-        version = (SOURCE_ROOT / "VERSION").read_text().strip()
-
         scriptlets_path = (
             SOURCE_ROOT
             / "agent_build_refactored/managed_packages/install-scriptlets"
         )
 
         description = (
-            "Scalyr Agent 2 is the daemon process Scalyr customers run on their servers to collect metrics"
-            " and log files and transmit them to Scalyr."
+            'Scalyr Agent 2 is the daemon process Scalyr customers run on their servers to collect metrics'
+            ' and log files and transmit them to Scalyr. This is also the "All in one" package, that means that all '
+            'dependencies that are required by the package bundled with it.'
         )
-
-        changelogs_path = self.output_path / "changelogs"
-        changelogs_path.mkdir()
-        create_change_logs(output_dir=changelogs_path)
 
         package_arch = self.DEPENDENCY_PACKAGES_ARCHITECTURE.get_package_arch(
             package_type=self.PACKAGE_TYPE
         )
 
+        # prepare packages changelogs
+        changelogs_path = self.output_path / "changelogs"
+        changelogs_path.mkdir()
+        create_change_logs(output_dir=changelogs_path)
+
         package_output_dir = self.packages_output_path / self.PACKAGE_TYPE
-        package_output_dir.mkdir(parents=True)
+        package_output_dir.mkdir(parents=True, exist_ok=True)
 
         subprocess.check_call(
             [
                 # fmt: off
-                "fpm",
+                *self.common_agent_package_build_args,
                 "-s", "dir",
                 "-a", package_arch,
                 "-t", self.PACKAGE_TYPE,
                 "-C", str(agent_package_root),
-                "-n", AGENT_PACKAGE_NAME,
-                "-v", version,
-                "--license", "Apache 2.0",
-                "--vendor", "Scalyr",
-                "--provides", AGENT_PACKAGE_NAME,
+                "-n", AGENT_AIO_PACKAGE_NAME,
+                "--provides", AGENT_AIO_PACKAGE_NAME,
                 "--description", description,
-                "--depends", "bash >= 3.2",
-                "--url", "https://www.scalyr.com",
-                "--deb-user", "root",
-                "--deb-group", "root",
-                "--rpm-user", "root",
-                "--rpm-group", "root",
-                "--deb-changelog", str(changelogs_path / "changelog-deb"),
-                "--rpm-changelog", str(changelogs_path / "changelog-rpm"),
                 "--after-install", scriptlets_path / "postinstall.sh",
                 "--before-remove", scriptlets_path / "preuninstall.sh",
-                "--deb-no-default-config-files",
-                "--no-deb-auto-config-files",
-                "--config-files", f"/etc/{AGENT_SUBDIR_NAME}/agent.json",
-                "--config-files", f"/etc/{AGENT_SUBDIR_NAME}/agent.d",
-                "--config-files", f"/usr/share/{AGENT_SUBDIR_NAME}/monitors",
                 "--config-files", f"/opt/{AGENT_SUBDIR_NAME}/etc/preferred_openssl",
                 "--config-files", f"/opt/{AGENT_SUBDIR_NAME}/etc/additional-requirements.txt",
-                "--directories", f"/usr/share/{AGENT_SUBDIR_NAME}",
-                "--directories", f"/var/lib/{AGENT_SUBDIR_NAME}",
-                "--directories", f"/var/log/{AGENT_SUBDIR_NAME}",
                 "--directories", f"/opt/{AGENT_SUBDIR_NAME}",
                 "--directories", f"/var/opt/{AGENT_SUBDIR_NAME}",
-                "--rpm-use-file-permissions",
-                "--deb-use-file-permissions",
-                "--verbose",
+                "--deb-changelog", str(changelogs_path / "changelog-deb"),
+                "--rpm-changelog", str(changelogs_path / "changelog-rpm"),
+                "--conflicts", AGENT_NON_AIO_AIO_PACKAGE_NAME
                 # fmt: on
             ],
             cwd=str(package_output_dir),
         )
-        if self.PACKAGE_TYPE == "deb":
-            package_glob = f"{AGENT_PACKAGE_NAME}_{version}_{package_arch}.{self.PACKAGE_TYPE}"
-        elif self.PACKAGE_TYPE == "rpm":
-            package_glob = f"{AGENT_PACKAGE_NAME}-{version}-1.{package_arch}.{self.PACKAGE_TYPE}"
-        else:
-            raise Exception(f"Unknown package type {self.PACKAGE_TYPE}")
-
-        found = list(package_output_dir.glob(package_glob))
-        assert (
-            len(found) == 1
-        ), f"Number of result agent packages has to be 1, got {len(found)}"
-        return found[0].name
 
     @classmethod
     def _get_build_package_root_step(cls, package_name: str) -> ArtifactRunnerStep:
@@ -1280,151 +1488,6 @@ class LinuxDependencyPackagesBuilder(Runner):
 
         return package_path
 
-    @classmethod
-    def add_command_line_arguments(cls, parser: argparse.ArgumentParser):
-        super(LinuxDependencyPackagesBuilder, cls).add_command_line_arguments(
-            parser=parser
-        )
-
-        subparsers = parser.add_subparsers(dest="command")
-
-        build_packages_parser = subparsers.add_parser(
-            "build", help="Build needed packages."
-        )
-
-        build_packages_parser.add_argument(
-            "--last-repo-python-package-file",
-            dest="last_repo_python_package_file",
-            required=False,
-            help="Path to the python package file. If specified, then the python "
-            "dependency package from this path will be reused instead of building a new one.",
-        )
-        build_packages_parser.add_argument(
-            "--last-repo-agent-libs-package-file",
-            dest="last_repo_agent_libs_package_file",
-            required=False,
-            help="Path to the agent libs package file. If specified, then the agent-libs dependency package from this "
-            "path will be reused instead of building a new one.",
-        )
-
-        def _add_packagecloud_args(_parser):
-            _parser.add_argument(
-                "--token", required=True, help="Auth token for packagecloud."
-            )
-
-            _parser.add_argument(
-                "--user-name",
-                dest="user_name",
-                required=True,
-                help="Target username for packagecloud.",
-            )
-
-            _parser.add_argument(
-                "--repo-name",
-                dest="repo_name",
-                required=True,
-                help="Target repo for packagecloud.",
-            )
-
-        publish_packages_parser = subparsers.add_parser(
-            "publish", help="Publish packages that are built by 'build' command."
-        )
-        publish_packages_parser.add_argument(
-            "--packages-dir",
-            dest="packages_dir",
-            required=True,
-            help="Path to a directory with packages to publish.",
-        )
-        _add_packagecloud_args(publish_packages_parser)
-
-        find_last_repo_package_parser = subparsers.add_parser(
-            "find_last_repo_package",
-            help="Find existing packages in repo, in order to reuse them.",
-        )
-
-        find_last_repo_package_parser.add_argument(
-            "--package-name",
-            dest="package_name",
-            required=True,
-            choices=[PYTHON_PACKAGE_NAME, AGENT_LIBS_PACKAGE_NAME],
-            help="Name of the package to find.",
-        )
-        _add_packagecloud_args(find_last_repo_package_parser)
-
-        download_package_parser = subparsers.add_parser(
-            "download_package",
-            help="Download package from repo. Used by CI/CD to reuse already existing packages from repo.",
-        )
-        download_package_parser.add_argument(
-            "--package-filename",
-            dest="package_filename",
-            required=True,
-            help="Package filename to download.",
-        )
-        download_package_parser.add_argument(
-            "--output-dir",
-            dest="output_dir",
-            required=True,
-            help="Path where to store downloaded package.",
-        )
-        _add_packagecloud_args(download_package_parser)
-
-    @classmethod
-    def handle_command_line_arguments(
-        cls,
-        args,
-    ):
-        super(LinuxDependencyPackagesBuilder, cls).handle_command_line_arguments(
-            args=args
-        )
-
-        work_dir = pl.Path(args.work_dir)
-
-        builder = cls(work_dir=work_dir)
-
-        if args.command == "build":
-            builder.build_agent_package()
-            if not IN_DOCKER:
-                output_path = SOURCE_ROOT / "build"
-                if output_path.exists():
-                    shutil.rmtree(output_path)
-                shutil.copytree(
-                    builder.packages_output_path,
-                    output_path,
-                    dirs_exist_ok=True,
-                )
-        elif args.command == "publish":
-            builder.publish_packages_to_packagecloud(
-                packages_dir_path=pl.Path(args.packages_dir),
-                token=args.token,
-                user_name=args.user_name,
-                repo_name=args.repo_name,
-            )
-        elif args.command == "find_last_repo_package":
-            last_package_filename = builder.find_last_repo_package(
-                package_name=args.package_name,
-                token=args.token,
-                user_name=args.user_name,
-                repo_name=args.repo_name,
-            )
-            if last_package_filename:
-                print(last_package_filename)
-
-        elif args.command == "download_package":
-            last_package_path = builder.download_package_from_repo(
-                package_filename=args.package_filename,
-                output_dir=args.output_dir,
-                token=args.token,
-                user_name=args.user_name,
-                repo_name=args.repo_name,
-            )
-            if last_package_path:
-                print(last_package_path)
-
-        else:
-            logging.error(f"Unknown command {args.command}.")
-            exit(1)
-
 
 # Version of the  Python build dependencies.
 _PYTHON_BUILD_DEPENDENCIES_VERSIONS = {
@@ -1894,18 +1957,18 @@ BUILD_PYTHON_PACKAGE_ROOT_STEPS = create_build_python_package_root_steps()
 BUILD_AGENT_LIBS_PACKAGE_ROOT_STEPS = create_build_agent_libs_package_root_steps()
 
 
-ALL_MANAGED_PACKAGE_BUILDERS: Dict[str, Type[LinuxDependencyPackagesBuilder]] = {}
+ALL_AIO_PACKAGE_BUILDERS: Dict[str, Type[LinuxAIOPackagesBuilder]] = {}
 
 # Iterate through all supported architectures and create package builders classes for each.
 for arch in SUPPORTED_ARCHITECTURES:
 
-    class DebLinuxDependencyPackagesBuilder(LinuxDependencyPackagesBuilder):
+    class DebLinuxAIOPackagesBuilder(LinuxAIOPackagesBuilder):
         PACKAGE_TYPE = "deb"
         PACKAGECLOUD_DISTRO = "any"
         PACKAGECLOUD_DISTRO_VERSION = "any"
         DEPENDENCY_PACKAGES_ARCHITECTURE = arch
 
-    class RpmLinuxDependencyPackagesBuilder(LinuxDependencyPackagesBuilder):
+    class RpmLinuxAIOPackagesBuilder(LinuxAIOPackagesBuilder):
         PACKAGE_TYPE = "rpm"
         PACKAGECLOUD_DISTRO = "rpm_any"
         PACKAGECLOUD_DISTRO_VERSION = "rpm_any"
@@ -1913,12 +1976,12 @@ for arch in SUPPORTED_ARCHITECTURES:
 
     # Since we create builders "dynamically" we should assign name to each of them, so
     # they can be accessible later.
-    for cls in [DebLinuxDependencyPackagesBuilder, RpmLinuxDependencyPackagesBuilder]:
+    for cls in [DebLinuxAIOPackagesBuilder, RpmLinuxAIOPackagesBuilder]:
         cls.assign_fully_qualified_name(
             class_name=cls.__name__, module_name=__name__, class_name_suffix=arch.value
         )
-        name = f"{cls.PACKAGE_TYPE}-{arch.value}"
-        ALL_MANAGED_PACKAGE_BUILDERS[name] = cls
+        name = f"{cls.PACKAGE_TYPE}-aio-{arch.value}"
+        ALL_AIO_PACKAGE_BUILDERS[name] = cls
 
 
 def _calculate_all_packages_checksum(package_name: str):
@@ -1926,8 +1989,8 @@ def _calculate_all_packages_checksum(package_name: str):
     Calculate checksum for ALL packages with given name.
     """
     sha256 = hashlib.sha256()
-    for builder_name in sorted(ALL_MANAGED_PACKAGE_BUILDERS.keys()):
-        builder_cls = ALL_MANAGED_PACKAGE_BUILDERS[builder_name]
+    for builder_name in sorted(ALL_AIO_PACKAGE_BUILDERS.keys()):
+        builder_cls = ALL_AIO_PACKAGE_BUILDERS[builder_name]
         checksum = builder_cls.get_package_checksum(package_name=package_name)
         sha256.update(checksum.encode())
 
@@ -1981,3 +2044,18 @@ def _parse_package_version_parts(version: str) -> Tuple[int, str]:
     """
     iteration, checksum = version.split("+")
     return int(iteration), checksum
+
+
+ALL_MANAGED_PACKAGE_BUILDERS: Dict[str, Type[LinuxPackageBuilder]] = ALL_AIO_PACKAGE_BUILDERS.copy()
+
+
+class DebLinuxNonAIOPackagesBuilder(LinuxNonAIOPackageBuilder):
+    PACKAGE_TYPE = "deb"
+
+
+class RpmLinuxNonAIOPackagesBuilder(LinuxNonAIOPackageBuilder):
+    PACKAGE_TYPE = "rpm"
+
+
+ALL_MANAGED_PACKAGE_BUILDERS["deb-non-aio"] = DebLinuxNonAIOPackagesBuilder
+ALL_MANAGED_PACKAGE_BUILDERS["rpm-non-aio"] = RpmLinuxNonAIOPackagesBuilder

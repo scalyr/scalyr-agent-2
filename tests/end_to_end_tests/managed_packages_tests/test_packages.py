@@ -35,7 +35,7 @@ from agent_build_refactored.tools.constants import SOURCE_ROOT
 from agent_build_refactored.managed_packages.managed_packages_builders import (
     AGENT_SUBDIR_NAME,
     DEFAULT_PYTHON_PACKAGE_OPENSSL_VERSION,
-    AGENT_PACKAGE_NAME,
+    AGENT_AIO_PACKAGE_NAME,
 )
 from tests.end_to_end_tests.tools import AgentPaths, AgentCommander, TimeoutTracker
 from tests.end_to_end_tests.verify import (
@@ -46,6 +46,8 @@ from tests.end_to_end_tests.verify import (
 from tests.end_to_end_tests.run_in_remote_machine import TargetDistro
 
 logger = logging.getLogger(__name__)
+
+DISTROS_WITH_PYTHON_2 = {"centos7", "ubuntu1404", "ubuntu1604"}
 
 
 def _verify_package_paths(
@@ -90,8 +92,10 @@ def _verify_package_paths(
 
 
 def test_dependency_packages(
-    package_builder, tmp_path, target_distro, agent_package_path
+    package_builder, tmp_path, target_distro, agent_package_path, use_aio_package
 ):
+    if not use_aio_package:
+        pytest.skip("Only AIO packages are tested.")
 
     if target_distro.name not in ["ubuntu2204", "amazonlinux2"]:
         pytest.skip("No need to check on all distros.")
@@ -100,7 +104,7 @@ def test_dependency_packages(
     _verify_package_paths(
         package_path=agent_package_path,
         package_type=package_builder.PACKAGE_TYPE,
-        package_name=AGENT_PACKAGE_NAME,
+        package_name=AGENT_AIO_PACKAGE_NAME,
         output_dir=tmp_path,
         expected_paths=[
             f"opt/{AGENT_SUBDIR_NAME}/",
@@ -114,7 +118,7 @@ def test_dependency_packages(
             f"var/opt/{AGENT_SUBDIR_NAME}/",
             # Depending on its type, a package also may install its own "metadata", so we have to take it into
             # account too.
-            f"usr/share/doc/{AGENT_PACKAGE_NAME}/"
+            f"usr/share/doc/{AGENT_SUBDIR_NAME}/"
             if package_type == "deb"
             else "usr/lib/.build-id/",
         ],
@@ -140,6 +144,8 @@ def test_packages(
     test_session_suffix,
     agent_version,
     tmp_path,
+    use_aio_package,
+    agent_package_name,
 ):
     if "x86_64" not in package_builder_name:
         timeout_tracker = TimeoutTracker(800)
@@ -152,14 +158,18 @@ def test_packages(
         remote_machine_type=remote_machine_type,
         target_distro=target_distro,
         timeout_tracker=timeout_tracker,
+        use_aio_package=use_aio_package,
     )
 
     logger.info("Install agent from install script.")
     _install_from_convenience_script(
-        script_path=convenience_script_path, target_distro=target_distro
+        script_path=convenience_script_path,
+        target_distro=target_distro,
+        use_aio_package=use_aio_package,
     )
 
-    _verify_python_and_libraries()
+    if use_aio_package:
+        _verify_python_and_libraries()
 
     logger.info("Verifying install_info.json file exists")
     install_info_path = (
@@ -226,15 +236,20 @@ def test_packages(
     else:
         raise Exception("Starting agent message is not found.")
 
-    m = re.search(r"OpenSSL version_number=(\d+)", starting_agent_message)
-    openssl_version = int(m.group(1))
+    if use_aio_package:
+        logger.info(
+            "Verify which version of OpenSSL has been picked up by the AIO package."
+        )
 
-    if isinstance(target_distro.expected_openssl_version_number, list):
-        expected_openssl_versions = target_distro.expected_openssl_version_number
-    else:
-        expected_openssl_versions = [target_distro.expected_openssl_version_number]
+        m = re.search(r"OpenSSL version_number=(\d+)", starting_agent_message)
+        openssl_version = int(m.group(1))
 
-    assert openssl_version in expected_openssl_versions
+        if isinstance(target_distro.expected_openssl_version_number, list):
+            expected_openssl_versions = target_distro.expected_openssl_version_number
+        else:
+            expected_openssl_versions = [target_distro.expected_openssl_version_number]
+
+        assert openssl_version in expected_openssl_versions
 
     _stop_agent_and_remove_logs_and_data(
         agent_commander=agent_commander,
@@ -254,7 +269,9 @@ def test_packages(
     monitor_file_path.write_text("test")
 
     logger.info("Cleanup")
-    _remove_all_agent_files(package_type=package_builder.PACKAGE_TYPE)
+    _remove_all_agent_files(
+        package_name=agent_package_name, package_type=package_builder.PACKAGE_TYPE
+    )
 
     assert monitor_file_path.exists()
     assert monitor_file_path.read_text() == "test"
@@ -324,11 +341,20 @@ def test_upgrade(
     scalyr_api_key,
     test_session_suffix,
     agent_version,
+    use_aio_package,
+    agent_package_name,
 ):
     """
     Perform an upgrade from the current stable release. The stable version of the package also has to be in the same
     repository as the tested packages.
     """
+
+    if use_aio_package:
+        # TODO: Remove this skip when we have first stable AIO package.
+        pytest.skip(
+            "We only test the upgrade process of the non AIO packages, because there are no stable packages for AIO."
+        )
+
     if distro_name == "centos6":
         pytest.skip(
             "Can not upgrade from CentOS 6 because our previous variant of packages does not support it."
@@ -339,10 +365,8 @@ def test_upgrade(
     else:
         timeout_tracker = TimeoutTracker(200)
 
-    distros_with_python_2 = {"centos7", "ubuntu1404", "ubuntu1604"}
-
     logger.info("Install stable version of the agent")
-    if distro_name in distros_with_python_2:
+    if distro_name in DISTROS_WITH_PYTHON_2:
         system_python_package_name = "python"
     else:
         system_python_package_name = "python3"
@@ -360,7 +384,7 @@ def test_upgrade(
                 "install",
                 "-y",
                 "--allow-unauthenticated",
-                f"{AGENT_PACKAGE_NAME}={stable_agent_package_version}",
+                f"{agent_package_name}={stable_agent_package_version}",
             ]
         )
     elif package_builder.PACKAGE_TYPE == "rpm":
@@ -376,7 +400,7 @@ repo_gpgcheck=0
         yum_repo_file_path.write_text(yum_repo_file_content)
         _call_yum(["install", "-y", system_python_package_name])
         _call_yum(
-            ["install", "-y", f"{AGENT_PACKAGE_NAME}-{stable_agent_package_version}-1"]
+            ["install", "-y", f"{agent_package_name}-{stable_agent_package_version}-1"]
         )
     else:
         raise Exception(f"Unknown package type: {package_builder.PACKAGE_TYPE}")
@@ -405,11 +429,11 @@ repo_gpgcheck=0
                 "-y",
                 "--only-upgrade",
                 "--allow-unauthenticated",
-                f"{AGENT_PACKAGE_NAME}",
+                f"{agent_package_name}",
             ]
         )
     elif package_builder.PACKAGE_TYPE == "rpm":
-        _call_yum(["install", "-y", f"{AGENT_PACKAGE_NAME}"])
+        _call_yum(["install", "-y", f"{agent_package_name}"])
     else:
         raise Exception(f"Unknown package type: {package_builder.PACKAGE_TYPE}")
 
@@ -428,7 +452,9 @@ repo_gpgcheck=0
     agent_commander.stop()
 
     logger.info("Cleanup")
-    _remove_all_agent_files(package_type=package_builder.PACKAGE_TYPE)
+    _remove_all_agent_files(
+        package_name=agent_package_name, package_type=package_builder.PACKAGE_TYPE
+    )
 
 
 def _perform_ssl_checks(
@@ -634,13 +660,18 @@ _ADDITIONAL_ENVIRONMENT = {
 
 
 def _install_from_convenience_script(
-    script_path: pl.Path,
-    target_distro: TargetDistro,
+    script_path: pl.Path, target_distro: TargetDistro, use_aio_package: bool
 ):
     """Install agent using convenience script."""
+
+    command_args = ["bash", str(script_path), "--verbose"]
+
+    if use_aio_package:
+        command_args.append("--use-aio-package")
+
     try:
         result = subprocess.run(
-            ["bash", str(script_path), "--verbose"],
+            command_args,
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -653,24 +684,25 @@ def _install_from_convenience_script(
     output = result.stdout.decode()
     logger.info(f"Install script has finished.\nOutput:\n{output}")
 
-    # Verify which variant of OpenSSL has been chosen by the package, system's one or embedded.
-    # NOTE: Expected results of this check may eventually become outdated, because of distribution's EOL
-    # or changes in version requirements for OpenSSL in Python.
-    # If system's OpenSSL is not used anymore on some distro, it may be due to this distro has become
-    # outdated enough, so Python just does not accept its version of OpenSSL and package falls back to
-    # embedded OpenSSL.
-    if target_distro.name == "ubuntu2204":
-        assert "Looking for system OpenSSL >= 3: found OpenSSL 3.0." in output
-    elif target_distro.name == "ubuntu2004":
-        assert "Looking for system OpenSSL >= 3: Not found" in output
-        assert "Looking for system OpenSSL >= 1.1.1: found OpenSSL 1.1.1" in output
-    elif target_distro.name in ["ubuntu1404", "centos6"]:
-        assert "Looking for system OpenSSL >= 3: Not found" in output
-        assert "Looking for system OpenSSL >= 1.1.1: Not found" in output
-        assert (
-            f"Using embedded OpenSSL == OpenSSL {DEFAULT_PYTHON_PACKAGE_OPENSSL_VERSION}"
-            in output
-        )
+    if use_aio_package:
+        # Verify which variant of OpenSSL has been chosen by the package, system's one or embedded.
+        # NOTE: Expected results of this check may eventually become outdated, because of distribution's EOL
+        # or changes in version requirements for OpenSSL in Python.
+        # If system's OpenSSL is not used anymore on some distro, it may be due to this distro has become
+        # outdated enough, so Python just does not accept its version of OpenSSL and package falls back to
+        # embedded OpenSSL.
+        if target_distro.name == "ubuntu2204":
+            assert "Looking for system OpenSSL >= 3: found OpenSSL 3.0." in output
+        elif target_distro.name == "ubuntu2004":
+            assert "Looking for system OpenSSL >= 3: Not found" in output
+            assert "Looking for system OpenSSL >= 1.1.1: found OpenSSL 1.1.1" in output
+        elif target_distro.name in ["ubuntu1404", "centos6"]:
+            assert "Looking for system OpenSSL >= 3: Not found" in output
+            assert "Looking for system OpenSSL >= 1.1.1: Not found" in output
+            assert (
+                f"Using embedded OpenSSL == OpenSSL {DEFAULT_PYTHON_PACKAGE_OPENSSL_VERSION}"
+                in output
+            )
 
 
 def _prepare_environment(
@@ -678,6 +710,7 @@ def _prepare_environment(
     remote_machine_type: str,
     target_distro: TargetDistro,
     timeout_tracker: TimeoutTracker,
+    use_aio_package: bool,
 ):
     """
     If needed, do some preparation before agent installation.
@@ -719,6 +752,15 @@ def _prepare_environment(
             content = content.replace("#baseurl", "baseurl")
             content = content.replace("mirrorlist=", "#mirrorlist=")
             repo_file.write_text(content)
+
+    if not use_aio_package:
+        # Install required Python interpreter, if that's not AIO package.
+        if target_distro.name in DISTROS_WITH_PYTHON_2:
+            system_python_package_name = "python"
+        else:
+            system_python_package_name = "python3"
+
+        packages_to_install.append(system_python_package_name)
 
     # Install additional packages if needed.
     if packages_to_install:
@@ -790,15 +832,18 @@ def _extract_package(package_type: str, package_path: pl.Path, output_path: pl.P
         raise Exception(f"Unknown package type {package_type}.")
 
 
-def _remove_all_agent_files(package_type: str):
+def _remove_all_agent_files(
+    package_name: str,
+    package_type: str,
+):
     """
     Cleanup system from everything that related with agent, trying to bring
     system into state before agent was installed.
     """
 
     if package_type == "deb":
-        _call_apt(["remove", "-y", AGENT_PACKAGE_NAME])
-        _call_apt(["purge", "-y", AGENT_PACKAGE_NAME])
+        _call_apt(["remove", "-y", package_name])
+        _call_apt(["purge", "-y", package_name])
         _call_apt(["autoremove", "-y"])
         source_list_path = pl.Path("/etc/apt/sources.list.d/scalyr.list")
         source_list_path.unlink()
@@ -812,7 +857,7 @@ def _remove_all_agent_files(package_type: str):
         _call_apt(["update"])
 
     elif package_type == "rpm":
-        _call_yum(["remove", "-y", AGENT_PACKAGE_NAME])
+        _call_yum(["remove", "-y", package_name])
     else:
         raise Exception(f"Unknown package type: {package_type}")
 
