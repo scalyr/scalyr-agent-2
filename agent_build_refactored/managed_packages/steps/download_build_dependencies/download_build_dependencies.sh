@@ -411,14 +411,10 @@ popd
 clear_public_keys
 
 
-mkdir "${STEP_OUTPUT_PATH}/libedit"
+pushd "${STEP_OUTPUT_PATH}"
+git clone "https://salsa.debian.org/debian/libedit.git"
 pushd "${STEP_OUTPUT_PATH}/libedit"
-curl -L "https://thrysoee.dk/editline/libedit-${LIBEDIT_VERSION}.tar.gz" > libedit.tar.gz
-
-# libedit does not provide any normal way of verifying its source, so every time when we update its
-# version we have to manually calculate its checksum and hardcode it there.
-echo -n "6792a6a992050762edcca28ff3318cdb7de37dccf7bc30db59fcd7017eed13c5  libedit.tar.gz" > libedit.tar.gz.sha256
-sha256sum -c libedit.tar.gz.sha256
+git checkout "${LIBEDIT_VERSION_COMMIT}"
 popd
 
 
