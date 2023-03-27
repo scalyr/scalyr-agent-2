@@ -145,6 +145,21 @@ DISTROS = {
             expected_openssl_version_number=0x1010104F,
         ),
         TargetDistro(
+            name="centos_stream9",
+            ec2_images={
+                Architecture.X86_64: EC2DistroImage(
+                    image_id="ami-01ca03df4a6012157",
+                    image_name="CentOS 8 (x86_64) - with Updates HVM",
+                    short_name="centos8",
+                    size_id="t2.small",
+                    ssh_username="centos",
+                )
+            },
+            docker_image="quay.io/centos/centos:stream9",
+            # EC2 and docker openssl versions are different, so we need to track them all.
+            expected_openssl_version_number=[0x101010BF, 0x1010107F],
+        ),
+        TargetDistro(
             name="centos8",
             ec2_images={
                 Architecture.X86_64: EC2DistroImage(

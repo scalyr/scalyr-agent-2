@@ -348,7 +348,7 @@ if [[ $REPO_TYPE == "yum" ]]; then
 name=Scalyr packages.
 baseurl=${YUM_REPOSITORY_URL}
 enabled=1
-gpgcheck=0
+gpgcheck=1
 repo_gpgcheck=1
 gpgkey=${PUBLIC_KEY_URL}
 EOM

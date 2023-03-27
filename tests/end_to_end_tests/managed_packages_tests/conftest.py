@@ -140,6 +140,28 @@ def agent_package_name(use_aio_package):
         return AGENT_NON_AIO_AIO_PACKAGE_NAME
 
 
+def _sign_rpm_file(path: pl.Path, key_id: str):
+
+    rpm_macros_path = pl.Path.home() / ".rpmmacros"
+
+    rpm_macros_path.write_text(
+        f"""%_gpg_name Scalyr Inc
+%__gpg_sign_cmd                 %{{__gpg}} \
+gpg2 --batch  --no-verbose --no-armor \
+--default-key {key_id} \
+--pinentry-mode loopback \
+--no-tty \
+--no-secmem-warning \
+-sbo %{{__signature_filename}} \
+--digest-algo sha256 \
+%{{__plaintext_filename}}
+        """
+    )
+
+    subprocess.run(["rpm", "--addsign", str(path)], check=True)
+
+
+
 class RepoBuilder(Runner):
     """
     This runner class is responsible for creating deb/rpm repositories from provided packages.
@@ -245,7 +267,13 @@ class RepoBuilder(Runner):
         elif package_type == "rpm":
             # Create rpm repository using 'createrepo_c'.
             for package_path in packages_dir_path.glob("*.rpm"):
-                shutil.copy(package_path, repo_path)
+
+                package_repo_path = repo_path / package_path.name
+
+                shutil.copy(package_path, package_repo_path)
+                _sign_rpm_file(path=package_repo_path, key_id=sign_key_id)
+
+
             subprocess.check_call(["createrepo_c", str(repo_path)])
 
             # Sign repository's metadata
