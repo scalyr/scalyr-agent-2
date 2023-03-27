@@ -153,7 +153,7 @@ gpg2 --batch  --no-verbose --no-armor \
 --no-tty \
 --no-secmem-warning \
 -sbo %{{__signature_filename}} \
---digest-algo sha1 \
+--digest-algo sha256 \
 %{{__plaintext_filename}}
         """
     )
