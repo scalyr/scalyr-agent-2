@@ -167,6 +167,10 @@ def cleanup_volumes(
 
 
 def _get_instance_name(instance):
+
+    if instance.tags is None:
+        return None
+
     for tag in instance.tags:
         if tag["Key"] == "Name":
             return tag["Value"]
