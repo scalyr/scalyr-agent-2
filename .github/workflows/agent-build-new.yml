@@ -46,98 +46,104 @@ jobs:
           echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
           echo "aws_objects_name_prefix=${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}" >> $GITHUB_OUTPUT
 
-  build-linux-packages:
-    name: "Build Linux packages"
-    needs:
-      - pre_job
-    uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
-    with:
-      aws_private_key_name: ${{ needs.pre_job.outputs.aws_private_key_name }}
-      aws_security_group: ${{ needs.pre_job.outputs.aws_security_group }}
-      aws_prefix_list_id: ${{ needs.pre_job.outputs.aws_prefix_list_id }}
-      aws_region: ${{ needs.pre_job.outputs.aws_region }}
-      aws_objects_name_prefix: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
-    secrets:
-      CT_AWS_DEV_EC2_PRIVATE_KEY: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
-      CT_AWS_DEV_EC2_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
-      CT_AWS_DEV_EC2_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
-      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
-      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
-
-  build-windows-package:
-    name: "Build Windows package"
-    uses: ./.github/workflows/reusable-agent-build-windows.yml
-    secrets:
-      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
-  build_tarball:
-    runs-on: ubuntu-20.04
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Install python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.8.13"
-
-      - name: Build tarball
-        run: |
-          mkdir -p build/tarball/noarch
-          pushd build/tarball/noarch
-          python3 ../../../build_package.py tarball
-          popd
-
-      - name: Save tarball as artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: tarball-noarch
-          path: build
-          retention-days: 1
-
-      - name: Notify Slack on Failure
-        if: ${{ failure() && github.ref_name == 'master' }}
-        uses: act10ns/slack@ed1309ab9862e57e9e583e51c7889486b9a00b0f # v2.0.0
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        with:
-          status: ${{ job.status }}
-          steps: ${{ toJson(steps) }}
-          channel: '#eng-dataset-cloud-tech'
+      - name: Get missing step caches matrices
+        id: get_missing_caches_matrices
+        uses: .github/actions/init-pre-built-steps-matrices
 
 
-  # Aggregate all agent build artifacts that we build by this workflow and put in a single artifact,
-  # so it's just need to download only one artifact, for example during a release process.
-  prepare-artifacts:
-    runs-on: ubuntu-20.04
-    needs:
-      - build-linux-packages
-      - build-windows-package
-      - build_tarball
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v3
-        with:
-          path: /tmp/all_artifacts
-
-
-      - name: Prepare artifacts
-        run: |
-          mkdir -p /tmp/result_artifacts
-          cp -a /tmp/all_artifacts/linux-packages-*/. /tmp/result_artifacts
-          cp -a /tmp/all_artifacts/tarball-noarch/. /tmp/result_artifacts
-          cp -a /tmp/all_artifacts/windows-msi/. /tmp/result_artifacts
-          
-          
-
-      - name: Save result artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: result-artifacts
-          path: /tmp/result_artifacts
-          retention-days: 1
+#  build-linux-packages:
+#    name: "Build Linux packages"
+#    needs:
+#      - pre_job
+#    uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
+#    with:
+#      aws_private_key_name: ${{ needs.pre_job.outputs.aws_private_key_name }}
+#      aws_security_group: ${{ needs.pre_job.outputs.aws_security_group }}
+#      aws_prefix_list_id: ${{ needs.pre_job.outputs.aws_prefix_list_id }}
+#      aws_region: ${{ needs.pre_job.outputs.aws_region }}
+#      aws_objects_name_prefix: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
+#    secrets:
+#      CT_AWS_DEV_EC2_PRIVATE_KEY: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
+#      CT_AWS_DEV_EC2_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
+#      CT_AWS_DEV_EC2_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
+#      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
+#      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
+#
+#  build-windows-package:
+#    name: "Build Windows package"
+#    uses: ./.github/workflows/reusable-agent-build-windows.yml
+#    secrets:
+#      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+#
+#  build_tarball:
+#    runs-on: ubuntu-20.04
+#
+#    steps:
+#      - name: Checkout repository
+#        uses: actions/checkout@v3
+#
+#      - name: Install python
+#        uses: actions/setup-python@v4
+#        with:
+#          python-version: "3.8.13"
+#
+#      - name: Build tarball
+#        run: |
+#          mkdir -p build/tarball/noarch
+#          pushd build/tarball/noarch
+#          python3 ../../../build_package.py tarball
+#          popd
+#
+#      - name: Save tarball as artifact
+#        uses: actions/upload-artifact@v3
+#        with:
+#          name: tarball-noarch
+#          path: build
+#          retention-days: 1
+#
+#      - name: Notify Slack on Failure
+#        if: ${{ failure() && github.ref_name == 'master' }}
+#        uses: act10ns/slack@ed1309ab9862e57e9e583e51c7889486b9a00b0f # v2.0.0
+#        env:
+#          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+#        with:
+#          status: ${{ job.status }}
+#          steps: ${{ toJson(steps) }}
+#          channel: '#eng-dataset-cloud-tech'
+#
+#
+#  # Aggregate all agent build artifacts that we build by this workflow and put in a single artifact,
+#  # so it's just need to download only one artifact, for example during a release process.
+#  prepare-artifacts:
+#    runs-on: ubuntu-20.04
+#    needs:
+#      - build-linux-packages
+#      - build-windows-package
+#      - build_tarball
+#
+#    steps:
+#      - name: Checkout repository
+#        uses: actions/checkout@v3
+#
+#      - name: Download artifacts
+#        uses: actions/download-artifact@v3
+#        with:
+#          path: /tmp/all_artifacts
+#
+#
+#      - name: Prepare artifacts
+#        run: |
+#          mkdir -p /tmp/result_artifacts
+#          cp -a /tmp/all_artifacts/linux-packages-*/. /tmp/result_artifacts
+#          cp -a /tmp/all_artifacts/tarball-noarch/. /tmp/result_artifacts
+#          cp -a /tmp/all_artifacts/windows-msi/. /tmp/result_artifacts
+#
+#
+#
+#      - name: Save result artifact
+#        uses: actions/upload-artifact@v3
+#        with:
+#          name: result-artifacts
+#          path: /tmp/result_artifacts
+#          retention-days: 1

@@ -104,11 +104,9 @@ async function executeRunner() {
     // 3. If there are steps, which results haven't been found during the step 1, then the results of those
     //    steps will be cached using their cache names.
 
-    const cachesKeysFile = core.getInput("caches_keys_file_path");
-    const cacheVersionSuffix = core.getInput("missing_caches_keys_output_path");
+    const cachesKeysJson = core.getInput("caches_keys_json");
 
-    const cachesKeysRaw = fs.readFileSync(cachesKeysFile);
-    const cachesKeys = JSON.parse(cachesKeysRaw);
+    const cachesKeys = JSON.parse(cachesKeysJson);
 
     const missingCaches = []
 

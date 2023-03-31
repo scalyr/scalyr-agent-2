@@ -2,11 +2,7 @@ name: 'Get steps missing caches'
 description: |
   Prepares current machine by performing the set of the runner steps, which are defined in the 'agent_build/tools/runner.py' module.
 inputs:
-  caches_keys_file_path:
-    description: "FQDN of the runner"
-    required: true
-
-  missing_caches_keys_output_path:
+  caches_keys_json:
     description: "FQDN of the runner"
     required: true
 
