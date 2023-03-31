@@ -53,7 +53,7 @@ runs:
       id: prepare-ssh
       shell: bash
       run: |
-        echo '${{ input.aws_private_key }}' > /tmp/private_key.pem
+        echo '${{ inputs.aws_private_key }}' > /tmp/private_key.pem
         chmod 600 /tmp/private_key.pem
         eval `ssh-agent -s`
 
