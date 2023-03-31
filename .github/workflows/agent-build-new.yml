@@ -55,11 +55,12 @@ jobs:
   run_pre_build_steps:
     name: "Run pre-built steps"
     needs:
-      - pre_job
+      - ${{ matrix.needs }}
 
     strategy:
       matrix:
          os: [ubuntu-20.04, ubuntu-22.04]
+         needs: [pre_job]
     uses: ./.github/workflows/run-pre-build-jobs.yml
     with:
       aws_private_key_name: ${{ needs.pre_job.outputs.aws_private_key_name }}
