@@ -59861,7 +59861,7 @@ async function executeRunner() {
         console.log(`Check cache for step cache key ${key}`);
         const result = await cache.restoreCache(
             primaryKey=key,
-            options=new cache.DownloadOptions(lookupOnly=true)
+            options={ lookupOnly: true }
         )
         console.log(result)
     }
