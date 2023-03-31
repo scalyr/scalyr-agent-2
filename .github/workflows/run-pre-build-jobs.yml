@@ -87,7 +87,7 @@ jobs:
           aws_private_key_name: ${{ inputs.aws_private_key_name }}
           aws_region: ${{ inputs.aws_region }}
           aws_security_group: ${{ inputs.aws_security_group }}
-          aws_security_groups_prefix_list_id: ${{ inputs.aws_prefix_list_id }}
+          aws_prefix_list_id: ${{ inputs.aws_prefix_list_id }}
           aws_objects_name_prefix: ${{ inputs.aws_objects_name_prefix }}
 
 
@@ -112,5 +112,5 @@ jobs:
           aws_private_key_name: ${{ inputs.aws_private_key_name }}
           aws_region: ${{ inputs.aws_region }}
           aws_security_group: ${{ inputs.aws_security_group }}
-          aws_security_groups_prefix_list_id: ${{ inputs.aws_prefix_list_id }}
+          aws_prefix_list_id: ${{ inputs.aws_prefix_list_id }}
           aws_objects_name_prefix: ${{ inputs.aws_objects_name_prefix }}
