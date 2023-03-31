@@ -118,7 +118,9 @@ for level_steps in levels:
 
 
 def get_missing_caches_matrices(input_missing_cache_keys_file: pl.Path):
-    missing_cache_keys = json.loads(input_missing_cache_keys_file.read_text())
+    json_content = input_missing_cache_keys_file.read_text()
+    print(json_content)
+    missing_cache_keys = json.loads(json_content)
 
     matrices = []
     for level in runner_levels:
