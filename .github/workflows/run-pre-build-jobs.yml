@@ -69,6 +69,7 @@ jobs:
           cat $GITHUB_OUTPUT
 
   run_pre_built_job0:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-20.04
     needs:
       - pre_job
