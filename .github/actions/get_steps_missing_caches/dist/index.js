@@ -59786,6 +59786,7 @@ async function executeRunner() {
         const result = await cache.restoreCache(
             paths=[""],
             primaryKey=key,
+            restoreKeys=[],
             options={ lookupOnly: true }
         )
         console.log(result)
