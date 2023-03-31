@@ -127,6 +127,7 @@ jobs:
     runs-on: ubuntu-20.04
     needs:
       - pre_job
+      - run_pre_built_job0
     strategy:
       matrix: ${{ fromJSON(needs.pre_job.outputs.pre_build_jobs_matrices_json) }}
     steps:
