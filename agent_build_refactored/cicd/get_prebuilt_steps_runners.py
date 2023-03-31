@@ -114,6 +114,7 @@ for level_steps in levels:
         fqdn = runner_cls.get_fully_qualified_name()
         current_runner_level[fqdn] = {
             "step": step,
+            "cache_key": f"{step.id}_v4",
             "runner": runner_cls
         }
 
@@ -135,10 +136,9 @@ def get_missing_caches_matrices(input_missing_cache_keys_file: pl.Path):
 
             step = info["step"]
 
-            cache_key = f"{step.id}_v3"
             matrix_include.append({
                 "step_runner_fqdn": step_wrapper_runner_fqdn,
-                "cache_key": cache_key,
+                "cache_key": info["cache_key"],
                 "name": step.name
             })
 
@@ -154,7 +154,7 @@ def get_all_cache_keys():
     result = set()
     for level in runner_levels:
         for info in level.values():
-            result.add(info["step"].id)
+            result.add(info["cache_key"])
 
     return json.dumps(list(result))
 
