@@ -12,7 +12,7 @@ repoze.lru==0.7
 six==1.14.0
 
 # Required for redis monitor.
-redis==2.10.5
+redis==4.4.4
 
 # Required for mysql monitor
 PyMySQL==0.9.3
