@@ -30,11 +30,14 @@ from typing import Dict
 # local packages. All such imports also have to be done after that.
 import requests
 
-sys.path.append(str(pl.Path(__file__).parent.parent.parent))
+SOURCE_ROOT = pl.Path(__file__).parent.parent.parent
+
+sys.path.append(str(SOURCE_ROOT))
 
 from agent_build_refactored.tools.runner import Runner, RunnerStep
 
 from agent_build_refactored import ALL_USED_BUILDERS
+
 
 
 used_builders = []
@@ -119,7 +122,6 @@ for level_steps in levels:
 
 def get_missing_caches_matrices(input_missing_cache_keys_file: pl.Path):
     json_content = input_missing_cache_keys_file.read_text()
-    print(json_content)
     missing_cache_keys = json.loads(json_content)
 
     matrices = []
@@ -162,6 +164,7 @@ if __name__ == "__main__":
         "--input-missing-cache-keys-file",
         required=True
     )
+    missing_caches_matrices_parser.add_argument("--output-workflow", required=True)
 
     all_cache_keys_parser = subparsers.add_parser("all-cache-keys")
 
@@ -169,9 +172,9 @@ if __name__ == "__main__":
 
     if args.command == "get-missing-caches-matrices":
         matrices = get_missing_caches_matrices(
-            input_missing_cache_keys_file=pl.Path(args.input_missing_cache_keys_file)
+            input_missing_cache_keys_file=pl.Path(args.input_missing_cache_keys_file),
         )
-        print(json.dumps(matrices))
+        print(matrices)
     elif args.command == "all-cache-keys":
         print(get_all_cache_keys())
 

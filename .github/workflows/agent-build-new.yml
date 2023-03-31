@@ -17,7 +17,6 @@ permissions:
 
 jobs:
   pre_job:
-    name: Skip Duplicate Jobs Pre Job
     runs-on: ubuntu-latest
     permissions:
       actions: write  # Needed for skip-duplicate-jobs job
@@ -52,6 +51,15 @@ jobs:
         id: get_missing_caches_matrices
         uses: ./.github/actions/init_pre_built_steps_matrices
 
+  run_pre_build_steps:
+    name: "Run pre-built steps"
+    needs:
+      - pre_job
+
+    strategy:
+      matrix:
+        os: ubuntu:20.04
+    uses: ./.github/workflows/run-pre-build-jobs.yml
 
 
 #  build-linux-packages:

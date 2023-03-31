@@ -1,6 +1,10 @@
 name: "Init pre-build steps job matrices"
 description: "This action accepts matrices for the jobs that are used in the agent-build workflow and excludes job that are must not be executed in mon-master runs."
 
+outputs:
+  matrices:
+    value: ${{ steps. }}
+    description: "vv"
 
 runs:
   using: "composite"
@@ -22,8 +26,9 @@ runs:
       shell: bash
       run: |
         echo '${{ steps.get_missing_caches_matrices.outputs.missing_cache_keys_json }}' > /tmp/missing_cache_keys_json.json
-        python3 agent_build_refactored/cicd/get_prebuilt_steps_runners.py get-missing-caches-matrices \
-          --input-missing-cache-keys-file /tmp/missing_cache_keys_json.json
+        # echo 'python3 agent_build_refactored/cicd/get_prebuilt_steps_runners.py get-missing-caches-matrices --input-missing-cache-keys-file /tmp/missing_cache_keys_json.json
+        
+        # cat ./.github/workflows/run-pre-build-jobs.yml
         
   
 #    - name: Get job matrices.
