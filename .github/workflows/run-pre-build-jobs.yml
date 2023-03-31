@@ -107,6 +107,7 @@ jobs:
         uses: ./.github/actions/run_pre_built_step
         with:
           step_runner_fqdn: ${{ matrix.step_runner_fqdn }}
+          aws_private_key: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
           aws_access_key: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
           aws_secret_key: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
           aws_private_key_name: ${{ inputs.aws_private_key_name }}
