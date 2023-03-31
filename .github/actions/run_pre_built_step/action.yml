@@ -36,7 +36,7 @@ runs:
     - name: Install python
       uses: actions/setup-python@v4
       with:
-        python-version: ${{ matrix.python-version }}
+        python-version: ${{ inputs.python_version }}
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@f03ac48505955848960e80bbb68046aa35c7b9e7 # v2.0.0
