@@ -140,9 +140,12 @@ def get_missing_caches_matrices(input_missing_cache_keys_file: pl.Path):
                 "name":  info["step"].name
             })
 
-        matrix = {
-            "package": matrix_include
-        }
+        if len(matrix_include) > 0:
+            matrix = {
+                "include": matrix_include
+            }
+        else:
+            matrix = ""
         matrices.append(matrix)
 
     return matrices

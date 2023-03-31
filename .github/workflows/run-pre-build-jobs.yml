@@ -74,6 +74,7 @@ jobs:
     runs-on: ubuntu-20.04
     needs:
       - pre_job
+    if: ${{needs.pre_job.outputs.matrix0 != '' }}
     strategy:
       matrix: ${{ fromJSON(needs.pre_job.outputs.matrix0) }}
     steps:
@@ -103,6 +104,8 @@ jobs:
     needs:
       - pre_job
       - run_pre_built_job0
+
+    if: ${{needs.pre_job.outputs.matrix1 != '' }}
     strategy:
       matrix: ${{ fromJSON(needs.pre_job.outputs.matrix1) }}
     steps:
@@ -130,6 +133,7 @@ jobs:
     needs:
       - pre_job
       - run_pre_built_job1
+    if: ${{needs.pre_job.outputs.matrix2 != '' }}
     strategy:
       matrix: ${{ fromJSON(needs.pre_job.outputs.matrix2) }}
     steps:
