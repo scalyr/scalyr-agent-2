@@ -21,6 +21,7 @@ runs:
       id: dddd
       shell: bash
       run: |
+        echo "efewfewrwerewrrwerwrwerwer22222"
         echo "${{ steps.get_missing_caches_matrices.outputs.missing_cache_keys_json }}"
   
 #    - name: Get job matrices.
