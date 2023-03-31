@@ -17,8 +17,8 @@ runs:
       with:
         caches_keys_json: ${{ steps.get_all_used_steps_cache_keys.outputs.cache_keys_json }}
 
-    - name: ttttt
-      id: dddd
+    - name: Print
+      id: print
       shell: bash
       run: |
         echo "efewfewrwerewrrwerwrwerwer22222"
