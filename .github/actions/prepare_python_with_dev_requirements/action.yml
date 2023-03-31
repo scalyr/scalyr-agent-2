@@ -18,14 +18,15 @@ runs:
       id: cache_dev_requirements
       uses: actions/cache@v3
       with:
-        path: /tmp/dev_requirements
+        path: venv
         key: dev-requirements-${{ hashFiles('dev-requirements-new.txt') }}
 
     - name: Install dev. requirements
       if: steps.cache_dev_requirements.outputs.cache-hit != 'true'
       shell: bash
       run: |
-        python3 -m pip install --root /tmp/dev_requirements -r dev-requirements-new.txt
+        python3 -m venv venv
+        venv/bin/python3 -m pip install -r dev-requirements-new.txt
 
     - name: Copy dev. requirements
       shell: bash
