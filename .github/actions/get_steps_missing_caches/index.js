@@ -50,7 +50,7 @@ async function executeRunner() {
         }
     }
 
-    core.setOutput("missing_cache_keys", JSON.stringify(missingCaches));
+    core.setOutput("missing_cache_keys_json", JSON.stringify(missingCaches));
 
 
 

@@ -6,6 +6,10 @@ inputs:
     description: "FQDN of the runner"
     required: true
 
+outputs:
+  missing_cache_keys_json:
+    description: "JSON-encoded list of missing step cache keys"
+
 
 runs:
   using: 'node16'

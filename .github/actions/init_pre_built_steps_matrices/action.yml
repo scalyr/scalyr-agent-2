@@ -16,6 +16,12 @@ runs:
       uses: ./.github/actions/get_steps_missing_caches
       with:
         caches_keys_json: ${{ steps.get_all_used_steps_cache_keys.outputs.cache_keys_json }}
+
+    - name: 3333
+      id: dddd
+      shell: bash
+      run: |
+        echo "${{ steps.get_missing_caches_matrices.outputs.missing_cache_keys_json }}"
   
 #    - name: Get job matrices.
 #      id: get-job-matrices
