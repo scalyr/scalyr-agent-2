@@ -145,7 +145,7 @@ jobs:
       - pre_job
       - run_pre_built_job0
     strategy:
-      matrix: ${{ fromJSON(needs.pre_job.outputs.print.matrix1) }}
+      matrix: ${{ fromJSON(needs.pre_job.outputs.matrix1) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
