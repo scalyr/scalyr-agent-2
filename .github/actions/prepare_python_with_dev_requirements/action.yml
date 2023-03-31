@@ -30,7 +30,7 @@ runs:
     - name: Copy dev. requirements
       shell: bash
       run: |
-        cp -a /tmp/dev_requirements/. /
+        sudo cp -a /tmp/dev_requirements/. /
 
     - name: Run cached step
       shell: bash
