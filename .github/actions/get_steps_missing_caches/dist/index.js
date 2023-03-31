@@ -59849,14 +59849,17 @@ async function executeRunner() {
 
     const cachesKeysJson = core.getInput("caches_keys_json");
 
+    console.log("JSSOOON")
+    console.log(cachesKeysJson)
+
+
     const cachesKeys = JSON.parse(cachesKeysJson);
 
     const missingCaches = []
 
-    for (let name of cachesKeys) {
-        console.log(`Check cache for step ${name}`);
+    for (let key of cachesKeys) {
+        console.log(`Check cache for step cache key ${key}`);
         const result = await cache.restoreCache(
-            paths=[name],
             primaryKey=key,
             options=DownloadOptions(lookupOnly=true)
         )
