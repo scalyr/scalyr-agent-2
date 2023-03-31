@@ -164,7 +164,6 @@ if __name__ == "__main__":
         "--input-missing-cache-keys-file",
         required=True
     )
-    missing_caches_matrices_parser.add_argument("--output-workflow", required=True)
 
     all_cache_keys_parser = subparsers.add_parser("all-cache-keys")
 
