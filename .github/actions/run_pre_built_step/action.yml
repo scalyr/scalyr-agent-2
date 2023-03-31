@@ -47,10 +47,10 @@ runs:
         image: tonistiigi/binfmt:qemu-v6.2.0
         platforms: all
 
-    - name: Prepare environment.
-      uses: ./.github/actions/execute-runner
-      with:
-        runner-fqdn: "agent_build_refactored.__init__.BuildTestEnvironment"
+#    - name: Prepare environment.
+#      uses: ./.github/actions/execute-runner
+#      with:
+#        runner-fqdn: "agent_build_refactored.__init__.BuildTestEnvironment"
 
     - name: Prepare SSH
       id: prepare-ssh
