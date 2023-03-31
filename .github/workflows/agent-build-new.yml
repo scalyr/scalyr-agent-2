@@ -2,8 +2,8 @@ name: Agent Build Refactored
 
 on:
   push:
-    branches:
-      - master
+#    branches:
+#      - master
   pull_request:
     branches:
       - master
@@ -24,16 +24,39 @@ jobs:
       contents: read
     outputs:
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
+      aws_private_key_name: ${{ steps.init_common_options.outputs.aws_private_key_name }}
+      aws_security_group: ${{ steps.init_common_options.outputs.aws_security_group }}
+      aws_prefix_list_id: ${{ steps.init_common_options.outputs.aws_prefix_list_id }}
+      aws_region: ${{ steps.init_common_options.outputs.aws_region }}
+      aws_objects_name_prefix: ${{ steps.init_common_options.outputs.aws_objects_name_prefix }}
     steps:
-      - id: skip_check
-        uses: fkirc/skip-duplicate-actions@12aca0a884f6137d619d6a8a09fcc3406ced5281 # v4.0.0
-        with:
-          cancel_others: 'true'
-          github_token: ${{ github.token }}
+#      - id: skip_check
+#        uses: fkirc/skip-duplicate-actions@12aca0a884f6137d619d6a8a09fcc3406ced5281 # v4.0.0
+#        with:
+#          cancel_others: 'true'
+#          github_token: ${{ github.token }}
+
+      - name: Init common options
+        id: init_common_options
+        shell: bash
+        run: |
+          echo "aws_private_key_name=CT_SCALYR_AGENT_GHA" >> $GITHUB_OUTPUT
+          echo "aws_security_group=github-actions-remote-access" >> $GITHUB_OUTPUT
+          echo "aws_prefix_list_id=pl-04a16228a97704d23" >> $GITHUB_OUTPUT
+          echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
+          echo "aws_objects_name_prefix=${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}" >> $GITHUB_OUTPUT
 
   build-linux-packages:
     name: "Build Linux packages"
+    needs:
+      - pre_job
     uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
+    with:
+      aws_private_key_name: ${{ needs.pre_job.outputs.aws_private_key_name }}
+      aws_security_group: ${{ needs.pre_job.outputs.aws_security_group }}
+      aws_prefix_list_id: ${{ needs.pre_job.outputs.aws_prefix_list_id }}
+      aws_region: ${{ needs.pre_job.outputs.aws_region }}
+      aws_objects_name_prefix: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
     secrets:
       CT_AWS_DEV_EC2_PRIVATE_KEY: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
       CT_AWS_DEV_EC2_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}

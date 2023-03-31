@@ -241,6 +241,21 @@ class RunnerStep:
 
         return sorted(list(set(tracked_files)))
 
+    def get_all_required_steps(self):
+
+        result = {}
+
+        for step in self.required_steps.values():
+            result[step.id] = step
+            result.update(step.get_all_required_steps())
+
+        if self._base_step:
+            result[self._base_step.id] = self._base_step
+            result.update(self._base_step.get_all_required_steps())
+
+        return result
+
+
     def get_all_cacheable_steps(self) -> List["RunnerStep"]:
         """
         Get list of all steps (including nested) which are used by this step.
@@ -825,6 +840,23 @@ class Runner:
         # Filter all identical steps
         result_dict = {step.id: step for step in result}
         return list(result_dict.values())
+
+    @classmethod
+    def get_all_steps(cls) -> Dict[str, RunnerStep]:
+        """
+        Gather all (including nested) RunnerSteps from all possible plases which are used by this runner.
+        """
+        result = {}
+        base_environment = cls.get_base_environment()
+        if base_environment:
+            result[base_environment.id] = base_environment
+            result.update(base_environment.get_all_required_steps())
+
+        for req_step in cls.get_all_required_steps():
+            result[req_step.id] = req_step
+            result.update(req_step.get_all_required_steps())
+
+        return result
 
     @classmethod
     def get_fully_qualified_name(cls) -> str:

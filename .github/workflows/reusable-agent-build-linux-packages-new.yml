@@ -2,6 +2,18 @@ name: Agent Linux Packages Build Refactored
 
 on:
   workflow_call:
+    inputs:
+      aws_private_key_name:
+        type: string
+      aws_region:
+        type: string
+      aws_security_group:
+        type: string
+      aws_prefix_list_id:
+        type: string
+      aws_objects_name_prefix:
+        type: string
+
     secrets:
       CT_AWS_DEV_EC2_PRIVATE_KEY:
         required: true
@@ -23,247 +35,244 @@ env:
 # Since we can do a "master" run (on push and PR to a master branch) and "non-master" run, it generates matrices with different
 #  size according to that information.
 jobs:
-  pre_job:
-    runs-on: ubuntu-20.04
-    outputs:
-      is_master_run: ${{ steps.init-matrices.outputs.is_master_run }}
-      to_publish: ${{ steps.init-matrices.outputs.to_publish }}
-      is_production: ${{ steps.init-matrices.outputs.is_production }}
-      version: ${{ steps.init-matrices.outputs.version }}
-      aws_private_key_name: ${{ steps.init_common_options.outputs.aws_private_key_name }}
-      aws_security_group: ${{ steps.init_common_options.outputs.aws_security_group }}
-      aws_prefix_list_id: ${{ steps.init_common_options.outputs.aws_prefix_list_id }}
-      aws_region: ${{ steps.init_common_options.outputs.aws_region }}
-      aws_objects_name_prefix: ${{ steps.init_common_options.outputs.aws_objects_name_prefix }}
-      # The following outputs will be used by the other jobs below as their strategy matrices.
-      pre_build_steps_matrix_json: ${{ steps.init-matrices.outputs.pre_build_steps_matrix_json }}
-      agent_image_build_matrix_json: ${{ steps.init-matrices.outputs.agent_image_build_matrix_json }}
-      managed_packages_build_matrix_json: ${{ steps.init-matrices.outputs.managed_packages_build_matrix_json }}
-      managed_packages_test_matrix_json: ${{ steps.init-matrices.outputs.managed_packages_test_matrix_json }}
+#  pre_job:
+#    runs-on: ubuntu-20.04
+#    outputs:
+#      is_master_run: ${{ steps.init-matrices.outputs.is_master_run }}
+#      to_publish: ${{ steps.init-matrices.outputs.to_publish }}
+#      is_production: ${{ steps.init-matrices.outputs.is_production }}
+#      version: ${{ steps.init-matrices.outputs.version }}
+#      aws_private_key_name: ${{ steps.init_common_options.outputs.aws_private_key_name }}
+#      aws_security_group: ${{ steps.init_common_options.outputs.aws_security_group }}
+#      aws_prefix_list_id: ${{ steps.init_common_options.outputs.aws_prefix_list_id }}
+#      aws_region: ${{ steps.init_common_options.outputs.aws_region }}
+#      aws_objects_name_prefix: ${{ steps.init_common_options.outputs.aws_objects_name_prefix }}
+#      # The following outputs will be used by the other jobs below as their strategy matrices.
+#      pre_build_steps_matrix_json: ${{ steps.init-matrices.outputs.pre_build_steps_matrix_json }}
+#      agent_image_build_matrix_json: ${{ steps.init-matrices.outputs.agent_image_build_matrix_json }}
+#      managed_packages_build_matrix_json: ${{ steps.init-matrices.outputs.managed_packages_build_matrix_json }}
+#      managed_packages_test_matrix_json: ${{ steps.init-matrices.outputs.managed_packages_test_matrix_json }}
+#
+#    steps:
+#      - name: Checkout repository
+#        uses: actions/checkout@v3
+#
+#      - name: Install python
+#        uses: actions/setup-python@v4
+#        with:
+#          python-version: "3.8.13"
+#
+#      - name: Init common options
+#        id: init_common_options
+#        shell: bash
+#        run: |
+#          echo "aws_private_key_name=CT_SCALYR_AGENT_GHA" >> $GITHUB_OUTPUT
+#          echo "aws_security_group=github-actions-remote-access" >> $GITHUB_OUTPUT
+#          echo "aws_prefix_list_id=pl-04a16228a97704d23" >> $GITHUB_OUTPUT
+#          echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
+#          echo "aws_objects_name_prefix=${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}" >> $GITHUB_OUTPUT
+#
+#      - name: Init job matrices
+#        uses: ./.github/actions/init-job-matrices
+#        id: init-matrices
+#        with:
+#          github_token: ${{ secrets.GITHUB_TOKEN }}
+#
+#          # In this action we define all our job matrices. It filters out jobs that must not be executed if
+#          # workflow run is not from the 'master' branch or from PR to the 'master' branch.
+#          # Jobs that has to be in a non-master workflow run has to have a '"master_run_only": false' field.
+#          # In the 'non-master' runs we only build debian-based images.
+#          images-to-build: |
+#            [
+#              { "name": "docker-json-debian", "master_run_only": false },
+#              { "name": "docker-syslog-debian", "master_run_only": false },
+#              { "name": "docker-api-debian", "master_run_only": false },
+#              { "name": "k8s-debian", "master_run_only": false },
+#              { "name": "docker-json-alpine", "master_run_only": true },
+#              { "name": "docker-syslog-alpine", "master_run_only": true },
+#              { "name": "docker-api-alpine", "master_run_only": true },
+#              { "name": "k8s-alpine", "master_run_only": true }
+#            ]
+#
+#          managed-packages-to-build: |
+#            [
+#              { "name": "deb-aio-x86_64", "master_run_only": false },
+#              { "name": "rpm-aio-x86_64", "master_run_only": false },
+#              { "name": "deb-aio-arm64", "master_run_only": false },
+#              { "name": "rpm-aio-arm64", "master_run_only": false },
+#              { "name": "deb-non-aio", "master_run_only": false },
+#              { "name": "rpm-non-aio", "master_run_only": false }
+#            ]
+#
+#          managed-packages-to-test: |
+#            [
+#              { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "ubuntu2204",    "remote-machine-type": "ec2",    "master_run_only": false },
+#              { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "ubuntu2004",    "remote-machine-type": "ec2",    "master_run_only": false },
+#              { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "ubuntu1804",    "remote-machine-type": "ec2",    "master_run_only": false },
+#              { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "ubuntu1604",    "remote-machine-type": "ec2",    "master_run_only": false },
+#              { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "ubuntu1404",    "remote-machine-type": "docker", "master_run_only": false },
+#              { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "debian10",      "remote-machine-type": "ec2",    "master_run_only": false },
+#              { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "debian11",      "remote-machine-type": "docker", "master_run_only": false },
+#              { "name": "rpm-aio-x86_64", "arch": "x86_64", "distro-name": "centos8",       "remote-machine-type": "docker", "master_run_only": false },
+#              { "name": "rpm-aio-x86_64", "arch": "x86_64", "distro-name": "centos7",       "remote-machine-type": "ec2",    "master_run_only": false },
+#              { "name": "rpm-aio-x86_64", "arch": "x86_64", "distro-name": "centos6",       "remote-machine-type": "docker", "master_run_only": false },
+#              { "name": "rpm-aio-x86_64", "arch": "x86_64", "distro-name": "amazonlinux2",  "remote-machine-type": "ec2",    "master_run_only": false },
+#              { "name": "deb-aio-arm64",  "arch": "arm64",  "distro-name": "ubuntu1404",    "remote-machine-type": "docker", "master_run_only": false },
+#              { "name": "rpm-aio-arm64",  "arch": "arm64",  "distro-name": "centos7",       "remote-machine-type": "docker", "master_run_only": false },
+#              { "name": "deb-non-aio",    "arch": "x86_64", "distro-name": "ubuntu1404",    "remote-machine-type": "docker", "master_run_only": false },
+#              { "name": "deb-non-aio",    "arch": "x86_64", "distro-name": "ubuntu2204",    "remote-machine-type": "docker", "master_run_only": false },
+#              { "name": "rpm-non-aio",    "arch": "x86_64", "distro-name": "centos7",       "remote-machine-type": "docker", "master_run_only": false },
+#              { "name": "rpm-non-aio",    "arch": "x86_64", "distro-name": "amazonlinux2",  "remote-machine-type": "docker", "master_run_only": false }
+#            ]
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Install python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.8.13"
-
-      - name: Init common options
-        id: init_common_options
-        shell: bash
-        run: |
-          echo "aws_private_key_name=CT_SCALYR_AGENT_GHA" >> $GITHUB_OUTPUT
-          echo "aws_security_group=github-actions-remote-access" >> $GITHUB_OUTPUT
-          echo "aws_prefix_list_id=pl-04a16228a97704d23" >> $GITHUB_OUTPUT
-          echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
-          echo "aws_objects_name_prefix=${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}" >> $GITHUB_OUTPUT
-
-      - name: Init job matrices
-        uses: ./.github/actions/init-job-matrices
-        id: init-matrices
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-
-          # In this action we define all our job matrices. It filters out jobs that must not be executed if
-          # workflow run is not from the 'master' branch or from PR to the 'master' branch.
-          # Jobs that has to be in a non-master workflow run has to have a '"master_run_only": false' field.
-          # In the 'non-master' runs we only build debian-based images.
-          images-to-build: |
-            [
-              { "name": "docker-json-debian", "master_run_only": false },
-              { "name": "docker-syslog-debian", "master_run_only": false },
-              { "name": "docker-api-debian", "master_run_only": false },
-              { "name": "k8s-debian", "master_run_only": false },
-              { "name": "docker-json-alpine", "master_run_only": true },
-              { "name": "docker-syslog-alpine", "master_run_only": true },
-              { "name": "docker-api-alpine", "master_run_only": true },
-              { "name": "k8s-alpine", "master_run_only": true }
-            ]
-
-          managed-packages-to-build: |
-            [
-              { "name": "deb-aio-x86_64", "master_run_only": false },
-              { "name": "rpm-aio-x86_64", "master_run_only": false },
-              { "name": "deb-aio-arm64", "master_run_only": false },
-              { "name": "rpm-aio-arm64", "master_run_only": false },
-              { "name": "deb-non-aio", "master_run_only": false },
-              { "name": "rpm-non-aio", "master_run_only": false }
-            ]
-
-          managed-packages-to-test: |
-            [
-              { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "ubuntu2204",    "remote-machine-type": "ec2",    "master_run_only": false },
-              { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "ubuntu2004",    "remote-machine-type": "ec2",    "master_run_only": false },
-              { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "ubuntu1804",    "remote-machine-type": "ec2",    "master_run_only": false },
-              { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "ubuntu1604",    "remote-machine-type": "ec2",    "master_run_only": false },
-              { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "ubuntu1404",    "remote-machine-type": "docker", "master_run_only": false },
-              { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "debian10",      "remote-machine-type": "ec2",    "master_run_only": false },
-              { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "debian11",      "remote-machine-type": "docker", "master_run_only": false },
-              { "name": "rpm-aio-x86_64", "arch": "x86_64", "distro-name": "centos8",       "remote-machine-type": "docker", "master_run_only": false },
-              { "name": "rpm-aio-x86_64", "arch": "x86_64", "distro-name": "centos7",       "remote-machine-type": "ec2",    "master_run_only": false },
-              { "name": "rpm-aio-x86_64", "arch": "x86_64", "distro-name": "centos6",       "remote-machine-type": "docker", "master_run_only": false },
-              { "name": "rpm-aio-x86_64", "arch": "x86_64", "distro-name": "amazonlinux2",  "remote-machine-type": "ec2",    "master_run_only": false },
-              { "name": "deb-aio-arm64",  "arch": "arm64",  "distro-name": "ubuntu1404",    "remote-machine-type": "docker", "master_run_only": false },
-              { "name": "rpm-aio-arm64",  "arch": "arm64",  "distro-name": "centos7",       "remote-machine-type": "docker", "master_run_only": false },
-              { "name": "deb-non-aio",    "arch": "x86_64", "distro-name": "ubuntu1404",    "remote-machine-type": "docker", "master_run_only": false },
-              { "name": "deb-non-aio",    "arch": "x86_64", "distro-name": "ubuntu2204",    "remote-machine-type": "docker", "master_run_only": false },
-              { "name": "rpm-non-aio",    "arch": "x86_64", "distro-name": "centos7",       "remote-machine-type": "docker", "master_run_only": false },
-              { "name": "rpm-non-aio",    "arch": "x86_64", "distro-name": "amazonlinux2",  "remote-machine-type": "docker", "master_run_only": false }
-            ]
-
-  # This job pre-executes and caches Runner steps that has to be executed in a separate job.
-  # For example, we build platform-specific base docker images in a separate jobs to reduce overall build time, because
-  # some of base images are built with using QEMU.
-  pre-build-cached-step:
-    name: ${{ matrix.name }}
-    needs:
-      - pre_job
-
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      # This job receives its matrix from the 'pre_job' job. The matrix itself is created by the .github/actions/init-job-matrices action.
-      # The matrix, for now, consists only from the 'include' part with following fields:
-      #   "name": Name of the build job. (Not used in actiual build process, but just gives meaningful name to the job).
-      #   "step-runner-fqdn": Fully qualified name of the builder class that has to run the cached step.
-      #   "python-version": Version of python to setup on this runner. (NOTE: version of python used in images may differ, and it specified in the source code.)
-      #   "os": Runner OS.
-      matrix: ${{ fromJSON(needs.pre_job.outputs.pre_build_steps_matrix_json) }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f03ac48505955848960e80bbb68046aa35c7b9e7 # v2.0.0
-        with:
-          driver-opts: network=host
-
-      - name: Set up QEMU
-        id: qemu
-        uses: docker/setup-qemu-action@e81a89b1732b9c48d79cd809d8d81d79c4647a18 # v2
-        with:
-          image: tonistiigi/binfmt:qemu-v6.2.0
-          platforms: all
-
-      - name: Install python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Prepare environment.
-        uses: ./.github/actions/execute-runner
-        with:
-          runner-fqdn: "agent_build_refactored.__init__.BuildTestEnvironment"
-
-      - name: Prepare SSH
-        id: prepare-ssh
-        shell: bash
-        run: |
-          echo '${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}' > /tmp/private_key.pem
-          chmod 600 /tmp/private_key.pem
-          eval `ssh-agent -s`
-
-          cat "/tmp/private_key.pem" | ssh-add -
-          echo "ssh_auth_sock=${SSH_AUTH_SOCK}" >> $GITHUB_OUTPUT
-
-      - name: Run cached step
-        uses: ./.github/actions/execute-runner
-        env:
-          SSH_AUTH_SOCK: ${{ steps.prepare-ssh.outputs.ssh_auth_sock }}
-        with:
-          runner-fqdn: ${{ matrix.step-runner-fqdn }}
-          aws_access_key: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
-          aws_secret_key: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
-          aws_private_key_path:  "/tmp/private_key.pem"
-          aws_private_key_name: ${{ needs.pre_job.outputs.aws_private_key_name }}
-          aws_region: ${{ needs.pre_job.outputs.aws_region }}
-          aws_security_group: ${{ needs.pre_job.outputs.aws_security_group }}
-          aws_security_groups_prefix_list_id: ${{ needs.pre_job.outputs.aws_prefix_list_id }}
-          aws_objects_name_prefix: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
-
-  build-images:
-    name: Build image '${{ matrix.name }}'
-    # Since we do not use those images for now, disable this job, to reduce noise.
-    if: ${{ 'true' == 'false' }}
-    needs:
-      - pre_job
-      - pre-build-cached-step
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      # This job receives its matrix from the 'pre_job' job. The matrix itself is created by the .github/actions/init-job-matrices action.
-      # The matrix, for now, consists only from the 'include' part with following fields:
-      #   "name": name of the builder that builds the target images.
-      #   "master_run_only": If 'true' then it this package will be included only in a "master" workflow run.
-      #
-      #  The default values of these fields are generated by the .github/actions/init-job-matrices action, but they can be overwritten.
-      #   "builder-fqdn": Fully qualified name of the builder to find its cached steps.
-      #   "python-version": Version of python to set up on this runner. (NOTE: version of python used in images may differ, and it specified in the source code.)
-      #   "os": Runner OS.
-      matrix: ${{ fromJSON(needs.pre_job.outputs.agent_image_build_matrix_json) }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-        with:
-          # Need to deep copy the repo to look for tags.
-          fetch-depth: '0'
-
-      - name: Install python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Set up QEMU
-        id: qemu
-        uses: docker/setup-qemu-action@e81a89b1732b9c48d79cd809d8d81d79c4647a18 # v2
-        with:
-          image: tonistiigi/binfmt:qemu-v6.2.0
-          platforms: all
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f03ac48505955848960e80bbb68046aa35c7b9e7 # v2.0.0
-        with:
-          driver-opts: network=host
-
-      - name: Prepare everything that is needed by image builder '${{ matrix.name }}'
-        uses: ./.github/actions/execute-runner
-        with:
-          runner-fqdn: ${{ matrix.builder-fqdn }}
-
-      - name: Build image with builder '${{ matrix.name }}'
-        run: |
-          python3 build_package_new_refactored.py ${{ matrix.name }} \
-            build --output-registry-dir /tmp/result
-
-      - name: Save registry data root with result images as artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: ${{ matrix.name }}-registry
-          path: /tmp/result
-          retention-days: 1
+#  # This job pre-executes and caches Runner steps that has to be executed in a separate job.
+#  # For example, we build platform-specific base docker images in a separate jobs to reduce overall build time, because
+#  # some of base images are built with using QEMU.
+#  pre-build-cached-step:
+#    name: ${{ matrix.name }}
+#    needs:
+#      - pre_job
+#
+#    runs-on: ${{ matrix.os }}
+#    strategy:
+#      fail-fast: false
+#      # This job receives its matrix from the 'pre_job' job. The matrix itself is created by the .github/actions/init-job-matrices action.
+#      # The matrix, for now, consists only from the 'include' part with following fields:
+#      #   "name": Name of the build job. (Not used in actiual build process, but just gives meaningful name to the job).
+#      #   "step-runner-fqdn": Fully qualified name of the builder class that has to run the cached step.
+#      #   "python-version": Version of python to setup on this runner. (NOTE: version of python used in images may differ, and it specified in the source code.)
+#      #   "os": Runner OS.
+#      matrix: ${{ fromJSON(needs.pre_job.outputs.pre_build_steps_matrix_json) }}
+#
+#    steps:
+#      - name: Checkout repository
+#        uses: actions/checkout@v3
+#
+#      - name: Set up Docker Buildx
+#        uses: docker/setup-buildx-action@f03ac48505955848960e80bbb68046aa35c7b9e7 # v2.0.0
+#        with:
+#          driver-opts: network=host
+#
+#      - name: Set up QEMU
+#        id: qemu
+#        uses: docker/setup-qemu-action@e81a89b1732b9c48d79cd809d8d81d79c4647a18 # v2
+#        with:
+#          image: tonistiigi/binfmt:qemu-v6.2.0
+#          platforms: all
+#
+#      - name: Install python
+#        uses: actions/setup-python@v4
+#        with:
+#          python-version: ${{ matrix.python-version }}
+#
+#      - name: Prepare environment.
+#        uses: ./.github/actions/execute-runner
+#        with:
+#          runner-fqdn: "agent_build_refactored.__init__.BuildTestEnvironment"
+#
+#      - name: Prepare SSH
+#        id: prepare-ssh
+#        shell: bash
+#        run: |
+#          echo '${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}' > /tmp/private_key.pem
+#          chmod 600 /tmp/private_key.pem
+#          eval `ssh-agent -s`
+#
+#          cat "/tmp/private_key.pem" | ssh-add -
+#          echo "ssh_auth_sock=${SSH_AUTH_SOCK}" >> $GITHUB_OUTPUT
+#
+#      - name: Run cached step
+#        uses: ./.github/actions/execute-runner
+#        env:
+#          SSH_AUTH_SOCK: ${{ steps.prepare-ssh.outputs.ssh_auth_sock }}
+#        with:
+#          runner-fqdn: ${{ matrix.step-runner-fqdn }}
+#          aws_access_key: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
+#          aws_secret_key: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
+#          aws_private_key_path:  "/tmp/private_key.pem"
+#          aws_private_key_name: ${{ needs.pre_job.outputs.aws_private_key_name }}
+#          aws_region: ${{ needs.pre_job.outputs.aws_region }}
+#          aws_security_group: ${{ needs.pre_job.outputs.aws_security_group }}
+#          aws_security_groups_prefix_list_id: ${{ needs.pre_job.outputs.aws_prefix_list_id }}
+#          aws_objects_name_prefix: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
+#
+#  build-images:
+#    name: Build image '${{ matrix.name }}'
+#    # Since we do not use those images for now, disable this job, to reduce noise.
+#    if: ${{ 'true' == 'false' }}
+#    needs:
+#      - pre_job
+#      - pre-build-cached-step
+#    runs-on: ${{ matrix.os }}
+#
+#    strategy:
+#      # This job receives its matrix from the 'pre_job' job. The matrix itself is created by the .github/actions/init-job-matrices action.
+#      # The matrix, for now, consists only from the 'include' part with following fields:
+#      #   "name": name of the builder that builds the target images.
+#      #   "master_run_only": If 'true' then it this package will be included only in a "master" workflow run.
+#      #
+#      #  The default values of these fields are generated by the .github/actions/init-job-matrices action, but they can be overwritten.
+#      #   "builder-fqdn": Fully qualified name of the builder to find its cached steps.
+#      #   "python-version": Version of python to set up on this runner. (NOTE: version of python used in images may differ, and it specified in the source code.)
+#      #   "os": Runner OS.
+#      matrix: ${{ fromJSON(needs.pre_job.outputs.agent_image_build_matrix_json) }}
+#
+#    steps:
+#      - name: Checkout repository
+#        uses: actions/checkout@v3
+#        with:
+#          # Need to deep copy the repo to look for tags.
+#          fetch-depth: '0'
+#
+#      - name: Install python
+#        uses: actions/setup-python@v4
+#        with:
+#          python-version: ${{ matrix.python-version }}
+#
+#      - name: Set up QEMU
+#        id: qemu
+#        uses: docker/setup-qemu-action@e81a89b1732b9c48d79cd809d8d81d79c4647a18 # v2
+#        with:
+#          image: tonistiigi/binfmt:qemu-v6.2.0
+#          platforms: all
+#
+#      - name: Set up Docker Buildx
+#        uses: docker/setup-buildx-action@f03ac48505955848960e80bbb68046aa35c7b9e7 # v2.0.0
+#        with:
+#          driver-opts: network=host
+#
+#      - name: Prepare everything that is needed by image builder '${{ matrix.name }}'
+#        uses: ./.github/actions/execute-runner
+#        with:
+#          runner-fqdn: ${{ matrix.builder-fqdn }}
+#
+#      - name: Build image with builder '${{ matrix.name }}'
+#        run: |
+#          python3 build_package_new_refactored.py ${{ matrix.name }} \
+#            build --output-registry-dir /tmp/result
+#
+#      - name: Save registry data root with result images as artifact
+#        uses: actions/upload-artifact@v3
+#        with:
+#          name: ${{ matrix.name }}-registry
+#          path: /tmp/result
+#          retention-days: 1
 
   build-managed-packages:
     name: Build managed package ${{ matrix.name }}
     needs:
       - pre_job
       - pre-build-cached-step
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-20.04
+    matrix:
+      packages:
+        - { "name": "deb-aio-x86_64" }
+        - { "name": "rpm-aio-x86_64" }
+        - { "name": "deb-aio-arm64" }
+        - { "name": "rpm-aio-arm64" }
+        - { "name": "deb-non-aio" }
+        - { "name": "rpm-non-aio" }
 
-    strategy:
-      # This job receives its matrix from the 'pre_job' job. The matrix itself is created by the .github/actions/init-job-matrices action.
-      # The matrix, for now, consists only from the 'include' part with following fields:
-      #   "name": name of the builder that builds the target package.
-      #   "master_run_only": If 'true' then it this package will be included only in a "master" workflow run.
-      #
-      #  The default values of these fields are generated by the .github/actions/init-job-matrices action, but they can be overwritten.
-      #   "builder-fqdn": Fully qualified name of the builder to find its cached steps.
-      #   "python-version": Version of python to set up on this runner.
-      #   "os": Runner OS.
-      matrix: ${{ fromJSON(needs.pre_job.outputs.managed_packages_build_matrix_json) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -311,11 +320,11 @@ jobs:
           aws_access_key: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
           aws_secret_key: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
           aws_private_key_path: "/tmp/private_key.pem"
-          aws_private_key_name: ${{ needs.pre_job.outputs.aws_private_key_name }}
-          aws_region: ${{ needs.pre_job.outputs.aws_region }}
-          aws_security_group: ${{ needs.pre_job.outputs.aws_security_group }}
-          aws_security_groups_prefix_list_id: ${{ needs.pre_job.outputs.aws_prefix_list_id }}
-          aws_objects_name_prefix: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
+          aws_private_key_name: ${{ inputs.aws_private_key_name }}
+          aws_region: ${{ inputs.aws_region }}
+          aws_security_group: ${{ inputs.aws_security_group }}
+          aws_security_groups_prefix_list_id: ${{ inputs.aws_prefix_list_id }}
+          aws_objects_name_prefix: ${{ inputs.aws_objects_name_prefix }}
 
       # Before we build needed packages, we check if the target repo already contains dependency
       # 'scalyr-agent-python3' and 'scalyr-agent-libs' packages. If there are such packages, then we reuse them
@@ -408,12 +417,12 @@ jobs:
           SSH_AUTH_SOCK: ${{ steps.prepare-ssh.outputs.ssh_auth_sock }}
           AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
           AWS_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
-          AWS_PRIVATE_KEY_NAME: ${{ needs.pre_job.outputs.aws_private_key_name }}
+          AWS_PRIVATE_KEY_NAME: ${{ inputs.aws_private_key_name }}
           AWS_PRIVATE_KEY_PATH: "/tmp/private_key.pem"
-          AWS_REGION: ${{ needs.pre_job.outputs.aws_region }}
-          AWS_SECURITY_GROUP: ${{ needs.pre_job.outputs.aws_security_group }}
-          AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ needs.pre_job.outputs.aws_prefix_list_id }}
-          AWS_OBJECTS_NAME_PREFIX: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
+          AWS_REGION: ${{ inputs.aws_region }}
+          AWS_SECURITY_GROUP: ${{ inputs.aws_security_group }}
+          AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ inputs.aws_prefix_list_id }}
+          AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
         run: |
             python3 build_package_new_refactored.py ${{ matrix.name }} build 
 
@@ -434,16 +443,25 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
-      # This job receives its matrix from the 'pre_job' job. The matrix itself is created by the .github/actions/init-job-matrices action.
-      # The matrix, for now, consists only from the 'include' part with following fields:
-      #   "name": name of the builder that builds the target packages.
-      #   "master_run_only": If 'true' then it this package will be included only in a "master" workflow run.
-      #
-      #  The default values of these fields are generated by the .github/actions/init-job-matrices action, but they can be overwritten.
-      #   "builder-fqdn": Fully qualified name of the builder to find its cached steps.
-      #   "python-version": Version of python to set up on this runner.
-      #   "os": Runner OS.
-      matrix: ${{ fromJSON(needs.pre_job.outputs.managed_packages_test_matrix_json) }}
+      matrix:
+        package:
+          - { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "ubuntu2204",    "remote-machine-type": "ec2"    }
+          - { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "ubuntu2004",    "remote-machine-type": "ec2"    }
+          - { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "ubuntu1804",    "remote-machine-type": "ec2"    }
+          - { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "ubuntu1604",    "remote-machine-type": "ec2"    }
+          - { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "ubuntu1404",    "remote-machine-type": "docker" }
+          - { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "debian10",      "remote-machine-type": "ec2"    }
+          - { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "debian11",      "remote-machine-type": "docker" }
+          - { "name": "rpm-aio-x86_64", "arch": "x86_64", "distro-name": "centos8",       "remote-machine-type": "docker" }
+          - { "name": "rpm-aio-x86_64", "arch": "x86_64", "distro-name": "centos7",       "remote-machine-type": "ec2"    }
+          - { "name": "rpm-aio-x86_64", "arch": "x86_64", "distro-name": "centos6",       "remote-machine-type": "docker" }
+          - { "name": "rpm-aio-x86_64", "arch": "x86_64", "distro-name": "amazonlinux2",  "remote-machine-type": "ec2"    }
+          - { "name": "deb-aio-arm64",  "arch": "arm64",  "distro-name": "ubuntu1404",    "remote-machine-type": "docker" }
+          - { "name": "rpm-aio-arm64",  "arch": "arm64",  "distro-name": "centos7",       "remote-machine-type": "docker" }
+          - { "name": "deb-non-aio",    "arch": "x86_64", "distro-name": "ubuntu1404",    "remote-machine-type": "docker" }
+          - { "name": "deb-non-aio",    "arch": "x86_64", "distro-name": "ubuntu2204",    "remote-machine-type": "docker" }
+          - { "name": "rpm-non-aio",    "arch": "x86_64", "distro-name": "centos7",       "remote-machine-type": "docker" }
+          - { "name": "rpm-non-aio",    "arch": "x86_64", "distro-name": "amazonlinux2",  "remote-machine-type": "docker" }
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -491,12 +509,12 @@ jobs:
         env:
           AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
           AWS_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
-          AWS_PRIVATE_KEY_NAME: ${{ needs.pre_job.outputs.aws_private_key_name }}
+          AWS_PRIVATE_KEY_NAME: ${{ inputs.aws_private_key_name }}
           AWS_PRIVATE_KEY_PATH: "/tmp/private_key.pem"
-          AWS_REGION: ${{ needs.pre_job.outputs.aws_region }}
-          AWS_SECURITY_GROUP: ${{ needs.pre_job.outputs.aws_security_group }}
-          AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ needs.pre_job.outputs.aws_prefix_list_id }}
-          AWS_OBJECTS_NAME_PREFIX: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
+          AWS_REGION: ${{ inputs.aws_region }}
+          AWS_SECURITY_GROUP: ${{ inputs.aws_security_group }}
+          AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ inputs.aws_prefix_list_id }}
+          AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
         run: |
           echo "${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}" > /tmp/private_key.pem
           chmod 600 /tmp/private_key.pem
@@ -537,11 +555,11 @@ jobs:
         env:
           AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
           AWS_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
-          AWS_PRIVATE_KEY_NAME: ${{ needs.pre_job.outputs.aws_private_key_name }}
+          AWS_PRIVATE_KEY_NAME: ${{ inputs.aws_private_key_name }}
           AWS_PRIVATE_KEY_PATH: "/tmp/private_key.pem"
-          AWS_REGION: ${{ needs.pre_job.outputs.aws_region }}
-          AWS_SECURITY_GROUP: ${{ needs.pre_job.outputs.aws_security_group }}
-          AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ needs.pre_job.outputs.aws_prefix_list_id }}
-          AWS_OBJECTS_NAME_PREFIX: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
+          AWS_REGION: ${{ inputs.aws_region }}
+          AWS_SECURITY_GROUP: ${{ inputs.aws_security_group }}
+          AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ inputs.aws_prefix_list_id }}
+          AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
         run: |
           python3 agent_build_refactored/tools/run_in_ec2/cleanup_ec2_objects.py

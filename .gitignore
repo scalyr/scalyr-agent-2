@@ -31,8 +31,10 @@ tests/package_tests/credentials.json
 tests/credentials.json
 !.github/actions/perform-deployment/dist
 !.github/actions/execute-runner/dist
+!.github/actions/get_steps_missing_caches/dist
 .github/actions/perform-deployment/node_modules
 .github/actions/execute-runner/node_modules
+.github/actions/get_steps_missing_caches/node_modules
 /agent_build_output
 
 # Installer logs
