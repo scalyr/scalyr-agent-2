@@ -37,9 +37,6 @@ env:
 jobs:
   build-managed-packages:
     name: Build managed package ${{ matrix.name }}
-    needs:
-      - pre_job
-      - pre-build-cached-step
     runs-on: ubuntu-20.04
     strategy:
       matrix:
