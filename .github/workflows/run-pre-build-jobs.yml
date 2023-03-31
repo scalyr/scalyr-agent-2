@@ -76,6 +76,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Print
+        id: print
+        run: |
+          echo '${{ needs.pre_job.outputs.print.matrix0 }}'
+
+
       - name: Get missing step caches matrices
         id: get_missing_caches_matrices
         uses: ./.github/actions/init_pre_built_steps_matrices
