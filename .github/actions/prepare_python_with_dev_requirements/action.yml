@@ -27,8 +27,3 @@ runs:
       run: |
         python3 -m venv venv
         venv/bin/python3 -m pip install -r dev-requirements-new.txt
-
-    - name: Copy dev. requirements
-      shell: bash
-      run: |
-        sudo cp -a /tmp/dev_requirements/. /
