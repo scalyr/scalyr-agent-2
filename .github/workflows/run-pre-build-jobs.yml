@@ -61,8 +61,8 @@ jobs:
           jq -c '.[0]' /tmp/missing_cache_matrices.json
           jq -c '.[1]' /tmp/missing_cache_matrices.json
           echo "22222"
-          echo 'matrix0=$(jq -c ".[0]" /tmp/missing_cache_matrices.json)' >> $GITHUB_OUTPUT
-          echo 'matrix1=$(jq -c ".[1]" /tmp/missing_cache_matrices.json)' >> $GITHUB_OUTPUT
+          echo "matrix0=$(jq -c '.[0]' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
+          echo "matrix1=$(jq -c '.[1]' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
           echo "3333"
           cat $GITHUB_OUTPUT
 
