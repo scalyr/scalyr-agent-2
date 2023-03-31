@@ -1,0 +1,47 @@
+name: "Prepare Python with dev. requirements"
+description: "This action accepts matrices for the jobs that are used in the agent-build workflow and excludes job that are must not be executed in mon-master runs."
+
+inputs:
+  python_version:
+    description: ""
+
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Cache dev requirements
+      id: cache_dev_requirements
+      uses: actions/cache@v3
+      with:
+        path: /tmp/dev_requirements
+        key: dev-requirements-${{ hashFiles('dev-requirements-new.txt') }}
+
+    - name: Install dev. requirements
+      if: steps.cache_dev_requirements.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        python3 -m pip install --root /tmp/dev_requirements -r dev-requirements-new.txt
+
+    - name: Copy dev. requirements
+      shell: bash
+      run: |
+        cp -a /tmp/dev_requirements/. /
+
+    - name: Run cached step
+      shell: bash
+      env:
+        AWS_ACCESS_KEY: ${{ inputs.aws_access_key }}
+        AWS_SECRET_KEY: ${{ inputs.aws_secret_key }}
+        AWS_PRIVATE_KEY_NAME: ${{ inputs.aws_private_key_name }}
+        AWS_PRIVATE_KEY_PATH: "/tmp/private_key.pem"
+        AWS_REGION: ${{ inputs.aws_region }}
+        AWS_SECURITY_GROUP: ${{ inputs.aws_security_group }}
+        AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ inputs.aws_prefix_list_id }}
+        AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
+      run: |
+        python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn }} --run-all-cacheable-steps
