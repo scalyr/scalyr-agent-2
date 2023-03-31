@@ -35,6 +35,8 @@ jobs:
 #        with:
 #          cancel_others: 'true'
 #          github_token: ${{ github.token }}
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
       - name: Init common options
         id: init_common_options
