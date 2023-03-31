@@ -152,7 +152,7 @@ jobs:
 
       - name: Get missing step caches matrices
         id: get_missing_caches_matrices
-        uses: ./.github/actions/init_pre_built_steps_matrices
+        uses: ./.github/actions/run_pre_built_step
         with:
           step_runner_fqdn: ${{ matrix.step_runner_fqdn }}
           aws_access_key: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
