@@ -13,7 +13,7 @@ runs:
 
     - name: Get missing step caches matrices
       id: get_missing_caches_matrices
-      uses: .github/actions/get_steps_missing_caches
+      uses: ./.github/actions/get_steps_missing_caches
       with:
         caches_keys_json: ${{ steps.get_all_used_steps_cache_keys.outputs.cache_keys_json }}
   
