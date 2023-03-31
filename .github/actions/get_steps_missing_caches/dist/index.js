@@ -59859,10 +59859,11 @@ async function executeRunner() {
 
     for (let key of cachesKeys) {
         console.log(`Check cache for step cache key ${key}`);
-//        const result = await cache.restoreCache(
-//            primaryKey=key,
-//            options={ lookupOnly: true }
-//        )
+        const result = await cache.restoreCache(
+            "",
+            primaryKey=key,
+            options={ lookupOnly: true }
+        )
         console.log(result)
     }
 
