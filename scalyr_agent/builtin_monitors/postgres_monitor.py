@@ -74,11 +74,13 @@ define_config_option(
 define_config_option(
     __monitor__,
     "use_ssl",
-    ("Optional (defaults to False). Whether to connect to PostgreSQL over SSL. "
-     "Note: Self-signed server certs are not supported at this time. "
-     "Additionally, server cert validation and hostname checking is only "
-     "performed on Python 2.7.9 and newer. Older Python versions are vulnerable "
-     "to MitM attacks."),
+    (
+        "Optional (defaults to False). Whether to connect to PostgreSQL over SSL. "
+        "Note: Self-signed server certs are not supported at this time. "
+        "Additionally, server cert validation and hostname checking is only "
+        "performed on Python 2.7.9 and newer. Older Python versions are vulnerable "
+        "to MitM attacks."
+    ),
     convert_to=bool,
     default=False,
 )
@@ -410,7 +412,9 @@ class PostgreSQLDb(object):
     def __repr__(self):
         return self.__str__()
 
-    def __init__(self, host, port, database, username, password, use_ssl=False, logger=None):
+    def __init__(
+        self, host, port, database, username, password, use_ssl=False, logger=None
+    ):
         """Constructor:
 
         @param database: database we are connecting to
@@ -528,7 +532,7 @@ For help, contact us at [support@scalyr.com](mailto:support@scalyr.com).
         database = None
         host = "localhost"
         port = 5432
-        use_ssl = self._config.get('use_ssl', False)
+        use_ssl = self._config.get("use_ssl", False)
         username = None
         password = None
         if "database_host" in self._config:
