@@ -103,6 +103,7 @@ jobs:
 
 
   run_pre_built_job1:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-20.04
     needs:
       - pre_job
@@ -132,6 +133,7 @@ jobs:
           aws_objects_name_prefix: ${{ inputs.aws_objects_name_prefix }}
 
   run_pre_built_job2:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-20.04
     needs:
       - pre_job
