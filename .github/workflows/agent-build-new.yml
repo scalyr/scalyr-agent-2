@@ -28,7 +28,6 @@ jobs:
       aws_prefix_list_id: ${{ steps.init_common_options.outputs.aws_prefix_list_id }}
       aws_region: ${{ steps.init_common_options.outputs.aws_region }}
       aws_objects_name_prefix: ${{ steps.init_common_options.outputs.aws_objects_name_prefix }}
-      pre_build_jobs_matrices_json: ${{ steps.get_missing_caches_matrices.outputs.matrices }}
     steps:
 #      - id: skip_check
 #        uses: fkirc/skip-duplicate-actions@12aca0a884f6137d619d6a8a09fcc3406ced5281 # v4.0.0
@@ -48,19 +47,10 @@ jobs:
           echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
           echo "aws_objects_name_prefix=${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}" >> $GITHUB_OUTPUT
 
-      - name: Get missing step caches matrices
-        id: get_missing_caches_matrices
-        uses: ./.github/actions/init_pre_built_steps_matrices
-
   run_pre_build_steps:
     name: "Run pre-built steps"
     needs:
-      - ${{ matrix.needs }}
-
-    strategy:
-      matrix:
-         os: [ubuntu-20.04, ubuntu-22.04]
-         needs: [pre_job]
+      - pre_job
     uses: ./.github/workflows/run-pre-build-jobs.yml
     with:
       aws_private_key_name: ${{ needs.pre_job.outputs.aws_private_key_name }}
