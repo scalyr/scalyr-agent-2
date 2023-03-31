@@ -1191,10 +1191,10 @@ class Runner:
         work_dir = pl.Path(args.work_dir)
 
         if args.run_all_cacheable_steps:
-            steps = cls.get_all_cacheable_steps()
+            steps = cls.get_all_steps()
 
             cls._run_steps(
-                steps=steps,
+                steps=list(steps.values()),
                 work_dir=work_dir,
             )
             exit(0)

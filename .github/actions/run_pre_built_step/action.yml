@@ -68,7 +68,7 @@ runs:
       uses: actions/cache@v3
       with:
         path: agent_build_output/step_cache/${{ inputs.cache_key }}
-        key: ${{ inputs.cache_key }}-v1
+        key: ${{ inputs.cache_key }}-v2
 
     - name: Run cached step
       shell: bash
