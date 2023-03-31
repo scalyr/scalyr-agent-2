@@ -34,6 +34,7 @@ jobs:
     runs-on: ubuntu-20.04
     outputs:
       matrix0: ${{ steps.print.outputs.matrix0 }}
+      matrix1: ${{ steps.print.outputs.matrix1 }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -141,7 +142,7 @@ jobs:
       - pre_job
       - run_pre_built_job0
     strategy:
-      matrix: ${{ fromJSON(needs.pre_job.outputs.print.matrix0) }}
+      matrix: ${{ fromJSON(needs.pre_job.outputs.print.matrix1) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
