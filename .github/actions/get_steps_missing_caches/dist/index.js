@@ -59773,10 +59773,6 @@ async function executeRunner() {
 
     const cachesKeysJson = core.getInput("caches_keys_json");
 
-    console.log("JSSOOON")
-    console.log(cachesKeysJson)
-
-
     const cachesKeys = JSON.parse(cachesKeysJson);
 
     const missingCaches = []
@@ -59796,6 +59792,8 @@ async function executeRunner() {
             missingCaches.push(key)
         }
     }
+
+    core.setOutput("missing_cache_keys", JSON.stringify(missingCaches));
 
 
 
