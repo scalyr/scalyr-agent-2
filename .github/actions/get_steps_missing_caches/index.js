@@ -47,6 +47,13 @@ async function executeRunner() {
             options={ lookupOnly: true }
         )
         console.log(result)
+
+        if (typeof result !== "undefined") {
+            console.log(`Cache for the step with key ${key} is found.`)
+        } else {
+            console.log(`Cache for the step with key ${key} is not found.`)
+            missingCaches.push(key)
+        }
     }
 
 
