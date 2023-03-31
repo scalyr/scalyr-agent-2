@@ -60,15 +60,15 @@ jobs:
           jq -c '.[0]' /tmp/missing_cache_matrices.json
           jq -c '.[1]' /tmp/missing_cache_matrices.json
           echo "22222"
-          #echo 'matrix0=$(jq -c '.[0]' /tmp/missing_cache_matrices.json)' >> $GITHUB_OUTPUT
-          #echo 'matrix1=$(jq -c '.[1]' /tmp/missing_cache_matrices.json)' >> $GITHUB_OUTPUT
+          echo 'matrix0=$(jq -c '.[0]' /tmp/missing_cache_matrices.json)' >> $GITHUB_OUTPUT
+          echo 'matrix1=$(jq -c '.[1]' /tmp/missing_cache_matrices.json)' >> $GITHUB_OUTPUT
 
   run_pre_built_job0:
     runs-on: ubuntu-20.04
     needs:
       - pre_job
     strategy:
-      matrix: ${{ fromJSON(needs.pre_job.outputs.pre_build_jobs_matrices_json) }}
+      matrix: ${{ fromJSON(needs.pre_job.outputs.print.matrix0) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -140,7 +140,7 @@ jobs:
     needs:
       - pre_job
     strategy:
-      matrix: ${{ fromJSON(needs.pre_job.outputs.pre_build_jobs_matrices_json) }}
+      matrix: ${{ fromJSON(needs.pre_job.outputs.print.matrix0) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
