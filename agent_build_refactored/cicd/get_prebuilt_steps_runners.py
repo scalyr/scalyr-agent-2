@@ -173,7 +173,7 @@ if __name__ == "__main__":
         matrices = get_missing_caches_matrices(
             input_missing_cache_keys_file=pl.Path(args.input_missing_cache_keys_file),
         )
-        print(matrices)
+        print(json.dumps(matrices))
     elif args.command == "all-cache-keys":
         print(get_all_cache_keys())
 
