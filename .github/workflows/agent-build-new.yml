@@ -28,6 +28,8 @@ jobs:
       aws_prefix_list_id: ${{ steps.init_common_options.outputs.aws_prefix_list_id }}
       aws_region: ${{ steps.init_common_options.outputs.aws_region }}
       aws_objects_name_prefix: ${{ steps.init_common_options.outputs.aws_objects_name_prefix }}
+
+      python_version: 3.8.13
     steps:
 #      - id: skip_check
 #        uses: fkirc/skip-duplicate-actions@12aca0a884f6137d619d6a8a09fcc3406ced5281 # v4.0.0
@@ -58,6 +60,7 @@ jobs:
       aws_prefix_list_id: ${{ needs.pre_job.outputs.aws_prefix_list_id }}
       aws_region: ${{ needs.pre_job.outputs.aws_region }}
       aws_objects_name_prefix: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
+      python_version: ${{ needs.pre_job.outputs.python_version }}
     secrets:
       CT_AWS_DEV_EC2_PRIVATE_KEY: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
       CT_AWS_DEV_EC2_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}

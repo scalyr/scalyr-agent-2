@@ -8,6 +8,9 @@ inputs:
   cache_key:
     description: ""
 
+  python_version:
+    description: ""
+
   aws_private_key_name:
     description: ""
   aws_region:
@@ -47,10 +50,12 @@ runs:
         image: tonistiigi/binfmt:qemu-v6.2.0
         platforms: all
 
-#    - name: Prepare environment.
-#      uses: ./.github/actions/execute-runner
-#      with:
-#        runner-fqdn: "agent_build_refactored.__init__.BuildTestEnvironment"
+    - name: Prepare dev requirements.
+      uses: ./.github/actions/prepare_python_with_dev_requirements
+      with:
+        python_version: ${{ inputs.python_version }}
+
+
 
     - name: Prepare SSH
       id: prepare-ssh
