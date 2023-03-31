@@ -41,7 +41,7 @@ async function executeRunner() {
     for (let key of cachesKeys) {
         console.log(`Check cache for step cache key ${key}`);
         const result = await cache.restoreCache(
-            paths=[""],
+            paths=["/tmp/${key}"],
             primaryKey=key,
             restoreKeys=[],
             options={ lookupOnly: true }
