@@ -131,12 +131,13 @@ def get_missing_caches_matrices(input_missing_cache_keys_file: pl.Path):
 
         for step_wrapper_runner_fqdn, info in level.items():
 
-            if info["step"].id not in missing_cache_keys:
+            cache_key = info["cache_key"]
+            if cache_key not in missing_cache_keys:
                 continue
 
             matrix_include.append({
                 "step_runner_fqdn": step_wrapper_runner_fqdn,
-                "cache_key": info["cache_key"],
+                "cache_key": cache_key,
                 "name":  info["step"].name
             })
 
