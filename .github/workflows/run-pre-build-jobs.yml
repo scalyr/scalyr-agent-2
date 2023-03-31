@@ -37,6 +37,7 @@ jobs:
     outputs:
       matrix0: ${{ steps.print.outputs.matrix0 }}
       matrix1: ${{ steps.print.outputs.matrix1 }}
+      matrix2: ${{ steps.print.outputs.matrix2 }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -104,6 +105,33 @@ jobs:
       - run_pre_built_job0
     strategy:
       matrix: ${{ fromJSON(needs.pre_job.outputs.matrix1) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Get missing step caches matrices
+        id: get_missing_caches_matrices
+        uses: ./.github/actions/run_pre_built_step
+        with:
+          step_runner_fqdn: ${{ matrix.step_runner_fqdn }}
+          cache_key: ${{ matrix.cache_key }}
+          python_version: ${{ inputs.python_version }}
+          aws_private_key: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
+          aws_access_key: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
+          aws_secret_key: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
+          aws_private_key_name: ${{ inputs.aws_private_key_name }}
+          aws_region: ${{ inputs.aws_region }}
+          aws_security_group: ${{ inputs.aws_security_group }}
+          aws_prefix_list_id: ${{ inputs.aws_prefix_list_id }}
+          aws_objects_name_prefix: ${{ inputs.aws_objects_name_prefix }}
+
+  run_pre_built_job2:
+    runs-on: ubuntu-20.04
+    needs:
+      - pre_job
+      - run_pre_built_job1
+    strategy:
+      matrix: ${{ fromJSON(needs.pre_job.outputs.matrix2) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
