@@ -74,7 +74,11 @@ define_config_option(
 define_config_option(
     __monitor__,
     "use_ssl",
-    "Optional (defaults to False). Whether to connect to PostgreSQL over SSL.",
+    ("Optional (defaults to False). Whether to connect to PostgreSQL over SSL. "
+     "Note: Self-signed server certs are not supported at this time. "
+     "Additionally, server cert validation and hostname checking is only "
+     "performed on Python 2.7.9 and newer. Older Python versions are vulnerable "
+     "to MitM attacks."),
     convert_to=bool,
     default=False,
 )
