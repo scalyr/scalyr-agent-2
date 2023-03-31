@@ -73,6 +73,7 @@ runs:
     - name: Run cached step
       shell: bash
       env:
+        SSH_AUTH_SOCK: ${{ steps.prepare-ssh.outputs.ssh_auth_sock }}
         AWS_ACCESS_KEY: ${{ inputs.aws_access_key }}
         AWS_SECRET_KEY: ${{ inputs.aws_secret_key }}
         AWS_PRIVATE_KEY_NAME: ${{ inputs.aws_private_key_name }}
