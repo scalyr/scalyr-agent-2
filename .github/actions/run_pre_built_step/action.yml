@@ -5,6 +5,9 @@ inputs:
   step_runner_fqdn:
     description: ""
 
+  cache_key:
+    description: ""
+
   aws_private_key_name:
     description: ""
   aws_region:
@@ -60,8 +63,15 @@ runs:
         cat "/tmp/private_key.pem" | ssh-add -
         echo "ssh_auth_sock=${SSH_AUTH_SOCK}" >> $GITHUB_OUTPUT
 
+    - name: Cache step
+      id: cache-step
+      uses: actions/cache@v3
+      with:
+        path: agent_build_output/step_cache/${{ inputs.cache_key }}
+        key: ${{ inputs.cache_key }}
+
     - name: Run cached step
-      uses: ./.github/actions/execute-runner
+      shell: bash
       env:
         AWS_ACCESS_KEY: ${{ inputs.aws_access_key }}
         AWS_SECRET_KEY: ${{ inputs.aws_secret_key }}
@@ -71,3 +81,5 @@ runs:
         AWS_SECURITY_GROUP: ${{ inputs.aws_security_group }}
         AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ inputs.aws_prefix_list_id }}
         AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
+      run: |
+        python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn }} --run-all-cacheable-steps
