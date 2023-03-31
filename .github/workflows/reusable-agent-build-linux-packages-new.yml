@@ -264,14 +264,15 @@ jobs:
       - pre_job
       - pre-build-cached-step
     runs-on: ubuntu-20.04
-    matrix:
-      packages:
-        - { "name": "deb-aio-x86_64" }
-        - { "name": "rpm-aio-x86_64" }
-        - { "name": "deb-aio-arm64" }
-        - { "name": "rpm-aio-arm64" }
-        - { "name": "deb-non-aio" }
-        - { "name": "rpm-non-aio" }
+    strategy:
+      matrix:
+        packages:
+          - { "name": "deb-aio-x86_64" }
+          - { "name": "rpm-aio-x86_64" }
+          - { "name": "deb-aio-arm64" }
+          - { "name": "rpm-aio-arm64" }
+          - { "name": "deb-non-aio" }
+          - { "name": "rpm-non-aio" }
 
     steps:
       - name: Checkout repository
