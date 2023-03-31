@@ -12,7 +12,7 @@ runs:
     - name: Install python
       uses: actions/setup-python@v4
       with:
-        python-version: ${{ inputs.python-version }}
+        python-version: ${{ inputs.python_version }}
 
     - name: Cache dev requirements
       id: cache_dev_requirements
