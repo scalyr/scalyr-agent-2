@@ -3,7 +3,7 @@ description: "This action accepts matrices for the jobs that are used in the age
 
 outputs:
   matrices:
-    value: ${{ steps. }}
+    value: ${{ steps.print.outputs.matrices }}
     description: "vv"
 
 runs:
@@ -26,9 +26,7 @@ runs:
       shell: bash
       run: |
         echo '${{ steps.get_missing_caches_matrices.outputs.missing_cache_keys_json }}' > /tmp/missing_cache_keys_json.json
-        # echo 'python3 agent_build_refactored/cicd/get_prebuilt_steps_runners.py get-missing-caches-matrices --input-missing-cache-keys-file /tmp/missing_cache_keys_json.json
-        
-        # cat ./.github/workflows/run-pre-build-jobs.yml
+        echo 'matrices=$(python3 agent_build_refactored/cicd/get_prebuilt_steps_runners.py get-missing-caches-matrices --input-missing-cache-keys-file /tmp/missing_cache_keys_json.json)' >> $GITHUB_OUTPUT
         
   
 #    - name: Get job matrices.

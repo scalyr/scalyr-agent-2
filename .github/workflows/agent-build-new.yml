@@ -28,6 +28,7 @@ jobs:
       aws_prefix_list_id: ${{ steps.init_common_options.outputs.aws_prefix_list_id }}
       aws_region: ${{ steps.init_common_options.outputs.aws_region }}
       aws_objects_name_prefix: ${{ steps.init_common_options.outputs.aws_objects_name_prefix }}
+      pre_build_jobs_matrices_json: ${{ steps.get_missing_caches_matrices.outputs.matrices }}
     steps:
 #      - id: skip_check
 #        uses: fkirc/skip-duplicate-actions@12aca0a884f6137d619d6a8a09fcc3406ced5281 # v4.0.0
