@@ -59782,14 +59782,12 @@ async function executeRunner() {
     const missingCaches = []
 
     for (let key of cachesKeys) {
-        console.log(`Check cache for step cache key ${key}`);
         const result = await cache.restoreCache(
             paths=["/tmp/${key}"],
             primaryKey=key,
             restoreKeys=[],
             options={ lookupOnly: true }
         )
-        console.log(result)
 
         if (typeof result !== "undefined") {
             console.log(`Cache for the step with key ${key} is found.`)
