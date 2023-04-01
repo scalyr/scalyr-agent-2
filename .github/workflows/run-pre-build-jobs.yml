@@ -63,7 +63,6 @@ jobs:
           "prepare_toolset_x86_64-ubuntu-22-04-linux-amd64-711077b6458732363915059f8239b487b74db26b3723e1d26d74e9401d6f365e"]'
         cache_version_suffix: v11
         cache_root: agent_build_output/step_cache
-        lookup_only: true
     - name: Print
       id: print
       shell: bash

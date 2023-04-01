@@ -85,6 +85,7 @@ runs:
         steps_ids: ${{ inputs.required_steps }}
         cache_version_suffix: ${{ inputs.cache_version_suffix }}
         cache_root: agent_build_output/step_cache
+        lookup-only: false
 
     - name: Run cached step
       shell: bash
