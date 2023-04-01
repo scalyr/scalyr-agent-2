@@ -39,6 +39,7 @@ from agent_build_refactored.tools.runner import Runner, RunnerStep
 from agent_build_refactored import ALL_USED_BUILDERS
 
 
+CACHE_VERSION_SUFFIX = "v6"
 
 used_builders = []
 
@@ -141,8 +142,6 @@ for level_steps in levels:
         fqdn = runner_cls.get_fully_qualified_name()
         current_runner_level[fqdn] = {
             "step": step,
-            "cache_key": f"{step.id}",
-            "cache_path": step_id,
             "runner": runner_cls
         }
 
@@ -159,21 +158,22 @@ def get_missing_caches_matrices(input_missing_cache_keys_file: pl.Path):
 
         for step_wrapper_runner_fqdn, info in level.items():
 
-            cache_key = info["cache_key"]
-            if cache_key not in missing_cache_keys:
+            step = info["step"]
+            step_id = step.id
+            if step_id not in missing_cache_keys:
                 continue
 
-            step = info["step"]
+
             required_steps_ids = []
             for req_step_id in step.get_all_required_steps().keys():
                 required_steps_ids.append(req_step_id)
 
             matrix_include.append({
                 "step_runner_fqdn": step_wrapper_runner_fqdn,
-                "cache_key": cache_key,
-                "cache_path": info["cache_path"],
+                "step_id": step_id,
                 "name":  info["step"].name,
-                "required_steps": sorted(required_steps_ids)
+                "required_steps": sorted(required_steps_ids),
+                "cache_version_suffix": CACHE_VERSION_SUFFIX,
             })
 
         if len(matrix_include) > 0:
@@ -188,12 +188,12 @@ def get_missing_caches_matrices(input_missing_cache_keys_file: pl.Path):
 
 
 def get_all_cache_keys():
-    result = set()
+    step_ids = set()
     for level in runner_levels:
         for info in level.values():
-            result.add(info["cache_key"])
+            step_ids.add(info["step"].id)
 
-    return json.dumps(list(result))
+    return json.dumps(list(sorted(step_ids)))
 
 
 if __name__ == "__main__":
@@ -208,6 +208,8 @@ if __name__ == "__main__":
 
     all_cache_keys_parser = subparsers.add_parser("all-cache-keys")
 
+    get_cache_version_suffix_parser = subparsers.add_parser("get-cache-version-suffix")
+
     args = parser.parse_args()
 
     if args.command == "get-missing-caches-matrices":
@@ -217,5 +219,7 @@ if __name__ == "__main__":
         print(json.dumps(matrices))
     elif args.command == "all-cache-keys":
         print(get_all_cache_keys())
+    elif args.command == "get-cache-version-suffix":
+        print(CACHE_VERSION_SUFFIX)
 
     exit(0)

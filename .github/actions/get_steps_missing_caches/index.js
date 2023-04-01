@@ -28,19 +28,19 @@ async function executeRunner() {
     // 3. If there are steps, which results haven't been found during the step 1, then the results of those
     //    steps will be cached using their cache names.
 
-    const cachesKeysJson = core.getInput("caches_keys_json");
-    const cacheVersionSuffix = core.getInput("cache_version_suffix");
+    const stepsIdsJSON = core.getInput("steps_ids");
     const lookupOnly = core.getInput("lookup-only");
     const cacheRoot = core.getInput("cache_root");
 
 
-    const cachesKeys = JSON.parse(cachesKeysJson);
+    const stepsIDs = JSON.parse(stepsIdsJSON);
+    const cacheVersionSuffix = core.getInput("cache_version_suffix");
 
     const missingCaches = []
 
-    for (let cacheKey of cachesKeys) {
-        const cachePath = path.join(cacheRoot, cacheKey);
-        const finalCacheKey = `${cacheKey}_${cacheVersionSuffix}`
+    for (let stepID of stepsIDs) {
+        const cachePath = path.join(cacheRoot, stepID);
+        const finalCacheKey = `${stepID}_${cacheVersionSuffix}`
         const result = await cache.restoreCache(
             paths=[cachePath],
             primaryKey=finalCacheKey,
@@ -52,7 +52,7 @@ async function executeRunner() {
             console.log(`Cache for the step with key ${finalCacheKey} is found.`)
         } else {
             console.log(`Cache for the step with key ${finalCacheKey} is not found.`)
-            missingCaches.push(cacheKey)
+            missingCaches.push(stepID)
         }
     }
 

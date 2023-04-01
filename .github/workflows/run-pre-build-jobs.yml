@@ -48,14 +48,15 @@ jobs:
         id: get_all_used_steps_cache_keys
         shell: bash
         run: |
-          echo "cache_keys_json=$(python3 agent_build_refactored/cicd/get_prebuilt_steps_runners.py all-cache-keys)" >> $GITHUB_OUTPUT
+          echo "steps_ids=$(python3 agent_build_refactored/cicd/get_prebuilt_steps_runners.py all-cache-keys)" >> $GITHUB_OUTPUT
+          echo "cache_version_suffix=$(python3 agent_build_refactored/cicd/get_prebuilt_steps_runners.py get-cache-version-suffix)" >> $GITHUB_OUTPUT
 
       - name: Get missing step caches matrices
         id: get_missing_caches_matrices
         uses: ./.github/actions/get_steps_missing_caches
         with:
-          caches_keys_json: ${{ steps.get_all_used_steps_cache_keys.outputs.cache_keys_json }}
-          cache_version_suffix: ${{ inputs.cache_version_suffix }}
+          steps_ids: ${{ steps.get_all_used_steps_cache_keys.outputs.steps_ids }}
+          cache_version_suffix: ${{ steps.get_all_used_steps_cache_keys.outputs.cache_version_suffix }}
           lookup_only: true
 
       - name: Print
