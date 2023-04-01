@@ -83,6 +83,9 @@ jobs:
           echo "matrix_length1=$(jq -c '.[1]["include"]  | length' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
           echo "matrix2=$(jq -c '.[2]' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
           echo "matrix_length2=$(jq -c '.[2]["include"]  | length' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
+          
+          echo "LLLLLLLLLLL"
+          cat $GITHUB_OUTPUT
 
   run_pre_built_job0:
     name: Level 0 ${{ matrix.name }}
@@ -153,7 +156,7 @@ jobs:
     needs:
       - pre_job
       - run_pre_built_job1
-    if: ${{ always() && (needs.run_pre_built_job1.result == 'success' || needs.run_pre_built_job1.result == 'skipped')}}
+    if: ${{ always() && (needs.run_pre_built_job1.result == 'success' || needs.run_pre_built_job1.result == 'skipped') && needs.pre_job.outputs.matrix_length2 != '0' }}
     strategy:
       matrix: ${{ fromJSON(needs.pre_job.outputs.matrix2) }}
     steps:
