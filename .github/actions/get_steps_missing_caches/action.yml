@@ -9,6 +9,9 @@ inputs:
     description: ""
   cache_root:
     description: ""
+  lookup_only:
+    default: "true"
+    description: ""
 
 outputs:
   missing_cache_keys_json:

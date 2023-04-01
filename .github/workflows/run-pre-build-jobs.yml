@@ -56,6 +56,7 @@ jobs:
         with:
           caches_keys_json: ${{ steps.get_all_used_steps_cache_keys.outputs.cache_keys_json }}
           cache_version_suffix: ${{ inputs.cache_version_suffix }}
+          lookup_only: true
 
       - name: Print
         id: print
