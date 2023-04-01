@@ -67,3 +67,4 @@ more-itertools==8.5.0
 distro==1.6.0
 xmltodict==0.13.0
 syslogmp==0.3
+strictyaml==1.7.3
