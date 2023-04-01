@@ -50,7 +50,7 @@ jobs:
         shell: bash
         run: |
           echo '${{ steps.get_missing_caches_matrices.outputs.missing_cache_keys_json }}' > /tmp/missing_cache_keys.json
-          venv/bin/python3  agent_build_refactored/cicd/get_prebuilt_steps_runners.py get-missing-caches-matrices --input-missing-cache-keys-file /tmp/missing_cache_keys.json > /tmp/missing_cache_matrices.json
+          python3  agent_build_refactored/cicd/get_prebuilt_steps_runners.py get-missing-caches-matrices --input-missing-cache-keys-file /tmp/missing_cache_keys.json > /tmp/missing_cache_matrices.json
           i=0
           jq -c '.[]' /tmp/missing_cache_matrices.json | while read -r matrix; do 
             echo "matrix${i}=$(echo "$matrix" | jq -c '.')" >> $GITHUB_OUTPUT
@@ -128,7 +128,7 @@ jobs:
           AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ inputs.aws_prefix_list_id }}
           AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
         run: |
-          venv/bin/python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn }} --run-all-cacheable-steps
+          python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn }} --run-all-cacheable-steps
 
 
 #      - name: Get missing step caches matrices
