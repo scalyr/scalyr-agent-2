@@ -61,7 +61,7 @@ jobs:
           "install_build_environment_arm64-centos-7-linux-arm64-98628582d5bbde89ca1ebcecabae204796ae86d80fa18b7005a0836066abeb18",
           "install_build_environment_x86_64-centos-6-linux-amd64-c770e8725d62b7838cb6f3bd6a3c7a202ffc9176e8aa3a443553c2d304dd1627",
           "prepare_toolset_x86_64-ubuntu-22-04-linux-amd64-711077b6458732363915059f8239b487b74db26b3723e1d26d74e9401d6f365e"]'
-        cache_version_suffix: v11
+        cache_version_suffix: v12
         cache_root: agent_build_output/step_cache
         lookup_only: true
     - name: Print
