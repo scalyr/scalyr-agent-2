@@ -32,6 +32,7 @@ async function executeRunner() {
     const lookupOnlyStr = core.getInput("lookup-only");
     const lookupOnly = lookupOnlyStr === 'true' ? true : false;
     console.log("FFFFFFFF")
+    console.log(lookupOnlyStr)
     console.log(lookupOnlyStr === 'true')
     const cacheRoot = core.getInput("cache_root");
 
