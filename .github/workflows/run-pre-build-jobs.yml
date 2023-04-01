@@ -43,7 +43,15 @@ jobs:
       id: get_missing_caches_matrices
       uses: ./.github/actions/get_steps_missing_caches
       with:
-        steps_ids: '["build_agent_libs_venv_arm64-centos-7-linux-arm64-7fb6ced491f8cc6db5b6a3729cb1ddb835c0c6f829530d3f48e065ca5d1033bf",
+        steps_ids: '["agent-base-image-alpine-d2fabf5a134e6b1826079e48a59fde0192f069916f7ebe291a28bf65a5ffb301",
+          "agent-base-image-alpine-linux-amd64-efbc66ecd9ef8b4f7a9eb2612010b01efb79800e21497ab70746d894693c24de",
+          "agent-base-image-alpine-linux-arm-v7-efab154755cbc1b760a7181a695861676c93bce009d6e3b2cd512439b730cd87",
+          "agent-base-image-alpine-linux-arm64-897d6b5b8b7c89adc045cafeef58b0ceffd465029437be80af2e1a0d54236c3c",
+          "agent-base-image-debian-138b5502706b4da9ca84e54d5a43ff3f09e8d9d63e7cf5cfc62b21cca8f38bcf",
+          "agent-base-image-debian-linux-amd64-239e6474ce2d4018d978d31e6802d25a29b6468a1d9260767e12f31bd08341a5",
+          "agent-base-image-debian-linux-arm-v7-277387e9366d6930e5182c54303d8df8630cf3cd87fb3ed49c11662260e4690d",
+          "agent-base-image-debian-linux-arm64-6131db4d97cf421b801405e9523a0e5d7cc20c38ea5800e102a809fc45f66549",
+          "build_agent_libs_venv_arm64-centos-7-linux-arm64-7fb6ced491f8cc6db5b6a3729cb1ddb835c0c6f829530d3f48e065ca5d1033bf",
           "build_agent_libs_venv_x86_64-centos-6-linux-amd64-9f4b9b29236deb98b222b2ab6740c17186a6f3a59cc439657a8aae49ec31a3ad",
           "build_dev_requirements_arm64-centos-7-linux-arm64-d177aa6fa0bd2843ec112a675545eb87b454eb7f1d99b175d2974b921a932213",
           "build_dev_requirements_x86_64-centos-6-linux-amd64-43a5bd98e0b5b1768231009a16e64863c4deeacb54a12c9be7b4b95507b91899",
