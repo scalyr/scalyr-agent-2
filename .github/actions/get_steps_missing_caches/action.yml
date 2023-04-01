@@ -10,7 +10,7 @@ inputs:
   cache_version_suffix:
     description: ""
   lookup_only:
-    default: "true"
+    default: "false"
     description: ""
 
 outputs:
