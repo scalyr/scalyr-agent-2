@@ -71,19 +71,25 @@ jobs:
           python3 agent_build_refactored/cicd/get_prebuilt_steps_runners.py get-missing-caches-matrices --input-missing-cache-keys-file /tmp/missing_cache_keys.json > /tmp/missing_cache_matrices.json
           echo "111111"
           jq -c '.[0]' /tmp/missing_cache_matrices.json
+          jq -c '.[0] | length' /tmp/missing_cache_matrices.json
           jq -c '.[1]' /tmp/missing_cache_matrices.json
+          jq -c '.[1] | length' /tmp/missing_cache_matrices.json
           jq -c '.[2]' /tmp/missing_cache_matrices.json
+          jq -c '.[2] | length' /tmp/missing_cache_matrices.json
           echo "22222"
           echo "matrix0=$(jq -c '.[0]' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
+          echo "matrix_length0=$(jq -c '.[0] | length' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
           echo "matrix1=$(jq -c '.[1]' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
+          echo "matrix_length1=$(jq -c '.[1] | length' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
           echo "matrix2=$(jq -c '.[2]' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
+          echo "matrix_length2=$(jq -c '.[2] | length' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
 
   run_pre_built_job0:
     name: Level 0 ${{ matrix.name }}
     runs-on: ubuntu-20.04
     needs:
       - pre_job
-    if: ${{ needs.pre_job.outputs.matrix0 == '' }}
+    if: ${{ needs.pre_job.outputs.matrix_length0 != '0' }}
     strategy:
       matrix: ${{ fromJSON(needs.pre_job.outputs.matrix0) }}
     steps:
@@ -116,7 +122,7 @@ jobs:
     needs:
       - pre_job
       - run_pre_built_job0
-    if: ${{ always() && (needs.run_pre_built_job0.result == 'success' || needs.run_pre_built_job0.result == 'skipped') && needs.pre_job.outputs.matrix1 != '' }}
+    if: ${{ always() && (needs.run_pre_built_job0.result == 'success' || needs.run_pre_built_job0.result == 'skipped') && needs.pre_job.outputs.matrix_length1 != '0' }}
     strategy:
       matrix: ${{ fromJSON(needs.pre_job.outputs.matrix1) }}
     steps:
@@ -147,7 +153,7 @@ jobs:
     needs:
       - pre_job
       - run_pre_built_job1
-    if: ${{ always() && (needs.run_pre_built_job1.result == 'success' || needs.run_pre_built_job1.result == 'skipped') && needs.pre_job.outputs.matrix2 != '' }}
+    if: ${{ always() && (needs.run_pre_built_job1.result == 'success' || needs.run_pre_built_job1.result == 'skipped') && needs.pre_job.outputs.matrix_length2 != '0' }}
     strategy:
       matrix: ${{ fromJSON(needs.pre_job.outputs.matrix2) }}
     steps:
