@@ -67,6 +67,8 @@ runs:
         cat "/tmp/private_key.pem" | ssh-add -
         echo "ssh_auth_sock=${SSH_AUTH_SOCK}" >> $GITHUB_OUTPUT
         echo "${{ inputs.required_steps }}"
+        echo "agent_build_output/step_cache/${{ inputs.step_id }}"
+        echo "${{ inputs.step_id }}_${{ inputs.cache_version_suffix }}"
 
     - name: Cache step
       id: cache-step
