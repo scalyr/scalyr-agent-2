@@ -45,4 +45,4 @@ runs:
       shell: bash
       run: |
         ls /tmp/python_cache/opt/hostedtoolcache
-        sudo cp -a /tmp/python_cache /
+        sudo cp -a /tmp/python_cache/. /
