@@ -85,7 +85,9 @@ jobs:
       - pre_job
     if: ${{ needs.pre_job.outputs.matrix0 != '' }}
     strategy:
-      matrix: ${{ fromJSON(needs.pre_job.outputs.matrix0) }}
+      matrix:
+        include:
+          ddd: fffff
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
