@@ -111,7 +111,7 @@ jobs:
 
 
   run_pre_built_job1:
-    name: Level 1 ${{ matrix.name }}
+    name: Level 1 ${{ matrix.name }} ${{ always() && success() && needs.pre_job.outputs.matrix1 != '' }}
     runs-on: ubuntu-20.04
     needs:
       - pre_job
