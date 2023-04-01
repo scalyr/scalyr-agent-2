@@ -29,13 +29,15 @@ jobs:
       aws_region: us-east-1
       aws_objects_name_prefix: ${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}
       python_version: 3.8.13
-      cache_version_suffix: v5
+      cache_version_suffix: v6
     steps:
 #      - id: skip_check
 #        uses: fkirc/skip-duplicate-actions@12aca0a884f6137d619d6a8a09fcc3406ced5281 # v4.0.0
 #        with:
 #          cancel_others: 'true'
 #          github_token: ${{ github.token }}
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
   run_pre_build_steps:
     name: "Run pre-built steps"
