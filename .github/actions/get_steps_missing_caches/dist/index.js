@@ -59790,7 +59790,7 @@ async function executeRunner() {
             restoreKeys=[],
             options={ lookupOnly: lookupOnly }
         )
-
+        console.log(result)
         if (typeof result !== "undefined") {
             console.log(`Cache for the step with key ${finalCacheKey} is found.`)
         } else {
