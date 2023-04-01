@@ -81,7 +81,7 @@ runs:
       id: get_required_steps_caches
       uses: ./.github/actions/get_steps_missing_caches
       with:
-        caches_keys_json: ${{ inputs.required_steps }}
+        steps_ids: ${{ inputs.required_steps }}
         cache_version_suffix: ${{ inputs.cache_version_suffix }}
         cache_root: agent_build_output/step_cache
 
