@@ -1,34 +1,3 @@
-name: Run pre-built jobs.
-true:
-  workflow_call:
-    inputs:
-      aws_objects_name_prefix:
-        type: string
-      aws_prefix_list_id:
-        type: string
-      aws_private_key_name:
-        type: string
-      aws_region:
-        type: string
-      aws_security_group:
-        type: string
-      cache_version_suffix:
-        type: string
-      python_version:
-        type: string
-    secrets:
-      CT_AWS_DEV_EC2_ACCESS_KEY:
-        required: true
-      CT_AWS_DEV_EC2_PRIVATE_KEY:
-        required: true
-      CT_AWS_DEV_EC2_SECRET_KEY:
-        required: true
-      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ:
-        required: true
-      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE:
-        required: true
-permissions:
-  contents: read
 jobs:
   pre_job:
     outputs: {}
@@ -121,3 +90,34 @@ jobs:
 
         '
       shell: bash
+name: Run pre-built jobs.
+'on':
+  workflow_call:
+    inputs:
+      aws_objects_name_prefix:
+        type: string
+      aws_prefix_list_id:
+        type: string
+      aws_private_key_name:
+        type: string
+      aws_region:
+        type: string
+      aws_security_group:
+        type: string
+      cache_version_suffix:
+        type: string
+      python_version:
+        type: string
+    secrets:
+      CT_AWS_DEV_EC2_ACCESS_KEY:
+        required: true
+      CT_AWS_DEV_EC2_PRIVATE_KEY:
+        required: true
+      CT_AWS_DEV_EC2_SECRET_KEY:
+        required: true
+      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ:
+        required: true
+      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE:
+        required: true
+permissions:
+  contents: read

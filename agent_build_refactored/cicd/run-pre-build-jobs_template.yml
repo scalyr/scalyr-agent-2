@@ -1,6 +1,6 @@
 name: Run pre-built jobs.
 
-on:
+'on':
   workflow_call:
     inputs:
       python_version:
