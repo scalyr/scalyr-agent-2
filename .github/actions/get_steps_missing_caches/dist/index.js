@@ -59792,10 +59792,10 @@ async function executeRunner() {
         )
 
         if (typeof result !== "undefined") {
-            console.log(`Cache for the step with key ${key} is found.`)
+            console.log(`Cache for the step with key ${finalCacheKey} is found.`)
         } else {
-            console.log(`Cache for the step with key ${key} is not found.`)
-            missingCaches.push(key)
+            console.log(`Cache for the step with key ${finalCacheKey} is not found.`)
+            missingCaches.push(finalCacheKey)
         }
     }
 
