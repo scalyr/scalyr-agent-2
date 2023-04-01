@@ -99,23 +99,58 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
-    - name: Get missing step caches matrices
-      id: get_missing_caches_matrices
-      uses: ./.github/actions/run_pre_built_step
+    - name: Prepare dev requirements.
+      uses: ./.github/actions/prepare_python_with_dev_requirements
       with:
-        step_runner_fqdn: ${{ matrix.step_runner_fqdn }}
-        required_steps: ${{ toJSON(matrix.required_steps) }}
-        step_id: ${{ matrix.step_id }}
-        cache_version_suffix: ${{ matrix.cache_version_suffix }}
         python_version: ${{ inputs.python_version }}
-        aws_private_key: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
-        aws_access_key: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
-        aws_secret_key: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
-        aws_private_key_name: ${{ inputs.aws_private_key_name }}
-        aws_region: ${{ inputs.aws_region }}
-        aws_security_group: ${{ inputs.aws_security_group }}
-        aws_prefix_list_id: ${{ inputs.aws_prefix_list_id }}
-        aws_objects_name_prefix: ${{ inputs.aws_objects_name_prefix }}
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@f03ac48505955848960e80bbb68046aa35c7b9e7
+      with:
+        driver-opts: network=host
+    - name: Set up QEMU
+      id: qemu
+      uses: docker/setup-qemu-action@e81a89b1732b9c48d79cd809d8d81d79c4647a18
+      with:
+        image: tonistiigi/binfmt:qemu-v6.2.0
+        platforms: all
+    - name: Prepare SSH
+      id: prepare-ssh
+      shell: bash
+      run: |
+        echo '${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}' > /tmp/private_key.pem
+        chmod 600 /tmp/private_key.pem
+        eval `ssh-agent -s`
+
+        cat "/tmp/private_key.pem" | ssh-add -
+        echo "ssh_auth_sock=${SSH_AUTH_SOCK}" >> $GITHUB_OUTPUT
+    - name: Cache step
+      id: cache-step
+      uses: actions/cache@v3
+      with:
+        path: |
+          agent_build_output/step_cache/${{ matrix.step_id }}
+        key: ${{ matrix.step_id }}_${{ matrix.cache_version_suffix }}
+    - name: Get required steps caches
+      id: get_required_steps_caches
+      uses: ./.github/actions/get_steps_missing_caches
+      with:
+        steps_ids: ${{ toJSON(matrix.required_steps) }}
+        cache_version_suffix: ${{ matrix.cache_version_suffix }}
+        cache_root: agent_build_output/step_cache
+    - name: Run cached step
+      shell: bash
+      env:
+        SSH_AUTH_SOCK: ${{ steps.prepare-ssh.outputs.ssh_auth_sock }}
+        AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
+        AWS_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
+        AWS_PRIVATE_KEY_NAME: ${{ inputs.aws_private_key_name }}
+        AWS_PRIVATE_KEY_PATH: /tmp/private_key.pem
+        AWS_REGION: ${{ inputs.aws_region }}
+        AWS_SECURITY_GROUP: ${{ inputs.aws_security_group }}
+        AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ inputs.aws_prefix_list_id }}
+        AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
+      run: |
+        venv/bin/python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn }} --run-all-cacheable-steps
   run_pre_built_job1:
     name: Level 1 ${{ matrix.name }}'
     runs-on: ubuntu-20.04
@@ -129,23 +164,58 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
-    - name: Get missing step caches matrices
-      id: get_missing_caches_matrices
-      uses: ./.github/actions/run_pre_built_step
+    - name: Prepare dev requirements.
+      uses: ./.github/actions/prepare_python_with_dev_requirements
       with:
-        step_runner_fqdn: ${{ matrix.step_runner_fqdn }}
-        required_steps: ${{ toJSON(matrix.required_steps) }}
-        step_id: ${{ matrix.step_id }}
-        cache_version_suffix: ${{ matrix.cache_version_suffix }}
         python_version: ${{ inputs.python_version }}
-        aws_private_key: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
-        aws_access_key: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
-        aws_secret_key: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
-        aws_private_key_name: ${{ inputs.aws_private_key_name }}
-        aws_region: ${{ inputs.aws_region }}
-        aws_security_group: ${{ inputs.aws_security_group }}
-        aws_prefix_list_id: ${{ inputs.aws_prefix_list_id }}
-        aws_objects_name_prefix: ${{ inputs.aws_objects_name_prefix }}
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@f03ac48505955848960e80bbb68046aa35c7b9e7
+      with:
+        driver-opts: network=host
+    - name: Set up QEMU
+      id: qemu
+      uses: docker/setup-qemu-action@e81a89b1732b9c48d79cd809d8d81d79c4647a18
+      with:
+        image: tonistiigi/binfmt:qemu-v6.2.0
+        platforms: all
+    - name: Prepare SSH
+      id: prepare-ssh
+      shell: bash
+      run: |
+        echo '${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}' > /tmp/private_key.pem
+        chmod 600 /tmp/private_key.pem
+        eval `ssh-agent -s`
+
+        cat "/tmp/private_key.pem" | ssh-add -
+        echo "ssh_auth_sock=${SSH_AUTH_SOCK}" >> $GITHUB_OUTPUT
+    - name: Cache step
+      id: cache-step
+      uses: actions/cache@v3
+      with:
+        path: |
+          agent_build_output/step_cache/${{ matrix.step_id }}
+        key: ${{ matrix.step_id }}_${{ matrix.cache_version_suffix }}
+    - name: Get required steps caches
+      id: get_required_steps_caches
+      uses: ./.github/actions/get_steps_missing_caches
+      with:
+        steps_ids: ${{ toJSON(matrix.required_steps) }}
+        cache_version_suffix: ${{ matrix.cache_version_suffix }}
+        cache_root: agent_build_output/step_cache
+    - name: Run cached step
+      shell: bash
+      env:
+        SSH_AUTH_SOCK: ${{ steps.prepare-ssh.outputs.ssh_auth_sock }}
+        AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
+        AWS_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
+        AWS_PRIVATE_KEY_NAME: ${{ inputs.aws_private_key_name }}
+        AWS_PRIVATE_KEY_PATH: /tmp/private_key.pem
+        AWS_REGION: ${{ inputs.aws_region }}
+        AWS_SECURITY_GROUP: ${{ inputs.aws_security_group }}
+        AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ inputs.aws_prefix_list_id }}
+        AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
+      run: |
+        venv/bin/python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn }} --run-all-cacheable-steps
   run_pre_built_job2:
     name: Level 2 ${{ matrix.name }}'
     runs-on: ubuntu-20.04
@@ -159,23 +229,58 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
-    - name: Get missing step caches matrices
-      id: get_missing_caches_matrices
-      uses: ./.github/actions/run_pre_built_step
+    - name: Prepare dev requirements.
+      uses: ./.github/actions/prepare_python_with_dev_requirements
       with:
-        step_runner_fqdn: ${{ matrix.step_runner_fqdn }}
-        required_steps: ${{ toJSON(matrix.required_steps) }}
-        step_id: ${{ matrix.step_id }}
-        cache_version_suffix: ${{ matrix.cache_version_suffix }}
         python_version: ${{ inputs.python_version }}
-        aws_private_key: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
-        aws_access_key: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
-        aws_secret_key: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
-        aws_private_key_name: ${{ inputs.aws_private_key_name }}
-        aws_region: ${{ inputs.aws_region }}
-        aws_security_group: ${{ inputs.aws_security_group }}
-        aws_prefix_list_id: ${{ inputs.aws_prefix_list_id }}
-        aws_objects_name_prefix: ${{ inputs.aws_objects_name_prefix }}
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@f03ac48505955848960e80bbb68046aa35c7b9e7
+      with:
+        driver-opts: network=host
+    - name: Set up QEMU
+      id: qemu
+      uses: docker/setup-qemu-action@e81a89b1732b9c48d79cd809d8d81d79c4647a18
+      with:
+        image: tonistiigi/binfmt:qemu-v6.2.0
+        platforms: all
+    - name: Prepare SSH
+      id: prepare-ssh
+      shell: bash
+      run: |
+        echo '${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}' > /tmp/private_key.pem
+        chmod 600 /tmp/private_key.pem
+        eval `ssh-agent -s`
+
+        cat "/tmp/private_key.pem" | ssh-add -
+        echo "ssh_auth_sock=${SSH_AUTH_SOCK}" >> $GITHUB_OUTPUT
+    - name: Cache step
+      id: cache-step
+      uses: actions/cache@v3
+      with:
+        path: |
+          agent_build_output/step_cache/${{ matrix.step_id }}
+        key: ${{ matrix.step_id }}_${{ matrix.cache_version_suffix }}
+    - name: Get required steps caches
+      id: get_required_steps_caches
+      uses: ./.github/actions/get_steps_missing_caches
+      with:
+        steps_ids: ${{ toJSON(matrix.required_steps) }}
+        cache_version_suffix: ${{ matrix.cache_version_suffix }}
+        cache_root: agent_build_output/step_cache
+    - name: Run cached step
+      shell: bash
+      env:
+        SSH_AUTH_SOCK: ${{ steps.prepare-ssh.outputs.ssh_auth_sock }}
+        AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
+        AWS_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
+        AWS_PRIVATE_KEY_NAME: ${{ inputs.aws_private_key_name }}
+        AWS_PRIVATE_KEY_PATH: /tmp/private_key.pem
+        AWS_REGION: ${{ inputs.aws_region }}
+        AWS_SECURITY_GROUP: ${{ inputs.aws_security_group }}
+        AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ inputs.aws_prefix_list_id }}
+        AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
+      run: |
+        venv/bin/python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn }} --run-all-cacheable-steps
   run_pre_built_job3:
     name: Level 3 ${{ matrix.name }}'
     runs-on: ubuntu-20.04
@@ -189,23 +294,58 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
-    - name: Get missing step caches matrices
-      id: get_missing_caches_matrices
-      uses: ./.github/actions/run_pre_built_step
+    - name: Prepare dev requirements.
+      uses: ./.github/actions/prepare_python_with_dev_requirements
       with:
-        step_runner_fqdn: ${{ matrix.step_runner_fqdn }}
-        required_steps: ${{ toJSON(matrix.required_steps) }}
-        step_id: ${{ matrix.step_id }}
-        cache_version_suffix: ${{ matrix.cache_version_suffix }}
         python_version: ${{ inputs.python_version }}
-        aws_private_key: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
-        aws_access_key: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
-        aws_secret_key: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
-        aws_private_key_name: ${{ inputs.aws_private_key_name }}
-        aws_region: ${{ inputs.aws_region }}
-        aws_security_group: ${{ inputs.aws_security_group }}
-        aws_prefix_list_id: ${{ inputs.aws_prefix_list_id }}
-        aws_objects_name_prefix: ${{ inputs.aws_objects_name_prefix }}
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@f03ac48505955848960e80bbb68046aa35c7b9e7
+      with:
+        driver-opts: network=host
+    - name: Set up QEMU
+      id: qemu
+      uses: docker/setup-qemu-action@e81a89b1732b9c48d79cd809d8d81d79c4647a18
+      with:
+        image: tonistiigi/binfmt:qemu-v6.2.0
+        platforms: all
+    - name: Prepare SSH
+      id: prepare-ssh
+      shell: bash
+      run: |
+        echo '${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}' > /tmp/private_key.pem
+        chmod 600 /tmp/private_key.pem
+        eval `ssh-agent -s`
+
+        cat "/tmp/private_key.pem" | ssh-add -
+        echo "ssh_auth_sock=${SSH_AUTH_SOCK}" >> $GITHUB_OUTPUT
+    - name: Cache step
+      id: cache-step
+      uses: actions/cache@v3
+      with:
+        path: |
+          agent_build_output/step_cache/${{ matrix.step_id }}
+        key: ${{ matrix.step_id }}_${{ matrix.cache_version_suffix }}
+    - name: Get required steps caches
+      id: get_required_steps_caches
+      uses: ./.github/actions/get_steps_missing_caches
+      with:
+        steps_ids: ${{ toJSON(matrix.required_steps) }}
+        cache_version_suffix: ${{ matrix.cache_version_suffix }}
+        cache_root: agent_build_output/step_cache
+    - name: Run cached step
+      shell: bash
+      env:
+        SSH_AUTH_SOCK: ${{ steps.prepare-ssh.outputs.ssh_auth_sock }}
+        AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
+        AWS_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
+        AWS_PRIVATE_KEY_NAME: ${{ inputs.aws_private_key_name }}
+        AWS_PRIVATE_KEY_PATH: /tmp/private_key.pem
+        AWS_REGION: ${{ inputs.aws_region }}
+        AWS_SECURITY_GROUP: ${{ inputs.aws_security_group }}
+        AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ inputs.aws_prefix_list_id }}
+        AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
+      run: |
+        venv/bin/python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn }} --run-all-cacheable-steps
   run_pre_built_job4:
     name: Level 4 ${{ matrix.name }}'
     runs-on: ubuntu-20.04
@@ -219,20 +359,55 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
-    - name: Get missing step caches matrices
-      id: get_missing_caches_matrices
-      uses: ./.github/actions/run_pre_built_step
+    - name: Prepare dev requirements.
+      uses: ./.github/actions/prepare_python_with_dev_requirements
       with:
-        step_runner_fqdn: ${{ matrix.step_runner_fqdn }}
-        required_steps: ${{ toJSON(matrix.required_steps) }}
-        step_id: ${{ matrix.step_id }}
-        cache_version_suffix: ${{ matrix.cache_version_suffix }}
         python_version: ${{ inputs.python_version }}
-        aws_private_key: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
-        aws_access_key: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
-        aws_secret_key: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
-        aws_private_key_name: ${{ inputs.aws_private_key_name }}
-        aws_region: ${{ inputs.aws_region }}
-        aws_security_group: ${{ inputs.aws_security_group }}
-        aws_prefix_list_id: ${{ inputs.aws_prefix_list_id }}
-        aws_objects_name_prefix: ${{ inputs.aws_objects_name_prefix }}
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@f03ac48505955848960e80bbb68046aa35c7b9e7
+      with:
+        driver-opts: network=host
+    - name: Set up QEMU
+      id: qemu
+      uses: docker/setup-qemu-action@e81a89b1732b9c48d79cd809d8d81d79c4647a18
+      with:
+        image: tonistiigi/binfmt:qemu-v6.2.0
+        platforms: all
+    - name: Prepare SSH
+      id: prepare-ssh
+      shell: bash
+      run: |
+        echo '${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}' > /tmp/private_key.pem
+        chmod 600 /tmp/private_key.pem
+        eval `ssh-agent -s`
+
+        cat "/tmp/private_key.pem" | ssh-add -
+        echo "ssh_auth_sock=${SSH_AUTH_SOCK}" >> $GITHUB_OUTPUT
+    - name: Cache step
+      id: cache-step
+      uses: actions/cache@v3
+      with:
+        path: |
+          agent_build_output/step_cache/${{ matrix.step_id }}
+        key: ${{ matrix.step_id }}_${{ matrix.cache_version_suffix }}
+    - name: Get required steps caches
+      id: get_required_steps_caches
+      uses: ./.github/actions/get_steps_missing_caches
+      with:
+        steps_ids: ${{ toJSON(matrix.required_steps) }}
+        cache_version_suffix: ${{ matrix.cache_version_suffix }}
+        cache_root: agent_build_output/step_cache
+    - name: Run cached step
+      shell: bash
+      env:
+        SSH_AUTH_SOCK: ${{ steps.prepare-ssh.outputs.ssh_auth_sock }}
+        AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
+        AWS_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
+        AWS_PRIVATE_KEY_NAME: ${{ inputs.aws_private_key_name }}
+        AWS_PRIVATE_KEY_PATH: /tmp/private_key.pem
+        AWS_REGION: ${{ inputs.aws_region }}
+        AWS_SECURITY_GROUP: ${{ inputs.aws_security_group }}
+        AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ inputs.aws_prefix_list_id }}
+        AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
+      run: |
+        venv/bin/python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn }} --run-all-cacheable-steps
