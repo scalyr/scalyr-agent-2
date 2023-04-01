@@ -231,9 +231,9 @@ def render_workflow_yaml():
         if counter > 0:
             previous_run_pre_built_job_object_name = f"{run_pre_built_job_object_name}{counter - 1}"
             level_run_pre_built_job["needs"].append(previous_run_pre_built_job_object_name)
-            level_run_pre_built_job["if"] = f"${{{{ always() && (needs.${previous_run_pre_built_job_object_name}.result == 'success' || needs.${previous_run_pre_built_job_object_name}.result == 'skipped') && needs.pre_job.outputs.matrix_length{counter} != '0' }}}}"
+            level_run_pre_built_job["if"] = f"${{{{ always() && (needs.{previous_run_pre_built_job_object_name}.result == 'success' || needs.{previous_run_pre_built_job_object_name}.result == 'skipped') && needs.pre_job.outputs.matrix_length{counter} != '0' }}}}"
         else:
-            level_run_pre_built_job["if"] = f"{{{{needs.pre_job.outputs.matrix_length{counter} != '0' }}}}"
+            level_run_pre_built_job["if"] = f"${{{{ needs.pre_job.outputs.matrix_length{counter} != '0' }}}}"
 
         level_run_pre_built_job["name"] = f"Level {counter} ${{{{ matrix.name }}}}'"
         level_run_pre_built_job["strategy"]["matrix"] = f"${{{{ fromJSON(needs.pre_job.outputs.matrix{counter}) }}}}"
