@@ -72,6 +72,7 @@ jobs:
       aws_prefix_list_id: ${{ needs.pre_job.outputs.aws_prefix_list_id }}
       aws_region: ${{ needs.pre_job.outputs.aws_region }}
       aws_objects_name_prefix: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
+      python_version: ${{ needs.pre_job.outputs.python_version }}
     secrets:
       CT_AWS_DEV_EC2_PRIVATE_KEY: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
       CT_AWS_DEV_EC2_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
@@ -122,40 +123,40 @@ jobs:
 #          channel: '#eng-dataset-cloud-tech'
 #
 #
-#  # Aggregate all agent build artifacts that we build by this workflow and put in a single artifact,
-#  # so it's just need to download only one artifact, for example during a release process.
-#  prepare-artifacts:
-#    runs-on: ubuntu-20.04
-#    needs:
-#      - build-linux-packages
-#      - build-windows-package
-#      - build_tarball
-#
-#    steps:
-#      - name: Checkout repository
-#        uses: actions/checkout@v3
-#
-#      - name: Download artifacts
-#        uses: actions/download-artifact@v3
-#        with:
-#          path: /tmp/all_artifacts
-#
-#
-#      - name: Prepare artifacts
-#        run: |
-#          mkdir -p /tmp/result_artifacts
-#          cp -a /tmp/all_artifacts/linux-packages-*/. /tmp/result_artifacts
-#          cp -a /tmp/all_artifacts/tarball-noarch/. /tmp/result_artifacts
-#          cp -a /tmp/all_artifacts/windows-msi/. /tmp/result_artifacts
-#
-#
-#
-#      - name: Save result artifact
-#        uses: actions/upload-artifact@v3
-#        with:
-#          name: result-artifacts
-#          path: /tmp/result_artifacts
-#          retention-days: 1
+  # Aggregate all agent build artifacts that we build by this workflow and put in a single artifact,
+  # so it's just need to download only one artifact, for example during a release process.
+  prepare-artifacts:
+    runs-on: ubuntu-20.04
+    needs:
+      - build-linux-packages
+      - build-windows-package
+      - build_tarball
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: /tmp/all_artifacts
+
+
+      - name: Prepare artifacts
+        run: |
+          mkdir -p /tmp/result_artifacts
+          cp -a /tmp/all_artifacts/linux-packages-*/. /tmp/result_artifacts
+          cp -a /tmp/all_artifacts/tarball-noarch/. /tmp/result_artifacts
+          cp -a /tmp/all_artifacts/windows-msi/. /tmp/result_artifacts
+
+
+
+      - name: Save result artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: result-artifacts
+          path: /tmp/result_artifacts
+          retention-days: 1
 
   clean-ec2-tests-objects:
     name: Remove ec2 test workflow prefix list entries

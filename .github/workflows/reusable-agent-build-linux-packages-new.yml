@@ -13,6 +13,8 @@ on:
         type: string
       aws_objects_name_prefix:
         type: string
+      python_version:
+        type: string
 
     secrets:
       CT_AWS_DEV_EC2_PRIVATE_KEY:
