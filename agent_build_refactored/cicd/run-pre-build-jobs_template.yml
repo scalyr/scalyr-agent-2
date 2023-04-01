@@ -1,0 +1,114 @@
+name: Run pre-built jobs.
+
+on:
+  workflow_call:
+    inputs:
+      python_version:
+        type: string
+      aws_private_key_name:
+        type: string
+      aws_region:
+        type: string
+      aws_security_group:
+        type: string
+      aws_prefix_list_id:
+        type: string
+      aws_objects_name_prefix:
+        type: string
+      cache_version_suffix:
+        type: string
+
+    secrets:
+      CT_AWS_DEV_EC2_PRIVATE_KEY:
+        required: true
+      CT_AWS_DEV_EC2_ACCESS_KEY:
+        required: true
+      CT_AWS_DEV_EC2_SECRET_KEY:
+        required: true
+      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE:
+        required: true
+      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  pre_job:
+    runs-on: ubuntu-20.04
+    outputs:
+      all_steps_ids_json:
+      cache_version_suffix:
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+#      - name: Get missing step caches matrices
+#        id: get_missing_caches_matrices
+#        uses: ./.github/actions/get_steps_missing_caches
+#        with:
+#          steps_ids: ${{ steps.get_all_used_steps_cache_keys.outputs.steps_ids_json }}
+#          cache_version_suffix: ${{ steps.get_all_used_steps_cache_keys.outputs.cache_version_suffix }}
+#          cache_root: agent_build_output/step_cache
+#          lookup_only: true
+
+      - name: Print
+        id: print
+        shell: bash
+        run: |
+          echo '${{ steps.get_missing_caches_matrices.outputs.missing_cache_keys_json }}' > /tmp/missing_cache_keys.json
+          echo !!!!!!
+          cat /tmp/missing_cache_keys.json
+          echo "@@@@@@@@@@"
+          python3 agent_build_refactored/cicd/get_prebuilt_steps_runners.py get-missing-caches-matrices --input-missing-cache-keys-file /tmp/missing_cache_keys.json > /tmp/missing_cache_matrices.json
+          echo "111111"
+          jq -c '.[0]' /tmp/missing_cache_matrices.json
+          jq -c '.[0]["include"] | length' /tmp/missing_cache_matrices.json
+          jq -c '.[1]' /tmp/missing_cache_matrices.json
+          jq -c '.[1]["include"] | length' /tmp/missing_cache_matrices.json
+          jq -c '.[2]' /tmp/missing_cache_matrices.json
+          jq -c '.[2]["include"] | length' /tmp/missing_cache_matrices.json
+          jq -c '.[3]' /tmp/missing_cache_matrices.json
+          jq -c '.[3]["include"] | length' /tmp/missing_cache_matrices.json
+          echo "22222"
+          echo "matrix0=$(jq -c '.[0]' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
+          echo "matrix_length0=$(jq -c '.[0]["include"] | length' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
+          echo "matrix1=$(jq -c '.[1]' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
+          echo "matrix_length1=$(jq -c '.[1]["include"] | length' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
+          echo "matrix2=$(jq -c '.[2]' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
+          echo "matrix_length2=$(jq -c '.[2]["include"] | length' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
+          echo "matrix3=$(jq -c '.[3]' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
+          echo "matrix_length3=$(jq -c '.[3]["include"] | length' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
+          echo "LLLLLLLLLLL"
+          cat $GITHUB_OUTPUT
+#
+#  run_pre_built_job0:
+#    name: Level 0 ${{ matrix.name }}
+#    runs-on: ubuntu-20.04
+#    needs:
+#      - pre_job
+#    if: ${{ needs.pre_job.outputs.matrix_length0 != '0' }}
+#    strategy:
+#      matrix: ${{ fromJSON(needs.pre_job.outputs.matrix0) }}
+#    steps:
+#      - name: Checkout repository
+#        uses: actions/checkout@v3
+#
+#
+#      - name: Get missing step caches matrices
+#        id: get_missing_caches_matrices
+#        uses: ./.github/actions/run_pre_built_step
+#        with:
+#          step_runner_fqdn: ${{ matrix.step_runner_fqdn }}
+#          required_steps: ${{ toJSON(matrix.required_steps) }}
+#          step_id: ${{ matrix.step_id }}
+#          cache_version_suffix: ${{ matrix.cache_version_suffix }}
+#          python_version: ${{ inputs.python_version }}
+#          aws_private_key: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
+#          aws_access_key: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
+#          aws_secret_key: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
+#          aws_private_key_name: ${{ inputs.aws_private_key_name }}
+#          aws_region: ${{ inputs.aws_region }}
+#          aws_security_group: ${{ inputs.aws_security_group }}
+#          aws_prefix_list_id: ${{ inputs.aws_prefix_list_id }}
+#          aws_objects_name_prefix: ${{ inputs.aws_objects_name_prefix }}

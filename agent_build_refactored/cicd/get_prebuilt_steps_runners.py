@@ -24,6 +24,7 @@ import json
 import os
 import pathlib as pl
 import sys
+import yaml
 from typing import Dict
 
 # This file can be executed as script. Add source root to the PYTHONPATH in order to be able to import
@@ -84,7 +85,6 @@ for name, runner_cls in ALL_USED_BUILDERS.items():
 
 
 a=10
-
 
 
 def create_wrapper_runner_from_step(step: RunnerStep):
@@ -191,6 +191,47 @@ def get_missing_caches_matrices(input_missing_cache_keys_file: pl.Path):
     return matrices
 
 
+def render_workflow_yaml():
+    template_path = pl.Path(__file__).parent / "run-pre-build-jobs_template.yml"
+    with template_path.open() as f:
+        workflow = yaml.load(f, yaml.Loader)
+
+    jobs = workflow["jobs"]
+
+    pre_job = jobs["pre_job"]
+
+    pre_job["outputs"] = pre_job_outputs = {}
+
+    all_used_steps_ids = list(sorted(all_used_steps.keys()))
+    # pre_job_outputs["all_steps_ids_json"] = json.dumps(all_used_steps_ids)
+    # pre_job_outputs["cache_version_suffix"] = CACHE_VERSION_SUFFIX
+
+    pre_job_steps = pre_job["steps"]
+
+    get_missing_cache_steps = {
+        "name": "Get missing step caches matrices",
+        "id": "get_missing_caches_matrices",
+        "uses": "./.github/actions/get_steps_missing_caches",
+        "with": {
+            "steps_ids": json.dumps(all_used_steps_ids),
+            "cache_version_suffix": CACHE_VERSION_SUFFIX,
+            "cache_root": "agent_build_output/step_cache",
+            "lookup_only": "true",
+        }
+    }
+
+    pre_job_steps.insert(1, get_missing_cache_steps)
+
+    workflow_path = SOURCE_ROOT / ".github/workflows/run-pre-build-jobs.yml"
+
+    with workflow_path.open("w") as f:
+        yaml.dump(workflow, f, yaml.Dumper)
+
+
+
+    a=10
+
+
 def get_all_cache_keys():
     step_ids = set()
     for level in runner_levels:
@@ -214,6 +255,8 @@ if __name__ == "__main__":
 
     get_cache_version_suffix_parser = subparsers.add_parser("get-cache-version-suffix")
 
+    render_workflow_yaml_parser = subparsers.add_parser("render-workflow-yaml")
+
     args = parser.parse_args()
 
     if args.command == "get-missing-caches-matrices":
@@ -225,5 +268,8 @@ if __name__ == "__main__":
         print(get_all_cache_keys())
     elif args.command == "get-cache-version-suffix":
         print(CACHE_VERSION_SUFFIX)
+    elif args.command == "render-workflow-yaml":
+        render_workflow_yaml()
+
 
     exit(0)
