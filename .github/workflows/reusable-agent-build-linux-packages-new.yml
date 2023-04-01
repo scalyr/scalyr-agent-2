@@ -108,7 +108,7 @@ jobs:
       - name: Get required steps ids
         id: get_required_steps_ids
         run: |
-          echo "all_required_steps=$(venv/bin/python3 build_package_new_refactored.py ${{ matrix.name }} --get-all-steps)" >> $GITHUB_OUTPUT
+          echo "all_required_steps=$(venv/bin/python3 build_package_new_refactored.py ${{ matrix.packages.name }} --get-all-steps)" >> $GITHUB_OUTPUT
           echo "cache_version_suffix=$(venv/bin/python3 agent_build_refactored/cicd/get_prebuilt_steps_runners.py get-cache-version-suffix)" >> $GITHUB_OUTPUT
           cat $GITHUB_OUTPUT
 
@@ -122,7 +122,7 @@ jobs:
 
       # Finally build the packages. We also specify already pre-downloaded dependency 'python' and 'agent-libs' packages
       # to reuse them instead of building if they are not changed.
-      - name: Build managed package with builder '${{ matrix.name }}'
+      - name: Build managed package with builder '${{ matrix.packages.name }}'
 #        env:
 #          SSH_AUTH_SOCK: ${{ steps.prepare-ssh.outputs.ssh_auth_sock }}
 #          AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
@@ -134,12 +134,12 @@ jobs:
 #          AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ inputs.aws_prefix_list_id }}
 #          AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
         run: |
-            venv/bin/python3 build_package_new_refactored.py ${{ matrix.name }} build 
+            venv/bin/python3 build_package_new_refactored.py ${{ matrix.packages.name }} build 
 
       - name: Save packages as artifact
         uses: actions/upload-artifact@v3
         with:
-          name: linux-packages-${{ matrix.name }}
+          name: linux-packages-${{ matrix.packages.name }}
           path: build
           retention-days: 1
 
