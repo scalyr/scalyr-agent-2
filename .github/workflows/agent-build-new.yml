@@ -79,50 +79,50 @@ jobs:
       CT_AWS_DEV_EC2_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
       CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
       CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
-#
-#  build-windows-package:
-#    name: "Build Windows package"
-#    uses: ./.github/workflows/reusable-agent-build-windows.yml
-#    secrets:
-#      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-#
-#  build_tarball:
-#    runs-on: ubuntu-20.04
-#
-#    steps:
-#      - name: Checkout repository
-#        uses: actions/checkout@v3
-#
-#      - name: Install python
-#        uses: actions/setup-python@v4
-#        with:
-#          python-version: "3.8.13"
-#
-#      - name: Build tarball
-#        run: |
-#          mkdir -p build/tarball/noarch
-#          pushd build/tarball/noarch
-#          python3 ../../../build_package.py tarball
-#          popd
-#
-#      - name: Save tarball as artifact
-#        uses: actions/upload-artifact@v3
-#        with:
-#          name: tarball-noarch
-#          path: build
-#          retention-days: 1
-#
-#      - name: Notify Slack on Failure
-#        if: ${{ failure() && github.ref_name == 'master' }}
-#        uses: act10ns/slack@ed1309ab9862e57e9e583e51c7889486b9a00b0f # v2.0.0
-#        env:
-#          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-#        with:
-#          status: ${{ job.status }}
-#          steps: ${{ toJson(steps) }}
-#          channel: '#eng-dataset-cloud-tech'
-#
-#
+
+  build-windows-package:
+    name: "Build Windows package"
+    uses: ./.github/workflows/reusable-agent-build-windows.yml
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  build_tarball:
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Prepare dev requirements.
+        uses: ./.github/actions/prepare_python_with_dev_requirements
+        with:
+          python_version: ${{ needs.pre_job.outputs.python_version }}
+
+      - name: Build tarball
+        run: |
+          mkdir -p build/tarball/noarch
+          pushd build/tarball/noarch
+          venv/bin/python3 ../../../build_package.py tarball
+          popd
+
+      - name: Save tarball as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: tarball-noarch
+          path: build
+          retention-days: 1
+
+      - name: Notify Slack on Failure
+        if: ${{ failure() && github.ref_name == 'master' }}
+        uses: act10ns/slack@ed1309ab9862e57e9e583e51c7889486b9a00b0f # v2.0.0
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          status: ${{ job.status }}
+          steps: ${{ toJson(steps) }}
+          channel: '#eng-dataset-cloud-tech'
+
+
   # Aggregate all agent build artifacts that we build by this workflow and put in a single artifact,
   # so it's just need to download only one artifact, for example during a release process.
   prepare-artifacts:
