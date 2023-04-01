@@ -14,16 +14,35 @@ runs:
       with:
         python-version: ${{ inputs.python_version }}
 
+#    - name: Cache dev requirements
+#      id: cache_dev_requirements
+#      uses: actions/cache@v3
+#      with:
+#        path: venv
+#        key: dev-requirements-${{ inputs.python_version }}-${{ hashFiles('dev-requirements-new.txt') }}
+
+#    - name: Install dev. requirements
+#      if: steps.cache_dev_requirements.outputs.cache-hit != 'true'
+#      shell: bash
+#      run: |
+#        python3 -m venv venv
+#        venv/bin/python3 -m pip install -r dev-requirements-new.txt
+
     - name: Cache dev requirements
       id: cache_dev_requirements
       uses: actions/cache@v3
       with:
-        path: venv
+        path: /tmp/python_cache
         key: dev-requirements-${{ inputs.python_version }}-${{ hashFiles('dev-requirements-new.txt') }}
 
     - name: Install dev. requirements
       if: steps.cache_dev_requirements.outputs.cache-hit != 'true'
       shell: bash
       run: |
-        python3 -m venv venv
-        venv/bin/python3 -m pip install -r dev-requirements-new.txt
+        python3 -m pip install --root /tmp/python_cache -r dev-requirements-new.txt
+
+    - name: Install dev. requirements
+      shell: bash
+      run: |
+        ls /tmp/python_cache
+        sudo cp -a /tmp/python_cache /
