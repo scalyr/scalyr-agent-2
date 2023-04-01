@@ -73,7 +73,7 @@ jobs:
         i=0
         jq -c '.[]' /tmp/missing_cache_matrices.json | while read -r matrix; do 
           echo "matrix${i}=$(echo "$matrix" | jq -c '.')" >> $GITHUB_OUTPUT
-          echo "matrix_length${i}=$(echo "$matrix" | jq -c '. | length')" >> $GITHUB_OUTPUT
+          echo "matrix_length${i}=$(echo "$matrix" | jq -c '.["include"] | length')" >> $GITHUB_OUTPUT
           ((i=i+1))
         done
         cat $GITHUB_OUTPUT
