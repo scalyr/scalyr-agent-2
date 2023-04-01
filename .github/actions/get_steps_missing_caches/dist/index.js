@@ -59795,7 +59795,7 @@ async function executeRunner() {
             console.log(`Cache for the step with key ${finalCacheKey} is found.`)
         } else {
             console.log(`Cache for the step with key ${finalCacheKey} is not found.`)
-            missingCaches.push(finalCacheKey)
+            missingCaches.push(cacheKey)
         }
     }
 
