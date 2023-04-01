@@ -73,7 +73,7 @@ runs:
       uses: actions/cache@v3
       with:
         path: |
-          agent_build_output/step_cache/${{ inputs.step_id }}
+           ${GITHUB_WORKSPACE}/agent_build_output/step_cache/${{ inputs.step_id }}
         key: ${{ inputs.step_id }}_${{ inputs.cache_version_suffix }}
 
     - name: Get required steps caches
