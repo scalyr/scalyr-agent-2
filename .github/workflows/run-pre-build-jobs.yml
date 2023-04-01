@@ -32,8 +32,10 @@ jobs:
           "prepare_toolset_x86_64-ubuntu-22-04-linux-amd64-5f07026ce1870528e32b1fee8560e7565bdf73a8ceee7fad4d2a289aec204a7b"]'
     - id: print
       name: Print
-      run: "jq '.[]' /tmp/missing_cache_matrices.json | while read -r repo; do \n\
-        \  echo \"do something with $repo\"; \ndone\nexit 0\n\necho '${{ steps.get_missing_caches_matrices.outputs.missing_cache_keys_json\
+      run: "echo '${{ steps.get_missing_caches_matrices.outputs.missing_cache_keys_json\
+        \ }}' > /tmp/missing_cache_keys.json\njq '.[]' /tmp/missing_cache_matrices.json\
+        \ | while read -r repo; do \n  echo \"do something with $repo\"; \ndone\n\
+        exit 0\n\necho '${{ steps.get_missing_caches_matrices.outputs.missing_cache_keys_json\
         \ }}' > /tmp/missing_cache_keys.json\necho !!!!!!\ncat /tmp/missing_cache_keys.json\n\
         echo \"@@@@@@@@@@\"\npython3 agent_build_refactored/cicd/get_prebuilt_steps_runners.py\
         \ get-missing-caches-matrices --input-missing-cache-keys-file /tmp/missing_cache_keys.json\

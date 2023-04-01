@@ -56,6 +56,7 @@ jobs:
         id: print
         shell: bash
         run: |
+          echo '${{ steps.get_missing_caches_matrices.outputs.missing_cache_keys_json }}' > /tmp/missing_cache_keys.json
           jq '.[]' /tmp/missing_cache_matrices.json | while read -r repo; do 
             echo "do something with $repo"; 
           done
