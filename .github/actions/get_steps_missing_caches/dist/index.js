@@ -58673,6 +58673,7 @@ async function executeRunner() {
     const stepsIdsJSON = core.getInput("steps_ids");
     const lookupOnlyStr = core.getInput("lookup-only");
     const lookupOnly = lookupOnlyStr === 'true' ? true : false;
+    console.log("FFFFFFFF")
     console.log(lookupOnlyStr === 'true')
     const cacheRoot = core.getInput("cache_root");
 
