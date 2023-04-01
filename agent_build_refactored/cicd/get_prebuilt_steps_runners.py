@@ -24,7 +24,6 @@ import json
 import os
 import pathlib as pl
 import sys
-import yaml
 import strictyaml
 from typing import Dict
 
