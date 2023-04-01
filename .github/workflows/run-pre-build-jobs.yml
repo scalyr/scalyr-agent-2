@@ -33,7 +33,9 @@ jobs:
     - id: print
       name: Print
       run: "echo '${{ steps.get_missing_caches_matrices.outputs.missing_cache_keys_json\
-        \ }}' > /tmp/missing_cache_keys.json\njq '.[]' /tmp/missing_cache_matrices.json\
+        \ }}' > /tmp/missing_cache_keys.json\npython3 agent_build_refactored/cicd/get_prebuilt_steps_runners.py\
+        \ get-missing-caches-matrices --input-missing-cache-keys-file /tmp/missing_cache_keys.json\
+        \ > /tmp/missing_cache_matrices.json\njq '.[]' /tmp/missing_cache_matrices.json\
         \ | while read -r repo; do \n  echo \"do something with $repo\"; \ndone\n\
         exit 0\n\necho '${{ steps.get_missing_caches_matrices.outputs.missing_cache_keys_json\
         \ }}' > /tmp/missing_cache_keys.json\necho !!!!!!\ncat /tmp/missing_cache_keys.json\n\
