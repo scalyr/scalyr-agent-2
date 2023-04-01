@@ -9,6 +9,8 @@ inputs:
 
   cache_key:
     description: ""
+  cache_version_suffix:
+    description: ""
   cache_path:
     description: ""
 
