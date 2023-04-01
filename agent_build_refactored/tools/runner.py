@@ -1162,6 +1162,14 @@ class Runner:
         )
 
         parser.add_argument(
+            "--get-all-steps",
+            dest="get_all_steps",
+            action="store_true",
+            help="Get ids of all used steps. it is meant to be used by GitHub Actions and there's no need to "
+            "use it manually.",
+        )
+
+        parser.add_argument(
             "--run-all-cacheable-steps",
             dest="run_all_cacheable_steps",
             action="store_true",
@@ -1202,6 +1210,10 @@ class Runner:
                 steps=list(steps.values()),
                 work_dir=work_dir,
             )
+            exit(0)
+        elif args.get_all_steps:
+            steps_ids = list(sorted(cls.get_all_steps().keys()))
+            print(json.dumps(steps_ids))
             exit(0)
 
     def _start_ec2_builder_instance(self):

@@ -52,10 +52,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Install python
-        uses: actions/setup-python@v4
+#      - name: Install python
+#        uses: actions/setup-python@v4
+#        with:
+#          python-version: ${{ matrix.python-version }}
+
+      - name: Prepare dev requirements.
+        uses: ./.github/actions/prepare_python_with_dev_requirements
         with:
-          python-version: ${{ matrix.python-version }}
+          python_version: ${{ inputs.python_version }}
 
       - name: Set up QEMU
         id: qemu
@@ -69,137 +74,66 @@ jobs:
         with:
           driver-opts: network=host
 
-      - name: Prepare environment.
-        uses: ./.github/actions/execute-runner
-        with:
-          runner-fqdn: "agent_build_refactored.__init__.BuildTestEnvironment"
+#      - name: Prepare environment.
+#        uses: ./.github/actions/execute-runner
+#        with:
+#          runner-fqdn: "agent_build_refactored.__init__.BuildTestEnvironment"
 
-      - name: Prepare SSH
-        id: prepare-ssh
-        shell: bash
+#      - name: Prepare SSH
+#        id: prepare-ssh
+#        shell: bash
+#        run: |
+#          echo '${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}' > /tmp/private_key.pem
+#          chmod 600 /tmp/private_key.pem
+#          eval `ssh-agent -s`
+#
+#          cat "/tmp/private_key.pem" | ssh-add -
+#          echo "ssh_auth_sock=${SSH_AUTH_SOCK}" >> $GITHUB_OUTPUT
+
+
+#      - name: Prepare everything that is needed by builder '${{ matrix.name }}'
+#        uses: ./.github/actions/execute-runner
+#        env:
+#          SSH_AUTH_SOCK: ${{ steps.prepare-ssh.outputs.ssh_auth_sock }}
+#        with:
+#          runner-fqdn: ${{ matrix.builder-fqdn }}
+#          aws_access_key: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
+#          aws_secret_key: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
+#          aws_private_key_path: "/tmp/private_key.pem"
+#          aws_private_key_name: ${{ inputs.aws_private_key_name }}
+#          aws_region: ${{ inputs.aws_region }}
+#          aws_security_group: ${{ inputs.aws_security_group }}
+#          aws_security_groups_prefix_list_id: ${{ inputs.aws_prefix_list_id }}
+#          aws_objects_name_prefix: ${{ inputs.aws_objects_name_prefix }}
+      - name: Get required steps ids
+        id: get_required_steps_ids
         run: |
-          echo '${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}' > /tmp/private_key.pem
-          chmod 600 /tmp/private_key.pem
-          eval `ssh-agent -s`
+          echo "all_required_steps=$(venv/bin/python3 build_package_new_refactored.py ${{ matrix.name }} --get-all-steps)" >> $GITHUB_OUTPUT
+          echo "cache_version_suffix=$(venv/bin/python3 agent_build_refactored/cicd/get_prebuilt_steps_runners.py get-cache-version-suffix)" >> $GITHUB_OUTPUT
 
-          cat "/tmp/private_key.pem" | ssh-add -
-          echo "ssh_auth_sock=${SSH_AUTH_SOCK}" >> $GITHUB_OUTPUT
-
-
-      - name: Prepare everything that is needed by builder '${{ matrix.name }}'
-        uses: ./.github/actions/execute-runner
-        env:
-          SSH_AUTH_SOCK: ${{ steps.prepare-ssh.outputs.ssh_auth_sock }}
+      - name: Get required steps caches
+        id: get_required_steps_caches
+        uses: ./.github/actions/get_steps_missing_caches
         with:
-          runner-fqdn: ${{ matrix.builder-fqdn }}
-          aws_access_key: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
-          aws_secret_key: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
-          aws_private_key_path: "/tmp/private_key.pem"
-          aws_private_key_name: ${{ inputs.aws_private_key_name }}
-          aws_region: ${{ inputs.aws_region }}
-          aws_security_group: ${{ inputs.aws_security_group }}
-          aws_security_groups_prefix_list_id: ${{ inputs.aws_prefix_list_id }}
-          aws_objects_name_prefix: ${{ inputs.aws_objects_name_prefix }}
-
-      # Before we build needed packages, we check if the target repo already contains dependency
-      # 'scalyr-agent-python3' and 'scalyr-agent-libs' packages. If there are such packages, then we reuse them
-      # instead of building.
-      #
-      # First get last version package file names from repository.
-      - name: Get last packages names from repo for the '${{ matrix.name }}'
-        id: get_last_packages_names
-        run: |
-            set -e
-          
-            echo "last_repo_python_package_name=${LAST_REPO_PYTHON_PACKAGE_NAME}" >> $GITHUB_OUTPUT
-            echo "last_repo_agent_libs_package_name=${LAST_REPO_AGENT_LIBS_PACKAGE_NAME}" >> $GITHUB_OUTPUT
-
-      # Look for python package in cache, so we don't have to download it every time from the Packagecloud.
-      - name: Cache last repo Python package.
-        if: steps.get_last_packages_names.outputs.last_repo_python_package_name
-        id: cache_python
-        uses: actions/cache@v3
-        with:
-          path: /tmp/python-package
-          key: python-package-${{ steps.get_last_packages_names.outputs.last_repo_python_package_name }}-${{ matrix.name }}-v1
-
-      # Look for agent-libs package in cache, so we don't have to download it every time from the Packagecloud.
-      - name: Cache last repo agent libs package.
-        if: steps.get_last_packages_names.outputs.last_repo_agent_libs_package_name
-        id: cache_agent_libs
-        uses: actions/cache@v3
-        with:
-          path: /tmp/agent-libs-package
-          key: agent-libs-package-${{ steps.get_last_packages_names.outputs.last_repo_agent_libs_package_name }}-${{ matrix.name }}-v1
-
-      # If python package is not in cache, then we have to download it from the Packagecloud.
-      - name: Download or use cached python package
-        # if: steps.get_last_packages_names.outputs.last_repo_python_package_name && steps.cache_python.outputs.cache-hit != 'true'
-        id: download_python
-        run: |
-            set -e 
-            if [ -n "${{ steps.get_last_packages_names.outputs.last_repo_python_package_name }}" ] && [ "${{ steps.cache_python.outputs.cache-hit }}" != "true" ]; then
-              LAST_REPO_PYTHON_PACKAGE_PATH=$(
-                python3 build_package_new_refactored.py ${{ matrix.name }} \
-                download_package \
-                --user-name "${{ secrets.PACKAGE_CLOUD_USER }}" \
-                --repo-name "${{ secrets.PACKAGE_CLOUD_INTERNAL_REPO }}" \
-                --token ${{ secrets.PACKAGE_CLOUD_TOKEN }} \
-                --package-filename "${{ steps.get_last_packages_names.outputs.last_repo_python_package_name }}" \
-                --output-dir /tmp/python-package
-              )
-              echo "::notice::Re-using downloaded python package from the Packagecloud."
-            elif [ -n "${{ steps.get_last_packages_names.outputs.last_repo_python_package_name }}" ]; then
-              LAST_REPO_PYTHON_PACKAGE_PATH="/tmp/python-package/${{ steps.get_last_packages_names.outputs.last_repo_python_package_name }}"
-              echo "::notice::Re-using python package from cache."
-            else
-              echo "::notice::No python packages to reuse."
-            fi
-              
-            
-            echo "last_repo_python_package_path=${LAST_REPO_PYTHON_PACKAGE_PATH}" >> $GITHUB_OUTPUT
-
-      # If agent-lib package is not in cache, then we have to download it from the Packagecloud.
-      - name: Download or use cached agent libs package
-        #if: steps.get_last_packages_names.outputs.last_repo_agent_libs_package_name && steps.cache_agent_libs.outputs.cache-hit != 'true'
-        id: download_agent_libs
-        run: |
-            set -e
-            if [ -n "${{ steps.get_last_packages_names.outputs.last_repo_agent_libs_package_name }}" ] && [ "${{ steps.cache_agent_libs.outputs.cache-hit }}" != "true" ]; then
-              LAST_REPO_AGENT_LIBS_PACKAGE_PATH=$(
-                python3 build_package_new_refactored.py ${{ matrix.name }} \
-                download_package \
-                --user-name "${{ secrets.PACKAGE_CLOUD_USER }}" \
-                --repo-name "${{ secrets.PACKAGE_CLOUD_INTERNAL_REPO }}" \
-                --token ${{ secrets.PACKAGE_CLOUD_TOKEN }} \
-                --package-filename "${{ steps.get_last_packages_names.outputs.last_repo_agent_libs_package_name }}" \
-                --output-dir /tmp/agent-libs-package
-              )
-              echo "::notice::Re-using downloaded agent-libs package from the Packagecloud."
-            elif [ -n "${{ steps.get_last_packages_names.outputs.last_repo_agent_libs_package_name }}" ]; then
-              LAST_REPO_AGENT_LIBS_PACKAGE_PATH="/tmp/agent-libs-package/${{ steps.get_last_packages_names.outputs.last_repo_agent_libs_package_name }}"
-              echo "::notice::Re-using agent-libs package from cache."
-            else
-              echo "::notice::No agent-libs packages to reuse."
-            fi
-          
-            echo "last_repo_agent_libs_package_path=${LAST_REPO_AGENT_LIBS_PACKAGE_PATH}" >> $GITHUB_OUTPUT
+          steps_ids: ${{ steps.get_required_steps_ids.outputs.all_required_steps }}
+          cache_version_suffix: ${{ steps.get_required_steps_ids.outputs.cache_version_suffix }}
+          cache_root: agent_build_output/step_cache
 
       # Finally build the packages. We also specify already pre-downloaded dependency 'python' and 'agent-libs' packages
       # to reuse them instead of building if they are not changed.
       - name: Build managed package with builder '${{ matrix.name }}'
-        env:
-          SSH_AUTH_SOCK: ${{ steps.prepare-ssh.outputs.ssh_auth_sock }}
-          AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
-          AWS_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
-          AWS_PRIVATE_KEY_NAME: ${{ inputs.aws_private_key_name }}
-          AWS_PRIVATE_KEY_PATH: "/tmp/private_key.pem"
-          AWS_REGION: ${{ inputs.aws_region }}
-          AWS_SECURITY_GROUP: ${{ inputs.aws_security_group }}
-          AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ inputs.aws_prefix_list_id }}
-          AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
+#        env:
+#          SSH_AUTH_SOCK: ${{ steps.prepare-ssh.outputs.ssh_auth_sock }}
+#          AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
+#          AWS_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
+#          AWS_PRIVATE_KEY_NAME: ${{ inputs.aws_private_key_name }}
+#          AWS_PRIVATE_KEY_PATH: "/tmp/private_key.pem"
+#          AWS_REGION: ${{ inputs.aws_region }}
+#          AWS_SECURITY_GROUP: ${{ inputs.aws_security_group }}
+#          AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ inputs.aws_prefix_list_id }}
+#          AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
         run: |
-            python3 build_package_new_refactored.py ${{ matrix.name }} build 
+            venv/bin/python3 build_package_new_refactored.py ${{ matrix.name }} build 
 
       - name: Save packages as artifact
         uses: actions/upload-artifact@v3

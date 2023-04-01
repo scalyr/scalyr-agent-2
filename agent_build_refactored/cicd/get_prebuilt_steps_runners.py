@@ -245,6 +245,8 @@ if __name__ == "__main__":
         print(json.dumps(matrices))
     elif args.command == "render-workflow-yaml":
         render_workflow_yaml()
+    elif args.command == "get-cache-version-suffix":
+        print(CACHE_VERSION_SUFFIX)
 
 
     exit(0)
