@@ -57,6 +57,7 @@ jobs:
         with:
           steps_ids: ${{ steps.get_all_used_steps_cache_keys.outputs.steps_ids }}
           cache_version_suffix: ${{ steps.get_all_used_steps_cache_keys.outputs.cache_version_suffix }}
+          cache_root: agent_build_output/step_cache
           lookup_only: true
 
       - name: Print
