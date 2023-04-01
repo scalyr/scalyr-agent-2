@@ -78,11 +78,11 @@ jobs:
           jq -c '.[2]["include"] | length' /tmp/missing_cache_matrices.json
           echo "22222"
           echo "matrix0=$(jq -c '.[0]' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
-          echo "matrix_length0=$(jq -c '.[0] | length' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
+          echo "matrix_length0=$(jq -c '.[0]["include"]  | length' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
           echo "matrix1=$(jq -c '.[1]' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
-          echo "matrix_length1=$(jq -c '.[1] | length' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
+          echo "matrix_length1=$(jq -c '.[1]["include"]  | length' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
           echo "matrix2=$(jq -c '.[2]' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
-          echo "matrix_length2=$(jq -c '.[2] | length' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
+          echo "matrix_length2=$(jq -c '.[2]["include"]  | length' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
 
   run_pre_built_job0:
     name: Level 0 ${{ matrix.name }}
