@@ -94,7 +94,7 @@ jobs:
         uses: ./.github/actions/run_pre_built_step
         with:
           step_runner_fqdn: ${{ matrix.step_runner_fqdn }}
-          required_steps: ${{ matrix.required_steps }}
+          required_steps: toJSON(${{ matrix.required_steps }})
           cache_key: ${{ matrix.cache_key }}
           cache_path: ${{ matrix.cache_path }}
           python_version: ${{ inputs.python_version }}
