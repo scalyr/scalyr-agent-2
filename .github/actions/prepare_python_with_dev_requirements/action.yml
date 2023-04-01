@@ -45,5 +45,5 @@ runs:
       shell: bash
       run: |
         ls /tmp/python_cache
-        ls /tmp/python_cache/home
+        ls /tmp/python_cache/opt
         sudo cp -a /tmp/python_cache /
