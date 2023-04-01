@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-const core = require('@actions/core');
+//const core = require('@actions/core');
 const cache = require('@actions/cache');
-const fs = require('fs');
+//const fs = require('fs');
 const path = require('path')
-const child_process = require('child_process')
-const buffer = require('buffer')
-const readline = require('readline')
-const process = require('process')
+//const child_process = require('child_process')
+//const buffer = require('buffer')
+//const readline = require('readline')
+//const process = require('process')
 
 async function executeRunner() {
     // The main action function. It does the following:
