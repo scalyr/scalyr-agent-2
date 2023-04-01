@@ -71,11 +71,11 @@ jobs:
           python3 agent_build_refactored/cicd/get_prebuilt_steps_runners.py get-missing-caches-matrices --input-missing-cache-keys-file /tmp/missing_cache_keys.json > /tmp/missing_cache_matrices.json
           echo "111111"
           jq -c '.[0]' /tmp/missing_cache_matrices.json
-          jq -c '.[0] | length' /tmp/missing_cache_matrices.json
+          jq -c '.[0]["include"] | length' /tmp/missing_cache_matrices.json
           jq -c '.[1]' /tmp/missing_cache_matrices.json
-          jq -c '.[1] | length' /tmp/missing_cache_matrices.json
+          jq -c '.[1]["include"] | length' /tmp/missing_cache_matrices.json
           jq -c '.[2]' /tmp/missing_cache_matrices.json
-          jq -c '.[2] | length' /tmp/missing_cache_matrices.json
+          jq -c '.[2]["include"] | length' /tmp/missing_cache_matrices.json
           echo "22222"
           echo "matrix0=$(jq -c '.[0]' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
           echo "matrix_length0=$(jq -c '.[0] | length' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
