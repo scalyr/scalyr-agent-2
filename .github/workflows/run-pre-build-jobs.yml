@@ -15,6 +15,8 @@ on:
         type: string
       aws_objects_name_prefix:
         type: string
+      cache_version_suffix:
+        type: string
 
     secrets:
       CT_AWS_DEV_EC2_PRIVATE_KEY:
@@ -53,6 +55,7 @@ jobs:
         uses: ./.github/actions/get_steps_missing_caches
         with:
           caches_keys_json: ${{ steps.get_all_used_steps_cache_keys.outputs.cache_keys_json }}
+          cache_version_suffix: ${{ inputs.cache_version_suffix }}
 
       - name: Print
         id: print

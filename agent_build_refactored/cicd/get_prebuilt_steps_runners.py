@@ -55,8 +55,35 @@ builders_to_prebuilt_runners = {}
 
 all_used_steps: Dict[str, RunnerStep] = {}
 for name, runner_cls in ALL_USED_BUILDERS.items():
-    for step_id, step in runner_cls.get_all_steps().items():
+    for step_id, step in runner_cls.get_all_steps(recursive=True).items():
         all_used_steps[step_id] = step
+
+# all_used_steps_list = []
+# all_used_steps_indices = {}
+#
+# for i, step_id in enumerate(sorted(all_used_steps.keys())):
+#     all_used_steps_list.append({
+#         "step_id": step_id,
+#         "required_steps": []
+#     })
+#     all_used_steps_indices[step_id] = i
+#
+# a=10
+# for step_info in all_used_steps_list:
+#     step_id = step_info["step_id"]
+#     step = all_used_steps[step_id]
+#     required_steps = []
+#     for req_step_id in step.get_all_required_steps():
+#         required_steps.append(
+#             all_used_steps_indices[req_step_id]
+#         )
+#
+#     step_info["required_steps"] = required_steps
+
+
+
+a=10
+
 
 
 def create_wrapper_runner_from_step(step: RunnerStep):

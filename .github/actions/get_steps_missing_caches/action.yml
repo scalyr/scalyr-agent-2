@@ -9,6 +9,10 @@ inputs:
 outputs:
   missing_cache_keys_json:
     description: "JSON-encoded list of missing step cache keys"
+  cache_version_suffix:
+    description: ""
+  cache_root:
+    description: ""
 
 
 runs:

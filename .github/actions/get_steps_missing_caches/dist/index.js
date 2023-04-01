@@ -59772,17 +59772,23 @@ async function executeRunner() {
     //    steps will be cached using their cache names.
 
     const cachesKeysJson = core.getInput("caches_keys_json");
+    const cacheVersionSuffix = core.getInput("cache_version_suffix");
+    const lookupOnly = core.getInput("lookup-only");
+    const cacheRoot = core.getInput("cache_root");
+
 
     const cachesKeys = JSON.parse(cachesKeysJson);
 
     const missingCaches = []
 
-    for (let key of cachesKeys) {
+    for (let cacheKey of cachesKeys) {
+        const cachePath = path.join(cacheRoot, cacheKey);
+        const finalCacheKey = "${cacheKey}_${cacheVersionSuffix}"
         const result = await cache.restoreCache(
-            paths=["/tmp/${key}"],
-            primaryKey=key,
+            paths=[cachePath],
+            primaryKey=finalCacheKey,
             restoreKeys=[],
-            options={ lookupOnly: true }
+            options={ lookupOnly: lookupOnly }
         )
 
         if (typeof result !== "undefined") {

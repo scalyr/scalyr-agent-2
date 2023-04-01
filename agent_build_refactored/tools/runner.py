@@ -241,17 +241,19 @@ class RunnerStep:
 
         return sorted(list(set(tracked_files)))
 
-    def get_all_required_steps(self):
+    def get_all_required_steps(self, recursive: bool = False):
 
         result = {}
 
         for step in self.required_steps.values():
             result[step.id] = step
-            result.update(step.get_all_required_steps())
+            if recursive:
+                result.update(step.get_all_required_steps())
 
         if self._base_step:
             result[self._base_step.id] = self._base_step
-            result.update(self._base_step.get_all_required_steps())
+            if recursive:
+                result.update(self._base_step.get_all_required_steps())
 
         return result
 
@@ -842,7 +844,7 @@ class Runner:
         return list(result_dict.values())
 
     @classmethod
-    def get_all_steps(cls) -> Dict[str, RunnerStep]:
+    def get_all_steps(cls, recursive: bool = False) -> Dict[str, RunnerStep]:
         """
         Gather all (including nested) RunnerSteps from all possible plases which are used by this runner.
         """
@@ -850,11 +852,14 @@ class Runner:
         base_environment = cls.get_base_environment()
         if base_environment:
             result[base_environment.id] = base_environment
-            result.update(base_environment.get_all_required_steps())
+            if recursive:
+                result.update(base_environment.get_all_required_steps())
 
         for req_step in cls.get_all_required_steps():
             result[req_step.id] = req_step
-            result.update(req_step.get_all_required_steps())
+
+            if recursive:
+                result.update(req_step.get_all_required_steps())
 
         return result
 
