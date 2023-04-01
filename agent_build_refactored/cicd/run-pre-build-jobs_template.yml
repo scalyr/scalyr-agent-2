@@ -64,7 +64,7 @@ jobs:
           jq -c '.[]' /tmp/missing_cache_matrices.json | while read -r matrix; do 
             
             #echo "$matrix"
-            echo "$matrix" | jq '.'
+            echo "$matrix" | jq -c '.'
             ((i=i+1))
           done
           exit 0
