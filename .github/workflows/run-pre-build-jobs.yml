@@ -38,8 +38,11 @@ jobs:
     runs-on: ubuntu-20.04
     outputs:
       matrix0: ${{ steps.print.outputs.matrix0 }}
+      matrix_length0: ${{ steps.print.outputs.matrix_length0 }}
       matrix1: ${{ steps.print.outputs.matrix1 }}
+      matrix_length1: ${{ steps.print.outputs.matrix_length1 }}
       matrix2: ${{ steps.print.outputs.matrix2 }}
+      matrix_length2: ${{ steps.print.outputs.matrix_length2 }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -125,7 +128,7 @@ jobs:
     needs:
       - pre_job
       - run_pre_built_job0
-    if: ${{ always() && (needs.run_pre_built_job0.result == 'success' || needs.run_pre_built_job0.result == 'skipped') && needs.pre_job.outputs.matrix_length2 == '0' }}
+    if: ${{ always() && (needs.run_pre_built_job0.result == 'success' || needs.run_pre_built_job0.result == 'skipped') && needs.pre_job.outputs.matrix_length1 != '0' }}
     strategy:
       matrix: ${{ fromJSON(needs.pre_job.outputs.matrix1) }}
     steps:
@@ -156,7 +159,7 @@ jobs:
     needs:
       - pre_job
       - run_pre_built_job1
-    if: ${{ always() && (needs.run_pre_built_job1.result == 'success' || needs.run_pre_built_job1.result == 'skipped') && needs.pre_job.outputs.matrix_length1 != '0' }}
+    if: ${{ always() && (needs.run_pre_built_job1.result == 'success' || needs.run_pre_built_job1.result == 'skipped') && needs.pre_job.outputs.matrix_length2 != '0' }}
     strategy:
       matrix: ${{ fromJSON(needs.pre_job.outputs.matrix2) }}
     steps:
