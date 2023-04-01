@@ -156,3 +156,36 @@ jobs:
 #          name: result-artifacts
 #          path: /tmp/result_artifacts
 #          retention-days: 1
+
+  clean-ec2-tests-objects:
+    name: Remove ec2 test workflow prefix list entries
+    if: ${{ always() }}
+    needs:
+      - test_managed_packages
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ needs.pre_job.outputs.python_version }}
+
+      - name: Prepare environment.
+        uses: ./.github/actions/execute-runner
+        with:
+          runner-fqdn: "agent_build_refactored.__init__.BuildTestEnvironment"
+
+      - name: Cleanup old prefix lists for ec2 test security group.
+        env:
+          AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
+          AWS_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
+          AWS_PRIVATE_KEY_NAME: ${{ needs.pre_job.outputs.aws_private_key_name }}
+          AWS_PRIVATE_KEY_PATH: "/tmp/private_key.pem"
+          AWS_REGION: ${{ needs.pre_job.outputs.aws_region }}
+          AWS_SECURITY_GROUP: ${{ needs.pre_job.outputs.aws_security_group }}
+          AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ needs.pre_job.outputs.aws_prefix_list_id }}
+          AWS_OBJECTS_NAME_PREFIX: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
+        run: |
+          python3 agent_build_refactored/tools/run_in_ec2/cleanup_ec2_objects.py

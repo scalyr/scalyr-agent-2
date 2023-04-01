@@ -238,36 +238,4 @@ jobs:
 #            --scalyr-api-key ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }} \
 #            --scalyr-api-read-key ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }} \
 #            --test-session-suffix ${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}
-#
-#  clean-ec2-tests-objects:
-#    name: Remove ec2 test workflow prefix list entries
-#    if: ${{ always() }}
-#    needs:
-#      - test_managed_packages
-#    runs-on: ubuntu-20.04
-#    steps:
-#      - name: Checkout repository
-#        uses: actions/checkout@v3
-#
-#      - name: Install python
-#        uses: actions/setup-python@v4
-#        with:
-#          python-version: "3.8.13"
-#
-#      - name: Prepare environment.
-#        uses: ./.github/actions/execute-runner
-#        with:
-#          runner-fqdn: "agent_build_refactored.__init__.BuildTestEnvironment"
-#
-#      - name: Cleanup old prefix lists for ec2 test security group.
-#        env:
-#          AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
-#          AWS_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
-#          AWS_PRIVATE_KEY_NAME: ${{ inputs.aws_private_key_name }}
-#          AWS_PRIVATE_KEY_PATH: "/tmp/private_key.pem"
-#          AWS_REGION: ${{ inputs.aws_region }}
-#          AWS_SECURITY_GROUP: ${{ inputs.aws_security_group }}
-#          AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ inputs.aws_prefix_list_id }}
-#          AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
-#        run: |
-#          python3 agent_build_refactored/tools/run_in_ec2/cleanup_ec2_objects.py
+
