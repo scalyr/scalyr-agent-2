@@ -59783,7 +59783,7 @@ async function executeRunner() {
 
     for (let cacheKey of cachesKeys) {
         const cachePath = path.join(cacheRoot, cacheKey);
-        const finalCacheKey = "${cacheKey}_${cacheVersionSuffix}"
+        const finalCacheKey = `${cacheKey}_${cacheVersionSuffix}`
         const result = await cache.restoreCache(
             paths=[cachePath],
             primaryKey=finalCacheKey,
