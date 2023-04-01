@@ -167,15 +167,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Install python
-        uses: actions/setup-python@v4
+      - name: Prepare dev requirements.
+        uses: ./.github/actions/prepare_python_with_dev_requirements
         with:
-          python-version: ${{ needs.pre_job.outputs.python_version }}
-
-      - name: Prepare environment.
-        uses: ./.github/actions/execute-runner
-        with:
-          runner-fqdn: "agent_build_refactored.__init__.BuildTestEnvironment"
+          python_version: ${{ needs.pre_job.outputs.python_version }}
 
       - name: Cleanup old prefix lists for ec2 test security group.
         env:
