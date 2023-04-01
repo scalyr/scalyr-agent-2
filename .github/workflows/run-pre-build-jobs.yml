@@ -91,6 +91,7 @@ jobs:
         with:
           step_runner_fqdn: ${{ matrix.step_runner_fqdn }}
           cache_key: ${{ matrix.cache_key }}
+          cache_path: ${{ matrix.cache_path }}
           python_version: ${{ inputs.python_version }}
           aws_private_key: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
           aws_access_key: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
@@ -122,6 +123,7 @@ jobs:
         with:
           step_runner_fqdn: ${{ matrix.step_runner_fqdn }}
           cache_key: ${{ matrix.cache_key }}
+          cache_path: ${{ matrix.cache_path }}
           python_version: ${{ inputs.python_version }}
           aws_private_key: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
           aws_access_key: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
@@ -151,6 +153,7 @@ jobs:
         with:
           step_runner_fqdn: ${{ matrix.step_runner_fqdn }}
           cache_key: ${{ matrix.cache_key }}
+          cache_path: ${{ matrix.cache_path }}
           python_version: ${{ inputs.python_version }}
           aws_private_key: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
           aws_access_key: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}

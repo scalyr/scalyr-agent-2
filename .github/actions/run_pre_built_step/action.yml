@@ -7,6 +7,8 @@ inputs:
 
   cache_key:
     description: ""
+  cache_path:
+    description: ""
 
   python_version:
     description: ""
@@ -67,7 +69,7 @@ runs:
       id: cache-step
       uses: actions/cache@v3
       with:
-        path: agent_build_output/step_cache/${{ inputs.cache_key }}
+        path: agent_build_output/step_cache/${{ inputs.cache_path }}
         key: ${{ inputs.cache_key }}
 
     - name: Run cached step
