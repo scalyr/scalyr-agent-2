@@ -40,6 +40,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Prepare dev requirements.
+        uses: ./.github/actions/prepare_python_with_dev_requirements
+        with:
+          python_version: ${{ inputs.python_version }}
+
 #      - name: Get missing step caches matrices
 #        id: get_missing_caches_matrices
 #        uses: ./.github/actions/get_steps_missing_caches

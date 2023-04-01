@@ -219,7 +219,7 @@ def render_workflow_yaml():
         }
     }
 
-    pre_job_steps.insert(1, get_missing_cache_steps)
+    pre_job_steps.insert(2, get_missing_cache_steps)
 
     workflow_path = SOURCE_ROOT / ".github/workflows/run-pre-build-jobs.yml"
 
