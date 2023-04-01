@@ -111,12 +111,12 @@ jobs:
 
 
   run_pre_built_job1:
-    name: Level 1 ${{ matrix.name }} ${{ always() && success() && needs.pre_job.outputs.matrix1 != '' }}
+    name: Level 1 ${{ matrix.name }}
     runs-on: ubuntu-20.04
     needs:
       - pre_job
       - run_pre_built_job0
-    if: ${{ always() && success() && needs.pre_job.outputs.matrix1 != '' }}
+    if: ${{ (needs.run_pre_built_job0.result == "success" || needs.run_pre_built_job0.result == "skipped") && needs.pre_job.outputs.matrix1 != '' }}
     strategy:
       matrix: ${{ fromJSON(needs.pre_job.outputs.matrix1) }}
     steps:
