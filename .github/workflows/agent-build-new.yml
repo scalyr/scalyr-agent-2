@@ -82,13 +82,14 @@ jobs:
 
   build-windows-package:
     name: "Build Windows package"
+    needs: pre_job
     uses: ./.github/workflows/reusable-agent-build-windows.yml
     secrets:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
   build_tarball:
     runs-on: ubuntu-20.04
-
+    needs: pre_job
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3

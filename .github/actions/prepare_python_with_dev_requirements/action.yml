@@ -44,5 +44,5 @@ runs:
     - name: Install dev. requirements
       shell: bash
       run: |
-        ls /tmp/python_cache
+        ls /tmp/python_cache/home
         sudo cp -a /tmp/python_cache /
