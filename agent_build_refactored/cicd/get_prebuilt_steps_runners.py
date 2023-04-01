@@ -184,7 +184,7 @@ def get_missing_caches_matrices(input_missing_cache_keys_file: pl.Path):
             matrix = ""
 
         matrix = {
-            "packages": matrix_include
+            "include": matrix_include
         }
         matrices.append(matrix)
 
