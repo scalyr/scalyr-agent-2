@@ -129,8 +129,8 @@ jobs:
     runs-on: ubuntu-20.04
     needs:
       - build-linux-packages
-      - build-windows-package
-      - build_tarball
+      #- build-windows-package
+      #- build_tarball
 
     steps:
       - name: Checkout repository
