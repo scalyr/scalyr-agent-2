@@ -71,6 +71,7 @@ jobs:
         echo '${{ steps.get_missing_caches_matrices.outputs.missing_cache_keys_json }}' > /tmp/missing_cache_keys.json
         venv/bin/python3  agent_build_refactored/cicd/get_prebuilt_steps_runners.py get-missing-caches-matrices --input-missing-cache-keys-file /tmp/missing_cache_keys.json > /tmp/missing_cache_matrices.json
         jq '.[]' /tmp/missing_cache_matrices.json | while read -r matrix; do 
+          echo "$matrix"
           jq -r '.' <<< "$matrix"
         done
         exit 0
