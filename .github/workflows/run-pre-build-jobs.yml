@@ -116,7 +116,7 @@ jobs:
     needs:
       - pre_job
       - run_pre_built_job0
-    if: ${{ needs.pre_job.outputs.matrix1 != '' }}
+    if: ${{ always() && success() && needs.pre_job.outputs.matrix1 != '' }}
     strategy:
       matrix: ${{ fromJSON(needs.pre_job.outputs.matrix1) }}
     steps:
