@@ -5,14 +5,14 @@ inputs:
   caches_keys_json:
     description: "FQDN of the runner"
     required: true
-
-outputs:
-  missing_cache_keys_json:
-    description: "JSON-encoded list of missing step cache keys"
   cache_version_suffix:
     description: ""
   cache_root:
     description: ""
+
+outputs:
+  missing_cache_keys_json:
+    description: "JSON-encoded list of missing step cache keys"
 
 
 runs:
