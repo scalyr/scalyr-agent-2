@@ -721,6 +721,6 @@ ALPINE_IMAGE_BUILDERS = [
     *ALPINE_K8S_IMAGE_BUILDERS,
 ]
 
-ALL_IMAGE_BUILDERS: Dict[str, Type[ContainerImageBuilder]] = UniqueDict(
-    {b.get_name(): b for b in [*DEBIAN_IMAGE_BUILDERS, *ALPINE_IMAGE_BUILDERS]}
-)
+# ALL_IMAGE_BUILDERS: Dict[str, Type[ContainerImageBuilder]] = UniqueDict(
+#     {b.get_name(): b for b in [*DEBIAN_IMAGE_BUILDERS, *ALPINE_IMAGE_BUILDERS]}
+# )
