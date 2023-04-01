@@ -58687,7 +58687,7 @@ async function executeRunner() {
             paths=[cachePath],
             primaryKey=finalCacheKey,
             restoreKeys=[],
-            //options={ lookupOnly: lookupOnly }
+            options={ lookupOnly: lookupOnly }
         )
         console.log(result)
         if (typeof result !== "undefined") {

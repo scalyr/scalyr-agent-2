@@ -39,7 +39,7 @@ from agent_build_refactored.tools.runner import Runner, RunnerStep
 from agent_build_refactored import ALL_USED_BUILDERS
 
 
-CACHE_VERSION_SUFFIX = "v10"
+CACHE_VERSION_SUFFIX = "v11"
 
 used_builders = []
 
