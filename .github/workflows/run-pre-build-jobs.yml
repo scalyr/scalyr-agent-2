@@ -125,7 +125,7 @@ jobs:
     needs:
       - pre_job
       - run_pre_built_job0
-    if: ${{ always() && (needs.run_pre_built_job0.result == 'success' || needs.run_pre_built_job0.result == 'skipped') && needs.pre_job.outputs.matrix_length1 != '0' }}
+    if: ${{ always() && (needs.run_pre_built_job0.result == 'success' || needs.run_pre_built_job0.result == 'skipped') && needs.pre_job.outputs.matrix_length2 == '0' }}
     strategy:
       matrix: ${{ fromJSON(needs.pre_job.outputs.matrix1) }}
     steps:
