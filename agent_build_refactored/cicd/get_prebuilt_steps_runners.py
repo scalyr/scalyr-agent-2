@@ -48,44 +48,10 @@ used_builders = []
 existing_runners = {}
 builders_to_prebuilt_runners = {}
 
-# pre_built_steps: Dict[str, RunnerStep] = {}
-# for name, runner_cls in ALL_USED_BUILDERS.items():
-#     for step in runner_cls.get_all_required_steps():
-#         if not step.github_actions_settings.pre_build_in_separate_job:
-#             continue
-#
-#         pre_built_steps[step.id] = step
-
 all_used_steps: Dict[str, RunnerStep] = {}
 for name, runner_cls in ALL_USED_BUILDERS.items():
     for step_id, step in runner_cls.get_all_steps(recursive=True).items():
         all_used_steps[step_id] = step
-
-# all_used_steps_list = []
-# all_used_steps_indices = {}
-#
-# for i, step_id in enumerate(sorted(all_used_steps.keys())):
-#     all_used_steps_list.append({
-#         "step_id": step_id,
-#         "required_steps": []
-#     })
-#     all_used_steps_indices[step_id] = i
-#
-# a=10
-# for step_info in all_used_steps_list:
-#     step_id = step_info["step_id"]
-#     step = all_used_steps[step_id]
-#     required_steps = []
-#     for req_step_id in step.get_all_required_steps():
-#         required_steps.append(
-#             all_used_steps_indices[req_step_id]
-#         )
-#
-#     step_info["required_steps"] = required_steps
-
-
-
-a=10
 
 
 def create_wrapper_runner_from_step(step: RunnerStep):
@@ -254,19 +220,6 @@ def render_workflow_yaml():
     )
 
 
-
-    a=10
-
-
-def get_all_cache_keys():
-    step_ids = set()
-    for level in runner_levels:
-        for info in level.values():
-            step_ids.add(info["step"].id)
-
-    return json.dumps(list(sorted(step_ids)))
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -290,10 +243,6 @@ if __name__ == "__main__":
             input_missing_cache_keys_file=pl.Path(args.input_missing_cache_keys_file),
         )
         print(json.dumps(matrices))
-    elif args.command == "all-cache-keys":
-        print(get_all_cache_keys())
-    elif args.command == "get-cache-version-suffix":
-        print(CACHE_VERSION_SUFFIX)
     elif args.command == "render-workflow-yaml":
         render_workflow_yaml()
 
