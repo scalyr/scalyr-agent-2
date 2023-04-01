@@ -64,6 +64,7 @@ jobs:
     name: "Build Linux packages"
     needs:
       - pre_job
+      - run_pre_build_steps
     uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
     with:
       aws_private_key_name: ${{ needs.pre_job.outputs.aws_private_key_name }}
