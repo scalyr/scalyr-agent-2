@@ -20,6 +20,7 @@ builds.
 
 import argparse
 import collections
+import copy
 import json
 import os
 import pathlib as pl
@@ -219,6 +220,24 @@ def render_workflow_yaml():
     }
 
     pre_job_steps.insert(2, get_missing_cache_steps)
+
+    run_pre_built_job_object_name = "run_pre_built_job"
+    run_pre_built_job = jobs.pop(run_pre_built_job_object_name)
+    run_pre_built_job_steps = run_pre_built_job["steps"]
+
+    counter = 0
+    for level in runner_levels:
+        level_run_pre_built_job = copy.deepcopy(run_pre_built_job)
+        if counter > 0:
+            previous_run_pre_built_job_object_name = f"{run_pre_built_job_object_name}{counter - 1}"
+            level_run_pre_built_job["needs"].append(previous_run_pre_built_job_object_name)
+
+        level_run_pre_built_job["strategy"]["matrix"] = f"${{{{ fromJSON(needs.pre_job.outputs.matrix{counter}) }}}}"
+        level_run_pre_built_job["if"] = f"${{{{ needs.pre_job.outputs.matrix_length{counter} != '0' }}}}"
+
+        level_run_pre_built_job_object_name = f"{run_pre_built_job_object_name}{counter}"
+        jobs[level_run_pre_built_job_object_name] = level_run_pre_built_job
+        counter +=1
 
     workflow_path = SOURCE_ROOT / ".github/workflows/run-pre-build-jobs.yml"
 
