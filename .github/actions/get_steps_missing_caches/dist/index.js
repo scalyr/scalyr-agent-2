@@ -58654,7 +58654,7 @@ var __webpack_exports__ = {};
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//const core = require('@actions/core');
+const core = __nccwpck_require__(2619);
 const cache = __nccwpck_require__(7599);
 //const fs = require('fs');
 const path = __nccwpck_require__(5622)
