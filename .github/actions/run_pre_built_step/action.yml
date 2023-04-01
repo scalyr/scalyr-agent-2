@@ -72,9 +72,9 @@ runs:
       id: cache-step
       uses: actions/cache@v3
       with:
-        path:
-         - agent_build_output/step_cache/${{ inputs.step_id }}
+        path: agent_build_output/step_cache/${{ inputs.step_id }}
         key: ${{ inputs.step_id }}_${{ inputs.cache_version_suffix }}
+        restore-keys: []
 
     - name: Get required steps caches
       id: get_required_steps_caches
