@@ -75,8 +75,11 @@ jobs:
           
           #echo "$matrix"
           echo "$matrix" | jq -c '.'
+          echo "matrix${i}=$(echo "$matrix" | jq -c '.')" >> $GITHUB_OUTPUT
+          echo "matrix_length{i}=$(echo "$matrix" | jq -c '. | length')" >> $GITHUB_OUTPUT
           ((i=i+1))
         done
+        cat $GITHUB_OUTPUT
         exit 0
 
         echo '${{ steps.get_missing_caches_matrices.outputs.missing_cache_keys_json }}' > /tmp/missing_cache_keys.json
