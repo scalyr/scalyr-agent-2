@@ -1,6 +1,6 @@
 name: Run pre-built jobs.
 
-'on':
+on:
   workflow_call:
     inputs:
       python_version:
@@ -36,9 +36,6 @@ permissions:
 jobs:
   pre_job:
     runs-on: ubuntu-20.04
-    outputs:
-      all_steps_ids_json:
-      cache_version_suffix:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3

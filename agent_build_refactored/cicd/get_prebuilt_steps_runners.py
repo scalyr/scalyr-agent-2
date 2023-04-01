@@ -25,6 +25,7 @@ import os
 import pathlib as pl
 import sys
 import yaml
+import strictyaml
 from typing import Dict
 
 # This file can be executed as script. Add source root to the PYTHONPATH in order to be able to import
@@ -193,14 +194,12 @@ def get_missing_caches_matrices(input_missing_cache_keys_file: pl.Path):
 
 def render_workflow_yaml():
     template_path = pl.Path(__file__).parent / "run-pre-build-jobs_template.yml"
-    with template_path.open() as f:
-        workflow = yaml.load(f, yaml.Loader)
+    template_ymp = strictyaml.load(template_path.read_text())
+    workflow = template_ymp.data
 
     jobs = workflow["jobs"]
 
     pre_job = jobs["pre_job"]
-
-    pre_job["outputs"] = pre_job_outputs = {}
 
     all_used_steps_ids = list(sorted(all_used_steps.keys()))
     # pre_job_outputs["all_steps_ids_json"] = json.dumps(all_used_steps_ids)
@@ -224,8 +223,9 @@ def render_workflow_yaml():
 
     workflow_path = SOURCE_ROOT / ".github/workflows/run-pre-build-jobs.yml"
 
-    with workflow_path.open("w") as f:
-        yaml.dump(workflow, f, yaml.Dumper)
+    workflow_path.write_text(
+        strictyaml.as_document(workflow).as_yaml()
+    )
 
 
 
