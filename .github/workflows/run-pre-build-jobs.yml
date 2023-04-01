@@ -32,64 +32,57 @@ jobs:
           "prepare_toolset_x86_64-ubuntu-22-04-linux-amd64-5f07026ce1870528e32b1fee8560e7565bdf73a8ceee7fad4d2a289aec204a7b"]'
     - id: print
       name: Print
-      run: 'echo ''${{ steps.get_missing_caches_matrices.outputs.missing_cache_keys_json
-        }}'' > /tmp/missing_cache_keys.json
-
-        echo !!!!!!
-
-        cat /tmp/missing_cache_keys.json
-
-        echo "@@@@@@@@@@"
-
-        python3 agent_build_refactored/cicd/get_prebuilt_steps_runners.py get-missing-caches-matrices
-        --input-missing-cache-keys-file /tmp/missing_cache_keys.json > /tmp/missing_cache_matrices.json
-
-        echo "111111"
-
-        jq -c ''.[0]'' /tmp/missing_cache_matrices.json
-
-        jq -c ''.[0]["include"] | length'' /tmp/missing_cache_matrices.json
-
-        jq -c ''.[1]'' /tmp/missing_cache_matrices.json
-
-        jq -c ''.[1]["include"] | length'' /tmp/missing_cache_matrices.json
-
-        jq -c ''.[2]'' /tmp/missing_cache_matrices.json
-
-        jq -c ''.[2]["include"] | length'' /tmp/missing_cache_matrices.json
-
-        jq -c ''.[3]'' /tmp/missing_cache_matrices.json
-
-        jq -c ''.[3]["include"] | length'' /tmp/missing_cache_matrices.json
-
-        echo "22222"
-
-        echo "matrix0=$(jq -c ''.[0]'' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
-
-        echo "matrix_length0=$(jq -c ''.[0]["include"] | length'' /tmp/missing_cache_matrices.json)"
-        >> $GITHUB_OUTPUT
-
-        echo "matrix1=$(jq -c ''.[1]'' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
-
-        echo "matrix_length1=$(jq -c ''.[1]["include"] | length'' /tmp/missing_cache_matrices.json)"
-        >> $GITHUB_OUTPUT
-
-        echo "matrix2=$(jq -c ''.[2]'' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
-
-        echo "matrix_length2=$(jq -c ''.[2]["include"] | length'' /tmp/missing_cache_matrices.json)"
-        >> $GITHUB_OUTPUT
-
-        echo "matrix3=$(jq -c ''.[3]'' /tmp/missing_cache_matrices.json)" >> $GITHUB_OUTPUT
-
-        echo "matrix_length3=$(jq -c ''.[3]["include"] | length'' /tmp/missing_cache_matrices.json)"
-        >> $GITHUB_OUTPUT
-
-        echo "LLLLLLLLLLL"
-
-        cat $GITHUB_OUTPUT
-
-        '
+      run: "jq '.[]' /tmp/missing_cache_matrices.json | while read -r repo; do \n\
+        \  echo \"do something with $repo\"; \ndone\nexit 0\n\necho '${{ steps.get_missing_caches_matrices.outputs.missing_cache_keys_json\
+        \ }}' > /tmp/missing_cache_keys.json\necho !!!!!!\ncat /tmp/missing_cache_keys.json\n\
+        echo \"@@@@@@@@@@\"\npython3 agent_build_refactored/cicd/get_prebuilt_steps_runners.py\
+        \ get-missing-caches-matrices --input-missing-cache-keys-file /tmp/missing_cache_keys.json\
+        \ > /tmp/missing_cache_matrices.json\necho \"111111\"\njq -c '.[0]' /tmp/missing_cache_matrices.json\n\
+        jq -c '.[0][\"include\"] | length' /tmp/missing_cache_matrices.json\njq -c\
+        \ '.[1]' /tmp/missing_cache_matrices.json\njq -c '.[1][\"include\"] | length'\
+        \ /tmp/missing_cache_matrices.json\njq -c '.[2]' /tmp/missing_cache_matrices.json\n\
+        jq -c '.[2][\"include\"] | length' /tmp/missing_cache_matrices.json\njq -c\
+        \ '.[3]' /tmp/missing_cache_matrices.json\njq -c '.[3][\"include\"] | length'\
+        \ /tmp/missing_cache_matrices.json\necho \"22222\"\necho \"matrix0=$(jq -c\
+        \ '.[0]' /tmp/missing_cache_matrices.json)\" >> $GITHUB_OUTPUT\necho \"matrix_length0=$(jq\
+        \ -c '.[0][\"include\"] | length' /tmp/missing_cache_matrices.json)\" >> $GITHUB_OUTPUT\n\
+        echo \"matrix1=$(jq -c '.[1]' /tmp/missing_cache_matrices.json)\" >> $GITHUB_OUTPUT\n\
+        echo \"matrix_length1=$(jq -c '.[1][\"include\"] | length' /tmp/missing_cache_matrices.json)\"\
+        \ >> $GITHUB_OUTPUT\necho \"matrix2=$(jq -c '.[2]' /tmp/missing_cache_matrices.json)\"\
+        \ >> $GITHUB_OUTPUT\necho \"matrix_length2=$(jq -c '.[2][\"include\"] | length'\
+        \ /tmp/missing_cache_matrices.json)\" >> $GITHUB_OUTPUT\necho \"matrix3=$(jq\
+        \ -c '.[3]' /tmp/missing_cache_matrices.json)\" >> $GITHUB_OUTPUT\necho \"\
+        matrix_length3=$(jq -c '.[3][\"include\"] | length' /tmp/missing_cache_matrices.json)\"\
+        \ >> $GITHUB_OUTPUT\necho \"LLLLLLLLLLL\"\ncat $GITHUB_OUTPUT\n"
       shell: bash
+  run_pre_built_job0:
+    if: ${{ needs.pre_job.outputs.matrix_length0 != '0' }}
+    name: Level 0 ${{ matrix.name }}
+    needs:
+    - pre_job
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+    - id: get_missing_caches_matrices
+      name: Get missing step caches matrices
+      uses: ./.github/actions/run_pre_built_step
+      with:
+        aws_access_key: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
+        aws_objects_name_prefix: ${{ inputs.aws_objects_name_prefix }}
+        aws_prefix_list_id: ${{ inputs.aws_prefix_list_id }}
+        aws_private_key: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
+        aws_private_key_name: ${{ inputs.aws_private_key_name }}
+        aws_region: ${{ inputs.aws_region }}
+        aws_secret_key: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
+        aws_security_group: ${{ inputs.aws_security_group }}
+        cache_version_suffix: ${{ matrix.cache_version_suffix }}
+        python_version: ${{ inputs.python_version }}
+        required_steps: ${{ toJSON(matrix.required_steps) }}
+        step_id: ${{ matrix.step_id }}
+        step_runner_fqdn: ${{ matrix.step_runner_fqdn }}
+    strategy:
+      matrix: ${{ fromJSON(needs.pre_job.outputs.matrix0) }}
 name: Run pre-built jobs.
 'on':
   workflow_call:
