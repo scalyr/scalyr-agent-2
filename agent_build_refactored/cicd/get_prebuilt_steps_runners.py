@@ -141,7 +141,7 @@ for level_steps in levels:
         fqdn = runner_cls.get_fully_qualified_name()
         current_runner_level[fqdn] = {
             "step": step,
-            "cache_key": f"{step.id}_v5",
+            "cache_key": f"{step.id}",
             "cache_path": step_id,
             "runner": runner_cls
         }
