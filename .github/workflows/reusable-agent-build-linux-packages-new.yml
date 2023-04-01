@@ -74,8 +74,8 @@ jobs:
       - name: Get required steps ids
         id: get_required_steps_ids
         run: |
-          echo "all_required_steps=$(venv/bin/python3 build_package_new_refactored.py ${{ matrix.packages.name }} --get-all-steps)" >> $GITHUB_OUTPUT
-          echo "cache_version_suffix=$(venv/bin/python3 agent_build_refactored/cicd/get_prebuilt_steps_runners.py get-cache-version-suffix)" >> $GITHUB_OUTPUT
+          echo "all_required_steps=$(python3 build_package_new_refactored.py ${{ matrix.packages.name }} --get-all-steps)" >> $GITHUB_OUTPUT
+          echo "cache_version_suffix=$(python3 agent_build_refactored/cicd/get_prebuilt_steps_runners.py get-cache-version-suffix)" >> $GITHUB_OUTPUT
           cat $GITHUB_OUTPUT
 
       - name: Get required steps caches
@@ -88,7 +88,7 @@ jobs:
 
       - name: Build managed package with builder '${{ matrix.packages.name }}'
         run: |
-            venv/bin/python3 build_package_new_refactored.py ${{ matrix.packages.name }} build 
+            python3 build_package_new_refactored.py ${{ matrix.packages.name }} build 
 
       - name: Save packages as artifact
         uses: actions/upload-artifact@v3
