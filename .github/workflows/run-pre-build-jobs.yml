@@ -128,8 +128,9 @@ jobs:
         uses: ./.github/actions/run_pre_built_step
         with:
           step_runner_fqdn: ${{ matrix.step_runner_fqdn }}
-          cache_key: ${{ matrix.cache_key }}
-          cache_path: ${{ matrix.cache_path }}
+          required_steps: ${{ toJSON(matrix.required_steps) }}
+          step_id: ${{ matrix.step_id }}
+          cache_version_suffix: ${{ matrix.cache_version_suffix }}
           python_version: ${{ inputs.python_version }}
           aws_private_key: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
           aws_access_key: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
@@ -158,8 +159,9 @@ jobs:
         uses: ./.github/actions/run_pre_built_step
         with:
           step_runner_fqdn: ${{ matrix.step_runner_fqdn }}
-          cache_key: ${{ matrix.cache_key }}
-          cache_path: ${{ matrix.cache_path }}
+          required_steps: ${{ toJSON(matrix.required_steps) }}
+          step_id: ${{ matrix.step_id }}
+          cache_version_suffix: ${{ matrix.cache_version_suffix }}
           python_version: ${{ inputs.python_version }}
           aws_private_key: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
           aws_access_key: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
