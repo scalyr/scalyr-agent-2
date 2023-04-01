@@ -223,8 +223,8 @@ def render_workflow_yaml():
 
     run_pre_built_job_object_name = "run_pre_built_job"
     run_pre_built_job = jobs.pop(run_pre_built_job_object_name)
-    run_pre_built_job_steps = run_pre_built_job["steps"]
 
+    pre_job_outputs = {}
     counter = 0
     for level in runner_levels:
         level_run_pre_built_job = copy.deepcopy(run_pre_built_job)
@@ -238,9 +238,14 @@ def render_workflow_yaml():
         level_run_pre_built_job["name"] = f"Level {counter} ${{{{ matrix.name }}}}'"
         level_run_pre_built_job["strategy"]["matrix"] = f"${{{{ fromJSON(needs.pre_job.outputs.matrix{counter}) }}}}"
 
+        pre_job_outputs[f"matrix{counter}"] = f"${{{{ steps.print.outputs.matrix{counter} }}}}"
+        pre_job_outputs[f"matrix_length{counter}"] = f"${{{{ steps.print.outputs.matrix_length{counter} }}}}"
+
         level_run_pre_built_job_object_name = f"{run_pre_built_job_object_name}{counter}"
         jobs[level_run_pre_built_job_object_name] = level_run_pre_built_job
         counter += 1
+
+    pre_job["outputs"] = pre_job_outputs
 
     workflow_path = SOURCE_ROOT / ".github/workflows/run-pre-build-jobs.yml"
 

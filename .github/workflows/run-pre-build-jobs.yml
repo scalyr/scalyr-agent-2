@@ -77,6 +77,17 @@ jobs:
           ((i=i+1))
         done
         cat $GITHUB_OUTPUT
+    outputs:
+      matrix0: ${{ steps.print.outputs.matrix0 }}
+      matrix_length0: ${{ steps.print.outputs.matrix_length0 }}
+      matrix1: ${{ steps.print.outputs.matrix1 }}
+      matrix_length1: ${{ steps.print.outputs.matrix_length1 }}
+      matrix2: ${{ steps.print.outputs.matrix2 }}
+      matrix_length2: ${{ steps.print.outputs.matrix_length2 }}
+      matrix3: ${{ steps.print.outputs.matrix3 }}
+      matrix_length3: ${{ steps.print.outputs.matrix_length3 }}
+      matrix4: ${{ steps.print.outputs.matrix4 }}
+      matrix_length4: ${{ steps.print.outputs.matrix_length4 }}
   run_pre_built_job0:
     name: Level 0 ${{ matrix.name }}'
     runs-on: ubuntu-20.04
@@ -171,7 +182,8 @@ jobs:
     needs:
     - pre_job
     - run_pre_built_job2
-    if: ${{ always() && (needs.run_pre_built_job2.result == 'success' || needs.run_pre_built_job2.result == 'skipped') }}
+    if: ${{ always() && (needs.run_pre_built_job2.result == 'success' || needs.run_pre_built_job2.result
+      == 'skipped') && needs.pre_job.outputs.matrix_length3 != '0' }}
     strategy:
       matrix: ${{ fromJSON(needs.pre_job.outputs.matrix3) }}
     steps:

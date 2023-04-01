@@ -31,9 +31,6 @@ async function executeRunner() {
     const stepsIdsJSON = core.getInput("steps_ids");
     const lookupOnlyStr = core.getInput("lookup_only");
     const lookupOnly = lookupOnlyStr === 'true' ? true : false;
-    console.log("FFFFFFFF")
-    console.log(lookupOnlyStr)
-    console.log(lookupOnlyStr === 'true')
     const cacheRoot = core.getInput("cache_root");
 
 
@@ -51,13 +48,10 @@ async function executeRunner() {
             restoreKeys=[],
             options={ lookupOnly: lookupOnly }
         )
-        console.log(result)
-        console.log(lookupOnly)
         if (typeof result !== "undefined") {
             console.log(`Cache for the step with key ${finalCacheKey} is found.`)
         } else {
             console.log(`Cache for the step with key ${finalCacheKey} is not found.`)
-            console.log(`PATH: ${cachePath}`)
             missingCaches.push(stepID)
         }
     }
