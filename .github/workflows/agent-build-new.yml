@@ -161,7 +161,7 @@ jobs:
     name: Remove ec2 test workflow prefix list entries
     if: ${{ always() }}
     needs:
-      - test_managed_packages
+      - build-linux-packages
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout repository
