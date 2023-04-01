@@ -29,7 +29,7 @@ async function executeRunner() {
     //    steps will be cached using their cache names.
 
     const stepsIdsJSON = core.getInput("steps_ids");
-    const lookupOnlyStr = core.getInput("lookup-only");
+    const lookupOnlyStr = core.getInput("lookup_only");
     const lookupOnly = lookupOnlyStr === 'true' ? true : false;
     console.log("FFFFFFFF")
     console.log(lookupOnlyStr)
