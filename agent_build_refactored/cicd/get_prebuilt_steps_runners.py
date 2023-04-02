@@ -169,8 +169,7 @@ def render_workflow_yaml():
     run_pre_built_job = jobs.pop(run_pre_built_job_object_name)
 
     pre_job_outputs = {}
-    counter = 0
-    for level in runner_levels:
+    for counter in range(len(runner_levels)):
         level_run_pre_built_job = copy.deepcopy(run_pre_built_job)
         if counter > 0:
             previous_run_pre_built_job_object_name = f"{run_pre_built_job_object_name}{counter - 1}"
@@ -179,7 +178,7 @@ def render_workflow_yaml():
         else:
             level_run_pre_built_job["if"] = f"${{{{ needs.pre_job.outputs.matrix_length{counter} != '0' }}}}"
 
-        level_run_pre_built_job["name"] = f"Level {counter} ${{{{ matrix.name }}}}"
+        level_run_pre_built_job["name"] = f"{counter} ${{{{ matrix.name }}}}"
         level_run_pre_built_job["strategy"]["matrix"] = f"${{{{ fromJSON(needs.pre_job.outputs.matrix{counter}) }}}}"
 
         pre_job_outputs[f"matrix{counter}"] = f"${{{{ steps.print.outputs.matrix{counter} }}}}"
@@ -187,7 +186,6 @@ def render_workflow_yaml():
 
         level_run_pre_built_job_object_name = f"{run_pre_built_job_object_name}{counter}"
         jobs[level_run_pre_built_job_object_name] = level_run_pre_built_job
-        counter += 1
 
     pre_job = jobs["pre_job"]
     pre_job["outputs"] = pre_job_outputs
