@@ -58,6 +58,7 @@ def create_wrapper_runner_from_step(step: RunnerStep):
     class StepWrapperRunner(Runner):
         CLASS_NAME_ALIAS = f"{step_id}_pre_build"
 
+        @classmethod
         def get_all_required_steps(cls) -> List[RunnerStep]:
             return [step]
 
