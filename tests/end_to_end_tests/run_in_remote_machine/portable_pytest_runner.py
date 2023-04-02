@@ -45,6 +45,7 @@ def create_build_portable_pytest_runner_step() -> Dict[
 
     steps = {}
     for architecture in SUPPORTED_ARCHITECTURES:
+        run_in_remote_docker = architecture != Architecture.X86_64
 
         step = ArtifactRunnerStep(
             name=f"build_portable_pytest_runner_{architecture.value}",
@@ -61,7 +62,10 @@ def create_build_portable_pytest_runner_step() -> Dict[
             environment_variables={
                 "PORTABLE_RUNNER_NAME": PORTABLE_RUNNER_NAME,
             },
-            github_actions_settings=GitHubActionsSettings(cacheable=True),
+            github_actions_settings=GitHubActionsSettings(
+                cacheable=True,
+                run_in_remote_docker=run_in_remote_docker
+            ),
         )
 
         steps[architecture] = step
