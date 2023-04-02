@@ -237,7 +237,6 @@ class RunnerStep:
                 if path.name in [".DS_Store"]:
                     continue
 
-
                 filtered.append(path)
 
             tracked_files.extend(filtered)
@@ -397,7 +396,7 @@ class RunnerStep:
             # ... content ...
             sha256.update(file_path.read_bytes())
             # ... and permissions.
-            #sha256.update(str(file_path.stat().st_mode).encode())
+            sha256.update(str(file_path.stat().st_mode).encode())
 
 
         # Also add user into the checksum.
