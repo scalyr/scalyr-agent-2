@@ -83,7 +83,7 @@ jobs:
       matrix5: ${{ steps.print.outputs.matrix5 }}
       matrix_length5: ${{ steps.print.outputs.matrix_length5 }}
   run_pre_built_job0:
-    name: Level 0 ${{ matrix.name }}'
+    name: Level 0 ${{ matrix.name }}
     runs-on: ubuntu-20.04
     needs:
     - pre_job
@@ -146,7 +146,7 @@ jobs:
       run: python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn
         }} --run-all-steps
   run_pre_built_job1:
-    name: Level 1 ${{ matrix.name }}'
+    name: Level 1 ${{ matrix.name }}
     runs-on: ubuntu-20.04
     needs:
     - pre_job
@@ -211,7 +211,7 @@ jobs:
       run: python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn
         }} --run-all-steps
   run_pre_built_job2:
-    name: Level 2 ${{ matrix.name }}'
+    name: Level 2 ${{ matrix.name }}
     runs-on: ubuntu-20.04
     needs:
     - pre_job
@@ -276,7 +276,7 @@ jobs:
       run: python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn
         }} --run-all-steps
   run_pre_built_job3:
-    name: Level 3 ${{ matrix.name }}'
+    name: Level 3 ${{ matrix.name }}
     runs-on: ubuntu-20.04
     needs:
     - pre_job
@@ -341,7 +341,7 @@ jobs:
       run: python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn
         }} --run-all-steps
   run_pre_built_job4:
-    name: Level 4 ${{ matrix.name }}'
+    name: Level 4 ${{ matrix.name }}
     runs-on: ubuntu-20.04
     needs:
     - pre_job
@@ -406,7 +406,7 @@ jobs:
       run: python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn
         }} --run-all-steps
   run_pre_built_job5:
-    name: Level 5 ${{ matrix.name }}'
+    name: Level 5 ${{ matrix.name }}
     runs-on: ubuntu-20.04
     needs:
     - pre_job

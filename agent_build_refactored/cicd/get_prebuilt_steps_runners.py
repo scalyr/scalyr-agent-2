@@ -179,7 +179,7 @@ def render_workflow_yaml():
         else:
             level_run_pre_built_job["if"] = f"${{{{ needs.pre_job.outputs.matrix_length{counter} != '0' }}}}"
 
-        level_run_pre_built_job["name"] = f"Level {counter} ${{{{ matrix.name }}}}'"
+        level_run_pre_built_job["name"] = f"Level {counter} ${{{{ matrix.name }}}}"
         level_run_pre_built_job["strategy"]["matrix"] = f"${{{{ fromJSON(needs.pre_job.outputs.matrix{counter}) }}}}"
 
         pre_job_outputs[f"matrix{counter}"] = f"${{{{ steps.print.outputs.matrix{counter} }}}}"
