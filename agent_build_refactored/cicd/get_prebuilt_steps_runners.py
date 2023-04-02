@@ -26,11 +26,18 @@ import os
 import pathlib as pl
 import sys
 import strictyaml
+import logging
 from typing import Dict, List
 
 # This file can be executed as script. Add source root to the PYTHONPATH in order to be able to import
 # local packages. All such imports also have to be done after that.
 import requests
+
+logging.basicConfig(
+    level=logging.INFO,
+)
+
+logger = logging.getLogger(__name__)
 
 SOURCE_ROOT = pl.Path(__file__).parent.parent.parent
 
@@ -116,6 +123,9 @@ def get_missing_caches_matrices(input_missing_cache_keys_file: pl.Path):
     json_content = input_missing_cache_keys_file.read_text()
     missing_cache_keys = json.loads(json_content)
 
+    logger.info("MISSING")
+    logger.info(missing_cache_keys)
+
     matrices = []
     for level in runner_levels:
         matrix_include = []
@@ -124,9 +134,12 @@ def get_missing_caches_matrices(input_missing_cache_keys_file: pl.Path):
 
             step = info["step"]
             step_id = step.id
+            logger.info(f"STEP: {step_id}")
             if step_id not in missing_cache_keys:
+                logger.info("SKIP")
                 continue
 
+            logger.info("CONTINUE")
             required_steps_ids = []
             for req_step_id in step.get_all_required_steps().keys():
                 required_steps_ids.append(req_step_id)
