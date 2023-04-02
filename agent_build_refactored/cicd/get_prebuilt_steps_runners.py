@@ -136,6 +136,7 @@ def get_missing_caches_matrices(input_missing_cache_keys_file: pl.Path):
             step_id = step.id
             logger.info(f"STEP: {step_id}")
             logger.info(f"LEEEN: {len(step._tracked_files)}")
+            logger.info(f"JJJJ: {json.dumps(sorted(str(p) for p in step._tracked_files))}")
             # logger.info("TRACKED: ")
             # for tf in step._tracked_files:
             #     logger.info(tf)
