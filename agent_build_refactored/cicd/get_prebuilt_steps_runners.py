@@ -101,7 +101,7 @@ for level_steps in levels:
             runner_cls = create_wrapper_runner_from_step(step)
             existing_runners[step.id] = runner_cls
 
-        fqdn = runner_cls.FQDN
+        fqdn = runner_cls.FULLY_QUALIFIED_NAME
         current_runner_level[fqdn] = {
             "step": step,
             "runner": runner_cls
