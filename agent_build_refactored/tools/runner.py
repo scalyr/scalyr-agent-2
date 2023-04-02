@@ -794,7 +794,7 @@ class RunnerMeta(abc.ABCMeta):
 
         module_name = attrs["__module__"]
         module = sys.modules[module_name]
-        module_path = pl.Path(module.__file__)
+        module_path = pl.Path(module.__file__).absolute()
         module_rel_path = module_path.relative_to(SOURCE_ROOT)
         module_without_ext = module_rel_path.parent / module_rel_path.stem
         module_fqdn = str(module_without_ext).replace(os.sep, ".")
