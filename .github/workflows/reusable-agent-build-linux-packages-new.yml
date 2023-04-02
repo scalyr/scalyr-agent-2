@@ -103,7 +103,7 @@ jobs:
     needs:
       - build-managed-packages
 
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-20.04
     strategy:
       fail-fast: false
       matrix:

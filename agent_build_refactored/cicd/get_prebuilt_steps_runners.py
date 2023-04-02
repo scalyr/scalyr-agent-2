@@ -127,7 +127,6 @@ def get_missing_caches_matrices(input_missing_cache_keys_file: pl.Path):
             if step_id not in missing_cache_keys:
                 continue
 
-
             required_steps_ids = []
             for req_step_id in step.get_all_required_steps().keys():
                 required_steps_ids.append(req_step_id)
