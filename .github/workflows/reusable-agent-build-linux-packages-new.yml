@@ -178,7 +178,7 @@ jobs:
           cat $GITHUB_OUTPUT
 
       - name: Get required steps caches
-        id: get_required_steps_caches
+        id: get_portable_test_runner_required_steps_caches
         uses: ./.github/actions/get_steps_missing_caches
         with:
           steps_ids: ${{ steps.get_required_steps_ids.outputs.portable_test_runner_required_steps_ids }}
@@ -186,7 +186,7 @@ jobs:
           cache_root: agent_build_output/step_cache
 
       - name: Get required steps caches
-        id: get_required_steps_caches
+        id: get_repo_builder_required_steps_caches
         uses: ./.github/actions/get_steps_missing_caches
         with:
           steps_ids: ${{ steps.get_required_steps_ids.outputs.repo_builder_required_steps_ids }}
