@@ -206,9 +206,6 @@ class RunnerStep:
         # All final file paths to track.
         tracked_files = []
 
-        if 'tests/end_to_end_tests/**/*' in tracked_files_globs:
-            a=10
-
         # Resolve file globs to get all files to track.
         for file_glob in set(tracked_file_globs):
             file_glob = pl.Path(file_glob)
@@ -225,8 +222,6 @@ class RunnerStep:
 
             filtered = []
             for path in found:
-                if str(path).endswith("_Store"):
-                    a=10
                 if path.is_dir():
                     continue
 
@@ -244,11 +239,6 @@ class RunnerStep:
 
 
                 filtered.append(path)
-                logger.info("WWWWW111111")
-                if 'tests/end_to_end_tests/**/*' in tracked_files_globs:
-                    for f in filtered:
-                        logger.info(f"FILEEEEE:{f}")
-                logger.info("WWWWW2222")
 
             tracked_files.extend(filtered)
 
