@@ -26,7 +26,7 @@ import os
 import pathlib as pl
 import sys
 import strictyaml
-from typing import Dict
+from typing import Dict, List
 
 # This file can be executed as script. Add source root to the PYTHONPATH in order to be able to import
 # local packages. All such imports also have to be done after that.
@@ -36,9 +36,9 @@ SOURCE_ROOT = pl.Path(__file__).parent.parent.parent
 
 sys.path.append(str(SOURCE_ROOT))
 
-from agent_build_refactored.tools.runner import Runner, RunnerStep
+from agent_build_refactored.tools.runner import Runner, RunnerStep, RunnerMeta
 
-from agent_build_refactored import ALL_USED_BUILDERS
+from agent_build_refactored.cicd.tttt import ALL_RUNNERS
 
 
 CACHE_VERSION_SUFFIX = "v12"
@@ -49,23 +49,18 @@ existing_runners = {}
 builders_to_prebuilt_runners = {}
 
 all_used_steps: Dict[str, RunnerStep] = {}
-for name, runner_cls in ALL_USED_BUILDERS.items():
+for runner_cls in ALL_RUNNERS:
     for step_id, step in runner_cls.get_all_steps(recursive=True).items():
         all_used_steps[step_id] = step
 
 
 def create_wrapper_runner_from_step(step: RunnerStep):
-    # Create "dummy" Runner for each runner step that has to be pre-built, this dummy runner will be executed
-    # by its fqdn to run the step.
     class StepWrapperRunner(Runner):
-        REQUIRED_STEPS = [step]
+        CLASS_NAME_ALIAS = f"{step_id}_pre_build"
 
-    # Since this runner class is created dynamically we have to generate a constant fqdn for it.
-    StepWrapperRunner.assign_fully_qualified_name(
-        class_name="pre-built-",
-        module_name=__name__,
-        class_name_suffix=step.id,
-    )
+        def get_all_required_steps(cls) -> List[RunnerStep]:
+            return [step]
+
     return StepWrapperRunner
 
 
@@ -106,7 +101,7 @@ for level_steps in levels:
             runner_cls = create_wrapper_runner_from_step(step)
             existing_runners[step.id] = runner_cls
 
-        fqdn = runner_cls.get_fully_qualified_name()
+        fqdn = runner_cls.FQDN
         current_runner_level[fqdn] = {
             "step": step,
             "runner": runner_cls

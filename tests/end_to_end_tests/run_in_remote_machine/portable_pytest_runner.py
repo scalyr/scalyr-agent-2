@@ -73,6 +73,7 @@ BUILD_PORTABLE_PYTEST_RUNNER_STEPS = create_build_portable_pytest_runner_step()
 
 
 class PortablePytestRunnerBuilder(Runner):
+    __required_cls_attrs__ = ["ARCHITECTURE"]
     ARCHITECTURE: Architecture
     """
     Builder class that builds pytest runner executable by using PyInstaller.
@@ -112,13 +113,13 @@ for arch in SUPPORTED_ARCHITECTURES:
     class BuilderCls(PortablePytestRunnerBuilder):
         ARCHITECTURE = arch
 
-    # Since we create builders "dynamically" we should assign name to each of them, so
-    # they can be accessible later.
-    BuilderCls.assign_fully_qualified_name(
-        class_name=PortablePytestRunnerBuilder.__name__,
-        module_name=__name__,
-        class_name_suffix=f"_{arch.value}",
-    )
+    # # Since we create builders "dynamically" we should assign name to each of them, so
+    # # they can be accessible later.
+    # BuilderCls.assign_fully_qualified_name(
+    #     class_name=PortablePytestRunnerBuilder.__name__,
+    #     module_name=__name__,
+    #     class_name_suffix=f"_{arch.value}",
+    # )
 
     PORTABLE_PYTEST_RUNNER_BUILDERS[arch] = BuilderCls
 

@@ -234,15 +234,6 @@ class ContainerImageBuilder(Runner):
             f"{cls.IMAGE_TYPE_SPEC.name}-{cls.BASE_IMAGE_BUILDER_STEP.base_distro.name}"
         )
 
-    @classmethod
-    def get_all_required_steps(cls):
-        """
-        Also add base image builder step as required to guarantee that it also will be cached.
-        """
-        steps = super(ContainerImageBuilder, cls).get_all_required_steps()
-        steps.append(cls.BASE_IMAGE_BUILDER_STEP)
-        return steps
-
     def build_container_filesystem(self, output_path: pl.Path):
         """
         Build tarball with agent's filesystem.
@@ -373,7 +364,7 @@ class ContainerImageBuilder(Runner):
                     "--build-arg",
                     f"BASE_IMAGE_NAME={full_base_image_name}",
                     "--build-arg",
-                    f"BUILDER_FQDN={type(self).get_fully_qualified_name()}",
+                    f"BUILDER_FQDN={type(self).FULLY_QUALIFIED_NAME}",
                     "--build-arg",
                     f"IMAGE_TYPE_STAGE_NAME={type(self).IMAGE_TYPE_SPEC.image_type_stage_name}",
                     *additional_options,

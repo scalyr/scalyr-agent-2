@@ -174,7 +174,8 @@ SUPPORTED_ARCHITECTURES = [
 ]
 
 
-class LinuxPackageBuilder(Runner, abc.ABC):
+class LinuxPackageBuilder(Runner):
+    __required_cls_attrs__ = ["PACKAGE_TYPE"]
     """
     This is a base class that is responsible for the building of the Linux agent deb and rpm packages that are managed
         by package managers such as apt and yum.
@@ -454,18 +455,13 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
 
     @classmethod
     def get_all_required_steps(cls) -> List[RunnerStep]:
-        steps = super(LinuxAIOPackagesBuilder, cls).get_all_required_steps()
-
-        steps.extend(
-            [
+        return [
                 BUILD_OPENSSL_1_1_1_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
                 BUILD_OPENSSL_3_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
                 BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
                 BUILD_PYTHON_WITH_OPENSSL_3_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
                 BUILD_AGENT_LIBS_VENV_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
             ]
-        )
-        return steps
 
     @property
     def dependency_packages_arch(self) -> str:
@@ -1967,19 +1963,18 @@ for arch in SUPPORTED_ARCHITECTURES:
         PACKAGECLOUD_DISTRO = "any"
         PACKAGECLOUD_DISTRO_VERSION = "any"
         DEPENDENCY_PACKAGES_ARCHITECTURE = arch
+        CLASS_NAME_ALIAS = f"DebLinuxAIOPackagesBuilder{arch.value}"
 
     class RpmLinuxAIOPackagesBuilder(LinuxAIOPackagesBuilder):
         PACKAGE_TYPE = "rpm"
         PACKAGECLOUD_DISTRO = "rpm_any"
         PACKAGECLOUD_DISTRO_VERSION = "rpm_any"
         DEPENDENCY_PACKAGES_ARCHITECTURE = arch
+        CLASS_NAME_ALIAS = f"RpmLinuxAIOPackagesBuilder${arch.value}"
 
     # Since we create builders "dynamically" we should assign name to each of them, so
     # they can be accessible later.
     for cls in [DebLinuxAIOPackagesBuilder, RpmLinuxAIOPackagesBuilder]:
-        cls.assign_fully_qualified_name(
-            class_name=cls.__name__, module_name=__name__, class_name_suffix=arch.value
-        )
         name = f"{cls.PACKAGE_TYPE}-aio-{arch.value}"
         ALL_AIO_PACKAGE_BUILDERS[name] = cls
 

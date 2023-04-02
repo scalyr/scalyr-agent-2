@@ -129,22 +129,3 @@ jobs:
           AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
         run: |
           python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn }} --run-all-cacheable-steps
-
-
-#      - name: Get missing step caches matrices
-#        id: get_missing_caches_matrices
-#        uses: ./.github/actions/run_pre_built_step
-#        with:
-#          step_runner_fqdn: ${{ matrix.step_runner_fqdn }}
-#          required_steps: ${{ toJSON(matrix.required_steps) }}
-#          step_id: ${{ matrix.step_id }}
-#          cache_version_suffix: ${{ matrix.cache_version_suffix }}
-#          python_version: ${{ inputs.python_version }}
-#          aws_private_key: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
-#          aws_access_key: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
-#          aws_secret_key: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
-#          aws_private_key_name: ${{ inputs.aws_private_key_name }}
-#          aws_region: ${{ inputs.aws_region }}
-#          aws_security_group: ${{ inputs.aws_security_group }}
-#          aws_prefix_list_id: ${{ inputs.aws_prefix_list_id }}
-#          aws_objects_name_prefix: ${{ inputs.aws_objects_name_prefix }}

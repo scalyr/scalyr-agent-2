@@ -11,8 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
+import abc
 import argparse
 import dataclasses
 import hashlib
@@ -775,73 +774,107 @@ class RunnerMappedPath:
     path: Union[pl.Path, str]
 
 
-class Runner:
+ALL_RUNNERS = []
+
+
+class RunnerMeta(abc.ABCMeta):
+    def __new__(mcs, name, bases, attrs):
+        global ALL_RUNNERS
+
+        if not bases:
+            return super().__new__(mcs, name, bases, attrs)
+
+        result = super().__new__(mcs, name, bases, attrs)
+
+        class_name_alias = getattr(result, "CLASS_NAME_ALIAS", None)
+        if class_name_alias:
+            name_for_fqdn = class_name_alias
+        else:
+            name_for_fqdn = name
+
+        module_name = attrs["__module__"]
+        module = sys.modules[module_name]
+        module_path = pl.Path(module.__file__)
+        module_rel_path = module_path.relative_to(SOURCE_ROOT)
+        module_without_ext = module_rel_path.parent / module_rel_path.stem
+        module_fqdn = str(module_without_ext).replace(os.sep, ".")
+        result_fqdn = f"{module_fqdn}.{name_for_fqdn}"
+        setattr(result, "FULLY_QUALIFIED_NAME", result_fqdn)
+        setattr(module, name_for_fqdn, result)
+
+        required_class_attrs = getattr(result, "__required_cls_attrs__", None)
+
+        add = True
+        if required_class_attrs:
+            for attr_name in required_class_attrs:
+                if attr_name not in attrs:
+                    add = False
+                    break
+
+        if len(result.__abstractmethods__) > 0:
+            add = False
+
+        if add:
+            ALL_RUNNERS.append(result)
+        else:
+            a=10
+
+        return result
+
+    def __str__(self):
+        return getattr(self, "FULLY_QUALIFIED_NAME")
+
+    def __repr__(self):
+        return getattr(self, "FULLY_QUALIFIED_NAME")
+
+
+
+class Runner(metaclass=RunnerMeta):
+
+    __required_cls_attrs__: List[str] = []
     """
     Abstraction which combines several RunnerStep instances in order to execute them and to use their results
         in order to perform its own work.
     """
 
-    # List of Runner steps which are required by this Runner. All steps which are meant to be cached by GitHub Actions
-    # have to be specified here.
-    REQUIRED_STEPS: List[RunnerStep] = []
-
-    # List of other Runner classes that are required by this one. As with previous, runners, which steps have to be
-    # cached by GitHub Actions, have to be specified here.
-    REQUIRED_RUNNERS_CLASSES: List[Type["Runner"]] = []
-
-    # Base environment step. Runner runs on top of it. Can be a docker image, so the Runner will be executed in
-    # container.
-    BASE_ENVIRONMENT: Union[EnvironmentRunnerStep, str] = None
-
     # This class attribute is used to find and load this runner class without direct access to it.
-    _FULLY_QUALIFIED_NAME = None
+    FULLY_QUALIFIED_NAME: str
+
+    CLASS_NAME_ALIAS: str = None
+
+    def __new__(cls, *args, **kwargs):
+        for attr_name in cls.__required_cls_attrs__:
+            if not hasattr(cls, attr_name):
+                raise NotImplementedError(
+                    f"The class' {cls.__name__} attribute '{attr_name}' does not exist, "
+                    f"but it is in the '__required_cls_attrs__'. Please specify required attribute."
+                )
+        return super(Runner, cls).__new__(cls)
+
 
     def __init__(
-        self, work_dir: pl.Path = None, required_steps: List[RunnerStep] = None
+        self, work_dir: pl.Path = None
     ):
         """
         :param work_dir: Path to the directory where Runner will store its results and intermediate data.
-        :param required_steps: Final list of RunnerSteps to be executed by this runner. If not specified, then just
-            the `REQUIRED_STEPS` class attribute is used.
         """
 
         self.base_environment = type(self).get_base_environment()
-        self.required_steps = required_steps or type(self).REQUIRED_STEPS[:]
         self.required_runners = {}
 
         self.work_dir = pl.Path(work_dir or SOURCE_ROOT / "agent_build_output")
-        output_name = type(self).get_fully_qualified_name().replace(".", "_")
+        output_name = type(self).FULLY_QUALIFIED_NAME.replace(".", "_")
         self.output_path = self.work_dir / "runner_outputs" / output_name
 
         self._input_values = {}
 
     @classmethod
     def get_base_environment(cls) -> Optional[EnvironmentRunnerStep]:
-        return cls.BASE_ENVIRONMENT
+        return None
 
     @classmethod
     def get_all_required_steps(cls) -> List[RunnerStep]:
-        return cls.REQUIRED_STEPS[:]
-
-    @classmethod
-    def get_all_cacheable_steps(cls) -> List[RunnerStep]:
-        """
-        Gather all (including nested) RunnerSteps from all possible plases which are used by this runner.
-        """
-        result = []
-        base_environment = cls.get_base_environment()
-        if base_environment:
-            result.extend(base_environment.get_all_cacheable_steps())
-
-        for req_step in cls.get_all_required_steps():
-            result.extend(req_step.get_all_cacheable_steps())
-
-        for runner_clas in cls.REQUIRED_RUNNERS_CLASSES:
-            result.extend(runner_clas.get_all_cacheable_steps())
-
-        # Filter all identical steps
-        result_dict = {step.id: step for step in result}
-        return list(result_dict.values())
+        return []
 
     @classmethod
     def get_all_steps(cls, recursive: bool = False) -> Dict[str, RunnerStep]:
@@ -862,63 +895,6 @@ class Runner:
                 result.update(req_step.get_all_required_steps())
 
         return result
-
-    @classmethod
-    def get_fully_qualified_name(cls) -> str:
-        """
-        Return fully qualified name of the class. This is needed for the runner to be able to run itself from
-        other process or docker container. We have a special script 'agent_build/scripts/runner_helper.py' which
-        can execute runner through finding them by their FQDN.
-        """
-
-        if cls._FULLY_QUALIFIED_NAME:
-            return cls._FULLY_QUALIFIED_NAME
-
-        module_path = pl.Path(sys.modules[cls.__module__].__file__)
-        module_rel_path = module_path.relative_to(SOURCE_ROOT)
-
-        module_without_ext = module_rel_path.parent / module_rel_path.stem
-        module_fqdn = str(module_without_ext).replace(os.sep, ".")
-        return f"{module_fqdn}.{cls.__qualname__}"
-
-    @classmethod
-    def assign_fully_qualified_name(
-        cls,
-        class_name: str,
-        module_name: str,
-        class_name_suffix: str = "",
-    ):
-        """
-        If runner class is created dynamically, and does not exist by default in the global scope,
-            then this method can do a little trick by creating an alias attribute of this class in target module.
-        :param class_name: Name of the result class.
-        :param class_name_suffix: Additional suffix to class name. if needed.
-        :param module_name: Name of the module where to add an attribute with this class.
-        """
-        final_class_name = f"{class_name}{class_name_suffix}"
-
-        module = sys.modules[module_name]
-        if module_name == "__main__":
-            # if the module is main we still have to get its full name
-
-            module_file_path = pl.Path(module.__file__)
-            if module_file_path.is_absolute():
-                module_file_path = module_file_path.relative_to(SOURCE_ROOT)
-
-            module_name_parts = str(module_file_path).strip(".py").split(os.sep)
-            module_name = ".".join(module_name_parts)
-
-        # Assign class' new alias in the target module to its FQDN.
-        cls._FULLY_QUALIFIED_NAME = f"{module_name}.{final_class_name}"
-        cls.__name__ = final_class_name
-
-        # Create alias attribute in the target module.
-        if hasattr(module, final_class_name):
-            raise ValueError(
-                f"Attribute '{final_class_name}' of the module {module_name} is already set."
-            )
-
-        setattr(module, final_class_name, cls)
 
     @property
     def base_docker_image(self) -> Optional[DockerImageSpec]:
@@ -987,7 +963,7 @@ class Runner:
                 self.base_docker_image.name,
                 python_executable,
                 "/tmp/source/agent_build_refactored/scripts/runner_helper.py",
-                type(self).get_fully_qualified_name(),
+                type(self).FULLY_QUALIFIED_NAME,
                 *final_command_args,
             ]
         )
@@ -1020,13 +996,7 @@ class Runner:
         # Run all steps and runners we depend on, skip this if we already in docker to avoid infinite loop.
         steps_to_run = []
         if not IN_DOCKER:
-            if self.base_environment:
-                steps_to_run.append(self.base_environment)
-
-            steps_to_run.extend(self.get_all_required_steps())
-
-            if self.required_runners:
-                steps_to_run.extend(self.required_runners)
+            steps_to_run.extend(list(self.get_all_steps().values()))
 
         self._run_steps(
             steps=steps_to_run,
@@ -1154,14 +1124,6 @@ class Runner:
         """
 
         parser.add_argument(
-            "--get-all-cacheable-steps",
-            dest="get_all_cacheable_steps",
-            action="store_true",
-            help="Get ids of all used cacheable steps. it is meant to be used by GitHub Actions and there's no need to "
-            "use it manually.",
-        )
-
-        parser.add_argument(
             "--get-all-steps",
             dest="get_all_steps",
             action="store_true",
@@ -1170,10 +1132,10 @@ class Runner:
         )
 
         parser.add_argument(
-            "--run-all-cacheable-steps",
-            dest="run_all_cacheable_steps",
+            "--run-all-steps",
+            dest="run_all_steps",
             action="store_true",
-            help="Run all used cacheable steps. it is meant to be used by GitHub Actions and there's no need to "
+            help="Run all used steps. it is meant to be used by GitHub Actions and there's no need to "
             "use it manually.",
         )
 
@@ -1195,15 +1157,9 @@ class Runner:
 
         cleanup()
 
-        if args.get_all_cacheable_steps:
-            steps = cls.get_all_cacheable_steps()
-            steps_ids = [step.id for step in steps]
-            print(json.dumps(steps_ids))
-            exit(0)
-
         work_dir = pl.Path(args.work_dir)
 
-        if args.run_all_cacheable_steps:
+        if args.run_all_steps:
             steps = cls.get_all_steps()
 
             cls._run_steps(

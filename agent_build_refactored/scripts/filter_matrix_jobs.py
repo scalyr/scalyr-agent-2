@@ -58,7 +58,7 @@ def main():
 
         builder_name = job["name"]
         builder = ALL_USED_BUILDERS[builder_name]
-        job["builder-fqdn"] = builder.get_fully_qualified_name()
+        job["builder-fqdn"] = builder.FULLY_QUALIFIED_NAME
 
         result_matrix["include"].append(job)
 
