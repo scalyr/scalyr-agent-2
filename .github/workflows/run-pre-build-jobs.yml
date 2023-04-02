@@ -51,8 +51,8 @@ jobs:
           "build_openssl_1_1_1_x86_64-centos-6-linux-amd64-1b2e38b3ba25ab12eb3224e95635aec3ea4b583beb68f4074410dfb039ed2719",
           "build_openssl_3_arm64-centos-7-linux-arm64-c1025ed386213b3ee22242b15cc1b34d11679f7ff3653258a1a9d6f0da68d7db",
           "build_openssl_3_x86_64-centos-6-linux-amd64-811ddbe39374d1c8ebdead4263c802b043ab4e22aecaa7c001934d6da8144a4f",
-          "build_portable_pytest_runner_arm64-centos-7-linux-arm64-3b15cf7fb0b7e727652b21d1341cd7d486a0bac596066b389f0e34eef6728396",
-          "build_portable_pytest_runner_x86_64-centos-6-linux-amd64-a4dd0399b0fcab0e6f271cd62eee631cf99db3163bdc2fe2bc35e33fc804799a",
+          "build_portable_pytest_runner_arm64-centos-7-linux-arm64-8d84a0716f1bd127a2876b7e1fef30f0d56220849d967be34826360f3c570eab",
+          "build_portable_pytest_runner_x86_64-centos-6-linux-amd64-05363f1d265a0a7e3649dc5a5d90f815ea562594ef96a83d009f4968933dcab2",
           "build_python_1_1_1_arm64-centos-7-linux-arm64-5fd37b5bef7f49ec0eae961ce7c80a65165c56bd01a206708c37de9a8f297c9b",
           "build_python_1_1_1_x86_64-centos-6-linux-amd64-39b4613d6f22e10a4ce5bfe5c19e4f4135c8f9b9be8a1144c15b4e56e9111f0d",
           "build_python_3_arm64-centos-7-linux-arm64-8dd96d28266e7abfc8cb9a5848d1c5bc29f598dd070e75514c86475e03ed93aa",
@@ -156,7 +156,7 @@ jobs:
         AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ inputs.aws_prefix_list_id }}
         AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
       run: python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn
-        }} --run-all-cacheable-steps
+        }} --run-all-steps
   run_pre_built_job1:
     name: Level 1 ${{ matrix.name }}'
     runs-on: ubuntu-20.04
@@ -221,7 +221,7 @@ jobs:
         AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ inputs.aws_prefix_list_id }}
         AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
       run: python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn
-        }} --run-all-cacheable-steps
+        }} --run-all-steps
   run_pre_built_job2:
     name: Level 2 ${{ matrix.name }}'
     runs-on: ubuntu-20.04
@@ -286,7 +286,7 @@ jobs:
         AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ inputs.aws_prefix_list_id }}
         AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
       run: python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn
-        }} --run-all-cacheable-steps
+        }} --run-all-steps
   run_pre_built_job3:
     name: Level 3 ${{ matrix.name }}'
     runs-on: ubuntu-20.04
@@ -351,7 +351,7 @@ jobs:
         AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ inputs.aws_prefix_list_id }}
         AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
       run: python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn
-        }} --run-all-cacheable-steps
+        }} --run-all-steps
   run_pre_built_job4:
     name: Level 4 ${{ matrix.name }}'
     runs-on: ubuntu-20.04
@@ -416,7 +416,7 @@ jobs:
         AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ inputs.aws_prefix_list_id }}
         AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
       run: python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn
-        }} --run-all-cacheable-steps
+        }} --run-all-steps
   run_pre_built_job5:
     name: Level 5 ${{ matrix.name }}'
     runs-on: ubuntu-20.04
@@ -481,4 +481,4 @@ jobs:
         AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ inputs.aws_prefix_list_id }}
         AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
       run: python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn
-        }} --run-all-cacheable-steps
+        }} --run-all-steps
