@@ -397,7 +397,7 @@ class RunnerStep:
             # ... content ...
             sha256.update(file_path.read_bytes())
             # ... and permissions.
-            sha256.update(str(file_path.stat().st_mode).encode())
+            #sha256.update(str(file_path.stat().st_mode).encode())
 
         # Also add user into the checksum.
         sha256.update(self.user.encode())
