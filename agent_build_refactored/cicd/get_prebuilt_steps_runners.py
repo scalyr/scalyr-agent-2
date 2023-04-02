@@ -135,12 +135,14 @@ def get_missing_caches_matrices(input_missing_cache_keys_file: pl.Path):
             step = info["step"]
             step_id = step.id
             logger.info(f"STEP: {step_id}")
+            logger.info(f"LEEEN: {len(step._tracked_files)}")
             # logger.info("TRACKED: ")
             # for tf in step._tracked_files:
             #     logger.info(tf)
 
             if "build_portable_pytest_runner_x86_64-centos-6-linux-amd64" in step_id:
                 a=10
+
 
             if step_id not in missing_cache_keys:
                 logger.info("SKIP")
