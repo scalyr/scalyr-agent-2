@@ -39,33 +39,18 @@ jobs:
       uses: ./.github/actions/prepare_python_with_dev_requirements
       with:
         python_version: ${{ inputs.python_version }}
+    - name: Get all steps ids
+      id: get_all_steps_ids
+      run: |
+        echo "all_steps_ids_json=$(python3  agent_build_refactored/cicd/get_prebuilt_steps_runners.py get-all-steps-ids)" >> $GITHUB_OUTPUT
+        echo "cache_version_suffix=$(python3 agent_build_refactored/cicd/get_prebuilt_steps_runners.py get-cache-version-suffix)" >> $GITHUB_OUTPUT
     - name: Get missing step caches matrices
       id: get_missing_caches_matrices
       uses: ./.github/actions/get_steps_missing_caches
       with:
-        steps_ids: '["build_agent_libs_venv_arm64-centos-7-linux-arm64-7fb6ced491f8cc6db5b6a3729cb1ddb835c0c6f829530d3f48e065ca5d1033bf",
-          "build_agent_libs_venv_x86_64-centos-6-linux-amd64-9f4b9b29236deb98b222b2ab6740c17186a6f3a59cc439657a8aae49ec31a3ad",
-          "build_dev_requirements_arm64-centos-7-linux-arm64-d177aa6fa0bd2843ec112a675545eb87b454eb7f1d99b175d2974b921a932213",
-          "build_dev_requirements_x86_64-centos-6-linux-amd64-43a5bd98e0b5b1768231009a16e64863c4deeacb54a12c9be7b4b95507b91899",
-          "build_openssl_1_1_1_arm64-centos-7-linux-arm64-48c92a30fe5589323fb1d56ea627c8023e07f0bf9dabeeee411e3fa4cd704134",
-          "build_openssl_1_1_1_x86_64-centos-6-linux-amd64-1b2e38b3ba25ab12eb3224e95635aec3ea4b583beb68f4074410dfb039ed2719",
-          "build_openssl_3_arm64-centos-7-linux-arm64-c1025ed386213b3ee22242b15cc1b34d11679f7ff3653258a1a9d6f0da68d7db",
-          "build_openssl_3_x86_64-centos-6-linux-amd64-811ddbe39374d1c8ebdead4263c802b043ab4e22aecaa7c001934d6da8144a4f",
-          "build_portable_pytest_runner_arm64-centos-7-linux-arm64-0bea9c7326612b4a9fae4c8ffb321b81bb6419fb14e8fa8051c0f9dad89ce783",
-          "build_portable_pytest_runner_x86_64-centos-6-linux-amd64-e58de8a64e02fc0cce773a95561d405903fd34d196f681e057dcadd75fc99153",
-          "build_python_1_1_1_arm64-centos-7-linux-arm64-5fd37b5bef7f49ec0eae961ce7c80a65165c56bd01a206708c37de9a8f297c9b",
-          "build_python_1_1_1_x86_64-centos-6-linux-amd64-39b4613d6f22e10a4ce5bfe5c19e4f4135c8f9b9be8a1144c15b4e56e9111f0d",
-          "build_python_3_arm64-centos-7-linux-arm64-8dd96d28266e7abfc8cb9a5848d1c5bc29f598dd070e75514c86475e03ed93aa",
-          "build_python_3_x86_64-centos-6-linux-amd64-64845615694c294080e6a712af1edc7c0bd92841cf8887638a81662ca90daa54",
-          "build_python_dependencies_arm64-centos-7-linux-arm64-6ab028d48ff56e24a561ed5b522d2d6da83a035f12236c2ab1c0d341ddb6aaa7",
-          "build_python_dependencies_x86_64-centos-6-linux-amd64-ea3d979d95d8181f955965dd50178af619eaed9a9097efa9d3de1443f8cef567",
-          "download_build_dependencies-ubuntu-22-04-linux-amd64-c145630f8525f18e5c32eaeb1a815fb1cd82449ffbeaf7ad7007bd39a0ee2f80",
-          "install_build_environment_arm64-centos-7-linux-arm64-98628582d5bbde89ca1ebcecabae204796ae86d80fa18b7005a0836066abeb18",
-          "install_build_environment_x86_64-centos-6-linux-amd64-c770e8725d62b7838cb6f3bd6a3c7a202ffc9176e8aa3a443553c2d304dd1627",
-          "prepare_python_environment_arm64-centos-7-linux-arm64-d7f2f775db222387a64fc9e8984bf48b594e8c7872d07afb4494e0d23ab4a44c",
-          "prepare_python_environment_x86_64-centos-6-linux-amd64-35a8111e5a534198db547b36dc1367124605bfbfcba68f3c503e1459a270e920",
-          "prepare_toolset_x86_64-ubuntu-22-04-linux-amd64-711077b6458732363915059f8239b487b74db26b3723e1d26d74e9401d6f365e"]'
-        cache_version_suffix: v12
+        steps_ids: ${{ steps.get_all_steps_ids.outputs.all_steps_ids_json }}
+        cache_version_suffix: ${{ steps.get_all_steps_ids.outputs.cache_version_suffix
+          }}
         cache_root: agent_build_output/step_cache
         lookup_only: true
     - name: Print

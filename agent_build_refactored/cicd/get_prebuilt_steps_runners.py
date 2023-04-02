@@ -134,22 +134,10 @@ def get_missing_caches_matrices(input_missing_cache_keys_file: pl.Path):
 
             step = info["step"]
             step_id = step.id
-            logger.info(f"STEP: {step_id}")
-            logger.info(f"LEEEN: {len(step._tracked_files)}")
-            logger.info(f"JJJJ: {json.dumps(sorted(str(p) for p in step._tracked_files))}")
-            # logger.info("TRACKED: ")
-            # for tf in step._tracked_files:
-            #     logger.info(tf)
-
-            if "build_portable_pytest_runner_x86_64-centos-6-linux-amd64" in step_id:
-                a=10
-
 
             if step_id not in missing_cache_keys:
-                logger.info("SKIP")
                 continue
 
-            logger.info("CONTINUE")
             required_steps_ids = []
             for req_step_id in step.get_all_required_steps().keys():
                 required_steps_ids.append(req_step_id)
@@ -161,13 +149,6 @@ def get_missing_caches_matrices(input_missing_cache_keys_file: pl.Path):
                 "required_steps": sorted(required_steps_ids),
                 "cache_version_suffix": CACHE_VERSION_SUFFIX,
             })
-
-        if len(matrix_include) > 0:
-            matrix = {
-                "include": matrix_include
-            }
-        else:
-            matrix = ""
 
         matrix = {
             "include": matrix_include
@@ -183,28 +164,6 @@ def render_workflow_yaml():
     workflow = template_ymp.data
 
     jobs = workflow["jobs"]
-
-    pre_job = jobs["pre_job"]
-
-    all_used_steps_ids = list(sorted(all_used_steps.keys()))
-    # pre_job_outputs["all_steps_ids_json"] = json.dumps(all_used_steps_ids)
-    # pre_job_outputs["cache_version_suffix"] = CACHE_VERSION_SUFFIX
-
-    pre_job_steps = pre_job["steps"]
-
-    get_missing_cache_steps = {
-        "name": "Get missing step caches matrices",
-        "id": "get_missing_caches_matrices",
-        "uses": "./.github/actions/get_steps_missing_caches",
-        "with": {
-            "steps_ids": json.dumps(all_used_steps_ids),
-            "cache_version_suffix": CACHE_VERSION_SUFFIX,
-            "cache_root": "agent_build_output/step_cache",
-            "lookup_only": "true",
-        }
-    }
-
-    pre_job_steps.insert(2, get_missing_cache_steps)
 
     run_pre_built_job_object_name = "run_pre_built_job"
     run_pre_built_job = jobs.pop(run_pre_built_job_object_name)
@@ -230,6 +189,7 @@ def render_workflow_yaml():
         jobs[level_run_pre_built_job_object_name] = level_run_pre_built_job
         counter += 1
 
+    pre_job = jobs["pre_job"]
     pre_job["outputs"] = pre_job_outputs
 
     workflow_path = SOURCE_ROOT / ".github/workflows/run-pre-build-jobs.yml"
@@ -249,7 +209,7 @@ if __name__ == "__main__":
         required=True
     )
 
-    all_cache_keys_parser = subparsers.add_parser("all-cache-keys")
+    all_cache_keys_parser = subparsers.add_parser("get-all-steps-ids")
 
     get_cache_version_suffix_parser = subparsers.add_parser("get-cache-version-suffix")
 
@@ -262,6 +222,9 @@ if __name__ == "__main__":
             input_missing_cache_keys_file=pl.Path(args.input_missing_cache_keys_file),
         )
         print(json.dumps(matrices))
+    elif args.command == "get-all-steps-ids":
+        print(json.dumps(list(sorted(all_used_steps.keys()))))
+
     elif args.command == "render-workflow-yaml":
         render_workflow_yaml()
     elif args.command == "get-cache-version-suffix":

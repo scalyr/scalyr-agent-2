@@ -45,6 +45,21 @@ jobs:
         with:
           python_version: ${{ inputs.python_version }}
 
+      - name: Get all steps ids
+        id: get_all_steps_ids
+        run: |
+          echo "all_steps_ids_json=$(python3  agent_build_refactored/cicd/get_prebuilt_steps_runners.py get-all-steps-ids)" >> $GITHUB_OUTPUT
+          echo "cache_version_suffix=$(python3 agent_build_refactored/cicd/get_prebuilt_steps_runners.py get-cache-version-suffix)" >> $GITHUB_OUTPUT
+
+      - name: Get missing step caches matrices
+        id: get_missing_caches_matrices
+        uses: ./.github/actions/get_steps_missing_caches
+        with:
+          steps_ids: ${{ steps.get_all_steps_ids.outputs.all_steps_ids_json }}
+          cache_version_suffix: ${{ steps.get_all_steps_ids.outputs.cache_version_suffix }}
+          cache_root: agent_build_output/step_cache
+          lookup_only: true
+
       - name: Print
         id: print
         shell: bash
