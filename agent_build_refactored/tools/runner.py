@@ -226,12 +226,15 @@ class RunnerStep:
                     continue
 
                 skip = False
-                for to_ignore in ["__pycache__", ".pytest_cache", ".DS_Store"]:
+                for to_ignore in ["__pycache__", ".pytest_cache", ]:
                     if to_ignore in path.parent.parts:
                         skip = True
                         break
 
                 if skip:
+                    continue
+
+                if path.name in [".DS_Store"]:
                     continue
 
                 filtered.append(path)
