@@ -53,6 +53,7 @@ for runner_cls in ALL_RUNNERS:
     for step_id, step in runner_cls.get_all_steps(recursive=True).items():
         all_used_steps[step_id] = step
 
+a=10
 
 def create_wrapper_runner_from_step(step: RunnerStep):
     class StepWrapperRunner(Runner):
