@@ -8,6 +8,7 @@ import socketserver
 import tarfile
 import threading
 import time
+from typing import Optional
 
 import pytest
 import requests
@@ -17,7 +18,7 @@ from agent_build_refactored.tools.constants import (
     AGENT_VERSION,
     SOURCE_ROOT,
 )
-from agent_build_refactored.tools.runner import Runner, RunnerMappedPath
+from agent_build_refactored.tools.runner import Runner, RunnerMappedPath, EnvironmentRunnerStep
 from agent_build_refactored.managed_packages.managed_packages_builders import (
     ALL_MANAGED_PACKAGE_BUILDERS,
     PREPARE_TOOLSET_STEPS,
@@ -146,7 +147,9 @@ class RepoBuilder(Runner):
     The result repo is used as a mock repository for testing.
     """
 
-    BASE_ENVIRONMENT = PREPARE_TOOLSET_STEPS[Architecture.X86_64]
+    @classmethod
+    def get_base_environment(cls) -> Optional[EnvironmentRunnerStep]:
+        return  PREPARE_TOOLSET_STEPS[Architecture.X86_64]
 
     def build(
         self,
@@ -159,6 +162,7 @@ class RepoBuilder(Runner):
         if self.runs_in_docker:
             self.run_in_docker(
                 command_args=[
+                    "build",
                     "--package-type",
                     package_type,
                     "--packages-dir",
@@ -267,8 +271,12 @@ class RepoBuilder(Runner):
     def add_command_line_arguments(cls, parser: argparse.ArgumentParser):
         super(RepoBuilder, cls).add_command_line_arguments(parser)
 
-        parser.add_argument("--package-type", dest="package_type", required=True)
-        parser.add_argument(
+        subparser = parser.add_subparsers(dest="command")
+
+        build_parser = subparser.add_parser("build")
+
+        build_parser.add_argument("--package-type", dest="package_type", required=True)
+        build_parser.add_argument(
             "--packages-dir",
             dest="packages_dir",
             required=True,
@@ -280,10 +288,12 @@ class RepoBuilder(Runner):
         args,
     ):
         super(RepoBuilder, cls).handle_command_line_arguments(args)
-        builder = cls()
-        builder.build(
-            package_type=args.package_type, packages_dir_path=pl.Path(args.packages_dir)
-        )
+
+        if args.command == "build":
+            builder = cls()
+            builder.build(
+                package_type=args.package_type, packages_dir_path=pl.Path(args.packages_dir)
+            )
 
 
 @pytest.fixture(scope="session")
