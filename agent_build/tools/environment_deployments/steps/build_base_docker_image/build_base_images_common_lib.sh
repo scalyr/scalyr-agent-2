@@ -116,7 +116,7 @@ build_all_base_images() {
     coverage_arg=""
     tag_suffix=""
     if $use_test_version ; then
-      coverage_arg="--build-arg COVERAGE_VERSION=4.5.4"
+      coverage_arg="--build-arg COVERAGE_VERSION=5.5"
       tag_suffix="-testing"
     fi
 
