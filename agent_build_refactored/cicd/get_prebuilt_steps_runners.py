@@ -48,7 +48,7 @@ from agent_build_refactored.tools.runner import Runner, RunnerStep, RunnerMeta
 from agent_build_refactored.cicd.tttt import ALL_RUNNERS
 
 
-CACHE_VERSION_SUFFIX = "v12"
+CACHE_VERSION_SUFFIX = "v13"
 
 used_builders = []
 
