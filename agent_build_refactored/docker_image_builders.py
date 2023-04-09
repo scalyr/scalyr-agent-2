@@ -51,6 +51,7 @@ from agent_build_refactored.tools import (
 )
 from agent_build_refactored.tools.runner import (
     Runner,
+    RunnerStep,
     ArtifactRunnerStep,
     GitHubActionsSettings,
 )
@@ -233,6 +234,10 @@ class ContainerImageBuilder(Runner):
         return (
             f"{cls.IMAGE_TYPE_SPEC.name}-{cls.BASE_IMAGE_BUILDER_STEP.base_distro.name}"
         )
+
+    @classmethod
+    def get_all_required_steps(cls) -> List[RunnerStep]:
+        return [cls.BASE_IMAGE_BUILDER_STEP]
 
     def build_container_filesystem(self, output_path: pl.Path):
         """
@@ -675,6 +680,7 @@ for base_distro_name in ["debian", "alpine"]:
         builder_name_suffix_chars = list(base_distro_name)
         builder_name_suffix_chars[0] = builder_name_suffix_chars[0].upper()
         builder_name_suffix = "".join(builder_name_suffix_chars)
+
         class _ContainerImageBuilder(ContainerImageBuilder):
             BASE_IMAGE_BUILDER_STEP = BaseImageBuilderStep(
                 base_distro=BaseDistroSpec(
