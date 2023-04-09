@@ -117,14 +117,7 @@ for arch in SUPPORTED_ARCHITECTURES:
     class BuilderCls(PortablePytestRunnerBuilder):
         ARCHITECTURE = arch
         CLASS_NAME_ALIAS = f"PortablePytestRunnerBuilder{arch.value}"
-
-    # # Since we create builders "dynamically" we should assign name to each of them, so
-    # # they can be accessible later.
-    # BuilderCls.assign_fully_qualified_name(
-    #     class_name=PortablePytestRunnerBuilder.__name__,
-    #     module_name=__name__,
-    #     class_name_suffix=f"_{arch.value}",
-    # )
+        ADD_TO_GLOBAL_RUNNER_COLLECTION = True
 
     PORTABLE_PYTEST_RUNNER_BUILDERS[arch] = BuilderCls
 

@@ -62,6 +62,7 @@ for runner_cls in ALL_RUNNERS:
 
 a=10
 
+
 def create_wrapper_runner_from_step(step: RunnerStep):
     class StepWrapperRunner(Runner):
         CLASS_NAME_ALIAS = f"{step_id}_pre_build"
