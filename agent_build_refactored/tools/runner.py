@@ -782,17 +782,15 @@ ALL_RUNNERS = []
 
 
 class RunnerMeta(abc.ABCMeta):
-    def __new__(mcs, name, bases, attrs):
+    def __init__(cls, name, bases, attrs):
         global ALL_RUNNERS
 
-        if not bases:
-            return super().__new__(mcs, name, bases, attrs)
+        super(RunnerMeta, cls).__init__(name, bases, attrs)
 
-        result = super().__new__(mcs, name, bases, attrs)
+        runner_cls: Type[Runner] = cls  # NOQA
 
-        class_name_alias = getattr(result, "CLASS_NAME_ALIAS", None)
-        if class_name_alias:
-            name_for_fqdn = class_name_alias
+        if runner_cls.CLASS_NAME_ALIAS is not None:
+            name_for_fqdn = runner_cls.CLASS_NAME_ALIAS
         else:
             name_for_fqdn = name
 
@@ -803,39 +801,22 @@ class RunnerMeta(abc.ABCMeta):
         module_without_ext = module_rel_path.parent / module_rel_path.stem
         module_fqdn = str(module_without_ext).replace(os.sep, ".")
         result_fqdn = f"{module_fqdn}.{name_for_fqdn}"
-        setattr(result, "FULLY_QUALIFIED_NAME", result_fqdn)
-        setattr(module, name_for_fqdn, result)
+        runner_cls.FULLY_QUALIFIED_NAME = result_fqdn
+        setattr(module, name_for_fqdn, runner_cls)
 
-        required_class_attrs = getattr(result, "__required_cls_attrs__", None)
-
-        add = True
-        if required_class_attrs:
-            for attr_name in required_class_attrs:
-                if attr_name not in attrs:
-                    add = False
-                    break
-
-        if len(result.__abstractmethods__) > 0:
-            add = False
-
-        if add:
-            ALL_RUNNERS.append(result)
-        else:
-            a=10
-
-        return result
+        if runner_cls.ADD_TO_GLOBAL_RUNNER_COLLECTION is True:
+            ALL_RUNNERS.append(runner_cls)
 
     def __str__(self):
-        return getattr(self, "FULLY_QUALIFIED_NAME")
+        runner_cls: Type[Runner] = self
+        return runner_cls.FULLY_QUALIFIED_NAME
 
     def __repr__(self):
-        return getattr(self, "FULLY_QUALIFIED_NAME")
-
+        runner_cls: Type[Runner] = self
+        return runner_cls.FULLY_QUALIFIED_NAME
 
 
 class Runner(metaclass=RunnerMeta):
-
-    __required_cls_attrs__: List[str] = []
     """
     Abstraction which combines several RunnerStep instances in order to execute them and to use their results
         in order to perform its own work.
@@ -846,15 +827,7 @@ class Runner(metaclass=RunnerMeta):
 
     CLASS_NAME_ALIAS: str = None
 
-    def __new__(cls, *args, **kwargs):
-        for attr_name in cls.__required_cls_attrs__:
-            if not hasattr(cls, attr_name):
-                raise NotImplementedError(
-                    f"The class' {cls.__name__} attribute '{attr_name}' does not exist, "
-                    f"but it is in the '__required_cls_attrs__'. Please specify required attribute."
-                )
-        return super(Runner, cls).__new__(cls)
-
+    ADD_TO_GLOBAL_RUNNER_COLLECTION: bool = False
 
     def __init__(
         self, work_dir: pl.Path = None

@@ -175,7 +175,6 @@ SUPPORTED_ARCHITECTURES = [
 
 
 class LinuxPackageBuilder(Runner):
-    __required_cls_attrs__ = ["PACKAGE_TYPE"]
     """
     This is a base class that is responsible for the building of the Linux agent deb and rpm packages that are managed
         by package managers such as apt and yum.
@@ -1964,13 +1963,15 @@ for arch in SUPPORTED_ARCHITECTURES:
         PACKAGECLOUD_DISTRO_VERSION = "any"
         DEPENDENCY_PACKAGES_ARCHITECTURE = arch
         CLASS_NAME_ALIAS = f"DebLinuxAIOPackagesBuilder{arch.value}"
+        ADD_TO_GLOBAL_RUNNER_COLLECTION = True
 
     class RpmLinuxAIOPackagesBuilder(LinuxAIOPackagesBuilder):
         PACKAGE_TYPE = "rpm"
         PACKAGECLOUD_DISTRO = "rpm_any"
         PACKAGECLOUD_DISTRO_VERSION = "rpm_any"
         DEPENDENCY_PACKAGES_ARCHITECTURE = arch
-        CLASS_NAME_ALIAS = f"RpmLinuxAIOPackagesBuilder${arch.value}"
+        CLASS_NAME_ALIAS = f"RpmLinuxAIOPackagesBuilder{arch.value}"
+        ADD_TO_GLOBAL_RUNNER_COLLECTION = True
 
     # Since we create builders "dynamically" we should assign name to each of them, so
     # they can be accessible later.
@@ -2046,10 +2047,12 @@ ALL_MANAGED_PACKAGE_BUILDERS: Dict[str, Type[LinuxPackageBuilder]] = ALL_AIO_PAC
 
 class DebLinuxNonAIOPackagesBuilder(LinuxNonAIOPackageBuilder):
     PACKAGE_TYPE = "deb"
+    ADD_TO_GLOBAL_RUNNER_COLLECTION = True
 
 
 class RpmLinuxNonAIOPackagesBuilder(LinuxNonAIOPackageBuilder):
     PACKAGE_TYPE = "rpm"
+    ADD_TO_GLOBAL_RUNNER_COLLECTION = True
 
 
 ALL_MANAGED_PACKAGE_BUILDERS["deb-non-aio"] = DebLinuxNonAIOPackagesBuilder

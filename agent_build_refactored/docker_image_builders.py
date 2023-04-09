@@ -649,69 +649,115 @@ AGENT_K8S_SPEC = AgentImageTypeSpec(
 )
 
 
-# Final image builder classes for Debian-based images.
-class DockerJsonDebian(ContainerImageBuilderDebian):
-    IMAGE_TYPE_SPEC = AGENT_DOCKER_JSON_SPEC
+ALL_IMAGE_BUILDERS: Dict[str, Type[ContainerImageBuilder]] = UniqueDict()
+
+for base_distro_name in ["debian", "alpine"]:
+
+    python_base_image_name_suffix = {
+        "debian": "slim",
+        "alpine": "alpine"
+    }[base_distro_name]
+
+    tag_suffix = {
+        "debian": None,
+        "alpine": "alpine"
+    }[base_distro_name]
+
+    spec_names = {
+        "DockerJSON": AGENT_DOCKER_JSON_SPEC,
+        "DockerSyslog": AGENT_DOCKER_SYSLOG_SPEC,
+        "DockerAPI": AGENT_DOCKER_API_SPEC,
+        "K8S": AGENT_K8S_SPEC
+    }
+
+    for spec_name, spec in spec_names.items():
+
+        builder_name_suffix_chars = list(base_distro_name)
+        builder_name_suffix_chars[0] = builder_name_suffix_chars[0].upper()
+        builder_name_suffix = "".join(builder_name_suffix_chars)
+        class _ContainerImageBuilder(ContainerImageBuilder):
+            BASE_IMAGE_BUILDER_STEP = BaseImageBuilderStep(
+                base_distro=BaseDistroSpec(
+                    name=base_distro_name,
+                    python_base_image=f"python:{IMAGES_PYTHON_VERSION}-{python_base_image_name_suffix}",
+                ),
+                supported_platforms=_AGENT_DOCKER_IMAGE_SUPPORTED_PLATFORMS,
+            )
+            IMAGE_TYPE_SPEC = spec
+            TAG_SUFFIX = tag_suffix
+
+            CLASS_NAME_ALIAS = f"{spec_name}{builder_name_suffix}"
+            ADD_TO_GLOBAL_RUNNER_COLLECTION = True
+
+        ALL_IMAGE_BUILDERS[_ContainerImageBuilder.get_name()] = _ContainerImageBuilder
 
 
-class DockerSyslogDebian(ContainerImageBuilderDebian):
-    IMAGE_TYPE_SPEC = AGENT_DOCKER_SYSLOG_SPEC
 
 
-class DockerApiDebian(ContainerImageBuilderDebian):
-    IMAGE_TYPE_SPEC = AGENT_DOCKER_API_SPEC
 
-
-class K8sDebian(ContainerImageBuilderDebian):
-    IMAGE_TYPE_SPEC = AGENT_K8S_SPEC
-
-
-# Final image builder classes for Alpine-base images.
-class DockerJsonAlpine(ContainerImageBuilderAlpine):
-    IMAGE_TYPE_SPEC = AGENT_DOCKER_JSON_SPEC
-    TAG_SUFFIX = "alpine"
-
-
-class DockerSyslogAlpine(ContainerImageBuilderAlpine):
-    IMAGE_TYPE_SPEC = AGENT_DOCKER_SYSLOG_SPEC
-    TAG_SUFFIX = "alpine"
-
-
-class DockerApiAlpine(ContainerImageBuilderAlpine):
-    IMAGE_TYPE_SPEC = AGENT_DOCKER_API_SPEC
-    TAG_SUFFIX = "alpine"
-
-
-class K8sAlpine(ContainerImageBuilderAlpine):
-    IMAGE_TYPE_SPEC = AGENT_K8S_SPEC
-    TAG_SUFFIX = "alpine"
-
-
-DEBIAN_DOCKER_IMAGE_BUILDERS = [
-    DockerJsonDebian,
-    DockerSyslogDebian,
-    DockerApiDebian,
-]
-
-DEBIAN_K8S_IMAGE_BUILDERS = [
-    K8sDebian,
-]
-DEBIAN_IMAGE_BUILDERS = [*DEBIAN_DOCKER_IMAGE_BUILDERS, *DEBIAN_K8S_IMAGE_BUILDERS]
-
-ALPINE_DOCKER_IMAGE_BUILDERS = [
-    DockerJsonAlpine,
-    DockerSyslogAlpine,
-    DockerApiAlpine,
-]
-ALPINE_K8S_IMAGE_BUILDERS = [
-    K8sAlpine,
-]
-
-ALPINE_IMAGE_BUILDERS = [
-    *ALPINE_DOCKER_IMAGE_BUILDERS,
-    *ALPINE_K8S_IMAGE_BUILDERS,
-]
-
-ALL_IMAGE_BUILDERS: Dict[str, Type[ContainerImageBuilder]] = UniqueDict(
-    {b.get_name(): b for b in [*DEBIAN_IMAGE_BUILDERS, *ALPINE_IMAGE_BUILDERS]}
-)
+# # Final image builder classes for Debian-based images.
+# class DockerJsonDebian(ContainerImageBuilderDebian):
+#     IMAGE_TYPE_SPEC = AGENT_DOCKER_JSON_SPEC
+#
+#
+# class DockerSyslogDebian(ContainerImageBuilderDebian):
+#     IMAGE_TYPE_SPEC = AGENT_DOCKER_SYSLOG_SPEC
+#
+#
+# class DockerApiDebian(ContainerImageBuilderDebian):
+#     IMAGE_TYPE_SPEC = AGENT_DOCKER_API_SPEC
+#
+#
+# class K8sDebian(ContainerImageBuilderDebian):
+#     IMAGE_TYPE_SPEC = AGENT_K8S_SPEC
+#
+#
+# # Final image builder classes for Alpine-base images.
+# class DockerJsonAlpine(ContainerImageBuilderAlpine):
+#     IMAGE_TYPE_SPEC = AGENT_DOCKER_JSON_SPEC
+#     TAG_SUFFIX = "alpine"
+#
+#
+# class DockerSyslogAlpine(ContainerImageBuilderAlpine):
+#     IMAGE_TYPE_SPEC = AGENT_DOCKER_SYSLOG_SPEC
+#     TAG_SUFFIX = "alpine"
+#
+#
+# class DockerApiAlpine(ContainerImageBuilderAlpine):
+#     IMAGE_TYPE_SPEC = AGENT_DOCKER_API_SPEC
+#     TAG_SUFFIX = "alpine"
+#
+#
+# class K8sAlpine(ContainerImageBuilderAlpine):
+#     IMAGE_TYPE_SPEC = AGENT_K8S_SPEC
+#     TAG_SUFFIX = "alpine"
+#
+#
+# DEBIAN_DOCKER_IMAGE_BUILDERS = [
+#     DockerJsonDebian,
+#     DockerSyslogDebian,
+#     DockerApiDebian,
+# ]
+#
+# DEBIAN_K8S_IMAGE_BUILDERS = [
+#     K8sDebian,
+# ]
+# DEBIAN_IMAGE_BUILDERS = [*DEBIAN_DOCKER_IMAGE_BUILDERS, *DEBIAN_K8S_IMAGE_BUILDERS]
+#
+# ALPINE_DOCKER_IMAGE_BUILDERS = [
+#     DockerJsonAlpine,
+#     DockerSyslogAlpine,
+#     DockerApiAlpine,
+# ]
+# ALPINE_K8S_IMAGE_BUILDERS = [
+#     K8sAlpine,
+# ]
+#
+# ALPINE_IMAGE_BUILDERS = [
+#     *ALPINE_DOCKER_IMAGE_BUILDERS,
+#     *ALPINE_K8S_IMAGE_BUILDERS,
+# ]
+#
+# ALL_IMAGE_BUILDERS: Dict[str, Type[ContainerImageBuilder]] = UniqueDict(
+#     {b.get_name(): b for b in [*DEBIAN_IMAGE_BUILDERS, *ALPINE_IMAGE_BUILDERS]}
+# )
