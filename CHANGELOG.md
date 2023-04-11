@@ -7,7 +7,7 @@ Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Jan 19, 2023 00:00 -0800
 --->
 
 Docker Images / Kubernetes:
-* Docker images now utilize Python:3.11.2 image.
+* Docker images now utilize Python:3.11.3 image.
 
 ## 2.2.1 "Frosty" - Mar 29, 2023
 <!---
