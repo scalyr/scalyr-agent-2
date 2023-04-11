@@ -86,6 +86,7 @@ For help, contact us at [support@scalyr.com](mailto:support@scalyr.com).
 | `id`                | Optional. An id, included with each event. Shows in the UI as a value for the `instance` field. If you are running multiple instances of this plugin, id lets you distinguish between them. This is especially useful if you are running multiple PostgreSQL instances on a single server. Each instance has a separate `{...}` stanza in the configuration file (`/etc/scalyr-agent-2/agent.json`). | 
 | `database_host`     | Optional (default to `localhost`). Name of the host on which PostgreSQL is running. | 
 | `database_port`     | Optional (defaults to `5432`). Port for PostgreSQL. | 
+| `use_ssl`           | Optional (defaults to False). Whether to connect to PostgreSQL over SSL. Note: Self-signed server certs are not supported at this time. Additionally, server cert validation and hostname checking is only performed on Python 2.7.9 and newer. Older Python versions are vulnerable to MitM attacks. | 
 | `database_name`     | Name of the PostgreSQL database the Scalyr Agent will connect to. | 
 | `database_username` | Username the Scalyr Agent connects with. | 
 | `database_password` | Password the Scalyr Agent connects with. | 

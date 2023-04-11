@@ -95,8 +95,8 @@ popd
 
 mkdir /tmp/build-libedit
 pushd /tmp/build-libedit
-tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/libedit/libedit.tar.gz"
-pushd "libedit-${LIBEDIT_VERSION}"
+cp -a "${DOWNLOAD_BUILD_DEPENDENCIES}/libedit" "."
+pushd "libedit"
 ./configure \
   CFLAGS="-fPIC -I/usr/local/include -I/usr/local/include/ncurses" \
   LDFLAGS="-L/usr/local/lib -L/usr/local/lib64" \
