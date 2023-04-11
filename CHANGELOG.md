@@ -9,6 +9,9 @@ Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Jan 19, 2023 00:00 -0800
 Docker Images / Kubernetes:
 * Docker images now utilize Python:3.11.3 image.
 
+AIO Package:
+- Upgrade All-in-On package to utilize Python 3.11.3.
+
 ## 2.2.1 "Frosty" - Mar 29, 2023
 <!---
 Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Jan 19, 2023 00:00 -0800
