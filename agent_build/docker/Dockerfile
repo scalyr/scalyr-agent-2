@@ -39,7 +39,7 @@ RUN tar -xf /tmp/build/scalyr-agent.tar.gz
 
 WORKDIR /
 
-FROM python:3.11.2-slim-bullseye as scalyr-base-slim-bullseye
+FROM python:3.11.3-slim-bullseye as scalyr-base-slim-bullseye
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
 # We upgrade current packages in order to keep everything up to date, including security updates.
@@ -47,7 +47,7 @@ RUN apt-get update ; apt-get dist-upgrade -y
 RUN python3 -m pip install --upgrade setuptools
 RUN apt-get clean
 
-FROM python:3.11.2-alpine as scalyr-base-alpine
+FROM python:3.11.3-alpine as scalyr-base-alpine
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
 
