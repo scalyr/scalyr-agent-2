@@ -782,6 +782,7 @@ ALL_RUNNERS = []
 
 
 class RunnerMeta(abc.ABCMeta):
+    """This is a metaclass for all Runner classes."""
     def __init__(cls, name, bases, attrs):
         global ALL_RUNNERS
 
