@@ -42,26 +42,26 @@ jobs:
     - name: Get all steps ids
       id: get_all_steps_ids
       run: |
-        echo "all_steps_ids_json=$(python3  agent_build_refactored/cicd/get_prebuilt_steps_runners.py get-all-steps-ids)" >> $GITHUB_OUTPUT
-        echo "cache_version_suffix=$(python3 agent_build_refactored/cicd/get_prebuilt_steps_runners.py get-cache-version-suffix)" >> $GITHUB_OUTPUT
-    - name: Get missing step caches matrices
-      id: get_missing_caches_matrices
-      uses: ./.github/actions/get_steps_missing_caches
+        echo "all_steps_ids_json=$(python3  agent_build_refactored/cicd/cacheable_runner_steps_helper.py get-all-steps-ids)" >> $GITHUB_OUTPUT
+        echo "cache_version_suffix=$(python3 agent_build_refactored/cicd/cacheable_runner_steps_helper.py get-cache-version-suffix)" >> $GITHUB_OUTPUT
+    - name: Get missing caches steps
+      id: get_missing_caches_steps
+      uses: ./.github/actions/restore_steps_caches
       with:
         steps_ids: ${{ steps.get_all_steps_ids.outputs.all_steps_ids_json }}
         cache_version_suffix: ${{ steps.get_all_steps_ids.outputs.cache_version_suffix
           }}
         cache_root: agent_build_output/step_cache
         lookup_only: true
-    - name: Print
-      id: print
+    - name: Print missing steps caches matrices
+      id: print_missing_caches_matrices
       shell: bash
       run: |
-        echo '${{ steps.get_missing_caches_matrices.outputs.missing_cache_keys_json }}' > /tmp/missing_cache_keys.json
+        cat <<< "${{ steps.get_missing_caches_steps.outputs.missing_steps_ids_json }}" > /tmp/missing_steps_ids.json
         echo "MISSS"
         cat /tmp/missing_cache_keys.json
         echo "MISSSEND"
-        python3  agent_build_refactored/cicd/get_prebuilt_steps_runners.py get-missing-caches-matrices --input-missing-cache-keys-file /tmp/missing_cache_keys.json > /tmp/missing_cache_matrices.json
+        python3  agent_build_refactored/cicd/cacheable_runner_steps_helper.py get-missing-caches-matrices --missing-steps-ids-file /tmp/missing_steps_ids.json > /tmp/missing_cache_matrices.json
         i=0
         jq -c '.[]' /tmp/missing_cache_matrices.json | while read -r matrix; do 
           echo "matrix${i}=$(echo "$matrix" | jq -c '.')" >> $GITHUB_OUTPUT
@@ -80,8 +80,6 @@ jobs:
       matrix_length3: ${{ steps.print.outputs.matrix_length3 }}
       matrix4: ${{ steps.print.outputs.matrix4 }}
       matrix_length4: ${{ steps.print.outputs.matrix_length4 }}
-      matrix5: ${{ steps.print.outputs.matrix5 }}
-      matrix_length5: ${{ steps.print.outputs.matrix_length5 }}
   run_pre_built_job0:
     name: 0 ${{ matrix.name }}
     runs-on: ubuntu-20.04
@@ -350,71 +348,6 @@ jobs:
       == 'skipped') && needs.pre_job.outputs.matrix_length4 != '0' }}
     strategy:
       matrix: ${{ fromJSON(needs.pre_job.outputs.matrix4) }}
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
-    - name: Prepare dev requirements.
-      uses: ./.github/actions/prepare_python_with_dev_requirements
-      with:
-        python_version: ${{ inputs.python_version }}
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@f03ac48505955848960e80bbb68046aa35c7b9e7
-      with:
-        driver-opts: network=host
-    - name: Set up QEMU
-      id: qemu
-      uses: docker/setup-qemu-action@e81a89b1732b9c48d79cd809d8d81d79c4647a18
-      with:
-        image: tonistiigi/binfmt:qemu-v6.2.0
-        platforms: all
-    - name: Prepare SSH
-      id: prepare-ssh
-      shell: bash
-      run: |
-        echo '${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}' > /tmp/private_key.pem
-        chmod 600 /tmp/private_key.pem
-        eval `ssh-agent -s`
-
-        cat "/tmp/private_key.pem" | ssh-add -
-        echo "ssh_auth_sock=${SSH_AUTH_SOCK}" >> $GITHUB_OUTPUT
-    - name: Cache step
-      id: cache-step
-      uses: actions/cache@v3
-      with:
-        path: |
-          agent_build_output/step_cache/${{ matrix.step_id }}
-        key: ${{ matrix.step_id }}_${{ matrix.cache_version_suffix }}
-    - name: Get required steps caches
-      id: get_required_steps_caches
-      uses: ./.github/actions/get_steps_missing_caches
-      with:
-        steps_ids: ${{ toJSON(matrix.required_steps) }}
-        cache_version_suffix: ${{ matrix.cache_version_suffix }}
-        cache_root: agent_build_output/step_cache
-    - name: Run cached step
-      shell: bash
-      env:
-        SSH_AUTH_SOCK: ${{ steps.prepare-ssh.outputs.ssh_auth_sock }}
-        AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
-        AWS_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
-        AWS_PRIVATE_KEY_NAME: ${{ inputs.aws_private_key_name }}
-        AWS_PRIVATE_KEY_PATH: /tmp/private_key.pem
-        AWS_REGION: ${{ inputs.aws_region }}
-        AWS_SECURITY_GROUP: ${{ inputs.aws_security_group }}
-        AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ inputs.aws_prefix_list_id }}
-        AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
-      run: python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn
-        }} --run-all-steps
-  run_pre_built_job5:
-    name: 5 ${{ matrix.name }}
-    runs-on: ubuntu-20.04
-    needs:
-    - pre_job
-    - run_pre_built_job4
-    if: ${{ always() && (needs.run_pre_built_job4.result == 'success' || needs.run_pre_built_job4.result
-      == 'skipped') && needs.pre_job.outputs.matrix_length5 != '0' }}
-    strategy:
-      matrix: ${{ fromJSON(needs.pre_job.outputs.matrix5) }}
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
