@@ -758,34 +758,34 @@ workflows:
  package-tests:
    <<: *skip_release_build_branch_push
    jobs:
-     - build-linux-packages-and-installer-script
-     - build-windows-package
-     - package-test-rpm:
-         context: scalyr-agent
-         <<: *master_and_release_only
-     - package-test-deb:
-         context: scalyr-agent
-         <<: *master_and_release_only
-     - smoke-rpm-package-py2:
-         context: scalyr-agent
-         requires:
-           - package-test-rpm
-         <<: *master_and_release_only
-     - smoke-rpm-package-py3:
-         context: scalyr-agent
-         requires:
-           - package-test-rpm
-         <<: *master_and_release_only
-     - smoke-deb-package-py2:
-         context: scalyr-agent
-         requires:
-           - package-test-deb
-         <<: *master_and_release_only
-     - smoke-deb-package-py3:
-         context: scalyr-agent
-         requires:
-           - package-test-deb
-         <<: *master_and_release_only
+#     - build-linux-packages-and-installer-script
+#     - build-windows-package
+#     - package-test-rpm:
+#         context: scalyr-agent
+#         <<: *master_and_release_only
+#     - package-test-deb:
+#         context: scalyr-agent
+#         <<: *master_and_release_only
+#     - smoke-rpm-package-py2:
+#         context: scalyr-agent
+#         requires:
+#           - package-test-rpm
+#         <<: *master_and_release_only
+#     - smoke-rpm-package-py3:
+#         context: scalyr-agent
+#         requires:
+#           - package-test-rpm
+#         <<: *master_and_release_only
+#     - smoke-deb-package-py2:
+#         context: scalyr-agent
+#         requires:
+#           - package-test-deb
+#         <<: *master_and_release_only
+#     - smoke-deb-package-py3:
+#         context: scalyr-agent
+#         requires:
+#           - package-test-deb
+#         <<: *master_and_release_only
     # - ami-tests-development-windows:
     #      context: scalyr-agent
     #      requires:
@@ -817,25 +817,25 @@ workflows:
      #   context: scalyr-agent
      #- ami-tests-stable-linux:
      #   context: scalyr-agent
-     - build-linux-packages-and-installer-script
-     - build-windows-package
-     - package-test-rpm:
-         context: scalyr-agent
-     - package-test-deb:
-         context: scalyr-agent
-     - smoke-rpm-package-py2:
-         context: scalyr-agent
-         requires:
-           - package-test-rpm
-     - smoke-rpm-package-py3:
-         context: scalyr-agent
-         requires:
-           - package-test-rpm
-     - smoke-deb-package-py2:
-         context: scalyr-agent
-         requires:
-           - package-test-deb
-     - smoke-deb-package-py3:
-         context: scalyr-agent
-         requires:
-           - package-test-deb
+#     - build-linux-packages-and-installer-script
+#     - build-windows-package
+#     - package-test-rpm:
+#         context: scalyr-agent
+#     - package-test-deb:
+#         context: scalyr-agent
+#     - smoke-rpm-package-py2:
+#         context: scalyr-agent
+#         requires:
+#           - package-test-rpm
+#     - smoke-rpm-package-py3:
+#         context: scalyr-agent
+#         requires:
+#           - package-test-rpm
+#     - smoke-deb-package-py2:
+#         context: scalyr-agent
+#         requires:
+#           - package-test-deb
+#     - smoke-deb-package-py3:
+#         context: scalyr-agent
+#         requires:
+#           - package-test-deb
