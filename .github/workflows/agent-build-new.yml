@@ -39,11 +39,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-  run_pre_build_steps:
-    name: "Run pre-built steps"
+  run_cacheable_steps:
+    name: "Run cacheable steps"
     needs:
       - pre_job
-    uses: ./.github/workflows/run-cacheable-runner-steps.yml
+    uses: ./.github/workflows/reusable-run-cacheable-runner-steps.yml
     with:
       aws_private_key_name: ${{ needs.pre_job.outputs.aws_private_key_name }}
       aws_security_group: ${{ needs.pre_job.outputs.aws_security_group }}
@@ -64,7 +64,7 @@ jobs:
     name: "Build Linux packages"
     needs:
       - pre_job
-      - run_pre_build_steps
+      - run_cacheable_steps
     uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
     with:
       aws_private_key_name: ${{ needs.pre_job.outputs.aws_private_key_name }}

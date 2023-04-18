@@ -170,7 +170,7 @@ def generate_workflow_yaml():
     This function generates yml file for workflow that run pre-built steps.
 
     """
-    template_path = pl.Path(__file__).parent / "run-cacheable-runner-steps-template.yml"
+    template_path = pl.Path(__file__).parent / "reusable-run-cacheable-runner-steps-template.yml"
     template_ymp = strictyaml.load(template_path.read_text())
     workflow = template_ymp.data
 
@@ -217,7 +217,7 @@ def generate_workflow_yaml():
     pre_job = jobs["pre_job"]
     pre_job["outputs"] = pre_job_outputs
 
-    workflow_path = SOURCE_ROOT / ".github/workflows/run-cacheable-runner-steps.yml"
+    workflow_path = SOURCE_ROOT / ".github/workflows/reusable-run-cacheable-runner-steps.yml"
 
     workflow_path.write_text(strictyaml.as_document(workflow).as_yaml())
 
