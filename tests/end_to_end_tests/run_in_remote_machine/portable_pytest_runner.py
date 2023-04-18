@@ -63,8 +63,7 @@ def create_build_portable_pytest_runner_step() -> Dict[
                 "PORTABLE_RUNNER_NAME": PORTABLE_RUNNER_NAME,
             },
             github_actions_settings=GitHubActionsSettings(
-                cacheable=True,
-                run_in_remote_docker=run_in_remote_docker
+                cacheable=True, run_in_remote_docker=run_in_remote_docker
             ),
         )
 
@@ -77,7 +76,6 @@ BUILD_PORTABLE_PYTEST_RUNNER_STEPS = create_build_portable_pytest_runner_step()
 
 
 class PortablePytestRunnerBuilder(Runner):
-    __required_cls_attrs__ = ["ARCHITECTURE"]
     ARCHITECTURE: Architecture
     """
     Builder class that builds pytest runner executable by using PyInstaller.

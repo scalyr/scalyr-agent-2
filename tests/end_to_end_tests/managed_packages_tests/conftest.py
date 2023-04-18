@@ -18,7 +18,11 @@ from agent_build_refactored.tools.constants import (
     AGENT_VERSION,
     SOURCE_ROOT,
 )
-from agent_build_refactored.tools.runner import Runner, RunnerMappedPath, EnvironmentRunnerStep
+from agent_build_refactored.tools.runner import (
+    Runner,
+    RunnerMappedPath,
+    EnvironmentRunnerStep,
+)
 from agent_build_refactored.managed_packages.managed_packages_builders import (
     ALL_MANAGED_PACKAGE_BUILDERS,
     PREPARE_TOOLSET_STEPS,
@@ -149,7 +153,7 @@ class RepoBuilder(Runner):
 
     @classmethod
     def get_base_environment(cls) -> Optional[EnvironmentRunnerStep]:
-        return  PREPARE_TOOLSET_STEPS[Architecture.X86_64]
+        return PREPARE_TOOLSET_STEPS[Architecture.X86_64]
 
     def build(
         self,
@@ -292,7 +296,8 @@ class RepoBuilder(Runner):
         if args.command == "build":
             builder = cls()
             builder.build(
-                package_type=args.package_type, packages_dir_path=pl.Path(args.packages_dir)
+                package_type=args.package_type,
+                packages_dir_path=pl.Path(args.packages_dir),
             )
 
 

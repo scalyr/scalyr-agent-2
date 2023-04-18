@@ -11,6 +11,79 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""
+This module is responsible for building Python agent for Linux distributions with package managers.
+
+It defines builder classes that are responsible for the building of the Linux agent deb and rpm packages that are
+    managed by package managers such as apt and yum.
+
+There are two variants of packages that can be built:
+    1. All in one (aio) package named "scalyr-agent-2-aio", that contains all required dependencies, so it can run basically on any Linux
+        glibc-based distribution.
+    2. Package that depends on some system packages, such as Python or OpenSLL, named "scalyr-agent-2". Probably will be
+        discontinued in the future in favour of the first one.
+
+The aio package provides the "embedded" Python interpreter that is specially built to be used by the agent.
+    It is built against the oldest possible version of gLibc, so it has to be enough to maintain
+    only one build of the package in order to support all target systems.
+
+    One of the features on the package, is that is can use system's OpenSSL if it has appropriate version, or
+    fallback to the OpenSSL library which is shipped with the package. To achieve that, the Python interpreter from the
+    package contains multiple versions of OpenSSL (1.1.1 and 3) and Python's 'OpenSSL-related' C bindings - _ssl.cpython*.so and _hashlib.cpython.so.
+    On each new installation/upgrade of the package (or user's manual run of the command
+    `/opt/scalyr-agent-2/bin/agent-python3-config initialize`), the package follows next steps in order to
+    resolve OpenSSL library to use:
+        - 1: First it tries to find system's OpenSSL 3+. It creates a symlink '/opt/scalyr-agent-2/lib/openssl/current'
+            that points to the directory `/opt/scalyr-agent-2/lib/openssl/3`. This directory contains directory
+            named 'bindings' that, in turn, contains Python's C bindings - '_ssl' and '_hashlib' that are compiled
+            against OpenSSL 3. The Python's OpenSSL-related C bindings in '/opt/scalyr-agent-2/python3/lib/pythonX.Y/lib-dynload'
+            are also linked to the bindings in the `current` directory, so by changing the target of the `current` symlink
+            we also change OpenSSL version of the Python's C bindings.
+            Then the package will try "probe" the system's OpenSSL. That is done basically just by running new
+            process of the interpreter and importing the 'ssl' module. If there's no exception, then appropriate
+            OpenSSL 3 is presented in the system and Python can use it. If there is an exception, then
+            OpenSSL 3 can not be found and we go to the step 2.
+
+        - 2: If first step is not successful and system does not have appropriate OpenSSL 3, then we re-create the
+            `current` symlink and link it with the `/opt/scalyr-agent-2/lib/openssl/1_1_1` which has bindings for
+            OpenSSL 1.1.1+, so we can repeat the same "probing", but now for OpenSSL 1.1.1+.
+
+        - 3: If OpenSSL 1.1.1+ is also not presented in a system, then we fallback to the 'embedded' OpenSSL library that
+            is shipped with the package. This is achieved by making the `current` symlink to target the
+            '/opt/scalyr-agent-2/lib/openssl/embedded' directory. This directory, as in previous steps, contains
+            C bindings for OpenSSL (for now we use 1.1.1 for the embedded OpenSSL), but it also has another
+            subdirectory named 'libs', and this subdirectory contains shared objects of the embedded OpenSSL.
+            Agent, when starts new process of the Python interpreter, adds '/opt/scalyr-agent-2/lib/openssl/current' to
+            the 'LD_LIBRARY_PATH' environment variable, so when the `current` directory is linked with the `embedded`
+            directory, system's dynamic linker has to find the shared objects of the embedded OpenSSL earlier that
+            anything else that may be presented in a system.
+
+The package also provides requirement libraries for the agent, for example Python 'requests' or 'orjson' libraries.
+    Agent requirements are shipped in form of virtualenv (or just venv). The venv with agent's 'core' requirements is shipped with this packages.
+    User can also install their own additional requirements by specifying them in the package's config file -
+    /opt/scalyr-agent-2/etc/additional-requirements.txt.
+    The original venv that is shipped with the package is never used directly by the agent. Instead of that, the package
+    follows the next steps:
+        - 1: The original venv is copied to the `/var/opt/scalyr-agent/venv` directory, the path that is
+               expected to be used by the agent.
+        - 2: The requirements from the additional-requirements.txt file are installed to a copied venv. The core
+                requirements are already there, so it has to install only additional ones.
+
+    This new venv initialization process is triggered every time by the package's 'postinstall' script, guaranteeing
+    that venv is up to date on each install/upgrade. For the same purpose, the `additional-requirements.txt` file is
+    set as package's config file, to be able to 'survive' upgrades. User also can 're-initialize' agent requirements
+    manually by running the command `/opt/scalyr-agent-2/bin/agent-libs-config initialize`
+
+
+The structure of the package has to guarantee that files of these packages does not interfere with
+    files of local system Python interpreter. To achieve that, Python interpreter files are installed in the
+    '/opt/scalyr-agent-2/python3' directory.
+
+
+"""
+
+
 import abc
 import dataclasses
 import hashlib
@@ -57,77 +130,6 @@ from agent_build_refactored.prepare_agent_filesystem import (
 )
 
 logger = logging.getLogger(__name__)
-
-"""
-This module is responsible for building Python agent for Linux distributions with package managers.
-
-It defines builder classes that are responsible for the building of the Linux agent deb and rpm packages that are
-    managed by package managers such as apt and yum.
-
-There are two variants of packages that can be built:
-    1. All in one (aio) package named "scalyr-agent-2-aio", that contains all required dependencies, so it can run basically on any Linux 
-        glibc-based distribution.
-    2. Package that depends on some system packages, such as Python or OpenSLL, named "scalyr-agent-2". Probably will be 
-        discontinued in the future in favour of the first one.
-        
-The aio package provides the "embedded" Python interpreter that is specially built to be used by the agent.
-    It is built against the oldest possible version of gLibc, so it has to be enough to maintain
-    only one build of the package in order to support all target systems.
-
-    One of the features on the package, is that is can use system's OpenSSL if it has appropriate version, or
-    fallback to the OpenSSL library which is shipped with the package. To achieve that, the Python interpreter from the
-    package contains multiple versions of OpenSSL (1.1.1 and 3) and Python's 'OpenSSL-related' C bindings - _ssl.cpython*.so and _hashlib.cpython.so.
-    On each new installation/upgrade of the package (or user's manual run of the command
-    `/opt/scalyr-agent-2/bin/agent-python3-config initialize`), the package follows next steps in order to
-    resolve OpenSSL library to use:
-        - 1: First it tries to find system's OpenSSL 3+. It creates a symlink '/opt/scalyr-agent-2/lib/openssl/current' 
-            that points to the directory `/opt/scalyr-agent-2/lib/openssl/3`. This directory contains directory
-            named 'bindings' that, in turn, contains Python's C bindings - '_ssl' and '_hashlib' that are compiled 
-            against OpenSSL 3. The Python's OpenSSL-related C bindings in '/opt/scalyr-agent-2/python3/lib/pythonX.Y/lib-dynload'
-            are also linked to the bindings in the `current` directory, so by changing the target of the `current` symlink
-            we also change OpenSSL version of the Python's C bindings. 
-            Then the package will try "probe" the system's OpenSSL. That is done basically just by running new 
-            process of the interpreter and importing the 'ssl' module. If there's no exception, then appropriate 
-            OpenSSL 3 is presented in the system and Python can use it. If there is an exception, then 
-            OpenSSL 3 can not be found and we go to the step 2.
-            
-        - 2: If first step is not successful and system does not have appropriate OpenSSL 3, then we re-create the
-            `current` symlink and link it with the `/opt/scalyr-agent-2/lib/openssl/1_1_1` which has bindings for
-            OpenSSL 1.1.1+, so we can repeat the same "probing", but now for OpenSSL 1.1.1+.
-
-        - 3: If OpenSSL 1.1.1+ is also not presented in a system, then we fallback to the 'embedded' OpenSSL library that
-            is shipped with the package. This is achieved by making the `current` symlink to target the 
-            '/opt/scalyr-agent-2/lib/openssl/embedded' directory. This directory, as in previous steps, contains 
-            C bindings for OpenSSL (for now we use 1.1.1 for the embedded OpenSSL), but it also has another 
-            subdirectory named 'libs', and this subdirectory contains shared objects of the embedded OpenSSL.
-            Agent, when starts new process of the Python interpreter, adds '/opt/scalyr-agent-2/lib/openssl/current' to
-            the 'LD_LIBRARY_PATH' environment variable, so when the `current` directory is linked with the `embedded`
-            directory, system's dynamic linker has to find the shared objects of the embedded OpenSSL earlier that 
-            anything else that may be presented in a system. 
-
-The package also provides requirement libraries for the agent, for example Python 'requests' or 'orjson' libraries. 
-    Agent requirements are shipped in form of virtualenv (or just venv). The venv with agent's 'core' requirements is shipped with this packages.
-    User can also install their own additional requirements by specifying them in the package's config file -
-    /opt/scalyr-agent-2/etc/additional-requirements.txt.
-    The original venv that is shipped with the package is never used directly by the agent. Instead of that, the package
-    follows the next steps:
-        - 1: The original venv is copied to the `/var/opt/scalyr-agent/venv` directory, the path that is
-               expected to be used by the agent.
-        - 2: The requirements from the additional-requirements.txt file are installed to a copied venv. The core
-                requirements are already there, so it has to install only additional ones.
-
-    This new venv initialization process is triggered every time by the package's 'postinstall' script, guaranteeing
-    that venv is up to date on each install/upgrade. For the same purpose, the `additional-requirements.txt` file is
-    set as package's config file, to be able to 'survive' upgrades. User also can 're-initialize' agent requirements
-    manually by running the command `/opt/scalyr-agent-2/bin/agent-libs-config initialize`
-
-
-The structure of the package has to guarantee that files of these packages does not interfere with
-    files of local system Python interpreter. To achieve that, Python interpreter files are installed in the
-    '/opt/scalyr-agent-2/python3' directory.
-
-
-"""
 
 # Name of the subdirectory of the agent packages.
 AGENT_SUBDIR_NAME = "scalyr-agent-2"
@@ -179,6 +181,7 @@ class LinuxPackageBuilder(Runner):
     This is a base class that is responsible for the building of the Linux agent deb and rpm packages that are managed
         by package managers such as apt and yum.
     """
+
     # type of the package, aka 'deb' or 'rpm'
     PACKAGE_TYPE: str
 
@@ -201,30 +204,30 @@ class LinuxPackageBuilder(Runner):
         """
         version = (SOURCE_ROOT / "VERSION").read_text().strip()
         return [
-                # fmt: off
-                "fpm",
-                "--license", "Apache 2.0",
-                "--vendor", "Scalyr",
-                "--depends", "bash >= 3.2",
-                "--url", "https://www.scalyr.com",
-                "--deb-user", "root",
-                "--deb-group", "root",
-                "--rpm-user", "root",
-                "--rpm-group", "root",
-                "--deb-no-default-config-files",
-                "--no-deb-auto-config-files",
-                "-v", version,
-                "--config-files", f"/etc/{AGENT_SUBDIR_NAME}/agent.json",
-                "--config-files", f"/etc/{AGENT_SUBDIR_NAME}/agent.d",
-                "--config-files", f"/usr/share/{AGENT_SUBDIR_NAME}/monitors",
-                "--directories", f"/usr/share/{AGENT_SUBDIR_NAME}",
-                "--directories", f"/var/lib/{AGENT_SUBDIR_NAME}",
-                "--directories", f"/var/log/{AGENT_SUBDIR_NAME}",
-                "--rpm-use-file-permissions",
-                "--deb-use-file-permissions",
-                "--verbose",
-                # fmt: on
-            ]
+            # fmt: off
+            "fpm",
+            "--license", "Apache 2.0",
+            "--vendor", "Scalyr",
+            "--depends", "bash >= 3.2",
+            "--url", "https://www.scalyr.com",
+            "--deb-user", "root",
+            "--deb-group", "root",
+            "--rpm-user", "root",
+            "--rpm-group", "root",
+            "--deb-no-default-config-files",
+            "--no-deb-auto-config-files",
+            "-v", version,
+            "--config-files", f"/etc/{AGENT_SUBDIR_NAME}/agent.json",
+            "--config-files", f"/etc/{AGENT_SUBDIR_NAME}/agent.d",
+            "--config-files", f"/usr/share/{AGENT_SUBDIR_NAME}/monitors",
+            "--directories", f"/usr/share/{AGENT_SUBDIR_NAME}",
+            "--directories", f"/var/lib/{AGENT_SUBDIR_NAME}",
+            "--directories", f"/var/log/{AGENT_SUBDIR_NAME}",
+            "--rpm-use-file-permissions",
+            "--deb-use-file-permissions",
+            "--verbose",
+            # fmt: on
+        ]
 
     @abc.abstractmethod
     def build_agent_package(self):
@@ -248,8 +251,7 @@ class LinuxPackageBuilder(Runner):
 
         # Copy init.d folder.
         shutil.copytree(
-            SOURCE_ROOT
-            / "agent_build_refactored/managed_packages/files/init.d",
+            SOURCE_ROOT / "agent_build_refactored/managed_packages/files/init.d",
             package_root_path / "etc/init.d",
             dirs_exist_ok=True,
         )
@@ -259,24 +261,18 @@ class LinuxPackageBuilder(Runner):
 
     @classmethod
     def add_command_line_arguments(cls, parser: argparse.ArgumentParser):
-        super(LinuxPackageBuilder, cls).add_command_line_arguments(
-            parser=parser
-        )
+        super(LinuxPackageBuilder, cls).add_command_line_arguments(parser=parser)
 
         subparsers = parser.add_subparsers(dest="command")
 
-        subparsers.add_parser(
-            "build", help="Build needed packages."
-        )
+        subparsers.add_parser("build", help="Build needed packages.")
 
     @classmethod
     def handle_command_line_arguments(
         cls,
         args,
     ):
-        super(LinuxPackageBuilder, cls).handle_command_line_arguments(
-            args=args
-        )
+        super(LinuxPackageBuilder, cls).handle_command_line_arguments(args=args)
 
         work_dir = pl.Path(args.work_dir)
 
@@ -304,6 +300,7 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
     This class builds non-aio (all in one) version of the package, meaning that this package has some system dependencies,
     such as Python and OpenSSL.
     """
+
     @staticmethod
     def _create_non_aio_package_scriptlets(output_dir: pl.Path):
         """Copy three scriptlets required by the RPM and Debian non-aio packages.
@@ -311,7 +308,10 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
         These are the preinstall.sh, preuninstall.sh, and postuninstall.sh scripts.
         """
 
-        source_scriptlets_path = SOURCE_ROOT / "agent_build_refactored/managed_packages/non-aio/install-scriptlets"
+        source_scriptlets_path = (
+            SOURCE_ROOT
+            / "agent_build_refactored/managed_packages/non-aio/install-scriptlets"
+        )
 
         pre_install_scriptlet = output_dir / "preinstall.sh"
         post_install_scriptlet = output_dir / "postinstall.sh"
@@ -367,30 +367,42 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
         self._build_packages_common_files(package_root_path=agent_package_root)
 
         # Copy switch python executable script to package's bin
-        switch_python_source = SOURCE_ROOT / "agent_build_refactored/managed_packages/non-aio/files/bin/scalyr-switch-python.sh"
+        switch_python_source = (
+            SOURCE_ROOT
+            / "agent_build_refactored/managed_packages/non-aio/files/bin/scalyr-switch-python.sh"
+        )
 
         switch_python_executable_name = "scalyr-switch-python"
         package_bin_path = agent_package_root / f"usr/share/{AGENT_SUBDIR_NAME}/bin"
-        package_switch_python_executable = package_bin_path / switch_python_executable_name
-        shutil.copy(
-            switch_python_source,
-            package_switch_python_executable
+        package_switch_python_executable = (
+            package_bin_path / switch_python_executable_name
         )
-        sbin_python_switch_executable = agent_package_root / "usr/sbin" / switch_python_executable_name
-        sbin_python_switch_executable.symlink_to(f"/usr/share/{AGENT_SUBDIR_NAME}/bin/{switch_python_executable_name}")
+        shutil.copy(switch_python_source, package_switch_python_executable)
+        sbin_python_switch_executable = (
+            agent_package_root / "usr/sbin" / switch_python_executable_name
+        )
+        sbin_python_switch_executable.symlink_to(
+            f"/usr/share/{AGENT_SUBDIR_NAME}/bin/{switch_python_executable_name}"
+        )
 
         # Create copies of the agent_main.py with python2 and python3 shebang.
         agent_main_path = SOURCE_ROOT / "scalyr_agent/agent_main.py"
-        agent_package_path = agent_package_root / f"usr/share/{AGENT_SUBDIR_NAME}/py/scalyr_agent"
+        agent_package_path = (
+            agent_package_root / f"usr/share/{AGENT_SUBDIR_NAME}/py/scalyr_agent"
+        )
         agent_main_py2_path = agent_package_path / "agent_main_py2.py"
         agent_main_py3_path = agent_package_path / "agent_main_py3.py"
 
         agent_main_content = agent_main_path.read_text()
         agent_main_py2_path.write_text(
-            agent_main_content.replace("#!/usr/bin/env python", "#!/usr/bin/env python2")
+            agent_main_content.replace(
+                "#!/usr/bin/env python", "#!/usr/bin/env python2"
+            )
         )
         agent_main_py3_path.write_text(
-            agent_main_content.replace("#!/usr/bin/env python", "#!/usr/bin/env python3")
+            agent_main_content.replace(
+                "#!/usr/bin/env python", "#!/usr/bin/env python3"
+            )
         )
         main_permissions = os.stat(agent_main_path).st_mode
         os.chmod(agent_main_py2_path, main_permissions)
@@ -455,12 +467,12 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
     @classmethod
     def get_all_required_steps(cls) -> List[RunnerStep]:
         return [
-                BUILD_OPENSSL_1_1_1_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
-                BUILD_OPENSSL_3_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
-                BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
-                BUILD_PYTHON_WITH_OPENSSL_3_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
-                BUILD_AGENT_LIBS_VENV_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
-            ]
+            BUILD_OPENSSL_1_1_1_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
+            BUILD_OPENSSL_3_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
+            BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
+            BUILD_PYTHON_WITH_OPENSSL_3_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
+            BUILD_AGENT_LIBS_VENV_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
+        ]
 
     @property
     def dependency_packages_arch(self) -> str:
@@ -594,15 +606,19 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
 
         step_arch = self.DEPENDENCY_PACKAGES_ARCHITECTURE
 
-        build_python_with_openssl_1_1_1_step = BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[step_arch]
+        build_python_with_openssl_1_1_1_step = BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[
+            step_arch
+        ]
         build_python_with_openssl_3_step = BUILD_PYTHON_WITH_OPENSSL_3_STEPS[step_arch]
 
         # Copy Python interpreter to package.
         shutil.copytree(
-            build_python_with_openssl_1_1_1_step.get_output_directory(work_dir=self.work_dir),
+            build_python_with_openssl_1_1_1_step.get_output_directory(
+                work_dir=self.work_dir
+            ),
             package_root,
             dirs_exist_ok=True,
-            symlinks=True
+            symlinks=True,
         )
 
         relative_python_install_prefix = pl.Path(PYTHON_INSTALL_PREFIX).relative_to("/")
@@ -613,8 +629,8 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         python_hashlib_bindings_glob = "_hashlib.cpython-*-*-*-*.so"
 
         def copy_openssl_files(
-                build_python_step: ArtifactRunnerStep,
-                openssl_variant_name: str,
+            build_python_step: ArtifactRunnerStep,
+            openssl_variant_name: str,
         ):
             """# This function copies Python's ssl module related files."""
 
@@ -622,10 +638,18 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
             build_python_step_dir = build_python_step.get_output_directory(
                 work_dir=self.work_dir
             )
-            python_step_bindings_dir = build_python_step_dir / relative_python_install_prefix / f"lib/python{EMBEDDED_PYTHON_SHORT_VERSION}/lib-dynload"
+            python_step_bindings_dir = (
+                build_python_step_dir
+                / relative_python_install_prefix
+                / f"lib/python{EMBEDDED_PYTHON_SHORT_VERSION}/lib-dynload"
+            )
 
-            ssl_binding_path = list(python_step_bindings_dir.glob(python_ssl_bindings_glob))[0]
-            hashlib_binding_path = list(python_step_bindings_dir.glob(python_hashlib_bindings_glob))[0]
+            ssl_binding_path = list(
+                python_step_bindings_dir.glob(python_ssl_bindings_glob)
+            )[0]
+            hashlib_binding_path = list(
+                python_step_bindings_dir.glob(python_hashlib_bindings_glob)
+            )[0]
 
             bindings_dir = package_openssl_dir / openssl_variant_name / "bindings"
             bindings_dir.mkdir(parents=True)
@@ -636,13 +660,12 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         # Copy ssl modules which are compiled for OpenSSL 1.1.1
         copy_openssl_files(
             build_python_step=build_python_with_openssl_1_1_1_step,
-            openssl_variant_name="1_1_1"
+            openssl_variant_name="1_1_1",
         )
 
         # Copy ssl modules which are compiled for OpenSSL 3
         copy_openssl_files(
-            build_python_step=build_python_with_openssl_3_step,
-            openssl_variant_name="3"
+            build_python_step=build_python_with_openssl_3_step, openssl_variant_name="3"
         )
 
         # Create directory for the embedded OpenSSL files.
@@ -676,21 +699,39 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
 
         # Remove original bindings from Python interpreter and replace them with symlinks.
         package_python_dir = package_root / relative_python_install_prefix
-        package_python_lib_dir = package_python_dir / f"lib/python{EMBEDDED_PYTHON_SHORT_VERSION}"
+        package_python_lib_dir = (
+            package_python_dir / f"lib/python{EMBEDDED_PYTHON_SHORT_VERSION}"
+        )
         package_python_bindings_dir = package_python_lib_dir / "lib-dynload"
-        ssl_binding_path = list(package_python_bindings_dir.glob(python_ssl_bindings_glob))[0]
-        hashlib_binding_path = list(package_python_bindings_dir.glob(python_hashlib_bindings_glob))[0]
+        ssl_binding_path = list(
+            package_python_bindings_dir.glob(python_ssl_bindings_glob)
+        )[0]
+        hashlib_binding_path = list(
+            package_python_bindings_dir.glob(python_hashlib_bindings_glob)
+        )[0]
         ssl_binding_path.unlink()
         hashlib_binding_path.unlink()
-        ssl_binding_path.symlink_to(f"../../../../lib/openssl/current/bindings/{ssl_binding_path.name}")
-        hashlib_binding_path.symlink_to(f"../../../../lib/openssl/current/bindings/{hashlib_binding_path.name}")
+        ssl_binding_path.symlink_to(
+            f"../../../../lib/openssl/current/bindings/{ssl_binding_path.name}"
+        )
+        hashlib_binding_path.symlink_to(
+            f"../../../../lib/openssl/current/bindings/{hashlib_binding_path.name}"
+        )
 
         # Rename main Python executable to be 'python3-original' and copy our wrapper script instead of it
-        source_bin_dir = SOURCE_ROOT / "agent_build_refactored/managed_packages/files/bin"
+        source_bin_dir = (
+            SOURCE_ROOT / "agent_build_refactored/managed_packages/files/bin"
+        )
         package_python_bin_dir = package_python_dir / "bin"
-        package_python_bin_executable_full_name = package_python_bin_dir / f"python{EMBEDDED_PYTHON_SHORT_VERSION}"
-        package_python_bin_original_executable = package_python_bin_dir / "python3-original"
-        package_python_bin_executable_full_name.rename(package_python_bin_original_executable)
+        package_python_bin_executable_full_name = (
+            package_python_bin_dir / f"python{EMBEDDED_PYTHON_SHORT_VERSION}"
+        )
+        package_python_bin_original_executable = (
+            package_python_bin_dir / "python3-original"
+        )
+        package_python_bin_executable_full_name.rename(
+            package_python_bin_original_executable
+        )
         shutil.copy(source_bin_dir / "python3", package_python_bin_executable_full_name)
 
         # Copy executables that allows to configure the Python interpreter.
@@ -753,29 +794,37 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         package_venv_dir.mkdir()
         build_agent_libs_venv_step = BUILD_AGENT_LIBS_VENV_STEPS[step_arch]
         shutil.copytree(
-            build_agent_libs_venv_step.get_output_directory(work_dir=self.work_dir) / "venv",
+            build_agent_libs_venv_step.get_output_directory(work_dir=self.work_dir)
+            / "venv",
             package_venv_dir,
             dirs_exist_ok=True,
-            symlinks=True
+            symlinks=True,
         )
 
         # Recreate Python executables in venv and delete everything except them, since they are not needed.
         package_venv_bin_dir = package_venv_dir / "bin"
         shutil.rmtree(package_venv_bin_dir)
         package_venv_bin_dir.mkdir()
-        package_venv_bin_dir_original_executable = package_venv_bin_dir / "python3-original"
-        package_venv_bin_dir_original_executable.symlink_to(AGENT_OPT_DIR / "python3/bin/python3-original")
+        package_venv_bin_dir_original_executable = (
+            package_venv_bin_dir / "python3-original"
+        )
+        package_venv_bin_dir_original_executable.symlink_to(
+            AGENT_OPT_DIR / "python3/bin/python3-original"
+        )
 
         package_venv_bin_python3_executable = package_venv_bin_dir / "python3"
         shutil.copy(
-            SOURCE_ROOT / "agent_build_refactored/managed_packages/files/bin/venv-python3",
-            package_venv_bin_python3_executable
+            SOURCE_ROOT
+            / "agent_build_refactored/managed_packages/files/bin/venv-python3",
+            package_venv_bin_python3_executable,
         )
 
         package_venv_bin_python_executable = package_venv_bin_dir / "python"
         package_venv_bin_python_executable.symlink_to("python3")
 
-        package_venv_bin_python_full_executable = package_venv_bin_dir / f"python{EMBEDDED_PYTHON_SHORT_VERSION}"
+        package_venv_bin_python_full_executable = (
+            package_venv_bin_dir / f"python{EMBEDDED_PYTHON_SHORT_VERSION}"
+        )
         package_venv_bin_python_full_executable.symlink_to("python3")
 
         # Create core requirements file.
@@ -784,14 +833,16 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
 
         # Copy additional requirements file.
         shutil.copy(
-            SOURCE_ROOT / "agent_build_refactored/managed_packages/files/additional-requirements.txt",
-            package_opt_etc_dir
+            SOURCE_ROOT
+            / "agent_build_refactored/managed_packages/files/additional-requirements.txt",
+            package_opt_etc_dir,
         )
 
         # Copy script that allows configuring of the agent requirements.
         shutil.copy(
-            SOURCE_ROOT / "agent_build_refactored/managed_packages/files/bin/agent-libs-config",
-            package_opt_bin_dir
+            SOURCE_ROOT
+            / "agent_build_refactored/managed_packages/files/bin/agent-libs-config",
+            package_opt_bin_dir,
         )
 
         # Create /var/opt/ directory where agent's generated venv is stored.
@@ -813,13 +864,10 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
             package_root=agent_package_root
         )
 
-        self._build_packages_common_files(
-            package_root_path=agent_package_root
-        )
+        self._build_packages_common_files(package_root_path=agent_package_root)
 
         install_root_executable_path = (
-            agent_package_root
-            / f"usr/share/{AGENT_SUBDIR_NAME}/bin/scalyr-agent-2-new"
+            agent_package_root / f"usr/share/{AGENT_SUBDIR_NAME}/bin/scalyr-agent-2-new"
         )
         # Add agent's executable script.
         shutil.copy(
@@ -852,14 +900,13 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         )
 
         scriptlets_path = (
-            SOURCE_ROOT
-            / "agent_build_refactored/managed_packages/install-scriptlets"
+            SOURCE_ROOT / "agent_build_refactored/managed_packages/install-scriptlets"
         )
 
         description = (
-            'Scalyr Agent 2 is the daemon process Scalyr customers run on their servers to collect metrics'
+            "Scalyr Agent 2 is the daemon process Scalyr customers run on their servers to collect metrics"
             ' and log files and transmit them to Scalyr. This is also the "All in one" package, that means that all '
-            'dependencies that are required by the package bundled with it.'
+            "dependencies that are required by the package bundled with it."
         )
 
         package_arch = self.DEPENDENCY_PACKAGES_ARCHITECTURE.get_package_arch(
@@ -1611,7 +1658,6 @@ def create_build_python_dependencies_steps() -> Dict[Architecture, ArtifactRunne
 def create_build_python_steps(
     build_openssl_steps: Dict[Architecture, ArtifactRunnerStep],
     name_suffix: str,
-
 ) -> Dict[Architecture, ArtifactRunnerStep]:
     """
     Function that creates step instances that build Python interpreter.
@@ -1636,8 +1682,10 @@ def create_build_python_steps(
             base=INSTALL_BUILD_ENVIRONMENT_STEPS[architecture],
             required_steps={
                 "DOWNLOAD_BUILD_DEPENDENCIES": DOWNLOAD_PYTHON_DEPENDENCIES,
-                "BUILD_PYTHON_DEPENDENCIES": BUILD_PYTHON_DEPENDENCIES_STEPS[architecture],
-                "BUILD_OPENSSL": build_openssl_steps[architecture]
+                "BUILD_PYTHON_DEPENDENCIES": BUILD_PYTHON_DEPENDENCIES_STEPS[
+                    architecture
+                ],
+                "BUILD_OPENSSL": build_openssl_steps[architecture],
             },
             environment_variables={
                 "PYTHON_VERSION": EMBEDDED_PYTHON_VERSION,
@@ -1707,8 +1755,12 @@ def create_build_python_package_root_steps() -> Dict[Architecture, ArtifactRunne
             required_steps={
                 "BUILD_OPENSSL_1_1_1": BUILD_OPENSSL_1_1_1_STEPS[architecture],
                 "BUILD_OPENSSL_3": BUILD_OPENSSL_3_STEPS[architecture],
-                "BUILD_PYTHON_WITH_OPENSSL_1_1_1": BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[architecture],
-                "BUILD_PYTHON_WITH_OPENSSL_3": BUILD_PYTHON_WITH_OPENSSL_3_STEPS[architecture],
+                "BUILD_PYTHON_WITH_OPENSSL_1_1_1": BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[
+                    architecture
+                ],
+                "BUILD_PYTHON_WITH_OPENSSL_3": BUILD_PYTHON_WITH_OPENSSL_3_STEPS[
+                    architecture
+                ],
             },
             environment_variables={
                 "PYTHON_SHORT_VERSION": EMBEDDED_PYTHON_SHORT_VERSION,
@@ -1746,7 +1798,9 @@ def create_build_dev_requirements_steps() -> Dict[Architecture, ArtifactRunnerSt
             ],
             base=INSTALL_BUILD_ENVIRONMENT_STEPS[architecture],
             required_steps={
-                "BUILD_PYTHON_DEPENDENCIES": BUILD_PYTHON_DEPENDENCIES_STEPS[architecture],
+                "BUILD_PYTHON_DEPENDENCIES": BUILD_PYTHON_DEPENDENCIES_STEPS[
+                    architecture
+                ],
                 "BUILD_OPENSSL": BUILD_OPENSSL_1_1_1_STEPS[architecture],
                 "BUILD_PYTHON": BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[architecture],
             },
@@ -1847,20 +1901,18 @@ BUILD_PYTHON_DEPENDENCIES_STEPS = create_build_python_dependencies_steps()
 
 # Steps that build OpenSSL Python dependency, 1.1.1 and 3 versions.
 BUILD_OPENSSL_1_1_1_STEPS = create_build_openssl_steps(
-        openssl_version_type=OPENSSL_VERSION_TYPE_1_1_1
+    openssl_version_type=OPENSSL_VERSION_TYPE_1_1_1
 )
 BUILD_OPENSSL_3_STEPS = create_build_openssl_steps(
-        openssl_version_type=OPENSSL_VERSION_TYPE_3
+    openssl_version_type=OPENSSL_VERSION_TYPE_3
 )
 
 # Create steps that build Python interpreter with OpenSSl 1.1.1 and 3
 BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS = create_build_python_steps(
-    build_openssl_steps=BUILD_OPENSSL_1_1_1_STEPS,
-    name_suffix="1_1_1"
+    build_openssl_steps=BUILD_OPENSSL_1_1_1_STEPS, name_suffix="1_1_1"
 )
 BUILD_PYTHON_WITH_OPENSSL_3_STEPS = create_build_python_steps(
-    build_openssl_steps=BUILD_OPENSSL_3_STEPS,
-    name_suffix="3"
+    build_openssl_steps=BUILD_OPENSSL_3_STEPS, name_suffix="3"
 )
 
 # Create steps that build and install all agent dev requirements.
@@ -1886,7 +1938,9 @@ def create_prepare_toolset_steps() -> Dict[Architecture, EnvironmentRunnerStep]:
             base=base_image,
             required_steps={
                 "BUILD_OPENSSL_1_1_1": BUILD_OPENSSL_1_1_1_STEPS[architecture],
-                "BUILD_PYTHON_1_1_1": BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[architecture],
+                "BUILD_PYTHON_1_1_1": BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[
+                    architecture
+                ],
                 "BUILD_OPENSSL_3": BUILD_OPENSSL_3_STEPS[architecture],
                 "BUILD_PYTHON_3": BUILD_PYTHON_WITH_OPENSSL_3_STEPS[architecture],
                 "BUILD_DEV_REQUIREMENTS": BUILD_DEV_REQUIREMENTS_STEPS[architecture],
@@ -1907,7 +1961,9 @@ def create_prepare_toolset_steps() -> Dict[Architecture, EnvironmentRunnerStep]:
     return steps
 
 
-def create_prepare_python_environment_steps() -> Dict[Architecture, EnvironmentRunnerStep]:
+def create_prepare_python_environment_steps() -> Dict[
+    Architecture, EnvironmentRunnerStep
+]:
     """
     Create steps that prepare environment with all needed tools.
     """
@@ -1919,11 +1975,13 @@ def create_prepare_python_environment_steps() -> Dict[Architecture, EnvironmentR
             script_path="agent_build_refactored/managed_packages/steps/prepare_python_environment.sh",
             base=DockerImageSpec(
                 name=_SUPPORTED_ARCHITECTURES_TO_BUILD_ENVIRONMENTS[architecture].image,
-                platform=architecture.as_docker_platform.value
+                platform=architecture.as_docker_platform.value,
             ),
             required_steps={
                 "BUILD_OPENSSL_1_1_1": BUILD_OPENSSL_1_1_1_STEPS[architecture],
-                "BUILD_PYTHON_1_1_1": BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[architecture],
+                "BUILD_PYTHON_1_1_1": BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[
+                    architecture
+                ],
                 "BUILD_OPENSSL_3": BUILD_OPENSSL_3_STEPS[architecture],
                 "BUILD_PYTHON_3": BUILD_PYTHON_WITH_OPENSSL_3_STEPS[architecture],
                 "BUILD_DEV_REQUIREMENTS": BUILD_DEV_REQUIREMENTS_STEPS[architecture],
@@ -2042,7 +2100,9 @@ def _parse_package_version_parts(version: str) -> Tuple[int, str]:
     return int(iteration), checksum
 
 
-ALL_MANAGED_PACKAGE_BUILDERS: Dict[str, Type[LinuxPackageBuilder]] = ALL_AIO_PACKAGE_BUILDERS.copy()
+ALL_MANAGED_PACKAGE_BUILDERS: Dict[
+    str, Type[LinuxPackageBuilder]
+] = ALL_AIO_PACKAGE_BUILDERS.copy()
 
 
 class DebLinuxNonAIOPackagesBuilder(LinuxNonAIOPackageBuilder):

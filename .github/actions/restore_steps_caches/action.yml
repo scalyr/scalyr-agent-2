@@ -1,0 +1,23 @@
+name: 'Restore steps caches'
+description: |
+  Restores caches if the steps with given ids.
+inputs:
+  steps_ids:
+    description: "JSON-encoded list of steps ids"
+    required: true
+  cache_root:
+    description: "Path to the root of the cache"
+  cache_version_suffix:
+    description: "Cache key suffix"
+  lookup_only:
+    default: "false"
+    description: "If true, do not download cache on hit."
+
+outputs:
+  missing_steps_ids_json:
+    description: "JSON-encoded list of IDs of steps which caches have not been hit"
+
+
+runs:
+  using: 'node16'
+  main: 'dist/index.js'

@@ -658,21 +658,17 @@ ALL_IMAGE_BUILDERS: Dict[str, Type[ContainerImageBuilder]] = UniqueDict()
 
 for base_distro_name in ["debian", "alpine"]:
 
-    python_base_image_name_suffix = {
-        "debian": "slim",
-        "alpine": "alpine"
-    }[base_distro_name]
+    python_base_image_name_suffix = {"debian": "slim", "alpine": "alpine"}[
+        base_distro_name
+    ]
 
-    tag_suffix = {
-        "debian": None,
-        "alpine": "alpine"
-    }[base_distro_name]
+    tag_suffix = {"debian": None, "alpine": "alpine"}[base_distro_name]
 
     spec_names = {
         "DockerJSON": AGENT_DOCKER_JSON_SPEC,
         "DockerSyslog": AGENT_DOCKER_SYSLOG_SPEC,
         "DockerAPI": AGENT_DOCKER_API_SPEC,
-        "K8S": AGENT_K8S_SPEC
+        "K8S": AGENT_K8S_SPEC,
     }
 
     for spec_name, spec in spec_names.items():
@@ -696,4 +692,3 @@ for base_distro_name in ["debian", "alpine"]:
             ADD_TO_GLOBAL_RUNNER_COLLECTION = True
 
         ALL_IMAGE_BUILDERS[_ContainerImageBuilder.get_name()] = _ContainerImageBuilder
-

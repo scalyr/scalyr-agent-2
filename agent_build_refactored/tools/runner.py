@@ -226,7 +226,10 @@ class RunnerStep:
                     continue
 
                 skip = False
-                for to_ignore in ["__pycache__", ".pytest_cache", ]:
+                for to_ignore in [
+                    "__pycache__",
+                    ".pytest_cache",
+                ]:
                     if to_ignore in path.parent.parts:
                         skip = True
                         break
@@ -258,7 +261,6 @@ class RunnerStep:
                 result.update(self._base_step.get_all_required_steps())
 
         return result
-
 
     def get_all_cacheable_steps(self) -> List["RunnerStep"]:
         """
@@ -397,7 +399,6 @@ class RunnerStep:
             sha256.update(file_path.read_bytes())
             # ... and permissions.
             sha256.update(str(file_path.stat().st_mode).encode())
-
 
         # Also add user into the checksum.
         sha256.update(self.user.encode())
@@ -783,6 +784,7 @@ ALL_RUNNERS = []
 
 class RunnerMeta(abc.ABCMeta):
     """This is a metaclass for all Runner classes."""
+
     def __init__(cls, name, bases, attrs):
         global ALL_RUNNERS
 
@@ -830,9 +832,7 @@ class Runner(metaclass=RunnerMeta):
 
     ADD_TO_GLOBAL_RUNNER_COLLECTION: bool = False
 
-    def __init__(
-        self, work_dir: pl.Path = None
-    ):
+    def __init__(self, work_dir: pl.Path = None):
         """
         :param work_dir: Path to the directory where Runner will store its results and intermediate data.
         """
@@ -948,18 +948,20 @@ class Runner(metaclass=RunnerMeta):
 
         # Run chmod for the output directory of the runner, in order to fix possible permission
         # error that can be due to using root user inside the docker.
-        run_docker_command([
-            "run",
-            "-i",
-            "--rm",
-            "-v",
-            f"{self.output_path}:/tmp/data",
-            "ubuntu:22.04",
-            "chown",
-            "-R",
-            f"{os.getuid()}:{os.getgid()}",
-            "/tmp/data"
-        ])
+        run_docker_command(
+            [
+                "run",
+                "-i",
+                "--rm",
+                "-v",
+                f"{self.output_path}:/tmp/data",
+                "ubuntu:22.04",
+                "chown",
+                "-R",
+                f"{os.getuid()}:{os.getgid()}",
+                "/tmp/data",
+            ]
+        )
 
     def run_required(self):
         """

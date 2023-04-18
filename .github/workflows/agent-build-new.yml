@@ -43,7 +43,7 @@ jobs:
     name: "Run pre-built steps"
     needs:
       - pre_job
-    uses: ./.github/workflows/run-pre-build-jobs.yml
+    uses: ./.github/workflows/run-cacheable-runner-steps.yml
     with:
       aws_private_key_name: ${{ needs.pre_job.outputs.aws_private_key_name }}
       aws_security_group: ${{ needs.pre_job.outputs.aws_security_group }}
