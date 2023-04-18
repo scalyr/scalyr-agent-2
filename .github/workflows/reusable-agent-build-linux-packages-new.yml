@@ -80,7 +80,7 @@ jobs:
 
       - name: Get required steps caches
         id: get_required_steps_caches
-        uses: ./.github/actions/get_steps_missing_caches
+        uses: ./.github/actions/restore_steps_caches
         with:
           steps_ids: ${{ steps.get_required_steps_ids.outputs.all_required_steps }}
           cache_version_suffix: ${{ steps.get_required_steps_ids.outputs.cache_version_suffix }}
@@ -180,7 +180,7 @@ jobs:
 
       - name: Get required steps caches
         id: get_portable_test_runner_required_steps_caches
-        uses: ./.github/actions/get_steps_missing_caches
+        uses: ./.github/actions/restore_steps_caches
         with:
           steps_ids: ${{ steps.get_required_steps_ids.outputs.portable_test_runner_required_steps_ids }}
           cache_version_suffix: ${{ steps.get_required_steps_ids.outputs.cache_version_suffix }}
@@ -188,7 +188,7 @@ jobs:
 
       - name: Get required steps caches
         id: get_repo_builder_required_steps_caches
-        uses: ./.github/actions/get_steps_missing_caches
+        uses: ./.github/actions/restore_steps_caches
         with:
           steps_ids: ${{ steps.get_required_steps_ids.outputs.repo_builder_required_steps_ids }}
           cache_version_suffix: ${{ steps.get_required_steps_ids.outputs.cache_version_suffix }}
@@ -196,7 +196,7 @@ jobs:
 
       - name: Get required steps caches
         id: get_required_steps_caches
-        uses: ./.github/actions/get_steps_missing_caches
+        uses: ./.github/actions/restore_steps_caches
         with:
           steps_ids: ${{ steps.get_required_steps_ids.outputs.builder_required_steps_ids }}
           cache_version_suffix: ${{ steps.get_required_steps_ids.outputs.cache_version_suffix }}

@@ -128,7 +128,7 @@ jobs:
 
       - name: Get required steps caches
         id: get_required_steps_caches
-        uses: ./.github/actions/get_steps_missing_caches
+        uses: ./.github/actions/restore_steps_caches
         with:
           steps_ids: ${{ toJSON(matrix.required_steps) }}
           cache_version_suffix: ${{ matrix.cache_version_suffix }}
