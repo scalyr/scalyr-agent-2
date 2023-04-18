@@ -753,8 +753,8 @@ jobs:
 # we can't access EC2 instances in our testing environment. In the near future those tests will be
 # moved to GHA.
 
-workflows:
- version: 2
+#workflows:
+# version: 2
 # package-tests:
 #   <<: *skip_release_build_branch_push
 #   jobs:
@@ -804,15 +804,15 @@ workflows:
  # daily basis.
  # This helps us detect various installer script and other potential upstream
  # issues.
- daily-stable-ami-package-install-tests:
-   triggers:
-     - schedule:
-         cron: "0 2 * * *"
-         filters:
-           branches:
-             only:
-               - master
-   jobs:
+# daily-stable-ami-package-install-tests:
+#   triggers:
+#     - schedule:
+#         cron: "0 2 * * *"
+#         filters:
+#           branches:
+#             only:
+#               - master
+#   jobs:
      #- ami-tests-stable-windows:
      #   context: scalyr-agent
      #- ami-tests-stable-linux:
