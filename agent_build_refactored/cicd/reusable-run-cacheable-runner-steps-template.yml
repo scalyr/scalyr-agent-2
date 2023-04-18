@@ -66,7 +66,7 @@ jobs:
         run: |
           cat <<< "${{ steps.get_missing_caches_steps.outputs.missing_steps_ids_json }}" > /tmp/missing_steps_ids.json
           echo "MISSS"
-          cat /tmp/missing_cache_keys.json
+          cat /tmp/missing_steps_ids.json
           echo "MISSSEND"
           python3  agent_build_refactored/cicd/cacheable_runner_steps_helper.py get-missing-caches-matrices --missing-steps-ids-file /tmp/missing_steps_ids.json > /tmp/missing_cache_matrices.json
           i=0
