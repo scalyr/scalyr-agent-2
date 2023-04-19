@@ -92,7 +92,7 @@ jobs:
       id: print_missing_caches_matrices
       shell: bash
       run: |
-        cat <<< "${{ steps.get_missing_caches_steps.outputs.missing_steps_ids_json }}" > /tmp/missing_steps_ids.json
+        cat <<< '${{ steps.get_missing_caches_steps.outputs.missing_steps_ids_json }}' > /tmp/missing_steps_ids.json
         ls /tmp/ -al
         echo "MISSS"
         cat /tmp/missing_steps_ids.json
