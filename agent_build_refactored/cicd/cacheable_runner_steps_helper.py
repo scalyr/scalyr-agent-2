@@ -207,10 +207,10 @@ def generate_workflow_yaml():
 
         pre_job_outputs[
             f"matrix{counter}"
-        ] = f"${{{{ steps.print.outputs.matrix{counter} }}}}"
+        ] = f"${{{{ steps.print_missing_caches_matrices.outputs.matrix{counter} }}}}"
         pre_job_outputs[
             f"matrix_length{counter}"
-        ] = f"${{{{ steps.print.outputs.matrix_length{counter} }}}}"
+        ] = f"${{{{ steps.print_missing_caches_matrices.outputs.matrix_length{counter} }}}}"
 
         level_run_pre_built_job_object_name = (
             f"{run_pre_built_job_object_name}{counter}"

@@ -106,18 +106,24 @@ jobs:
         done
         cat $GITHUB_OUTPUT
     outputs:
-      matrix0: ${{ steps.print.outputs.matrix0 }}
-      matrix_length0: ${{ steps.print.outputs.matrix_length0 }}
-      matrix1: ${{ steps.print.outputs.matrix1 }}
-      matrix_length1: ${{ steps.print.outputs.matrix_length1 }}
-      matrix2: ${{ steps.print.outputs.matrix2 }}
-      matrix_length2: ${{ steps.print.outputs.matrix_length2 }}
-      matrix3: ${{ steps.print.outputs.matrix3 }}
-      matrix_length3: ${{ steps.print.outputs.matrix_length3 }}
-      matrix4: ${{ steps.print.outputs.matrix4 }}
-      matrix_length4: ${{ steps.print.outputs.matrix_length4 }}
-      matrix5: ${{ steps.print.outputs.matrix5 }}
-      matrix_length5: ${{ steps.print.outputs.matrix_length5 }}
+      matrix0: ${{ steps.print_missing_caches_matrices.outputs.matrix0 }}
+      matrix_length0: ${{ steps.print_missing_caches_matrices.outputs.matrix_length0
+        }}
+      matrix1: ${{ steps.print_missing_caches_matrices.outputs.matrix1 }}
+      matrix_length1: ${{ steps.print_missing_caches_matrices.outputs.matrix_length1
+        }}
+      matrix2: ${{ steps.print_missing_caches_matrices.outputs.matrix2 }}
+      matrix_length2: ${{ steps.print_missing_caches_matrices.outputs.matrix_length2
+        }}
+      matrix3: ${{ steps.print_missing_caches_matrices.outputs.matrix3 }}
+      matrix_length3: ${{ steps.print_missing_caches_matrices.outputs.matrix_length3
+        }}
+      matrix4: ${{ steps.print_missing_caches_matrices.outputs.matrix4 }}
+      matrix_length4: ${{ steps.print_missing_caches_matrices.outputs.matrix_length4
+        }}
+      matrix5: ${{ steps.print_missing_caches_matrices.outputs.matrix5 }}
+      matrix_length5: ${{ steps.print_missing_caches_matrices.outputs.matrix_length5
+        }}
   run_pre_built_job0:
     name: 0 ${{ matrix.name }}
     runs-on: ubuntu-20.04
