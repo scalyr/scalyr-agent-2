@@ -47,6 +47,7 @@ sys.path.append(str(SOURCE_ROOT))
 # It is important to import them before the import of the 'ALL_RUNNERS' or otherwise, runners from missing mudules
 # won't be presented in the "ALL_RUNNERS" final collection.
 import tests.end_to_end_tests  # NOQA
+import tests.end_to_end_tests.run_in_remote_machine.portable_pytest_runner # NOQA
 import tests.end_to_end_tests.managed_packages_tests.conftest  # NOQA
 
 # Import ALL_RUNNERS global collection only after all modules that define any runner are imported.

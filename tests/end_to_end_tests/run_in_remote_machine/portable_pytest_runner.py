@@ -76,11 +76,11 @@ BUILD_PORTABLE_PYTEST_RUNNER_STEPS = create_build_portable_pytest_runner_step()
 
 
 class PortablePytestRunnerBuilder(Runner):
-    ARCHITECTURE: Architecture
-    ADD_TO_GLOBAL_RUNNER_COLLECTION = True
     """
     Builder class that builds pytest runner executable by using PyInstaller.
     """
+
+    ARCHITECTURE: Architecture
 
     @classmethod
     def get_all_required_steps(cls) -> List[RunnerStep]:

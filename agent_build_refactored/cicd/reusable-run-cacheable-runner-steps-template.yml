@@ -84,6 +84,8 @@ jobs:
         run: |
           echo "all_steps_ids_json=$(python3  agent_build_refactored/cicd/cacheable_runner_steps_helper.py get-all-steps-ids)" >> $GITHUB_OUTPUT
           echo "cache_version_suffix=$(python3 agent_build_refactored/cicd/cacheable_runner_steps_helper.py get-cache-version-suffix)" >> $GITHUB_OUTPUT
+          
+          cat $GITHUB_OUTPUT
 
       - name: Get missing caches steps
         id: get_missing_caches_steps
