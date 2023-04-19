@@ -64,7 +64,8 @@ jobs:
         python3 agent_build_refactored/cicd/cacheable_runner_steps_helper.py update-files
 
         set +e
-        EXIT_CODE=$(git diff --exit-code)
+        git diff --exit-code
+        EXIT_CODE=$?
         set -e
 
         if [ $EXIT_CODE -ne 0 ]; then
