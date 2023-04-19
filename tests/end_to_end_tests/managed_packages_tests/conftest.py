@@ -146,6 +146,7 @@ def agent_package_name(use_aio_package):
 
 
 class RepoBuilder(Runner):
+    ADD_TO_GLOBAL_RUNNER_COLLECTION = True
     """
     This runner class is responsible for creating deb/rpm repositories from provided packages.
     The result repo is used as a mock repository for testing.

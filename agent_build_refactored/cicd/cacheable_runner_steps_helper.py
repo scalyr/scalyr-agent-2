@@ -258,7 +258,6 @@ def update_files():
     )
 
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command", required=True)
