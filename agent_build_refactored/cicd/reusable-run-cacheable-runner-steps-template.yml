@@ -60,6 +60,8 @@ jobs:
         working-directory: .github/actions/restore_steps_caches
         run: |
           npm install
+          
+          ls -al
 
       - name: Check that the workflow files are up to date
         run: |
