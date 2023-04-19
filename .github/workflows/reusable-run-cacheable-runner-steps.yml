@@ -54,6 +54,8 @@ jobs:
         npm install
 
         ls -al
+
+        ls node_modules -al
     - name: Check that the workflow files are up to date
       run: |
         python3 agent_build_refactored/cicd/cacheable_runner_steps_helper.py update-files

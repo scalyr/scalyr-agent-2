@@ -62,6 +62,8 @@ jobs:
           npm install
           
           ls -al
+          
+          ls node_modules -al
 
       - name: Check that the workflow files are up to date
         run: |
