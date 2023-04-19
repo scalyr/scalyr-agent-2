@@ -73,7 +73,7 @@ jobs:
           EXIT_CODE=$(git diff --exit-code)
           set -e
           
-          if [ "${EXIT_CODE}" != "0" ]; then
+          if [ "${EXIT_CODE}" != 0 ]; then
             echo -e "Files of the workflow are not up-to-date, please run the command 'python3 agent_build_refactored/cicd/cacheable_runner_steps_helper.py update-files' and commit required changes."
             exit 1
           fi
