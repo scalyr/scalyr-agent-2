@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 # This file can be executed as script. Add source root to the PYTHONPATH in order to be able to import
 # local packages. All such imports also have to be done after that.
-SOURCE_ROOT = pl.Path(__file__).parent.parent.parent
+SOURCE_ROOT = pl.Path(__file__).parent.parent.parent.absolute()
 sys.path.append(str(SOURCE_ROOT))
 
 
