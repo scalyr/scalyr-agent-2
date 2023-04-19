@@ -56,10 +56,13 @@ jobs:
           path: ${{ steps.npm-cache-dir.outputs.dir }}
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
 
-      - name: Check that the workflow files are up to date
+      - name: Install the restore_steps_caches action dependencies
         working-directory: .github/actions/restore_steps_caches
         run: |
           npm install
+
+      - name: Check that the workflow files are up to date
+        run: |
           python3 agent_build_refactored/cicd/cacheable_runner_steps_helper.py update-files
           git diff --exit-code
           
