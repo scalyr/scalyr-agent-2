@@ -63,7 +63,7 @@ jobs:
           
           ls -al
           
-          ls node_modules -al
+          ls node_modules/.bin -al
 
       - name: Check that the workflow files are up to date
         run: |
