@@ -19,7 +19,7 @@ runs:
       uses: actions/cache@v3
       with:
         path: /tmp/python_cache
-        key: dev-requirements-${{ inputs.python_version }}-${{ hashFiles('dev-requirements-new.txt') }}
+        key: dev-requirements-${{ inputs.python_version }}-${{ hashFiles('dev-requirements-new.txt') }}-v1
 
     - name: Install dev. requirements
       if: steps.cache_dev_requirements.outputs.cache-hit != 'true'
