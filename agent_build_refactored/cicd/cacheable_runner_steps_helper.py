@@ -13,10 +13,8 @@
 # limitations under the License.
 
 """
-This script helps GitHub Actions CI/CD to get information about runners that can be run in a separate "run-pre-build-jobs.yml"
-workflow.
-
-
+This script helps GitHub Actions CI/CD to get information about runners that can be run in a parallel jobs, that
+has to decrease overall build time.
 """
 
 import argparse
@@ -72,28 +70,29 @@ def get_all_used_steps():
 
     return result
 
+
 all_used_steps: Dict[str, RunnerStep] = get_all_used_steps()
 
 
-def create_wrapper_runner_from_step(step: RunnerStep):
-    class StepWrapperRunner(Runner):
-        CLASS_NAME_ALIAS = f"{step_id}_pre_build"
+# def create_wrapper_runner_from_step(step: RunnerStep):
+#     class StepWrapperRunner(Runner):
+#         CLASS_NAME_ALIAS = f"{step_id}_pre_build"
+#
+#         @classmethod
+#         def get_all_required_steps(cls) -> List[RunnerStep]:
+#             return [step]
+#
+#     return StepWrapperRunner
 
-        @classmethod
-        def get_all_required_steps(cls) -> List[RunnerStep]:
-            return [step]
 
-    return StepWrapperRunner
-
-
-def get_steps_levels():
+def get_cacheable_steps_stages():
     global all_used_steps
 
     remaining_steps = all_used_steps.copy()
-    levels = []
+    result_stages = []
 
     while remaining_steps:
-        current_layer = {}
+        current_stage = {}
         for step_id, step in remaining_steps.items():
             add = True
 
@@ -102,31 +101,52 @@ def get_steps_levels():
                     add = False
                     break
 
-            if add:
-                current_layer[step_id] = step
+            if not add:
+                continue
 
-        for step_id, step in current_layer.items():
-            remaining_steps.pop(step_id)
-        levels.append(current_layer)
+            _RunnerCls = existing_runners.get(step.id)
+            if _RunnerCls is None:
+                class _RunnerCls(Runner):
+                    CLASS_NAME_ALIAS = f"{step_id}_pre_build"
 
-    return levels
+                    @classmethod
+                    def get_all_required_steps(cls) -> List[RunnerStep]:
+                        return [step]
+
+                existing_runners[step.id] = _RunnerCls
+
+                fqdn = _RunnerCls.FULLY_QUALIFIED_NAME
+                current_stage[fqdn] = {"step": step, "runner": _RunnerCls}
+
+        for runner_fqdn, info in current_stage.items():
+            step = info["step"]
+            remaining_steps.pop(step.id, None)
+        result_stages.append(current_stage)
+
+    return result_stages
 
 
-levels = get_steps_levels()
+stages = get_cacheable_steps_stages()
 
-runner_levels = []
-for level_steps in levels:
-    current_runner_level = {}
-    for step_id, step in level_steps.items():
-        runner_cls = existing_runners.get(step.id)
-        if runner_cls is None:
-            runner_cls = create_wrapper_runner_from_step(step)
-            existing_runners[step.id] = runner_cls
-
-        fqdn = runner_cls.FULLY_QUALIFIED_NAME
-        current_runner_level[fqdn] = {"step": step, "runner": runner_cls}
-
-    runner_levels.append(current_runner_level)
+# runner_levels = []
+# for level_steps in levels:
+#     current_runner_level = {}
+#     for step_id, step in level_steps.items():
+#         _RunnerCls = existing_runners.get(step.id)
+#         if _RunnerCls is None:
+#             class _RunnerCls(Runner):
+#                 CLASS_NAME_ALIAS = f"{step_id}_pre_build"
+#
+#                 @classmethod
+#                 def get_all_required_steps(cls) -> List[RunnerStep]:
+#                     return [step]
+#
+#             existing_runners[step.id] = _RunnerCls
+#
+#         fqdn = _RunnerCls.FULLY_QUALIFIED_NAME
+#         current_runner_level[fqdn] = {"step": step, "runner": _RunnerCls}
+#
+#     runner_levels.append(current_runner_level)
 
 
 def get_missing_caches_matrices(input_missing_cache_keys_file: pl.Path):
@@ -137,10 +157,10 @@ def get_missing_caches_matrices(input_missing_cache_keys_file: pl.Path):
     logger.info(missing_cache_keys)
 
     matrices = []
-    for level in runner_levels:
+    for stage in stages:
         matrix_include = []
 
-        for step_wrapper_runner_fqdn, info in level.items():
+        for step_wrapper_runner_fqdn, info in stage.items():
 
             step = info["step"]
             step_id = step.id
@@ -183,25 +203,25 @@ def generate_workflow_yaml():
     run_pre_built_job = jobs.pop(run_pre_built_job_object_name)
 
     pre_job_outputs = {}
-    for counter in range(len(runner_levels)):
-        level_run_pre_built_job = copy.deepcopy(run_pre_built_job)
+    for counter in range(len(stages)):
+        stage_run_pre_built_job = copy.deepcopy(run_pre_built_job)
         if counter > 0:
             previous_run_pre_built_job_object_name = (
                 f"{run_pre_built_job_object_name}{counter - 1}"
             )
-            level_run_pre_built_job["needs"].append(
+            stage_run_pre_built_job["needs"].append(
                 previous_run_pre_built_job_object_name
             )
-            level_run_pre_built_job[
+            stage_run_pre_built_job[
                 "if"
             ] = f"${{{{ always() && (needs.{previous_run_pre_built_job_object_name}.result == 'success' || needs.{previous_run_pre_built_job_object_name}.result == 'skipped') && needs.pre_job.outputs.matrix_length{counter} != '0' }}}}"
         else:
-            level_run_pre_built_job[
+            stage_run_pre_built_job[
                 "if"
             ] = f"${{{{ needs.pre_job.outputs.matrix_length{counter} != '0' }}}}"
 
-        level_run_pre_built_job["name"] = f"{counter} ${{{{ matrix.name }}}}"
-        level_run_pre_built_job["strategy"][
+        stage_run_pre_built_job["name"] = f"{counter} ${{{{ matrix.name }}}}"
+        stage_run_pre_built_job["strategy"][
             "matrix"
         ] = f"${{{{ fromJSON(needs.pre_job.outputs.matrix{counter}) }}}}"
 
@@ -212,10 +232,10 @@ def generate_workflow_yaml():
             f"matrix_length{counter}"
         ] = f"${{{{ steps.print_missing_caches_matrices.outputs.matrix_length{counter} }}}}"
 
-        level_run_pre_built_job_object_name = (
+        stage_run_pre_built_job_object_name = (
             f"{run_pre_built_job_object_name}{counter}"
         )
-        jobs[level_run_pre_built_job_object_name] = level_run_pre_built_job
+        jobs[stage_run_pre_built_job_object_name] = stage_run_pre_built_job
 
     pre_job = jobs["pre_job"]
     pre_job["outputs"] = pre_job_outputs
