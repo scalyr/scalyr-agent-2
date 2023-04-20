@@ -171,8 +171,8 @@ def get_missing_caches_matrices(input_missing_cache_keys_file: pl.Path):
         for step_wrapper_runner_fqdn, step in stage.items():
 
             required_steps_ids = []
-            for req_step_id in step.get_all_required_steps().keys():
-                required_steps_ids.append(req_step_id)
+            for req_step in step.get_all_required_steps():
+                required_steps_ids.append(req_step.id)
 
             matrix_include.append(
                 {
