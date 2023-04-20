@@ -21,9 +21,9 @@
 # directory.
 
 STEP_SCRIPT_PATH="$1"
-CACHE_DIR="$2"
-STEP_OUTPUT_PATH="$3"
-SCRIPT_TYPE="$4"
+# CACHE_DIR="$2"
+STEP_OUTPUT_PATH="$2"
+SCRIPT_TYPE="$3"
 
 set -e
 

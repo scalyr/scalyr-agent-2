@@ -33,14 +33,14 @@ set -e
 # shellcheck disable=SC1090
 source ~/.bashrc
 
-tar -xzvf "${BUILD_PYTHON_DEPENDENCIES}/common.tar.gz" -C /
+tar -xzf "${BUILD_PYTHON_DEPENDENCIES}/common.tar.gz" -C /
 cp -a "${BUILD_OPENSSL}/." /
 ldconfig
 
 
 mkdir /tmp/build-python
 pushd /tmp/build-python
-tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/python/python.tgz"
+tar -xf "${DOWNLOAD_BUILD_DEPENDENCIES}/python/python.tgz"
 pushd "Python-${PYTHON_VERSION}"
 mkdir build
 pushd build
@@ -54,11 +54,11 @@ pushd build
 	--with-readline=edit \
 	--prefix="${INSTALL_PREFIX}" \
 	--exec-prefix="${INSTALL_PREFIX}" \
-	--with-ensurepip=upgrade \
-	--enable-optimizations "${ADDITIONAL_OPTIONS}"
+	--with-ensurepip=upgrade
+	#--enable-optimizations "${ADDITIONAL_OPTIONS}"
 
 make -j "$(nproc)"
-make test
+#make test
 make install
 
 popd

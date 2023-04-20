@@ -218,8 +218,8 @@ taTApkk=
 
 mkdir "${STEP_OUTPUT_PATH}/zlib"
 pushd "${STEP_OUTPUT_PATH}/zlib"
-curl -L "https://www.zlib.net/zlib-${ZLIB_VERSION}.tar.gz" > zlib.tar.gz
-curl -L "https://www.zlib.net/zlib-${ZLIB_VERSION}.tar.gz.asc" > zlib.tar.gz.asc
+curl -L "https://github.com/madler/zlib/releases/download/v${ZLIB_VERSION}/zlib-${ZLIB_VERSION}.tar.gz" > zlib.tar.gz
+curl -L "https://github.com/madler/zlib/releases/download/v${ZLIB_VERSION}/zlib-${ZLIB_VERSION}.tar.gz.asc" >  zlib.tar.gz.asc
 gpg --verify zlib.tar.gz.asc zlib.tar.gz
 popd
 

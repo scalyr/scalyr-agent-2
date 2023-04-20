@@ -23,7 +23,7 @@ import logging
 import inspect
 import subprocess
 import sys
-from typing import Union, Optional, List, Dict, Type, Callable
+from typing import Union, Optional, List, Dict, Type, Callable, Set
 
 
 from agent_build_refactored.tools.constants import (
@@ -246,21 +246,44 @@ class RunnerStep:
 
         return sorted(list(set(tracked_files)))
 
-    def get_all_required_steps(self, recursive: bool = False):
+    @staticmethod
+    def sort_and_filter_steps(steps: List['RunnerStep']) -> List['RunnerStep']:
+        steps_ids = {step.id: step for step in steps}
 
-        result = {}
+        return sorted(steps_ids.values(), key=lambda s: s.id)
 
-        for step in self.required_steps.values():
-            result[step.id] = step
-            if recursive:
-                result.update(step.get_all_required_steps())
+    @staticmethod
+    def get_steps_child_steps(steps: List['RunnerStep'], recursive: bool = False):
+
+        result_steps = steps[:]
+        if not recursive:
+            return RunnerStep.sort_and_filter_steps(steps=result_steps)
+
+        child_steps = list()
+
+        for step in steps:
+            for child_step in step.required_steps.values():
+                child_steps.append(child_step)
+
+        if not child_steps:
+            return []
+
+        nested_steps = RunnerStep.get_steps_child_steps(steps=child_steps, recursive=True)
+        result_steps.extend(nested_steps)
+
+        return RunnerStep.sort_and_filter_steps(steps=result_steps)
+
+    def get_all_required_steps(self, recursive: bool = False) -> List['RunnerStep']:
+
+        result_steps = list(self.required_steps.values())
 
         if self._base_step:
-            result[self._base_step.id] = self._base_step
-            if recursive:
-                result.update(self._base_step.get_all_required_steps())
+            result_steps.append(self._base_step)
 
-        return result
+        if not recursive:
+            return RunnerStep.sort_and_filter_steps(steps=result_steps)
+
+        return RunnerStep.get_steps_child_steps(steps=result_steps, recursive=True)
 
     def get_all_cacheable_steps(self) -> List["RunnerStep"]:
         """
@@ -295,6 +318,9 @@ class RunnerStep:
         result = f"{result}-{self.checksum}"
         return result
 
+    def __str__(self):
+        return self.id
+
     @property
     def result_image(self) -> Optional[DockerImageSpec]:
         """
@@ -311,6 +337,10 @@ class RunnerStep:
 
     def get_output_directory(self, work_dir: pl.Path):
         return work_dir / "step_output" / self.id
+
+    def get_temp_output_directory(self, work_dir: pl.Path):
+        output_directory = self.get_output_directory(work_dir=work_dir)
+        return pl.Path(f"{output_directory}_tmp")
 
     def get_cache_directory(self, work_dir: pl.Path):
         return work_dir / "step_cache" / self.id
@@ -416,51 +446,52 @@ class RunnerStep:
         elif output_directory.is_symlink():
             output_directory.unlink()
 
-    def _restore_cache(
-        self, output_directory: pl.Path, cache_directory: pl.Path
-    ) -> bool:
-        """
-        Searches for cached results, if found, then they are reused and the run is skipped.
-        :return: Boolean that indicates that the cache is found and step can be skipped.
-        """
-        if cache_directory.exists():
-            if output_directory.exists():
-                if output_directory.is_symlink():
-                    output_directory.unlink()
-                else:
-                    remove_directory_in_docker(output_directory)
+    # def _restore_cache(
+    #     self, output_directory: pl.Path, cache_directory: pl.Path
+    # ) -> bool:
+    #     """
+    #     Searches for cached results, if found, then they are reused and the run is skipped.
+    #     :return: Boolean that indicates that the cache is found and step can be skipped.
+    #     """
+    #     if cache_directory.exists():
+    #         if output_directory.exists():
+    #             if output_directory.is_symlink():
+    #                 output_directory.unlink()
+    #             else:
+    #                 remove_directory_in_docker(output_directory)
+    #
+    #         symlink_rel_path = pl.Path("../step_cache") / output_directory.name
+    #         output_directory.symlink_to(symlink_rel_path)
+    #         return True
+    #
+    #     return False
 
-            symlink_rel_path = pl.Path("../step_cache") / output_directory.name
-            output_directory.symlink_to(symlink_rel_path)
-            return True
+    # def _save_to_cache(
+    #     self, is_skipped: bool, output_directory: pl.Path, cache_directory: pl.Path
+    # ):
+    #     """
+    #     Saved results of the finished step to cache, if needed.
+    #     :param is_skipped: Boolean flag that indicates that the main run method has been skipped.
+    #     """
+    #     if not is_skipped:
+    #         shutil.copytree(
+    #             output_directory, cache_directory, dirs_exist_ok=True, symlinks=True
+    #         )
 
-        return False
-
-    def _save_to_cache(
-        self, is_skipped: bool, output_directory: pl.Path, cache_directory: pl.Path
-    ):
-        """
-        Saved results of the finished step to cache, if needed.
-        :param is_skipped: Boolean flag that indicates that the main run method has been skipped.
-        """
-        if not is_skipped:
-            shutil.copytree(
-                output_directory, cache_directory, dirs_exist_ok=True, symlinks=True
-            )
-
-    def _pre_run(self) -> bool:
-        """Function that runs after the step main run function."""
-        pass
-
-    def _post_run(self):
-        """
-        Function that runs after the step main run function.
-        """
-        pass
+    # def _pre_run(self) -> bool:
+    #     """Function that runs after the step main run function."""
+    # #     pass
+    #
+    # def _post_run(self):
+    #     """
+    #     Function that runs after the step main run function.
+    #     """
+    #     pass
 
     def _run_script_locally(
         self,
         work_dir: pl.Path,
+        temp_output_directory: pl.Path
     ):
         """
         Run the step's script, whether in docker or in current system.
@@ -469,8 +500,8 @@ class RunnerStep:
 
         isolated_source_root = self.get_isolated_root(work_dir=work_dir)
         isolated_source_root.mkdir(parents=True, exist_ok=True)
-        cache_directory = self.get_cache_directory(work_dir=work_dir)
-        cache_directory.mkdir(parents=True, exist_ok=True)
+        #cache_directory = self.get_cache_directory(work_dir=work_dir)
+        #cache_directory.mkdir(parents=True, exist_ok=True)
         output_directory = self.get_output_directory(work_dir=work_dir)
         output_directory.mkdir(parents=True, exist_ok=True)
 
@@ -480,12 +511,18 @@ class RunnerStep:
         env.update(env_variables_to_pass)
 
         command_args = self._get_command_args(
-            cache_directory=cache_directory, output_directory=output_directory
+            #cache_directory=cache_directory,
+            tmp_output_directory=temp_output_directory
         )
 
         check_call_with_log(command_args, env=env, cwd=str(isolated_source_root))
 
-    def _run_script_in_docker(self, work_dir: pl.Path, remote_docker_host: str):
+    def _run_script_in_docker(
+            self,
+            work_dir: pl.Path,
+            temp_output_directory: pl.Path,
+            remote_docker_host: str
+    ):
         """
         Run runner step's script in docker.
         :param work_dir: Path to directory where all results are stored.
@@ -493,12 +530,14 @@ class RunnerStep:
         """
 
         isolated_source_root = self.get_isolated_root(work_dir=work_dir)
-        cache_directory = self.get_cache_directory(work_dir=work_dir)
-        output_directory = self.get_output_directory(work_dir=work_dir)
+        #cache_directory = self.get_cache_directory(work_dir=work_dir)
+        #output_directory = self.get_output_directory(work_dir=work_dir)
+        # tmp_output_directory = self.get_temp_output_directory(work_dir=work_dir)
 
         in_docker_isolated_source_root = pl.Path("/tmp/agent_source")
-        in_docker_cache_directory = pl.Path("/tmp/step_cache")
-        in_docker_output_directory = pl.Path("/tmp/step_output")
+        #in_docker_cache_directory = pl.Path("/tmp/step_cache")
+        #in_docker_output_directory = pl.Path("/tmp/step_output")
+        in_docker_tmp_output_directory = pl.Path("/tmp/step_output")
 
         # Run step in docker.
         required_steps_directories = self._get_required_steps_output_directories(
@@ -539,8 +578,8 @@ class RunnerStep:
         )
 
         command_args = self._get_command_args(
-            cache_directory=in_docker_cache_directory,
-            output_directory=in_docker_output_directory,
+            #cache_directory=in_docker_cache_directory,
+            tmp_output_directory=in_docker_tmp_output_directory,
         )
 
         # Create intermediate container
@@ -572,8 +611,8 @@ class RunnerStep:
         input_paths = {
             f"{isolated_source_root}/.": in_docker_isolated_source_root,
             **{f"{src}/.": dst for src, dst in required_step_mounts.items()},
-            f"{output_directory}/.": in_docker_output_directory,
-            f"{cache_directory}/.": in_docker_cache_directory,
+            f"{temp_output_directory}/.": in_docker_tmp_output_directory,
+            # f"{cache_directory}/.": in_docker_cache_directory,
         }
 
         for src, dst in input_paths.items():
@@ -592,8 +631,8 @@ class RunnerStep:
         )
 
         output_paths = {
-            f"{in_docker_output_directory}/.": output_directory,
-            f"{in_docker_cache_directory}/.": cache_directory,
+            f"{in_docker_tmp_output_directory}/.": temp_output_directory,
+            # f"{in_docker_cache_directory}/.": cache_directory,
         }
 
         for src, dst in output_paths.items():
@@ -607,7 +646,11 @@ class RunnerStep:
                 remote_docker_host=remote_docker_host,
             )
 
-    def _get_command_args(self, cache_directory: pl.Path, output_directory: pl.Path):
+    def _get_command_args(
+            self,
+            # cache_directory: pl.Path,
+            tmp_output_directory: pl.Path
+    ):
         """
         Get list with command arguments that has to be executed by step.
         :return:
@@ -624,10 +667,14 @@ class RunnerStep:
             # and also provides some helper functions such as caching.
             "agent_build_refactored/tools/steps_libs/step_runner.sh",
             str(self.script_path),
-            str(cache_directory),
-            str(output_directory),
+            #str(cache_directory),
+            str(tmp_output_directory),
             script_type,
         ]
+
+    def is_output_exists(self, work_dir: pl.Path):
+        return self.get_output_directory(work_dir=work_dir).exists()
+
 
     def run(
         self,
@@ -638,33 +685,35 @@ class RunnerStep:
         Run the step. Based on its initial data, it will be executed in docker or locally, on the current system.
         """
 
-        output_directory = self.get_output_directory(work_dir)
-        cache_directory = self.get_cache_directory(work_dir)
+        #output_directory = self.get_output_directory(work_dir)
+        #cache_directory = self.get_cache_directory(work_dir)
         isolated_source_root = self.get_isolated_root(work_dir)
 
-        output_directory.parent.mkdir(parents=True, exist_ok=True)
-        cache_directory.parent.mkdir(parents=True, exist_ok=True)
+        temp_output_directory = self.get_temp_output_directory(work_dir=work_dir)
 
-        skipped = self._restore_cache(
-            output_directory=output_directory, cache_directory=cache_directory
-        )
-        if skipped:
-            logger.info(f"Result of the step '{self.id}' is found in cache, skip.")
-            return
+        #output_directory.parent.mkdir(parents=True, exist_ok=True)
+        #cache_directory.parent.mkdir(parents=True, exist_ok=True)
+
+        # skipped = self._restore_cache(
+        #     output_directory=output_directory, cache_directory=cache_directory
+        # )
+        # if skipped:
+        #     logger.info(f"Result of the step '{self.id}' is found in cache, skip.")
+        #     return
 
         logging.info(f"Run step {self.name}.")
-        for step in self.required_steps.values():
-            step.run(
-                work_dir=work_dir, remote_docker_host_getter=remote_docker_host_getter
-            )
+        # for step in self.required_steps.values():
+        #     step.run(
+        #         work_dir=work_dir, remote_docker_host_getter=remote_docker_host_getter
+        #     )
+        #
+        # if self._base_step:
+        #     self._base_step.run(
+        #         work_dir=work_dir, remote_docker_host_getter=remote_docker_host_getter
+        #     )
 
-        if self._base_step:
-            self._base_step.run(
-                work_dir=work_dir, remote_docker_host_getter=remote_docker_host_getter
-            )
-
-        self._remove_output_directory(output_directory=output_directory)
-        output_directory.mkdir(parents=True, exist_ok=True)
+        self._remove_output_directory(output_directory=temp_output_directory)
+        temp_output_directory.mkdir(parents=True, exist_ok=True)
 
         # Create directory to store only tracked files.
         if isolated_source_root.exists():
@@ -687,17 +736,39 @@ class RunnerStep:
         )
 
         self.get_isolated_root(work_dir=work_dir).mkdir(parents=True, exist_ok=True)
-        self.get_cache_directory(work_dir=work_dir).mkdir(parents=True, exist_ok=True)
-        self.get_output_directory(work_dir=work_dir).mkdir(parents=True, exist_ok=True)
+        #self.get_cache_directory(work_dir=work_dir).mkdir(parents=True, exist_ok=True)
+        #self.get_output_directory(work_dir=work_dir).mkdir(parents=True, exist_ok=True)
+
+
+        # Check that all required steps results exists.
+
+        all_required_steps = list(self.get_all_required_steps().values())
+
+        missing_steps_ids = []
+        for step in all_required_steps:
+            if not step.is_output_exists(work_dir=work_dir):
+                missing_steps_ids.append(step.id)
+
+        if missing_steps_ids:
+            raise Exception(
+                f"Can not run step '{self.id}' because not all required steps have their result outputs.\n"
+                f"Required steps with missing outputs: {missing_steps_ids}"
+            )
+
 
         try:
             if self.runs_in_docker:
                 remote_docker_host = remote_docker_host_getter(self)
                 self._run_script_in_docker(
-                    work_dir=work_dir, remote_docker_host=remote_docker_host
+                    work_dir=work_dir,
+                    temp_output_directory=temp_output_directory,
+                    remote_docker_host=remote_docker_host
                 )
             else:
-                self._run_script_locally(work_dir=work_dir)
+                self._run_script_locally(
+                    work_dir=work_dir,
+                    temp_output_directory=temp_output_directory
+                )
         except Exception:
             files = [str(g) for g in self._tracked_files]
             logging.exception(
@@ -707,11 +778,14 @@ class RunnerStep:
             )
             raise
 
-        self._save_to_cache(
-            is_skipped=skipped,
-            output_directory=output_directory,
-            cache_directory=cache_directory,
-        )
+        output_directory = self.get_output_directory(work_dir=work_dir)
+        temp_output_directory.rename(output_directory)
+
+        # self._save_to_cache(
+        #     is_skipped=skipped,
+        #     output_directory=output_directory,
+        #     cache_directory=cache_directory,
+        # )
         self.cleanup()
 
     def cleanup(self):
@@ -736,25 +810,31 @@ class EnvironmentRunnerStep(RunnerStep):
         If step does not run in docker, then its actions are executed directly on current system.
     """
 
-    def _restore_cache(
-        self, output_directory: pl.Path, cache_directory: pl.Path
-    ) -> bool:
-        is_skipped = super(EnvironmentRunnerStep, self)._restore_cache(
-            output_directory=output_directory, cache_directory=cache_directory
-        )
+    # def _restore_cache(
+    #     self, output_directory: pl.Path, cache_directory: pl.Path
+    # ) -> bool:
+    #     is_skipped = super(EnvironmentRunnerStep, self)._restore_cache(
+    #         output_directory=output_directory, cache_directory=cache_directory
+    #     )
+    #
+    #     if self.runs_in_docker:
+    #         return is_skipped
+    #
+    #     return False
 
-        if self.runs_in_docker:
-            return is_skipped
-
-        return False
-
-    def _run_script_in_docker(self, work_dir: pl.Path, remote_docker_host: str):
+    def _run_script_in_docker(
+            self,
+            work_dir: pl.Path,
+            temp_output_directory: pl.Path,
+            remote_docker_host: str):
         """
         For the environment step, we also have to save result image.
         """
 
         super(EnvironmentRunnerStep, self)._run_script_in_docker(
-            work_dir=work_dir, remote_docker_host=remote_docker_host
+            work_dir=work_dir,
+            temp_output_directory=temp_output_directory,
+            remote_docker_host=remote_docker_host
         )
 
         run_docker_command(
@@ -762,8 +842,8 @@ class EnvironmentRunnerStep(RunnerStep):
             remote_docker_host=remote_docker_host,
         )
 
-        output_directory = self.get_output_directory(work_dir=work_dir)
-        image_path = output_directory / self.result_image.name
+        temp_output_directory = self.get_temp_output_directory(work_dir=work_dir)
+        image_path = temp_output_directory / self.result_image.name
 
         logger.info(f"Saving image {self.result_image.name}.")
         if remote_docker_host:
@@ -855,24 +935,19 @@ class Runner(metaclass=RunnerMeta):
         return []
 
     @classmethod
-    def get_all_steps(cls, recursive: bool = False) -> Dict[str, RunnerStep]:
+    def get_all_steps(cls, recursive: bool = False) -> List[RunnerStep]:
         """
         Gather all (including nested) RunnerSteps from all possible plases which are used by this runner.
         """
-        result = {}
+
+        all_steps = cls.get_all_required_steps()
+
         base_environment = cls.get_base_environment()
         if base_environment:
-            result[base_environment.id] = base_environment
-            if recursive:
-                result.update(base_environment.get_all_required_steps())
+            all_steps.append(base_environment)
 
-        for req_step in cls.get_all_required_steps():
-            result[req_step.id] = req_step
+        return RunnerStep.get_steps_child_steps(steps=all_steps, recursive=recursive)
 
-            if recursive:
-                result.update(req_step.get_all_required_steps())
-
-        return result
 
     @property
     def base_docker_image(self) -> Optional[DockerImageSpec]:
@@ -973,10 +1048,45 @@ class Runner(metaclass=RunnerMeta):
             remove_directory_in_docker(self.output_path)
         self.output_path.mkdir(parents=True)
 
-        # Run all steps and runners we depend on, skip this if we already in docker to avoid infinite loop.
+        if IN_CICD or IN_DOCKER:
+
+            all_steps = self.get_all_steps()
+
+            missing_steps = []
+            for step in all_steps:
+                if not step.is_output_exists(work_dir=self.work_dir):
+                    missing_steps.append(step)
+
+            if missing_steps:
+                raise Exception(
+                    f"Can not execute runner {self.FULLY_QUALIFIED_NAME} because some of its required steps"
+                    f"don't have result directories.\nMissing steps: {missing_steps}"
+                )
+
+            return
+
+        all_steps = self.get_all_steps(recursive=True)
+
+        steps_with_missing_results = get_steps_with_missing_results(
+            steps=all_steps, work_dir=self.work_dir
+        )
+
+        full_stages = get_all_required_steps_stages(steps=all_steps)
+
+        filtered_stages = filter_steps_with_existing_output(
+            stages=full_stages,
+            steps_ids_with_missing_results=set(steps_with_missing_results.keys())
+        )
+
         steps_to_run = []
-        if not IN_DOCKER:
-            steps_to_run.extend(list(self.get_all_steps().values()))
+        for stage in filtered_stages:
+            for step_id, step in stage.items():
+                steps_to_run.append(step)
+
+        self._run_steps(
+            steps=steps_to_run,
+            work_dir=self.work_dir
+        )
 
         self._run_steps(
             steps=steps_to_run,
@@ -1078,6 +1188,7 @@ class Runner(metaclass=RunnerMeta):
                 s.run(
                     work_dir=work_dir,
                     remote_docker_host_getter=get_remote_docker_host_for_step,
+
                 )
         finally:
             # Restore original known_hosts file.
@@ -1166,6 +1277,57 @@ DOCKER_EC2_BUILDERS = {
         ssh_username="ubuntu",
     )
 }
+
+
+def get_steps_with_missing_results(steps: List[RunnerStep], work_dir: pl.Path):
+    result = {}
+    for step in steps:
+        if not step.is_output_exists(work_dir=work_dir):
+            result[step.id] = step
+
+    return result
+
+
+def get_all_required_steps_stages(steps: List[RunnerStep]):
+    remaining_steps = {step.id: step for step in steps}
+    result_stages = []
+
+    while remaining_steps:
+        current_stage = {}
+        for step_id, step in remaining_steps.items():
+            add = True
+
+            for req_step in step.get_all_required_steps():
+                if req_step.id in remaining_steps:
+                    add = False
+                    break
+
+            if add:
+                current_stage[step_id] = step
+
+        result_stages.append(current_stage)
+
+        for step_id, step in current_stage.items():
+            remaining_steps.pop(step_id)
+
+    return result_stages
+
+
+def filter_steps_with_existing_output(
+    stages: List[Dict[str, RunnerStep]],
+    steps_ids_with_missing_results: Set[str],
+):
+    result_stages = []
+
+    for stage in stages:
+        current_stage = {}
+        for step_id, step in stage.items():
+            if step_id in steps_ids_with_missing_results:
+                current_stage[step_id] = step
+
+        result_stages.append(current_stage)
+
+    return result_stages
 
 
 def run_docker_command(

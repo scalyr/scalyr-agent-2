@@ -51,7 +51,7 @@ import tests.end_to_end_tests.managed_packages_tests.conftest  # NOQA
 # Import ALL_RUNNERS global collection only after all modules that define any runner are imported.
 from agent_build_refactored.tools.runner import ALL_RUNNERS
 
-from agent_build_refactored.tools.runner import Runner, RunnerStep
+from agent_build_refactored.tools.runner import Runner, RunnerStep, get_all_required_steps_stages, get_steps_with_missing_results, filter_steps_with_existing_output
 
 # Suffix that is appended to all steps cache keys. CI/CD cache can be easily invalidated by changing this value.
 CACHE_VERSION_SUFFIX = "v14"
@@ -65,8 +65,8 @@ builders_to_prebuilt_runners = {}
 def get_all_used_steps():
     result = {}
     for runner_cls in ALL_RUNNERS:
-        for step_id, step in runner_cls.get_all_steps(recursive=True).items():
-            result[step_id] = step
+        for step in runner_cls.get_all_steps(recursive=True):
+            result[step.id] = step
 
     return result
 
@@ -116,17 +116,20 @@ def get_cacheable_steps_stages():
                 existing_runners[step.id] = _RunnerCls
 
                 fqdn = _RunnerCls.FULLY_QUALIFIED_NAME
-                current_stage[fqdn] = {"step": step, "runner": _RunnerCls}
+                current_stage[fqdn] = step
 
-        for runner_fqdn, info in current_stage.items():
-            step = info["step"]
+        for runner_fqdn, step in current_stage.items():
             remaining_steps.pop(step.id, None)
         result_stages.append(current_stage)
 
     return result_stages
 
 
-stages = get_cacheable_steps_stages()
+stages = get_all_required_steps_stages(steps=list(all_used_steps.values()))
+
+
+
+a=10
 
 # runner_levels = []
 # for level_steps in levels:
@@ -151,22 +154,24 @@ stages = get_cacheable_steps_stages()
 
 def get_missing_caches_matrices(input_missing_cache_keys_file: pl.Path):
     json_content = input_missing_cache_keys_file.read_text()
-    missing_cache_keys = json.loads(json_content)
+    missing_steps_ids = json.loads(json_content)
+
 
     logger.info("MISSING")
-    logger.info(missing_cache_keys)
+    logger.info(missing_steps_ids)
+
+    filtered_stages = filter_steps_with_existing_output(
+        stages=stages, steps_ids_with_missing_results=missing_steps_ids
+    )
 
     matrices = []
-    for stage in stages:
+    for stage in filtered_stages:
         matrix_include = []
 
         for step_wrapper_runner_fqdn, info in stage.items():
 
             step = info["step"]
             step_id = step.id
-
-            if step_id not in missing_cache_keys:
-                continue
 
             required_steps_ids = []
             for req_step_id in step.get_all_required_steps().keys():
