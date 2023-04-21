@@ -1228,14 +1228,6 @@ class Runner(metaclass=RunnerMeta):
         )
 
         parser.add_argument(
-            "--run-all-steps",
-            dest="run_all_steps",
-            action="store_true",
-            help="Run all used steps. it is meant to be used by GitHub Actions and there's no need to "
-            "use it manually.",
-        )
-
-        parser.add_argument(
             "--work-dir",
             dest="work_dir",
             default=str(SOURCE_ROOT / "agent_build_output"),
@@ -1253,23 +1245,10 @@ class Runner(metaclass=RunnerMeta):
 
         cleanup()
 
-        work_dir = pl.Path(args.work_dir)
-
-        if args.run_all_steps:
-            steps = cls.get_all_steps()
-
-            cls._run_steps(
-                steps=list(steps.values()),
-                work_dir=work_dir,
-            )
-            exit(0)
-        elif args.get_all_steps:
-            steps_ids = list(sorted(cls.get_all_steps().keys()))
+        if args.get_all_steps:
+            steps_ids = sorted([step.id for step in cls.get_all_steps()])
             print(json.dumps(steps_ids))
             exit(0)
-
-    def _start_ec2_builder_instance(self):
-        pass
 
 
 # Collection of EC2 AMI images that are used for creating instances with remote docker engine.

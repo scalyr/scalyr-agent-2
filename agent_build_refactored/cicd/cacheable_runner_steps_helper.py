@@ -86,48 +86,60 @@ a=10
 #     return StepWrapperRunner
 
 
-def get_cacheable_steps_stages():
-    global all_used_steps
+step_stages = get_all_required_steps_stages(steps=list(all_used_steps.values()))
 
-    remaining_steps = all_used_steps.copy()
-    result_stages = []
 
-    while remaining_steps:
-        current_stage = {}
-        for step_id, step in remaining_steps.items():
-            add = True
+class CacheableStepRunner(Runner):
+    STEP: RunnerStep
 
-            for req_step in step.get_all_required_steps():
-                if req_step.id in remaining_steps:
-                    add = False
-                    break
+    @classmethod
+    def get_all_required_steps(cls) -> List[RunnerStep]:
+        return [cls.STEP]
 
-            if not add:
-                continue
+    @classmethod
+    def add_command_line_arguments(cls, parser: argparse.ArgumentParser):
+        super(CacheableStepRunner, cls).add_command_line_arguments(parser=parser)
 
-            _RunnerCls = existing_runners.get(step.id)
+        subparsers = parser.add_subparsers(dest="command")
+
+        subparsers.add_parser("run-cacheable-step")
+
+    @classmethod
+    def handle_command_line_arguments(
+        cls,
+        args,
+    ):
+        super(CacheableStepRunner, cls).handle_command_line_arguments(args=args)
+
+        if args.command == "run-cacheable-step":
+            cls._run_steps(
+                steps=[cls.STEP],
+                work_dir=pl.Path(args.work_dir)
+            )
+            exit(0)
+        else:
+            print(f"Unknown command: {args.command}", file=sys.stderr)
+
+
+
+def get_steps_runners():
+    result_runners = {}
+
+    for stage in step_stages:
+        for step_id, step in stage.items():
+            _RunnerCls = result_runners.get(step.id)
             if _RunnerCls is None:
-                class _RunnerCls(Runner):
-                    CLASS_NAME_ALIAS = f"{step_id}"
+                class _RunnerCls(CacheableStepRunner):
+                    STEP = step
+                    CLASS_NAME_ALIAS = f"{step_id}_cached"
 
-                    @classmethod
-                    def get_all_required_steps(cls) -> List[RunnerStep]:
-                        return [step]
-
-                existing_runners[step.id] = _RunnerCls
-
-                fqdn = _RunnerCls.FULLY_QUALIFIED_NAME
-                current_stage[fqdn] = step
-
-        for runner_fqdn, step in current_stage.items():
-            remaining_steps.pop(step.id, None)
-        result_stages.append(current_stage)
-
-    return result_stages
+                result_runners[step_id] = _RunnerCls
 
 
-stages = get_all_required_steps_stages(steps=list(all_used_steps.values()))
+    return result_runners
 
+
+steps_runners = get_steps_runners()
 
 
 a=10
@@ -157,15 +169,13 @@ def get_missing_caches_matrices(input_missing_cache_keys_file: pl.Path):
     json_content = input_missing_cache_keys_file.read_text()
     missing_steps_ids = json.loads(json_content)
 
-    logger.info("Steps with missing caches:")
-    for step_id in missing_steps_ids:
-        logger.info(f"    {step_id}")
+    # logger.info("Steps with missing caches:")
+    # for step_id in missing_steps_ids:
+    #     logger.info(f"    {step_id}")
 
     filtered_stages = filter_steps_with_existing_output(
-        stages=stages, steps_ids_with_missing_results=missing_steps_ids
+        stages=step_stages, steps_ids_with_missing_results=missing_steps_ids
     )
-
-    existing_runners = {}
 
     result_matrices = []
     for stage in filtered_stages:
@@ -177,20 +187,11 @@ def get_missing_caches_matrices(input_missing_cache_keys_file: pl.Path):
             for req_step in step.get_all_required_steps():
                 required_steps_ids.append(req_step.id)
 
-            _RunnerCls = existing_runners.get(step.id)
-            if _RunnerCls is None:
-                class _RunnerCls(Runner):
-                    CLASS_NAME_ALIAS = f"{step_id}_cached"
-
-                    @classmethod
-                    def get_all_required_steps(cls) -> List[RunnerStep]:
-                        return [step]
-
-                existing_runners[step.id] = _RunnerCls
+            runner_cls = steps_runners[step_id]
 
             matrix_include.append(
                 {
-                    "step_runner_fqdn": _RunnerCls.FULLY_QUALIFIED_NAME,
+                    "step_runner_fqdn": runner_cls.FULLY_QUALIFIED_NAME,
                     "step_id": step.id,
                     "name": step.name,
                     "required_steps": sorted(required_steps_ids),
@@ -219,7 +220,7 @@ def generate_workflow_yaml():
     run_pre_built_job = jobs.pop(run_pre_built_job_object_name)
 
     pre_job_outputs = {}
-    for counter in range(len(stages)):
+    for counter in range(len(step_stages)):
         stage_run_pre_built_job = copy.deepcopy(run_pre_built_job)
         if counter > 0:
             previous_run_pre_built_job_object_name = (
