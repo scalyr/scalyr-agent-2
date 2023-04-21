@@ -58669,6 +58669,8 @@ async function executeRunner() {
     const lookupOnlyStr = core.getInput("lookup_only");
     const lookupOnly = lookupOnlyStr === 'true' ? true : false;
     const cacheRoot = core.getInput("cache_root");
+    const failOnCacheMissStr = core.getInput("fail_on_cache_miss");
+    const failOnCacheMiss = failOnCacheMissStr === 'true' ? true : false;
 
 
     const stepsIDs = JSON.parse(stepsIdsJSON);
@@ -58694,6 +58696,10 @@ async function executeRunner() {
     }
 
     core.setOutput("missing_steps_ids_json", JSON.stringify(missingCaches));
+
+    if (failOnCacheMiss && missingCaches.length > 0 ) {
+        throw new Error("The 'fail_on_cache_miss' option is enabled and there are missing caches.");
+    }
 }
 
 

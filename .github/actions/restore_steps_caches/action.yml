@@ -12,6 +12,9 @@ inputs:
   lookup_only:
     default: "false"
     description: "If true, do not download cache on hit."
+  fail_on_cache_miss:
+    default: "false"
+    description: "Fail this action if at least one step cache is missings."
 
 outputs:
   missing_steps_ids_json:
