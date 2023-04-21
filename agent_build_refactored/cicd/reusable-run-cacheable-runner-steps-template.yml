@@ -34,6 +34,13 @@ permissions:
   contents: read
 
 jobs:
+  dummy:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+
   pre_job:
     runs-on: ubuntu-20.04
     steps:
