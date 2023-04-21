@@ -73,18 +73,6 @@ def get_all_used_steps():
 
 all_used_steps: Dict[str, RunnerStep] = {step.id: step for step in get_all_used_steps()}
 
-a=10
-
-# def create_wrapper_runner_from_step(step: RunnerStep):
-#     class StepWrapperRunner(Runner):
-#         CLASS_NAME_ALIAS = f"{step_id}_pre_build"
-#
-#         @classmethod
-#         def get_all_required_steps(cls) -> List[RunnerStep]:
-#             return [step]
-#
-#     return StepWrapperRunner
-
 
 step_stages = get_all_required_steps_stages(steps=list(all_used_steps.values()))
 
@@ -142,36 +130,9 @@ def get_steps_runners():
 steps_runners = get_steps_runners()
 
 
-a=10
-
-# runner_levels = []
-# for level_steps in levels:
-#     current_runner_level = {}
-#     for step_id, step in level_steps.items():
-#         _RunnerCls = existing_runners.get(step.id)
-#         if _RunnerCls is None:
-#             class _RunnerCls(Runner):
-#                 CLASS_NAME_ALIAS = f"{step_id}_pre_build"
-#
-#                 @classmethod
-#                 def get_all_required_steps(cls) -> List[RunnerStep]:
-#                     return [step]
-#
-#             existing_runners[step.id] = _RunnerCls
-#
-#         fqdn = _RunnerCls.FULLY_QUALIFIED_NAME
-#         current_runner_level[fqdn] = {"step": step, "runner": _RunnerCls}
-#
-#     runner_levels.append(current_runner_level)
-
-
 def get_missing_caches_matrices(input_missing_cache_keys_file: pl.Path):
     json_content = input_missing_cache_keys_file.read_text()
     missing_steps_ids = json.loads(json_content)
-
-    # logger.info("Steps with missing caches:")
-    # for step_id in missing_steps_ids:
-    #     logger.info(f"    {step_id}")
 
     filtered_stages = filter_steps_with_existing_output(
         stages=step_stages, steps_ids_with_missing_results=missing_steps_ids

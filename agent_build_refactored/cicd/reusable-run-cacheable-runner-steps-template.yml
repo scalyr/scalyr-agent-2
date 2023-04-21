@@ -101,7 +101,7 @@ jobs:
         with:
           steps_ids: ${{ steps.get_all_steps_ids.outputs.all_steps_ids_json }}
           cache_version_suffix: ${{ steps.get_all_steps_ids.outputs.cache_version_suffix }}
-          cache_root: agent_build_output/step_cache
+          cache_root: agent_build_output/step_output
           lookup_only: true
 
       - name: Print missing steps caches matrices
@@ -167,7 +167,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: |
-            agent_build_output/step_cache/${{ matrix.step_id }}
+            agent_build_output/step_output/${{ matrix.step_id }}
           key: ${{ matrix.step_id }}_${{ matrix.cache_version_suffix }}
 
       - name: Get required steps caches
@@ -176,7 +176,7 @@ jobs:
         with:
           steps_ids: ${{ toJSON(matrix.required_steps) }}
           cache_version_suffix: ${{ matrix.cache_version_suffix }}
-          cache_root: agent_build_output/step_cache
+          cache_root: agent_build_output/step_output
 
       - name: Run cached step
         shell: bash

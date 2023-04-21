@@ -84,7 +84,7 @@ jobs:
         with:
           steps_ids: ${{ steps.get_required_steps_ids.outputs.all_required_steps }}
           cache_version_suffix: ${{ steps.get_required_steps_ids.outputs.cache_version_suffix }}
-          cache_root: agent_build_output/step_cache
+          cache_root: agent_build_output/step_output
 
       - name: Build managed package with builder '${{ matrix.packages.name }}'
         run: |
@@ -184,7 +184,7 @@ jobs:
         with:
           steps_ids: ${{ steps.get_required_steps_ids.outputs.portable_test_runner_required_steps_ids }}
           cache_version_suffix: ${{ steps.get_required_steps_ids.outputs.cache_version_suffix }}
-          cache_root: agent_build_output/step_cache
+          cache_root: agent_build_output/step_output
 
       - name: Get required steps caches
         id: get_repo_builder_required_steps_caches
@@ -192,7 +192,7 @@ jobs:
         with:
           steps_ids: ${{ steps.get_required_steps_ids.outputs.repo_builder_required_steps_ids }}
           cache_version_suffix: ${{ steps.get_required_steps_ids.outputs.cache_version_suffix }}
-          cache_root: agent_build_output/step_cache
+          cache_root: agent_build_output/step_output
 
       - name: Get required steps caches
         id: get_required_steps_caches
@@ -200,7 +200,7 @@ jobs:
         with:
           steps_ids: ${{ steps.get_required_steps_ids.outputs.builder_required_steps_ids }}
           cache_version_suffix: ${{ steps.get_required_steps_ids.outputs.cache_version_suffix }}
-          cache_root: agent_build_output/step_cache
+          cache_root: agent_build_output/step_output
 
       - name: Test '${{ matrix.configuration.name }}' packages
         env:
