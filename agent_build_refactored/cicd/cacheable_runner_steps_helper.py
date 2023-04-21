@@ -51,7 +51,7 @@ import tests.end_to_end_tests.managed_packages_tests.conftest  # NOQA
 # Import ALL_RUNNERS global collection only after all modules that define any runner are imported.
 from agent_build_refactored.tools.runner import ALL_RUNNERS
 
-from agent_build_refactored.tools.runner import Runner, RunnerStep, get_all_required_steps_stages, get_steps_with_missing_results, filter_steps_with_existing_output
+from agent_build_refactored.tools.runner import Runner, RunnerStep, get_all_required_steps_stages, get_steps_with_missing_results, filter_steps_with_existing_output, sort_and_filter_steps
 
 # Suffix that is appended to all steps cache keys. CI/CD cache can be easily invalidated by changing this value.
 CACHE_VERSION_SUFFIX = "v14"
@@ -63,16 +63,17 @@ builders_to_prebuilt_runners = {}
 
 
 def get_all_used_steps():
-    result = {}
+    all_steps = []
     for runner_cls in ALL_RUNNERS:
         for step in runner_cls.get_all_steps(recursive=True):
-            result[step.id] = step
+            all_steps.append(step)
 
-    return result
+    return sort_and_filter_steps(steps=all_steps)
 
 
-all_used_steps: Dict[str, RunnerStep] = get_all_used_steps()
+all_used_steps: Dict[str, RunnerStep] = {step.id: step for step in get_all_used_steps()}
 
+a=10
 
 # def create_wrapper_runner_from_step(step: RunnerStep):
 #     class StepWrapperRunner(Runner):
@@ -96,8 +97,8 @@ def get_cacheable_steps_stages():
         for step_id, step in remaining_steps.items():
             add = True
 
-            for req_step_id, req_step in step.get_all_required_steps().items():
-                if req_step_id in remaining_steps:
+            for req_step in step.get_all_required_steps():
+                if req_step.id in remaining_steps:
                     add = False
                     break
 
@@ -156,15 +157,15 @@ def get_missing_caches_matrices(input_missing_cache_keys_file: pl.Path):
     json_content = input_missing_cache_keys_file.read_text()
     missing_steps_ids = json.loads(json_content)
 
-
-    logger.info("MISSING")
-    logger.info(missing_steps_ids)
+    logger.info("Steps with missing caches:")
+    for step_id in missing_steps_ids:
+        logger.info(f"    {step_id}")
 
     filtered_stages = filter_steps_with_existing_output(
         stages=stages, steps_ids_with_missing_results=missing_steps_ids
     )
 
-    matrices = []
+    result_matrices = []
     for stage in filtered_stages:
         matrix_include = []
 
@@ -185,9 +186,9 @@ def get_missing_caches_matrices(input_missing_cache_keys_file: pl.Path):
             )
 
         matrix = {"include": matrix_include}
-        matrices.append(matrix)
+        result_matrices.append(matrix)
 
-    return matrices
+    return result_matrices
 
 
 def generate_workflow_yaml():

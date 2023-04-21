@@ -246,18 +246,13 @@ class RunnerStep:
 
         return sorted(list(set(tracked_files)))
 
-    @staticmethod
-    def sort_and_filter_steps(steps: List['RunnerStep']) -> List['RunnerStep']:
-        steps_ids = {step.id: step for step in steps}
-
-        return sorted(steps_ids.values(), key=lambda s: s.id)
 
     @staticmethod
     def get_steps_child_steps(steps: List['RunnerStep'], recursive: bool = False):
 
         result_steps = steps[:]
         if not recursive:
-            return RunnerStep.sort_and_filter_steps(steps=result_steps)
+            return sort_and_filter_steps(steps=result_steps)
 
         child_steps = list()
 
@@ -271,7 +266,7 @@ class RunnerStep:
         nested_steps = RunnerStep.get_steps_child_steps(steps=child_steps, recursive=True)
         result_steps.extend(nested_steps)
 
-        return RunnerStep.sort_and_filter_steps(steps=result_steps)
+        return sort_and_filter_steps(steps=result_steps)
 
     def get_all_required_steps(self, recursive: bool = False) -> List['RunnerStep']:
 
@@ -281,27 +276,34 @@ class RunnerStep:
             result_steps.append(self._base_step)
 
         if not recursive:
-            return RunnerStep.sort_and_filter_steps(steps=result_steps)
+            return sort_and_filter_steps(steps=result_steps)
 
-        return RunnerStep.get_steps_child_steps(steps=result_steps, recursive=True)
+        nested_child_steps = []
+        for step in result_steps:
+            for child_step in step.get_all_required_steps(recursive=True):
+                nested_child_steps.append(child_step)
 
-    def get_all_cacheable_steps(self) -> List["RunnerStep"]:
-        """
-        Get list of all steps (including nested) which are used by this step.
-        """
-        result = []
+        result_steps.extend(nested_child_steps)
 
-        # Include current step itself, if needed.
-        if self.github_actions_settings.cacheable:
-            result.append(self)
+        return sort_and_filter_steps(steps=result_steps)
 
-        for step in self.required_steps.values():
-            result.extend(step.get_all_cacheable_steps())
-
-        if self._base_step:
-            result.extend(self._base_step.get_all_cacheable_steps())
-
-        return result
+    # def get_all_cacheable_steps(self) -> List["RunnerStep"]:
+    #     """
+    #     Get list of all steps (including nested) which are used by this step.
+    #     """
+    #     result = []
+    #
+    #     # Include current step itself, if needed.
+    #     if self.github_actions_settings.cacheable:
+    #         result.append(self)
+    #
+    #     for step in self.required_steps.values():
+    #         result.extend(step.get_all_cacheable_steps())
+    #
+    #     if self._base_step:
+    #         result.extend(self._base_step.get_all_cacheable_steps())
+    #
+    #     return result
 
     def _get_id(self) -> str:
         """
@@ -742,10 +744,8 @@ class RunnerStep:
 
         # Check that all required steps results exists.
 
-        all_required_steps = list(self.get_all_required_steps().values())
-
         missing_steps_ids = []
-        for step in all_required_steps:
+        for step in self.get_all_required_steps():
             if not step.is_output_exists(work_dir=work_dir):
                 missing_steps_ids.append(step.id)
 
@@ -940,13 +940,23 @@ class Runner(metaclass=RunnerMeta):
         Gather all (including nested) RunnerSteps from all possible plases which are used by this runner.
         """
 
-        all_steps = cls.get_all_required_steps()
+        result_steps = cls.get_all_required_steps()
 
         base_environment = cls.get_base_environment()
         if base_environment:
-            all_steps.append(base_environment)
+            result_steps.append(base_environment)
 
-        return RunnerStep.get_steps_child_steps(steps=all_steps, recursive=recursive)
+        if not recursive:
+            return sort_and_filter_steps(steps=result_steps)
+
+        nested_steps = []
+        for step in result_steps:
+            for child_step in step.get_all_required_steps(recursive=True):
+                nested_steps.append(child_step)
+
+        result_steps.extend(nested_steps)
+
+        return sort_and_filter_steps(steps=result_steps)
 
 
     @property
@@ -1067,11 +1077,11 @@ class Runner(metaclass=RunnerMeta):
 
         all_steps = self.get_all_steps(recursive=True)
 
+        full_stages = get_all_required_steps_stages(steps=all_steps)
+
         steps_with_missing_results = get_steps_with_missing_results(
             steps=all_steps, work_dir=self.work_dir
         )
-
-        full_stages = get_all_required_steps_stages(steps=all_steps)
 
         filtered_stages = filter_steps_with_existing_output(
             stages=full_stages,
@@ -1086,11 +1096,6 @@ class Runner(metaclass=RunnerMeta):
         self._run_steps(
             steps=steps_to_run,
             work_dir=self.work_dir
-        )
-
-        self._run_steps(
-            steps=steps_to_run,
-            work_dir=self.work_dir,
         )
 
     def _run(self):
@@ -1277,6 +1282,12 @@ DOCKER_EC2_BUILDERS = {
         ssh_username="ubuntu",
     )
 }
+
+
+def sort_and_filter_steps(steps: List['RunnerStep']) -> List['RunnerStep']:
+    steps_ids = {step.id: step for step in steps}
+
+    return sorted(steps_ids.values(), key=lambda s: s.id)
 
 
 def get_steps_with_missing_results(steps: List[RunnerStep], work_dir: pl.Path):
