@@ -58,8 +58,8 @@ CACHE_VERSION_SUFFIX = "v14"
 
 used_builders = []
 
-existing_runners = {}
-builders_to_prebuilt_runners = {}
+#existing_runners = {}
+# builders_to_prebuilt_runners = {}
 
 
 def get_all_used_steps():
@@ -108,7 +108,7 @@ def get_cacheable_steps_stages():
             _RunnerCls = existing_runners.get(step.id)
             if _RunnerCls is None:
                 class _RunnerCls(Runner):
-                    CLASS_NAME_ALIAS = f"{step_id}_pre_build"
+                    CLASS_NAME_ALIAS = f"{step_id}"
 
                     @classmethod
                     def get_all_required_steps(cls) -> List[RunnerStep]:
@@ -165,19 +165,32 @@ def get_missing_caches_matrices(input_missing_cache_keys_file: pl.Path):
         stages=stages, steps_ids_with_missing_results=missing_steps_ids
     )
 
+    existing_runners = {}
+
     result_matrices = []
     for stage in filtered_stages:
         matrix_include = []
 
-        for step_wrapper_runner_fqdn, step in stage.items():
+        for step_id, step in stage.items():
 
             required_steps_ids = []
             for req_step in step.get_all_required_steps():
                 required_steps_ids.append(req_step.id)
 
+            _RunnerCls = existing_runners.get(step.id)
+            if _RunnerCls is None:
+                class _RunnerCls(Runner):
+                    CLASS_NAME_ALIAS = f"{step_id}_cached"
+
+                    @classmethod
+                    def get_all_required_steps(cls) -> List[RunnerStep]:
+                        return [step]
+
+                existing_runners[step.id] = _RunnerCls
+
             matrix_include.append(
                 {
-                    "step_runner_fqdn": step_wrapper_runner_fqdn,
+                    "step_runner_fqdn": _RunnerCls.FULLY_QUALIFIED_NAME,
                     "step_id": step.id,
                     "name": step.name,
                     "required_steps": sorted(required_steps_ids),
