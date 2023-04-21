@@ -177,6 +177,7 @@ jobs:
           steps_ids: ${{ toJSON(matrix.required_steps) }}
           cache_version_suffix: ${{ matrix.cache_version_suffix }}
           cache_root: agent_build_output/step_output
+          fail_on_cache_miss: true
 
       - name: Run cached step
         shell: bash
