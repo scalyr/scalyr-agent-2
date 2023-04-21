@@ -323,6 +323,9 @@ class RunnerStep:
     def __str__(self):
         return self.id
 
+    def __repr__(self):
+        return self.id
+
     @property
     def result_image(self) -> Optional[DockerImageSpec]:
         """
@@ -1069,7 +1072,7 @@ class Runner(metaclass=RunnerMeta):
 
             if missing_steps:
                 raise Exception(
-                    f"Can not execute runner {self.FULLY_QUALIFIED_NAME} because some of its required steps"
+                    f"Can not execute runner '{self.FULLY_QUALIFIED_NAME}' because some of its required steps"
                     f"don't have result directories.\nMissing steps: {missing_steps}"
                 )
 
