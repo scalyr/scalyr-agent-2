@@ -37,8 +37,9 @@ jobs:
   dummy:
     runs-on: ubuntu-20.04
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - name: Run
+        run:
+          exit 0
 
 
   pre_job:
