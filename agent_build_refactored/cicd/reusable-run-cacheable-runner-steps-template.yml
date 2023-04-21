@@ -192,4 +192,4 @@ jobs:
           AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ inputs.aws_prefix_list_id }}
           AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
         run: |
-          python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn }} run-cacheable-step
+          python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn }} run-cacheable-stepp
