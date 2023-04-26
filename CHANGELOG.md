@@ -6,6 +6,8 @@ Scalyr Agent 2 Changes By Release
 Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Jan 19, 2023 00:00 -0800
 --->
 
+Kubernetes:
+* Kubernetes ClusterRole resource definition now includes Argo Rollouts. The agent won't receive permission errors anymore when it interrogates Argo Rollout resources.
 
 ## 2.2.1 "Frosty" - Mar 29, 2023
 <!---
