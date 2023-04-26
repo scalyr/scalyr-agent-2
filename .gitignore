@@ -32,6 +32,7 @@ tests/credentials.json
 !.github/actions/perform-deployment/dist
 !.github/actions/execute-runner/dist
 !.github/actions/restore_steps_caches/dist
+tools/cicd/nodejs_actions/node_modules
 .github/actions/perform-deployment/node_modules
 .github/actions/execute-runner/node_modules
 .github/actions/restore_steps_caches/node_modules

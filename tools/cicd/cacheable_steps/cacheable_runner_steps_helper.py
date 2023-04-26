@@ -191,20 +191,20 @@ def update_files():
     """
     generate_workflow_yaml()
 
-    # Update the "restore_steps_caches" action source.
-    action_root = SOURCE_ROOT / ".github/actions/restore_steps_caches"
-
-    ncc_executable = action_root / "node_modules/.bin/ncc"
-
-    subprocess.run(
-        [
-            ncc_executable,
-            "build",
-            "index.js",
-        ],
-        cwd=action_root,
-        check=True
-    )
+    # # Update the "restore_steps_caches" action source.
+    # action_root = SOURCE_ROOT / ".github/actions/restore_steps_caches"
+    #
+    # ncc_executable = action_root / "node_modules/.bin/ncc"
+    #
+    # subprocess.run(
+    #     [
+    #         ncc_executable,
+    #         "build",
+    #         "index.js",
+    #     ],
+    #     cwd=action_root,
+    #     check=True
+    # )
 
 
 if __name__ == "__main__":
