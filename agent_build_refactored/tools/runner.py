@@ -1359,7 +1359,7 @@ def remove_steps_from_stages(
     for stage in stages:
         current_stage = {}
         for step_id, step in stage.items():
-            if step_id in steps_to_remove:
+            if step_id not in steps_to_remove:
                 current_stage[step_id] = step
 
         result_stages.append(current_stage)
