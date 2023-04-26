@@ -93,7 +93,7 @@ jobs:
       shell: bash
       run: |
         cat <<< '${{ steps.get_missing_caches_steps.outputs.steps_ids_with_cache_hit }}' | \
-          python3  tools/cicd/cacheable_runner_steps_helper.py get-missing-caches-matrices --github-step-output-file "${GITHUB_OUTPUT}"
+          python3  tools/cicd/cacheable_runner_steps_helper.py get-missing-caches-matrices >> "${GITHUB_OUTPUT}"
         cat $GITHUB_OUTPUT
     outputs:
       stage_matrix0: ${{ steps.print_missing_caches_matrices.outputs.stage_matrix0
