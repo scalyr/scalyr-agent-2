@@ -45,32 +45,11 @@ from agent_build_refactored.tools.run_in_ec2.constants import EC2DistroImage
 logger = logging.getLogger(__name__)
 
 
-def remove_directory_in_docker(path: pl.Path):
-    """
-    Since we produce some artifacts inside docker containers, we may face difficulties with
-    deleting the old ones because they may be created inside the container with the root user.
-    The workaround for that to delegate that deletion to a docker container as well.
-    """
-
-    if IN_DOCKER:
-        shutil.rmtree(path)
-        return
-
-    # In order to be able to remove the whole directory, we mount parent directory.
-    with DockerContainer(
-        name="agent_build_step_trash_remover",
-        image_name="ubuntu:22.04",
-        mounts=[f"{path.parent}:/parent"],
-        command=["rm", "-r", f"/parent/{path.name}"],
-        detached=False,
-    ):
-        pass
-
 def chown_directory_in_docker(path: pl.Path):
     """
     Since we produce some artifacts inside docker containers, we may face difficulties with
-    deleting the old ones because they may be created inside the container with the root user.
-    The workaround for that to delegate that deletion to a docker container as well.
+    manipulations of files because they may be created inside the container with the root user.
+    The workaround for that is to chown result artifacts in docker again.
     """
 
     if IN_DOCKER:
@@ -79,13 +58,27 @@ def chown_directory_in_docker(path: pl.Path):
 
     # In order to be able to remove the whole directory, we mount parent directory.
     with DockerContainer(
-        name="agent_build_step_trash_remover",
+        name="agent_build_step_chown",
         image_name="ubuntu:22.04",
         mounts=[f"{path.parent}:/parent"],
         command=["chown", "-R", f"{os.getuid()}:{os.getuid()}", f"/parent/{path.name}"],
         detached=False,
     ):
         pass
+
+
+def remove_root_owned_directory(path: pl.Path):
+    to_chown = False
+    try:
+        shutil.rmtree(path)
+    except PermissionError:
+        to_chown = True
+    except Exception:
+        raise
+
+    if to_chown:
+        chown_directory_in_docker(path)
+        shutil.rmtree(path)
 
 
 @dataclasses.dataclass
@@ -465,12 +458,10 @@ class RunnerStep:
 
         return sha256.hexdigest()
 
-    @staticmethod
-    def _remove_output_directory(output_directory: pl.Path):
-        if output_directory.is_dir():
-            remove_directory_in_docker(output_directory)
-        elif output_directory.is_symlink():
-            output_directory.unlink()
+
+
+
+
 
     # def _restore_cache(
     #     self, output_directory: pl.Path, cache_directory: pl.Path
@@ -517,6 +508,7 @@ class RunnerStep:
     def _run_script_locally(
         self,
         work_dir: pl.Path,
+        isolated_source_root: pl.Path,
         temp_output_directory: pl.Path
     ):
         """
@@ -524,12 +516,8 @@ class RunnerStep:
         :param work_dir: Path to directory where all results are stored.
         """
 
-        isolated_source_root = self.get_isolated_root(work_dir=work_dir)
-        isolated_source_root.mkdir(parents=True, exist_ok=True)
-        #cache_directory = self.get_cache_directory(work_dir=work_dir)
-        #cache_directory.mkdir(parents=True, exist_ok=True)
-        # output_directory = self.get_output_directory(work_dir=work_dir)
-        # output_directory.mkdir(parents=True, exist_ok=True)
+        # isolated_source_root = self.get_isolated_root(work_dir=work_dir)
+        # isolated_source_root.mkdir(parents=True, exist_ok=True)
 
         env_variables_to_pass = self._get_all_environment_variables(work_dir=work_dir)
 
@@ -546,6 +534,7 @@ class RunnerStep:
     def _run_script_in_docker(
             self,
             work_dir: pl.Path,
+            isolated_source_root: pl.Path,
             temp_output_directory: pl.Path,
             remote_docker_host: str
     ):
@@ -555,14 +544,9 @@ class RunnerStep:
         :param remote_docker_host: If not None - host of the remote docker machine to execute script.
         """
 
-        isolated_source_root = self.get_isolated_root(work_dir=work_dir)
-        #cache_directory = self.get_cache_directory(work_dir=work_dir)
-        #output_directory = self.get_output_directory(work_dir=work_dir)
-        # tmp_output_directory = self.get_temp_output_directory(work_dir=work_dir)
+        #isolated_source_root = self.get_isolated_root(work_dir=work_dir)
 
         in_docker_isolated_source_root = pl.Path("/tmp/agent_source")
-        #in_docker_cache_directory = pl.Path("/tmp/step_cache")
-        #in_docker_output_directory = pl.Path("/tmp/step_output")
         in_docker_tmp_output_directory = pl.Path("/tmp/step_output")
 
         # Run step in docker.
@@ -701,7 +685,6 @@ class RunnerStep:
     def is_output_exists(self, work_dir: pl.Path):
         return self.get_output_directory(work_dir=work_dir).exists()
 
-
     def run(
         self,
         work_dir: pl.Path,
@@ -711,35 +694,19 @@ class RunnerStep:
         Run the step. Based on its initial data, it will be executed in docker or locally, on the current system.
         """
 
-        #output_directory = self.get_output_directory(work_dir)
-        #cache_directory = self.get_cache_directory(work_dir)
         isolated_source_root = self.get_isolated_root(work_dir)
 
         temp_output_directory = self.get_temp_output_directory(work_dir=work_dir)
 
-        #output_directory.parent.mkdir(parents=True, exist_ok=True)
-        #cache_directory.parent.mkdir(parents=True, exist_ok=True)
-
-        # skipped = self._restore_cache(
-        #     output_directory=output_directory, cache_directory=cache_directory
-        # )
-        # if skipped:
-        #     logger.info(f"Result of the step '{self.id}' is found in cache, skip.")
-        #     return
-
         logging.info(f"Run step {self.name}.")
-        # for step in self.required_steps.values():
-        #     step.run(
-        #         work_dir=work_dir, remote_docker_host_getter=remote_docker_host_getter
-        #     )
-        #
-        # if self._base_step:
-        #     self._base_step.run(
-        #         work_dir=work_dir, remote_docker_host_getter=remote_docker_host_getter
-        #     )
 
-        self._remove_output_directory(output_directory=temp_output_directory)
+        if temp_output_directory.exists():
+            remove_root_owned_directory(path=temp_output_directory)
         temp_output_directory.mkdir(parents=True, exist_ok=True)
+
+        output_directory = self.get_output_directory(work_dir=work_dir)
+        if output_directory.exists():
+            shutil.rmtree(output_directory)
 
         # Create directory to store only tracked files.
         if isolated_source_root.exists():
@@ -762,12 +729,8 @@ class RunnerStep:
         )
 
         self.get_isolated_root(work_dir=work_dir).mkdir(parents=True, exist_ok=True)
-        #self.get_cache_directory(work_dir=work_dir).mkdir(parents=True, exist_ok=True)
-        #self.get_output_directory(work_dir=work_dir).mkdir(parents=True, exist_ok=True)
-
 
         # Check that all required steps results exists.
-
         missing_steps_ids = []
         for step in self.get_all_required_steps():
             if not step.is_output_exists(work_dir=work_dir):
@@ -785,12 +748,14 @@ class RunnerStep:
                 remote_docker_host = remote_docker_host_getter(self)
                 self._run_script_in_docker(
                     work_dir=work_dir,
+                    isolated_source_root=isolated_source_root,
                     temp_output_directory=temp_output_directory,
                     remote_docker_host=remote_docker_host
                 )
             else:
                 self._run_script_locally(
                     work_dir=work_dir,
+                    isolated_source_root=isolated_source_root,
                     temp_output_directory=temp_output_directory
                 )
         except Exception:
@@ -802,20 +767,8 @@ class RunnerStep:
             )
             raise
 
-        output_directory = self.get_output_directory(work_dir=work_dir)
-        if output_directory.exists():
-            shutil.rmtree(output_directory)
-
         chown_directory_in_docker(temp_output_directory)
         temp_output_directory.rename(output_directory)
-        #shutil.copytree(temp_output_directory, output_directory)
-        #remove_directory_in_docker(temp_output_directory)
-
-        # self._save_to_cache(
-        #     is_skipped=skipped,
-        #     output_directory=output_directory,
-        #     cache_directory=cache_directory,
-        # )
         self.cleanup()
 
     def cleanup(self):
@@ -839,18 +792,6 @@ class EnvironmentRunnerStep(RunnerStep):
         new image with the result environment.
         If step does not run in docker, then its actions are executed directly on current system.
     """
-
-    # def _restore_cache(
-    #     self, output_directory: pl.Path, cache_directory: pl.Path
-    # ) -> bool:
-    #     is_skipped = super(EnvironmentRunnerStep, self)._restore_cache(
-    #         output_directory=output_directory, cache_directory=cache_directory
-    #     )
-    #
-    #     if self.runs_in_docker:
-    #         return is_skipped
-    #
-    #     return False
 
     def _run_script_in_docker(
             self,
@@ -1063,20 +1004,7 @@ class Runner(metaclass=RunnerMeta):
 
         # Run chmod for the output directory of the runner, in order to fix possible permission
         # error that can be due to using root user inside the docker.
-        run_docker_command(
-            [
-                "run",
-                "-i",
-                "--rm",
-                "-v",
-                f"{self.output_path}:/tmp/data",
-                "ubuntu:22.04",
-                "chown",
-                "-R",
-                f"{os.getuid()}:{os.getgid()}",
-                "/tmp/data",
-            ]
-        )
+        chown_directory_in_docker(self.output_path)
 
     def run_required(self):
         """
@@ -1084,8 +1012,8 @@ class Runner(metaclass=RunnerMeta):
         """
 
         # Cleanup output if needed.
-        if self.output_path.is_dir():
-            remove_directory_in_docker(self.output_path)
+        if self.output_path.exists():
+            remove_root_owned_directory(path=self.output_path)
         self.output_path.mkdir(parents=True)
 
         if IN_CICD or IN_DOCKER:
