@@ -101,7 +101,7 @@ def get_missing_caches_matrices(
 
             if add_skip_job:
                 stage_jobs.append({
-                    "name": "dummy"
+                    "name": "All Reused From Cache"
                 })
 
             matrix = {"include": stage_jobs}

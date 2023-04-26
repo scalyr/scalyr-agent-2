@@ -99,26 +99,9 @@ jobs:
       - name: Print missing steps caches matrices
         id: print_missing_caches_matrices
         shell: bash
-        run: |
-          cat <<< '${{ steps.get_missing_caches_steps.outputs.steps_ids_with_cache_hit }}' > /tmp/existing_result_steps_ids.json
-          echo "EXISTING"
-          cat /tmp/existing_result_steps_ids.json
-          #python3  tools/cicd/cacheable_runner_steps_helper.py get-missing-caches-matrices --existing-result-step-ids-file /tmp/existing_result_steps_ids.json > /tmp/missing_cache_matrices.json
-          #echo "MISSING"
-          #cat /tmp/missing_cache_matrices.json
-          #ls /tmp/ -al
-          #i=0
-          #jq -c '.[]' /tmp/missing_cache_matrices.json | while read -r matrix; do 
-          #  echo "matrix${i}=$(echo "$matrix" | jq -c '.')" >> $GITHUB_OUTPUT
-          #  echo "matrix_length${i}=$(echo "$matrix" | jq -c '.["include"] | length')" >> $GITHUB_OUTPUT
-          #  ((i=i+1))
-          #done
-          
-          
-          
+        run: |          
           cat <<< '${{ steps.get_missing_caches_steps.outputs.steps_ids_with_cache_hit }}' | \
             python3  tools/cicd/cacheable_runner_steps_helper.py get-missing-caches-matrices --github-step-output-file "${GITHUB_OUTPUT}"
-          echo "MISSING"
           cat $GITHUB_OUTPUT
 
   stage:

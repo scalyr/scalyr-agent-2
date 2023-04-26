@@ -66,6 +66,27 @@ def remove_directory_in_docker(path: pl.Path):
     ):
         pass
 
+def chown_directory_in_docker(path: pl.Path):
+    """
+    Since we produce some artifacts inside docker containers, we may face difficulties with
+    deleting the old ones because they may be created inside the container with the root user.
+    The workaround for that to delegate that deletion to a docker container as well.
+    """
+
+    if IN_DOCKER:
+        shutil.rmtree(path)
+        return
+
+    # In order to be able to remove the whole directory, we mount parent directory.
+    with DockerContainer(
+        name="agent_build_step_trash_remover",
+        image_name="ubuntu:22.04",
+        mounts=[f"{path.parent}:/parent"],
+        command=["chown", "-R", f"{os.getuid()}:{os.getuid()}", f"/parent/{path.name}"],
+        detached=False,
+    ):
+        pass
+
 
 @dataclasses.dataclass
 class DockerImageSpec:
@@ -784,8 +805,11 @@ class RunnerStep:
         output_directory = self.get_output_directory(work_dir=work_dir)
         if output_directory.exists():
             shutil.rmtree(output_directory)
-        shutil.copytree(temp_output_directory, output_directory)
-        shutil.rmtree(temp_output_directory)
+
+        chown_directory_in_docker(temp_output_directory)
+        temp_output_directory.rename(output_directory)
+        #shutil.copytree(temp_output_directory, output_directory)
+        #remove_directory_in_docker(temp_output_directory)
 
         # self._save_to_cache(
         #     is_skipped=skipped,
