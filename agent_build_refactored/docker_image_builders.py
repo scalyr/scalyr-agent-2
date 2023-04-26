@@ -53,7 +53,6 @@ from agent_build_refactored.tools.runner import (
     Runner,
     RunnerStep,
     ArtifactRunnerStep,
-    GitHubActionsSettings,
 )
 
 log = logging.getLogger(__name__)
@@ -124,9 +123,6 @@ class BaseImagePlatformBuilderStep(ArtifactRunnerStep):
                 "PLATFORM": str(image_platform),
                 "COVERAGE_VERSION": TEST_IMAGE_COVERAGE_VERSION,
             },
-            github_actions_settings=GitHubActionsSettings(
-                cacheable=True, pre_build_in_separate_job=True
-            ),
         )
 
 
@@ -171,9 +167,6 @@ class BaseImageBuilderStep(ArtifactRunnerStep):
             environment_variables={
                 "BASE_IMAGE_NAME_PREFIX": self.base_image_name_prefix,
             },
-            github_actions_settings=GitHubActionsSettings(
-                cacheable=True,
-            ),
         )
         self.base_distro = base_distro
         self.supported_platforms = supported_platforms

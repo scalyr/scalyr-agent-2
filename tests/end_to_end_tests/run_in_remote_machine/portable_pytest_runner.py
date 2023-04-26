@@ -29,7 +29,6 @@ from agent_build_refactored.tools.runner import (
     Runner,
     ArtifactRunnerStep,
     RunnerStep,
-    GitHubActionsSettings,
 )
 from agent_build_refactored.managed_packages.managed_packages_builders import (
     PREPARE_PYTHON_ENVIRONMENT_STEPS,
@@ -62,9 +61,7 @@ def create_build_portable_pytest_runner_step() -> Dict[
             environment_variables={
                 "PORTABLE_RUNNER_NAME": PORTABLE_RUNNER_NAME,
             },
-            github_actions_settings=GitHubActionsSettings(
-                cacheable=True, run_in_remote_docker=run_in_remote_docker
-            ),
+            run_in_remote_docker_if_available=run_in_remote_docker,
         )
 
         steps[architecture] = step

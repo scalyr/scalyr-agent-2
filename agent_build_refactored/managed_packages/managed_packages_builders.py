@@ -112,7 +112,6 @@ from agent_build_refactored.tools.runner import (
     RunnerMappedPath,
     EnvironmentRunnerStep,
     DockerImageSpec,
-    GitHubActionsSettings,
     IN_DOCKER,
 )
 from agent_build_refactored.tools.constants import (
@@ -1589,9 +1588,7 @@ def create_build_openssl_steps(
             environment_variables={
                 "OPENSSL_VERSION": PYTHON_PACKAGE_SSL_VERSIONS[openssl_version_type],
             },
-            github_actions_settings=GitHubActionsSettings(
-                run_in_remote_docker=run_in_remote_docker, cacheable=True
-            ),
+            run_in_remote_docker_if_available=run_in_remote_docker,
         )
         steps[architecture] = step
 
@@ -1617,10 +1614,7 @@ def create_install_build_environment_steps() -> Dict[
                 name=build_env_info.image,
                 platform=architecture.as_docker_platform.value,
             ),
-            github_actions_settings=GitHubActionsSettings(
-                run_in_remote_docker=run_in_remote_docker,
-                cacheable=True,
-            ),
+            run_in_remote_docker_if_available=run_in_remote_docker,
         )
         steps[architecture] = step
 
@@ -1646,9 +1640,7 @@ def create_build_python_dependencies_steps() -> Dict[Architecture, ArtifactRunne
             environment_variables={
                 **_PYTHON_BUILD_DEPENDENCIES_VERSIONS,
             },
-            github_actions_settings=GitHubActionsSettings(
-                run_in_remote_docker=run_in_remote_docker, cacheable=True
-            ),
+            run_in_remote_docker_if_available=run_in_remote_docker,
         )
         steps[architecture] = step
 
@@ -1694,9 +1686,7 @@ def create_build_python_steps(
                 "INSTALL_PREFIX": PYTHON_INSTALL_PREFIX,
                 "PIP_VERSION": EMBEDDED_PYTHON_PIP_VERSION,
             },
-            github_actions_settings=GitHubActionsSettings(
-                run_in_remote_docker=run_in_remote_docker, cacheable=True
-            ),
+            run_in_remote_docker_if_available=run_in_remote_docker,
         )
 
         steps[architecture] = build_python
@@ -1767,7 +1757,6 @@ def create_build_python_package_root_steps() -> Dict[Architecture, ArtifactRunne
                 "INSTALL_PREFIX": "/opt/scalyr-agent-2-dependencies",
                 "LIBSSL_DIR": libssl_dir,
             },
-            github_actions_settings=GitHubActionsSettings(cacheable=True),
         )
 
         steps[architecture] = step
@@ -1809,9 +1798,7 @@ def create_build_dev_requirements_steps() -> Dict[Architecture, ArtifactRunnerSt
                 "RUST_PLATFORM": rust_target_platform,
                 "PYTHON_INSTALL_PREFIX": PYTHON_INSTALL_PREFIX,
             },
-            github_actions_settings=GitHubActionsSettings(
-                cacheable=True, run_in_remote_docker=run_in_remote_docker
-            ),
+            run_in_remote_docker_if_available=run_in_remote_docker,
         )
         steps[architecture] = build_dev_requirements_step
 
@@ -1847,9 +1834,7 @@ def create_build_agent_libs_venv_steps() -> Dict[Architecture, ArtifactRunnerSte
                 "REQUIREMENTS": AGENT_LIBS_REQUIREMENTS_CONTENT,
                 "PIP_VERSION": EMBEDDED_PYTHON_PIP_VERSION,
             },
-            github_actions_settings=GitHubActionsSettings(
-                cacheable=True, run_in_remote_docker=run_in_remote_docker
-            ),
+            run_in_remote_docker_if_available=run_in_remote_docker,
         )
         steps[architecture] = build_agent_libs_step
 
@@ -1884,9 +1869,6 @@ def create_build_agent_libs_package_root_steps() -> Dict[
                 "PYTHON_SHORT_VERSION": EMBEDDED_PYTHON_SHORT_VERSION,
                 "REQUIREMENTS": AGENT_LIBS_REQUIREMENTS_CONTENT,
             },
-            github_actions_settings=GitHubActionsSettings(
-                cacheable=True,
-            ),
         )
         steps[architecture] = step
 
@@ -1950,10 +1932,6 @@ def create_prepare_toolset_steps() -> Dict[Architecture, EnvironmentRunnerStep]:
                 "FPM_VERSION": "1.14.2",
                 "PACKAGECLOUD_VERSION": "0.3.11",
             },
-            github_actions_settings=GitHubActionsSettings(
-                cacheable=True,
-                pre_build_in_separate_job=True,
-            ),
         )
 
         steps[architecture] = prepare_toolset_step
@@ -1989,10 +1967,6 @@ def create_prepare_python_environment_steps() -> Dict[
             environment_variables={
                 "PYTHON_INSTALL_PREFIX": PYTHON_INSTALL_PREFIX,
             },
-            github_actions_settings=GitHubActionsSettings(
-                cacheable=True,
-                pre_build_in_separate_job=True,
-            ),
         )
 
         steps[architecture] = prepare_toolset_step
