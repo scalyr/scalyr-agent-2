@@ -9,6 +9,8 @@ Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Apr 26, 2023 00:00 -0800
 Improvements:
 * Support SSL connections to PostgreSQL
 
+Kubernetes:
+* Kubernetes ClusterRole resource definition now includes Argo Rollouts. The agent won't receive permission errors anymore when it interrogates Argo Rollout resources.
 
 ## 2.2.1 "Frosty" - Mar 29, 2023
 <!---
