@@ -37,7 +37,7 @@ from agent_build_refactored.tools.runner import ALL_RUNNERS
 from agent_build_refactored.tools.runner import Runner, RunnerStep, group_steps_by_stages, remove_steps_from_stages, sort_and_filter_steps
 
 # Suffix that is appended to all steps cache keys. CI/CD cache can be easily invalidated by changing this value.
-CACHE_VERSION_SUFFIX = "v14"
+CACHE_VERSION_SUFFIX = "v15"
 
 
 def get_all_used_steps() -> List[RunnerStep]:
