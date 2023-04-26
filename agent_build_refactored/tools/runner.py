@@ -160,12 +160,8 @@ class RunnerStep:
 
         tracked_files_globs = tracked_files_globs or []
         # Also add script path and shell helper script to tracked files list.
-        tracked_files_globs.extend(
-            [
-                self.script_path,
-                "agent_build_refactored/tools/steps_libs/step_runner.sh",
-            ]
-        )
+        tracked_files_globs.extend([self.script_path])
+
         self.tracked_files_globs = tracked_files_globs
         self._tracked_files = self._get_tracked_files(tracked_files_globs)
 
@@ -260,7 +256,6 @@ class RunnerStep:
 
         return sorted(list(set(tracked_files)))
 
-
     @staticmethod
     def get_steps_child_steps(steps: List['RunnerStep'], recursive: bool = False):
 
@@ -300,24 +295,6 @@ class RunnerStep:
         result_steps.extend(nested_child_steps)
 
         return sort_and_filter_steps(steps=result_steps)
-
-    # def get_all_cacheable_steps(self) -> List["RunnerStep"]:
-    #     """
-    #     Get list of all steps (including nested) which are used by this step.
-    #     """
-    #     result = []
-    #
-    #     # Include current step itself, if needed.
-    #     if self.github_actions_settings.cacheable:
-    #         result.append(self)
-    #
-    #     for step in self.required_steps.values():
-    #         result.extend(step.get_all_cacheable_steps())
-    #
-    #     if self._base_step:
-    #         result.extend(self._base_step.get_all_cacheable_steps())
-    #
-    #     return result
 
     def _get_id(self) -> str:
         """
@@ -361,11 +338,17 @@ class RunnerStep:
         output_directory = self.get_output_directory(work_dir=work_dir)
         return pl.Path(f"{output_directory}_tmp")
 
+    def get_in_docker_temp_output_directory(self):
+        return pl.Path("/tmp/step_output")
+
     def get_cache_directory(self, work_dir: pl.Path):
         return work_dir / "step_cache" / self.id
 
     def get_isolated_root(self, work_dir: pl.Path):
         return work_dir / "step_isolated_root" / self.id
+
+    def get_in_docker_isolated_root(self):
+        return pl.Path("/tmp/agent_source")
 
     def _get_required_steps_output_directories(
         self, work_dir: pl.Path
@@ -403,10 +386,17 @@ class RunnerStep:
             req_steps_env_variables = (
                 self._get_required_steps_docker_output_directories(work_dir=work_dir)
             )
+            source_root_value = self.get_in_docker_isolated_root()
+            step_output_path_value = self.get_in_docker_temp_output_directory()
         else:
             req_steps_env_variables = self._get_required_steps_output_directories(
                 work_dir=work_dir
             )
+            source_root_value = self.get_isolated_root(work_dir=work_dir)
+            step_output_path_value = self.get_temp_output_directory(work_dir=work_dir)
+
+        result_env_variables["SOURCE_ROOT"] = str(source_root_value)
+        result_env_variables["STEP_OUTPUT_PATH"] = str(step_output_path_value)
 
         # Set path of the required steps as env. variables.
         for step_env_var_name, step_output_path in req_steps_env_variables.items():
@@ -458,53 +448,6 @@ class RunnerStep:
 
         return sha256.hexdigest()
 
-
-
-
-
-
-    # def _restore_cache(
-    #     self, output_directory: pl.Path, cache_directory: pl.Path
-    # ) -> bool:
-    #     """
-    #     Searches for cached results, if found, then they are reused and the run is skipped.
-    #     :return: Boolean that indicates that the cache is found and step can be skipped.
-    #     """
-    #     if cache_directory.exists():
-    #         if output_directory.exists():
-    #             if output_directory.is_symlink():
-    #                 output_directory.unlink()
-    #             else:
-    #                 remove_directory_in_docker(output_directory)
-    #
-    #         symlink_rel_path = pl.Path("../step_cache") / output_directory.name
-    #         output_directory.symlink_to(symlink_rel_path)
-    #         return True
-    #
-    #     return False
-
-    # def _save_to_cache(
-    #     self, is_skipped: bool, output_directory: pl.Path, cache_directory: pl.Path
-    # ):
-    #     """
-    #     Saved results of the finished step to cache, if needed.
-    #     :param is_skipped: Boolean flag that indicates that the main run method has been skipped.
-    #     """
-    #     if not is_skipped:
-    #         shutil.copytree(
-    #             output_directory, cache_directory, dirs_exist_ok=True, symlinks=True
-    #         )
-
-    # def _pre_run(self) -> bool:
-    #     """Function that runs after the step main run function."""
-    # #     pass
-    #
-    # def _post_run(self):
-    #     """
-    #     Function that runs after the step main run function.
-    #     """
-    #     pass
-
     def _run_script_locally(
         self,
         work_dir: pl.Path,
@@ -516,16 +459,12 @@ class RunnerStep:
         :param work_dir: Path to directory where all results are stored.
         """
 
-        # isolated_source_root = self.get_isolated_root(work_dir=work_dir)
-        # isolated_source_root.mkdir(parents=True, exist_ok=True)
-
         env_variables_to_pass = self._get_all_environment_variables(work_dir=work_dir)
 
         env = os.environ.copy()
         env.update(env_variables_to_pass)
 
         command_args = self._get_command_args(
-            #cache_directory=cache_directory,
             tmp_output_directory=temp_output_directory
         )
 
@@ -544,10 +483,8 @@ class RunnerStep:
         :param remote_docker_host: If not None - host of the remote docker machine to execute script.
         """
 
-        #isolated_source_root = self.get_isolated_root(work_dir=work_dir)
-
-        in_docker_isolated_source_root = pl.Path("/tmp/agent_source")
-        in_docker_tmp_output_directory = pl.Path("/tmp/step_output")
+        in_docker_isolated_source_root = self.get_in_docker_isolated_root()
+        in_docker_tmp_output_directory = self.get_in_docker_temp_output_directory()
 
         # Run step in docker.
         required_steps_directories = self._get_required_steps_output_directories(
@@ -588,7 +525,6 @@ class RunnerStep:
         )
 
         command_args = self._get_command_args(
-            #cache_directory=in_docker_cache_directory,
             tmp_output_directory=in_docker_tmp_output_directory,
         )
 
@@ -622,7 +558,6 @@ class RunnerStep:
             f"{isolated_source_root}/.": in_docker_isolated_source_root,
             **{f"{src}/.": dst for src, dst in required_step_mounts.items()},
             f"{temp_output_directory}/.": in_docker_tmp_output_directory,
-            # f"{cache_directory}/.": in_docker_cache_directory,
         }
 
         for src, dst in input_paths.items():
@@ -642,7 +577,6 @@ class RunnerStep:
 
         output_paths = {
             f"{in_docker_tmp_output_directory}/.": temp_output_directory,
-            # f"{in_docker_cache_directory}/.": cache_directory,
         }
 
         for src, dst in output_paths.items():
@@ -658,28 +592,24 @@ class RunnerStep:
 
     def _get_command_args(
             self,
-            # cache_directory: pl.Path,
             tmp_output_directory: pl.Path
     ):
         """
         Get list with command arguments that has to be executed by step.
         :return:
         """
-        if self.script_path.suffix == ".py":
-            script_type = "python"
+        if self.script_path.suffix == ".sh":
+            executable = "bash"
+        elif self.script_path.suffix == ".py":
+            executable = sys.executable
         else:
-            script_type = "shell"
+            raise Exception(
+                f"Unknown script type '{self.script_path.suffix}' for the step {self}"
+            )
 
         return [
-            "env",
-            "bash",
-            # For the bash scripts, there is a special 'step_runner.sh' bash file that runs the given shell script
-            # and also provides some helper functions such as caching.
-            "agent_build_refactored/tools/steps_libs/step_runner.sh",
+            executable,
             str(self.script_path),
-            #str(cache_directory),
-            str(tmp_output_directory),
-            script_type,
         ]
 
     def is_output_exists(self, work_dir: pl.Path):
@@ -697,8 +627,6 @@ class RunnerStep:
         isolated_source_root = self.get_isolated_root(work_dir)
 
         temp_output_directory = self.get_temp_output_directory(work_dir=work_dir)
-
-        logging.info(f"Run step {self.name}.")
 
         if temp_output_directory.exists():
             remove_root_owned_directory(path=temp_output_directory)
