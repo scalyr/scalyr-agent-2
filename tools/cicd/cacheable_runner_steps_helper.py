@@ -44,99 +44,14 @@ SCRIPT_PATH = pl.Path(__file__).absolute()
 SOURCE_ROOT = SCRIPT_PATH.parent.parent.parent
 sys.path.append(str(SOURCE_ROOT))
 
-
-# Import modules that define any runner that is used during the builds.
-# It is important to import them before the import of the 'ALL_RUNNERS' or otherwise, runners from missing mudules
-# won't be presented in the "ALL_RUNNERS" final collection.
-import tests.end_to_end_tests  # NOQA
-import tests.end_to_end_tests.run_in_remote_machine.portable_pytest_runner # NOQA
-import tests.end_to_end_tests.managed_packages_tests.conftest  # NOQA
-
-# Import ALL_RUNNERS global collection only after all modules that define any runner are imported.
-from agent_build_refactored.tools.runner import ALL_RUNNERS
-
-from agent_build_refactored.tools.runner import Runner, RunnerStep, group_steps_by_stages, remove_steps_from_stages, sort_and_filter_steps
-
-# Suffix that is appended to all steps cache keys. CI/CD cache can be easily invalidated by changing this value.
-CACHE_VERSION_SUFFIX = "v14"
+from agent_build_refactored.tools.runner import remove_steps_from_stages
+from tools.cicd import step_stages, steps_runners, all_used_steps, CACHE_VERSION_SUFFIX
 
 
-def get_all_used_steps() -> List[RunnerStep]:
-    """
-    Get list of all steps that are used in the whole project.
-    """
-    all_steps = []
-    for runner_cls in ALL_RUNNERS:
-        for step in runner_cls.get_all_steps(recursive=True):
-            all_steps.append(step)
-
-    return sort_and_filter_steps(steps=all_steps)
-
-
-all_used_steps: Dict[str, RunnerStep] = {step.id: step for step in get_all_used_steps()}
-
-
-step_stages = group_steps_by_stages(steps=list(all_used_steps.values()))
-
-
-class CacheableStepRunner(Runner):
-    """
-    A "wrapper" runner class that is needed to locate and run cacheable steps.
-    """
-    STEP: RunnerStep
-
-    @classmethod
-    def get_all_required_steps(cls) -> List[RunnerStep]:
-        return [cls.STEP]
-
-    @classmethod
-    def add_command_line_arguments(cls, parser: argparse.ArgumentParser):
-        super(CacheableStepRunner, cls).add_command_line_arguments(parser=parser)
-
-        subparsers = parser.add_subparsers(dest="command")
-
-        subparsers.add_parser("run-cacheable-step")
-
-    @classmethod
-    def handle_command_line_arguments(
-        cls,
-        args,
-    ):
-        super(CacheableStepRunner, cls).handle_command_line_arguments(args=args)
-
-        if args.command == "run-cacheable-step":
-            cls._run_steps(
-                steps=[cls.STEP],
-                work_dir=pl.Path(args.work_dir)
-            )
-            exit(0)
-        else:
-            print(f"Unknown command: {args.command}", file=sys.stderr)
-
-
-def get_steps_runners():
-    result_runners = {}
-
-    for stage in step_stages:
-        for step_id, step in stage.items():
-            _RunnerCls = result_runners.get(step.id)
-            if _RunnerCls is None:
-                class _RunnerCls(CacheableStepRunner):
-                    STEP = step
-                    CLASS_NAME_ALIAS = f"{step_id}_cached"
-
-                result_runners[step_id] = _RunnerCls
-
-    return result_runners
-
-
-steps_runners = get_steps_runners()
-
-
-def get_missing_caches_matrices(existing_result_steps_ids_file: pl.Path):
+def get_missing_caches_matrices(existing_result_steps_ids_file: pl.Path, github_step_output_file: pl.Path):
     """
     Create GitHub Actions job matrix for each stage of steps.
-    :param steps_with_existing_results_file:
+    :param existing_result_steps_ids_file:
     :return:
     """
     json_content = existing_result_steps_ids_file.read_text()
@@ -146,11 +61,11 @@ def get_missing_caches_matrices(existing_result_steps_ids_file: pl.Path):
         stages=step_stages, steps_to_remove=existing_result_steps_ids
     )
 
-    matrices = []
+    stages = []
     last_non_empty_matrix_index = -1
 
     for i, stage in enumerate(filtered_stages):
-        matrix = []
+        stage_jobs = []
 
         for step_id, step in stage.items():
 
@@ -160,7 +75,7 @@ def get_missing_caches_matrices(existing_result_steps_ids_file: pl.Path):
 
             runner_cls = steps_runners[step_id]
 
-            matrix.append(
+            stage_jobs.append(
                 {
                     "step_runner_fqdn": runner_cls.FULLY_QUALIFIED_NAME,
                     "step_id": step.id,
@@ -170,30 +85,33 @@ def get_missing_caches_matrices(existing_result_steps_ids_file: pl.Path):
                 }
             )
 
-        if len(matrix) > 0:
+        if len(stage_jobs) > 0:
             last_non_empty_matrix_index = i
 
-        matrices.append(matrix)
+        stages.append(stage_jobs)
 
-    result_matrices = []
+    with github_step_output_file.open("w") as f:
+        for i, stage_jobs in enumerate(stages):
 
-    for i, matrix in enumerate(matrices):
-        if last_non_empty_matrix_index < 0:
-            continue
+            add_skip_job = False
+            if len(stage_jobs) == 0:
+                if i <= last_non_empty_matrix_index:
+                    add_skip_job = True
 
-        if i > last_non_empty_matrix_index:
-            continue
+            if add_skip_job:
+                stage_jobs.append({
+                    "name": "dummy"
+                })
 
-        if len(matrix) == 0:
-            matrix.append({
-                "name": "dummy"
-            })
+            matrix = {"include": stage_jobs}
 
-        result_matrices.append({
-            "include": matrix
-        })
+            f.write(f"stage_{i}_matrix={json.dumps(matrix)}")
+            if len(stage_jobs) == 0:
+                stage_skip = "true"
+            else:
+                stage_skip = "false"
 
-    return result_matrices
+            f.write(f"stage_{i}_skip={stage_skip}")
 
 
 def generate_workflow_yaml():
@@ -301,6 +219,9 @@ if __name__ == "__main__":
     missing_caches_matrices_parser.add_argument(
         "--existing-result-step-ids-file", required=True
     )
+    missing_caches_matrices_parser.add_argument(
+        "--github-step-output-file", required=True
+    )
 
     all_cache_keys_parser = subparsers.add_parser("get-all-steps-ids")
 
@@ -311,10 +232,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.command == "get-missing-caches-matrices":
-        matrices = get_missing_caches_matrices(
+        get_missing_caches_matrices(
             existing_result_steps_ids_file=pl.Path(args.existing_result_step_ids_file),
+            github_step_output_file=pl.Path(args.github_step_output_file)
         )
-        print(json.dumps(matrices))
     elif args.command == "get-all-steps-ids":
         print(json.dumps(list(sorted(all_used_steps.keys()))))
 
@@ -324,5 +245,3 @@ if __name__ == "__main__":
         print(CACHE_VERSION_SUFFIX)
 
     exit(0)
-
-
