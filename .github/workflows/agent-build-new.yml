@@ -60,7 +60,7 @@ jobs:
           set -e
 
           if [ $EXIT_CODE -ne 0 ]; then
-            echo -e "Files of the workflow are not up-to-date, please run the command 'bash tools/cicd/nodejs_actions/update_nodejs_actions.sh' and commit required changes."
+            echo -e "Files of the nodejs actions are not up to date, please run the command 'bash tools/cicd/nodejs_actions/update_nodejs_actions.sh' and commit required changes."
             exit 1
           fi
 
