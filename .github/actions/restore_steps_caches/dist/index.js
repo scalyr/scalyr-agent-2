@@ -58697,7 +58697,7 @@ async function executeRunner() {
         }
     }
 
-    core.setOutput("steps_ids_with_cache_hit", JSON.stringify(missingCaches));
+    core.setOutput("steps_ids_with_cache_hit", JSON.stringify(hitCachesStepIDs));
 
     if (failOnCacheMiss && missingCachesStepsIDs.length > 0 ) {
         throw new Error("The 'fail_on_cache_miss' option is enabled and there are missing caches.");

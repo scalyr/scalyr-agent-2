@@ -33,11 +33,6 @@ on:
 permissions:
   contents: read
 jobs:
-  dummy:
-    runs-on: ubuntu-20.04
-    steps:
-    - name: Run
-      run: exit 0
   pre_job:
     runs-on: ubuntu-20.04
     steps:
@@ -97,7 +92,7 @@ jobs:
       id: print_missing_caches_matrices
       shell: bash
       run: |
-        cat <<< '${{ steps.get_missing_caches_steps.outputs.missing_steps_ids_json }}' > /tmp/existing_result_steps_ids.json
+        cat <<< '${{ steps.get_missing_caches_steps.outputs.steps_ids_with_cache_hit }}' > /tmp/existing_result_steps_ids.json
         ls /tmp/ -al
         echo "MISSS"
         cat /tmp/existing_result_steps_ids.json
