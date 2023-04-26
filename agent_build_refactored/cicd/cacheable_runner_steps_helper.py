@@ -286,7 +286,7 @@ if __name__ == "__main__":
 
     if args.command == "get-missing-caches-matrices":
         matrices = get_missing_caches_matrices(
-            existing_result_steps_ids_file=pl.Path(args.existing_result_steps_ids_file),
+            existing_result_steps_ids_file=pl.Path(args.existing_result_step_ids_file),
         )
         print(json.dumps(matrices))
     elif args.command == "get-all-steps-ids":
