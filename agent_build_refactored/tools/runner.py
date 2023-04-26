@@ -609,7 +609,7 @@ class RunnerStep:
         :return:
         """
         if self.is_step_script_is_python:
-            executable = sys.executable
+            executable = "python3"
         elif self.script_path.suffix == ".sh":
             executable = "bash"
         else:
