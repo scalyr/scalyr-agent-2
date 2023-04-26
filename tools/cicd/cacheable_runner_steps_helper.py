@@ -160,7 +160,7 @@ def generate_workflow_yaml():
         jobs[stage_job_name] = stage_job
 
         for step in stage_job["steps"]:
-            step["if"] = f"${{ matrix.name != '{SKIPPED_STAGE_JOB_NAME}' }}"
+            step["if"] = f"${{{{ matrix.name != '{SKIPPED_STAGE_JOB_NAME}' }}}}"
 
     pre_job = jobs["pre_job"]
     pre_job["outputs"] = pre_job_outputs
