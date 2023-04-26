@@ -1080,15 +1080,19 @@ class Runner(metaclass=RunnerMeta):
 
         all_steps = self.get_all_steps(recursive=True)
 
+        # Find steps that do not have already existing results.
+        steps_with_existing_results = {}
+        for step in all_steps:
+            if step.is_output_exists(work_dir=self.work_dir):
+                steps_with_existing_results[step.id] = step
+
+        # Group steps by "stages" according to their dependencies.
         full_stages = group_steps_by_stages(steps=all_steps)
 
-        steps_with_missing_results = get_steps_with_missing_results(
-            steps=all_steps, work_dir=self.work_dir
-        )
-
-        filtered_stages = filter_steps_with_existing_output(
+        # Remove steps that have existing results and leave only steps that do not.
+        filtered_stages = remove_steps_from_stages(
             stages=full_stages,
-            steps_ids_with_missing_results=set(steps_with_missing_results.keys())
+            steps_to_remove=set(steps_with_existing_results.keys())
         )
 
         steps_to_run = []
@@ -1267,12 +1271,22 @@ DOCKER_EC2_BUILDERS = {
 
 
 def sort_and_filter_steps(steps: List['RunnerStep']) -> List['RunnerStep']:
+    """
+    Get initial list of steps and create another one, but sorted by step IDs and without duplicates.
+    :param steps: Steps to sort and filter.
+    """
     steps_ids = {step.id: step for step in steps}
 
     return sorted(steps_ids.values(), key=lambda s: s.id)
 
 
 def get_steps_with_missing_results(steps: List[RunnerStep], work_dir: pl.Path):
+    """
+
+    :param steps:
+    :param work_dir:
+    :return:
+    """
     result = {}
     for step in steps:
         if not step.is_output_exists(work_dir=work_dir):
@@ -1328,16 +1342,23 @@ def group_steps_by_stages(steps: List[RunnerStep]):
     return result_stages
 
 
-def filter_steps_with_existing_output(
+def remove_steps_from_stages(
     stages: List[Dict[str, RunnerStep]],
-    steps_ids_with_missing_results: Set[str],
+    steps_to_remove: Set[str],
 ):
+    """
+    Get the stages list that are produces by the `group_steps_by_stages` function and filter out steps that are
+    given from the arguments.
+    :param stages: Stages list to filter
+    :param steps_to_remove: List of steps that has to be filtered out.
+    :return: List of filtered stages.
+    """
     result_stages = []
 
     for stage in stages:
         current_stage = {}
         for step_id, step in stage.items():
-            if step_id in steps_ids_with_missing_results:
+            if step_id in steps_to_remove:
                 current_stage[step_id] = step
 
         result_stages.append(current_stage)

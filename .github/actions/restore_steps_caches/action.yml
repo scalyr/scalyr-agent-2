@@ -17,8 +17,8 @@ inputs:
     description: "Fail this action if at least one step cache is missings."
 
 outputs:
-  missing_steps_ids_json:
-    description: "JSON-encoded list of IDs of steps which caches have not been hit"
+  steps_ids_with_cache_hit:
+    description: "JSON-encoded list of IDs of steps which caches have been hit"
 
 
 runs:

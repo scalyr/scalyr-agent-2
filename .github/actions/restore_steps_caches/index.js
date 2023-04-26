@@ -28,7 +28,8 @@ async function executeRunner() {
     const stepsIDs = JSON.parse(stepsIdsJSON);
     const cacheVersionSuffix = core.getInput("cache_version_suffix");
 
-    const missingCaches = []
+    const hitCachesStepIDs = []
+    const missingCachesStepsIDs = []
 
     for (let stepID of stepsIDs) {
         const cachePath = path.join(cacheRoot, stepID);
@@ -41,15 +42,16 @@ async function executeRunner() {
         )
         if (typeof result !== "undefined") {
             console.log(`Cache for the step with key ${finalCacheKey} is found.`)
+            hitCachesStepIDs.push(stepID)
         } else {
             console.log(`Cache for the step with key ${finalCacheKey} is not found.`)
-            missingCaches.push(stepID)
+            missingCachesStepsIDs.push(stepID)
         }
     }
 
-    core.setOutput("missing_steps_ids_json", JSON.stringify(missingCaches));
+    core.setOutput("steps_ids_with_cache_hit", JSON.stringify(missingCaches));
 
-    if (failOnCacheMiss && missingCaches.length > 0 ) {
+    if (failOnCacheMiss && missingCachesStepsIDs.length > 0 ) {
         throw new Error("The 'fail_on_cache_miss' option is enabled and there are missing caches.");
     }
 }

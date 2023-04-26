@@ -15,6 +15,10 @@
 """
 This script helps GitHub Actions CI/CD to get information about steps that can be run and cached in parallel jobs. That
 has to decrease overall build time.
+
+How it works:
+
+
 """
 
 import argparse
@@ -51,7 +55,7 @@ import tests.end_to_end_tests.managed_packages_tests.conftest  # NOQA
 # Import ALL_RUNNERS global collection only after all modules that define any runner are imported.
 from agent_build_refactored.tools.runner import ALL_RUNNERS
 
-from agent_build_refactored.tools.runner import Runner, RunnerStep, group_steps_by_stages, filter_steps_with_existing_output, sort_and_filter_steps
+from agent_build_refactored.tools.runner import Runner, RunnerStep, group_steps_by_stages, remove_steps_from_stages, sort_and_filter_steps
 
 # Suffix that is appended to all steps cache keys. CI/CD cache can be easily invalidated by changing this value.
 CACHE_VERSION_SUFFIX = "v14"
@@ -129,12 +133,17 @@ def get_steps_runners():
 steps_runners = get_steps_runners()
 
 
-def get_missing_caches_matrices(input_missing_cache_keys_file: pl.Path):
-    json_content = input_missing_cache_keys_file.read_text()
-    missing_steps_ids = json.loads(json_content)
+def get_missing_caches_matrices(existing_result_steps_ids_file: pl.Path):
+    """
+    Create GitHub Actions job matrix for each stage of steps.
+    :param steps_with_existing_results_file:
+    :return:
+    """
+    json_content = existing_result_steps_ids_file.read_text()
+    existing_result_steps_ids = json.loads(json_content)
 
-    filtered_stages = filter_steps_with_existing_output(
-        stages=step_stages, steps_ids_with_missing_results=missing_steps_ids
+    filtered_stages = remove_steps_from_stages(
+        stages=step_stages, steps_to_remove=existing_result_steps_ids
     )
 
     result_matrices = []
@@ -264,7 +273,7 @@ if __name__ == "__main__":
         "get-missing-caches-matrices"
     )
     missing_caches_matrices_parser.add_argument(
-        "--missing-steps-ids-file", required=True
+        "--existing-result-step-ids-file", required=True
     )
 
     all_cache_keys_parser = subparsers.add_parser("get-all-steps-ids")
@@ -277,7 +286,7 @@ if __name__ == "__main__":
 
     if args.command == "get-missing-caches-matrices":
         matrices = get_missing_caches_matrices(
-            input_missing_cache_keys_file=pl.Path(args.missing_steps_ids_file),
+            existing_result_steps_ids_file=pl.Path(args.existing_result_steps_ids_file),
         )
         print(json.dumps(matrices))
     elif args.command == "get-all-steps-ids":
