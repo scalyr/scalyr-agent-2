@@ -178,7 +178,6 @@ def get_missing_caches_matrices(existing_result_steps_ids_file: pl.Path):
     result_matrices = []
 
     for i, matrix in enumerate(matrices):
-        result_matrix_include = []
         if last_non_empty_matrix_index < 0:
             continue
 
@@ -186,12 +185,12 @@ def get_missing_caches_matrices(existing_result_steps_ids_file: pl.Path):
             continue
 
         if len(matrix) == 0:
-            result_matrix_include.append({
+            matrix.append({
                 "name": "dummy"
             })
 
         result_matrices.append({
-            "include": result_matrix_include
+            "include": matrix
         })
 
     return result_matrices
