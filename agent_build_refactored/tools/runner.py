@@ -408,7 +408,6 @@ class RunnerStep:
         if self.is_step_script_is_python:
             result_env_variables["PYTHONPATH"] = source_root_value
 
-
         # Set path of the required steps as env. variables.
         for step_env_var_name, step_output_path in req_steps_env_variables.items():
             result_env_variables[step_env_var_name] = str(step_output_path)
