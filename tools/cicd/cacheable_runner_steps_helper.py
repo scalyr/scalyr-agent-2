@@ -214,12 +214,6 @@ if __name__ == "__main__":
     missing_caches_matrices_parser = subparsers.add_parser(
         "get-missing-caches-matrices"
     )
-    # missing_caches_matrices_parser.add_argument(
-    #     "--existing-result-step-ids-file", required=True
-    # )
-    # missing_caches_matrices_parser.add_argument(
-    #     "--github-step-output-file", required=True
-    # )
 
     all_cache_keys_parser = subparsers.add_parser("get-all-steps-ids")
 

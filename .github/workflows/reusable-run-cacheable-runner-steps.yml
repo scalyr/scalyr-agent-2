@@ -61,7 +61,7 @@ jobs:
         ls node_modules/.bin -al
     - name: Check that the workflow files are up to date
       run: |
-        python3 tools/cicd/cacheable_runner_steps_helper.py update-files
+        python3 tools/cicd/cacheable_steps/cacheable_runner_steps_helper.py update-files
 
         set +e
         git diff --exit-code
@@ -69,14 +69,14 @@ jobs:
         set -e
 
         if [ $EXIT_CODE -ne 0 ]; then
-          echo -e "Files of the workflow are not up-to-date, please run the command 'python3 tools/cicd/cacheable_runner_steps_helper.py update-files' and commit required changes."
+          echo -e "Files of the workflow are not up-to-date, please run the command 'python3 tools/cicd/cacheable_steps/cacheable_runner_steps_helper.py update-files' and commit required changes."
           exit 1
         fi
     - name: Get all steps ids
       id: get_all_steps_ids
       run: |
-        echo "all_steps_ids_json=$(python3  tools/cicd/cacheable_runner_steps_helper.py get-all-steps-ids)" >> $GITHUB_OUTPUT
-        echo "cache_version_suffix=$(python3 tools/cicd/cacheable_runner_steps_helper.py get-cache-version-suffix)" >> $GITHUB_OUTPUT
+        echo "all_steps_ids_json=$(python3  tools/cicd/cacheable_steps/cacheable_runner_steps_helper.py get-all-steps-ids)" >> $GITHUB_OUTPUT
+        echo "cache_version_suffix=$(python3 tools/cicd/cacheable_steps/cacheable_runner_steps_helper.py get-cache-version-suffix)" >> $GITHUB_OUTPUT
 
         cat $GITHUB_OUTPUT
     - name: Get missing caches steps
@@ -93,7 +93,7 @@ jobs:
       shell: bash
       run: |
         cat <<< '${{ steps.get_missing_caches_steps.outputs.steps_ids_with_cache_hit }}' | \
-          python3  tools/cicd/cacheable_runner_steps_helper.py get-missing-caches-matrices >> "${GITHUB_OUTPUT}"
+          python3  tools/cicd/cacheable_steps/cacheable_runner_steps_helper.py get-missing-caches-matrices >> "${GITHUB_OUTPUT}"
         cat $GITHUB_OUTPUT
     outputs:
       stage_matrix0: ${{ steps.print_missing_caches_matrices.outputs.stage_matrix0
