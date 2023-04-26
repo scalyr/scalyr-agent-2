@@ -1,10 +1,13 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.2.2 "TBD" - Mar 31, 2023
+## 2.2.2 "Pollux" - Apr 26, 2023
 <!---
-Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Jan 19, 2023 00:00 -0800
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Apr 26, 2023 00:00 -0800
 --->
+
+Improvements:
+* Support SSL connections to PostgreSQL
 
 Kubernetes:
 * Kubernetes ClusterRole resource definition now includes Argo Rollouts. The agent won't receive permission errors anymore when it interrogates Argo Rollout resources.
