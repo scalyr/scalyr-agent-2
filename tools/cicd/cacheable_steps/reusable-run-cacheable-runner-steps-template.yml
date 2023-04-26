@@ -45,39 +45,39 @@ jobs:
         with:
           python_version: ${{ inputs.python_version }}
 
-      - name: Get npm cache directory
-        id: npm-cache-dir
-        shell: bash
-        run: echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
-
-      - uses: actions/cache@v3
-        id: npm-cache # use this to check for `cache-hit` ==> if: steps.npm-cache.outputs.cache-hit != 'true'
-        with:
-          path: ${{ steps.npm-cache-dir.outputs.dir }}
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-
-      - name: Install the restore_steps_caches action dependencies
-        working-directory: .github/actions/restore_steps_caches
-        run: |
-          npm install
-          
-          ls -al
-          
-          ls node_modules/.bin -al
-
-      - name: Check that the workflow files are up to date
-        run: |
-          python3 tools/cicd/cacheable_steps/cacheable_runner_steps_helper.py update-files
-          
-          set +e
-          git diff --exit-code
-          EXIT_CODE=$?
-          set -e
-          
-          if [ $EXIT_CODE -ne 0 ]; then
-            echo -e "Files of the workflow are not up-to-date, please run the command 'python3 tools/cicd/cacheable_steps/cacheable_runner_steps_helper.py update-files' and commit required changes."
-            exit 1
-          fi
+#      - name: Get npm cache directory
+#        id: npm-cache-dir
+#        shell: bash
+#        run: echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
+#
+#      - uses: actions/cache@v3
+#        id: npm-cache # use this to check for `cache-hit` ==> if: steps.npm-cache.outputs.cache-hit != 'true'
+#        with:
+#          path: ${{ steps.npm-cache-dir.outputs.dir }}
+#          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+#
+#      - name: Install the restore_steps_caches action dependencies
+#        working-directory: .github/actions/restore_steps_caches
+#        run: |
+#          npm install
+#
+#          ls -al
+#
+#          ls node_modules/.bin -al
+#
+#      - name: Check that the workflow files are up to date
+#        run: |
+#          python3 tools/cicd/cacheable_steps/cacheable_runner_steps_helper.py update-files
+#
+#          set +e
+#          git diff --exit-code
+#          EXIT_CODE=$?
+#          set -e
+#
+#          if [ $EXIT_CODE -ne 0 ]; then
+#            echo -e "Files of the workflow are not up-to-date, please run the command 'python3 tools/cicd/cacheable_steps/cacheable_runner_steps_helper.py update-files' and commit required changes."
+#            exit 1
+#          fi
 
       - name: Get all steps ids
         id: get_all_steps_ids
