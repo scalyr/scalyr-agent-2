@@ -782,7 +782,8 @@ class RunnerStep:
             raise
 
         output_directory = self.get_output_directory(work_dir=work_dir)
-        temp_output_directory.rename(output_directory)
+        shutil.copytree(temp_output_directory, output_directory)
+        shutil.rmtree(temp_output_directory)
 
         # self._save_to_cache(
         #     is_skipped=skipped,
