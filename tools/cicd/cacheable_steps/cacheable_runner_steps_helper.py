@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 # local packages. All such imports also have to be done after that.
 
 SCRIPT_PATH = pl.Path(__file__).absolute()
-SOURCE_ROOT = SCRIPT_PATH.parent.parent.parent
+SOURCE_ROOT = SCRIPT_PATH.parent.parent.parent.parent
 sys.path.append(str(SOURCE_ROOT))
 
 from agent_build_refactored.tools.runner import remove_steps_from_stages
