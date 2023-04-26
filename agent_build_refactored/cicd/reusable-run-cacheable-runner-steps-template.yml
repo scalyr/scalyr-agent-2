@@ -104,8 +104,9 @@ jobs:
           ls /tmp/ -al
           echo "MISSS"
           cat /tmp/existing_result_steps_ids.json
-          echo "MISSSEND"
           python3  agent_build_refactored/cicd/cacheable_runner_steps_helper.py get-missing-caches-matrices --existing-result-step-ids-file /tmp/existing_result_steps_ids.json > /tmp/missing_cache_matrices.json
+          cat /tmp/missing_cache_matrices.json
+          echo "MISSSEND"
           i=0
           jq -c '.[]' /tmp/missing_cache_matrices.json | while read -r matrix; do 
             echo "matrix${i}=$(echo "$matrix" | jq -c '.')" >> $GITHUB_OUTPUT
