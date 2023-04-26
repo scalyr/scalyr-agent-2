@@ -75,7 +75,7 @@ jobs:
         id: get_required_steps_ids
         run: |
           echo "all_required_steps=$(python3 build_package_new_refactored.py ${{ matrix.packages.name }} --get-all-steps)" >> $GITHUB_OUTPUT
-          echo "cache_version_suffix=$(python3 agent_build_refactored/cicd/cacheable_runner_steps_helper.py get-cache-version-suffix)" >> $GITHUB_OUTPUT
+          echo "cache_version_suffix=$(python3 tools/cicd/cacheable_runner_steps_helper.py get-cache-version-suffix)" >> $GITHUB_OUTPUT
           cat $GITHUB_OUTPUT
 
       - name: Get required steps caches
@@ -175,7 +175,7 @@ jobs:
           echo "builder_required_steps_ids=$(python3 build_package_new_refactored.py ${{ matrix.configuration.name }} --get-all-steps)" >> $GITHUB_OUTPUT
           echo "portable_test_runner_required_steps_ids=$(python3 agent_build_refactored/scripts/runner_helper.py tests.end_to_end_tests.run_in_remote_machine.portable_pytest_runner.PortablePytestRunnerBuilder${{ matrix.configuration.arch }} --get-all-steps)" >> $GITHUB_OUTPUT
           echo "repo_builder_required_steps_ids=$(python3 agent_build_refactored/scripts/runner_helper.py tests.end_to_end_tests.managed_packages_tests.conftest.RepoBuilder --get-all-steps)" >> $GITHUB_OUTPUT
-          echo "cache_version_suffix=$(python3 agent_build_refactored/cicd/cacheable_runner_steps_helper.py get-cache-version-suffix)" >> $GITHUB_OUTPUT
+          echo "cache_version_suffix=$(python3 tools/cicd/cacheable_runner_steps_helper.py get-cache-version-suffix)" >> $GITHUB_OUTPUT
           cat $GITHUB_OUTPUT
 
       - name: Get required steps caches
