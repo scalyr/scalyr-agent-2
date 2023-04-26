@@ -23,6 +23,7 @@ How it works:
 
 import argparse
 import copy
+import io
 import json
 import pathlib as pl
 import subprocess
@@ -49,13 +50,13 @@ from tools.cicd import step_stages, steps_runners, all_used_steps, CACHE_VERSION
 
 SKIPPED_STAGE_JOB_NAME = "All Steps Are Reused From Cache"
 
+
 def get_missing_caches_matrices(
         existing_result_steps_ids: List[str],
-        github_step_output_file: pl.Path
 ):
     """
     Create GitHub Actions job matrix for each stage of steps.
-    :param existing_result_steps_ids_file:
+    :param existing_result_steps_ids:
     :return:
     """
 
@@ -92,28 +93,30 @@ def get_missing_caches_matrices(
 
         stages.append(stage_jobs)
 
-    with github_step_output_file.open("w") as f:
-        for i, stage_jobs in enumerate(stages):
+    buffer = io.StringIO()
+    for i, stage_jobs in enumerate(stages):
 
-            add_skip_job = False
-            if len(stage_jobs) == 0:
-                if i <= last_non_empty_matrix_index:
-                    add_skip_job = True
+        add_skip_job = False
+        if len(stage_jobs) == 0:
+            if i <= last_non_empty_matrix_index:
+                add_skip_job = True
 
-            if add_skip_job:
-                stage_jobs.append({
-                    "name": SKIPPED_STAGE_JOB_NAME
-                })
+        if add_skip_job:
+            stage_jobs.append({
+                "name": SKIPPED_STAGE_JOB_NAME
+            })
 
-            matrix = {"include": stage_jobs}
+        matrix = {"include": stage_jobs}
 
-            f.write(f"stage_matrix{i}={json.dumps(matrix)}\n")
-            if len(stage_jobs) == 0:
-                stage_skip = "true"
-            else:
-                stage_skip = "false"
+        buffer.write(f"stage_matrix{i}={json.dumps(matrix)}\n")
+        if len(stage_jobs) == 0:
+            stage_skip = "true"
+        else:
+            stage_skip = "false"
 
-            f.write(f"stage_skip{i}={stage_skip}\n")
+        buffer.write(f"stage_skip{i}={stage_skip}\n")
+
+    return buffer.getvalue()
 
 
 def generate_workflow_yaml():
@@ -214,9 +217,9 @@ if __name__ == "__main__":
     # missing_caches_matrices_parser.add_argument(
     #     "--existing-result-step-ids-file", required=True
     # )
-    missing_caches_matrices_parser.add_argument(
-        "--github-step-output-file", required=True
-    )
+    # missing_caches_matrices_parser.add_argument(
+    #     "--github-step-output-file", required=True
+    # )
 
     all_cache_keys_parser = subparsers.add_parser("get-all-steps-ids")
 
@@ -230,10 +233,11 @@ if __name__ == "__main__":
 
         existing_result_steps_ids_json = sys.stdin.read()
         existing_result_steps_ids = json.loads(existing_result_steps_ids_json)
-        get_missing_caches_matrices(
+        output_values = get_missing_caches_matrices(
             existing_result_steps_ids=existing_result_steps_ids,
-            github_step_output_file=pl.Path(args.github_step_output_file)
         )
+        sys.stdout.write(output_values)
+
     elif args.command == "get-all-steps-ids":
         print(json.dumps(list(sorted(all_used_steps.keys()))))
 

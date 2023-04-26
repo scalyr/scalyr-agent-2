@@ -64,19 +64,6 @@ class DockerImageSpec:
         )
 
 
-@dataclasses.dataclass
-class GitHubActionsSettings:
-    """Dataclass that stores settings for how step has to be executed on GitHub Actions CI/CD"""
-
-    # Flag that indicates that step has to be cached by GHA CI/CD
-    cacheable: bool = False
-
-    # Flag that indicates that this step has to be executed in a separate job during GHA CI/CD run.
-    # In case of multiple, long-running steps, this has to decrease overall build time.
-    pre_build_in_separate_job: bool = False
-    run_in_remote_docker: bool = False
-
-
 class RunnerStep:
     """
     Base abstraction that represents a shell/python script that has to be executed by the Runner. The step can be
@@ -99,7 +86,6 @@ class RunnerStep:
         required_steps: Dict[str, "ArtifactRunnerStep"] = None,
         environment_variables: Dict[str, str] = None,
         user: str = "root",
-        #github_actions_settings: "GitHubActionsSettings" = None,
         run_in_remote_docker_if_available: bool = False
     ):
         """
@@ -114,7 +100,9 @@ class RunnerStep:
             Value - Step instance.
         :param environment_variables: Dist with environment variables to pass to step's script.
         :param user: Name of the user under which name run the step's script.
-        :param github_actions_settings: Additional setting on how step has to be executed on GitHub Actions CI/CD
+        :param run_in_remote_docker_if_available: If possible, run this step in the remote docker engine that
+            runs inside AWS EC2 instance. It may be used, for example, to run ARM builds in the ARM-based EC2 instance,
+            that is much faster than using QEMU.
         """
         self.name = name
         self.user = user
@@ -155,9 +143,7 @@ class RunnerStep:
 
         self.runs_in_docker = bool(self.initial_docker_image)
 
-        # self.github_actions_settings = (
-        #     github_actions_settings or GitHubActionsSettings()
-        # )
+        self.run_in_remote_docker = run_in_remote_docker_if_available
 
         self.checksum = self._calculate_checksum()
 
@@ -994,7 +980,7 @@ class Runner(metaclass=RunnerMeta):
                 AWSSettings,
             )
 
-            if not step.github_actions_settings.run_in_remote_docker:
+            if not step.run_in_remote_docker:
                 return None
 
             # Get EC2 AMI image according to step's architecture.
