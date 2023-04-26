@@ -507,8 +507,8 @@ class RunnerStep:
         isolated_source_root.mkdir(parents=True, exist_ok=True)
         #cache_directory = self.get_cache_directory(work_dir=work_dir)
         #cache_directory.mkdir(parents=True, exist_ok=True)
-        output_directory = self.get_output_directory(work_dir=work_dir)
-        output_directory.mkdir(parents=True, exist_ok=True)
+        # output_directory = self.get_output_directory(work_dir=work_dir)
+        # output_directory.mkdir(parents=True, exist_ok=True)
 
         env_variables_to_pass = self._get_all_environment_variables(work_dir=work_dir)
 

@@ -119,7 +119,6 @@ jobs:
     runs-on: ubuntu-20.04
     needs:
       - pre_job
-    if: ${{ needs.pre_job.outputs.matrix_length0 != '0' }}
     strategy:
       matrix: ${{ fromJSON(needs.pre_job.outputs.matrix0) }}
     steps:

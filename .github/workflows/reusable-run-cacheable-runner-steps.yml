@@ -129,26 +129,29 @@ jobs:
     runs-on: ubuntu-20.04
     needs:
     - pre_job
-    if: ${{ needs.pre_job.outputs.matrix_length0 != '0' }}
     strategy:
       matrix: ${{ fromJSON(needs.pre_job.outputs.matrix0) }}
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
+      if: ${{ matrix.name != 'dummy' }}
     - name: Prepare dev requirements.
       uses: ./.github/actions/prepare_python_with_dev_requirements
       with:
         python_version: ${{ inputs.python_version }}
+      if: ${{ matrix.name != 'dummy' }}
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@f03ac48505955848960e80bbb68046aa35c7b9e7
       with:
         driver-opts: network=host
+      if: ${{ matrix.name != 'dummy' }}
     - name: Set up QEMU
       id: qemu
       uses: docker/setup-qemu-action@e81a89b1732b9c48d79cd809d8d81d79c4647a18
       with:
         image: tonistiigi/binfmt:qemu-v6.2.0
         platforms: all
+      if: ${{ matrix.name != 'dummy' }}
     - name: Prepare SSH
       id: prepare-ssh
       shell: bash
@@ -159,6 +162,7 @@ jobs:
 
         cat "/tmp/private_key.pem" | ssh-add -
         echo "ssh_auth_sock=${SSH_AUTH_SOCK}" >> $GITHUB_OUTPUT
+      if: ${{ matrix.name != 'dummy' }}
     - name: Cache step
       id: cache-step
       uses: actions/cache@v3
@@ -166,6 +170,7 @@ jobs:
         path: |
           agent_build_output/step_output/${{ matrix.step_id }}
         key: ${{ matrix.step_id }}_${{ matrix.cache_version_suffix }}
+      if: ${{ matrix.name != 'dummy' }}
     - name: Get required steps caches
       id: get_required_steps_caches
       uses: ./.github/actions/restore_steps_caches
@@ -174,6 +179,7 @@ jobs:
         cache_version_suffix: ${{ matrix.cache_version_suffix }}
         cache_root: agent_build_output/step_output
         fail_on_cache_miss: true
+      if: ${{ matrix.name != 'dummy' }}
     - name: Run cached step
       shell: bash
       env:
@@ -188,33 +194,36 @@ jobs:
         AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
       run: python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn
         }} run-cacheable-step
+      if: ${{ matrix.name != 'dummy' }}
   run_pre_built_job1:
     name: 1 ${{ matrix.name }}
     runs-on: ubuntu-20.04
     needs:
     - pre_job
     - run_pre_built_job0
-    if: ${{ always() && (needs.run_pre_built_job0.result == 'success' || needs.run_pre_built_job0.result
-      == 'skipped') && needs.pre_job.outputs.matrix_length1 != '0' }}
     strategy:
       matrix: ${{ fromJSON(needs.pre_job.outputs.matrix1) }}
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
+      if: ${{ matrix.name != 'dummy' }}
     - name: Prepare dev requirements.
       uses: ./.github/actions/prepare_python_with_dev_requirements
       with:
         python_version: ${{ inputs.python_version }}
+      if: ${{ matrix.name != 'dummy' }}
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@f03ac48505955848960e80bbb68046aa35c7b9e7
       with:
         driver-opts: network=host
+      if: ${{ matrix.name != 'dummy' }}
     - name: Set up QEMU
       id: qemu
       uses: docker/setup-qemu-action@e81a89b1732b9c48d79cd809d8d81d79c4647a18
       with:
         image: tonistiigi/binfmt:qemu-v6.2.0
         platforms: all
+      if: ${{ matrix.name != 'dummy' }}
     - name: Prepare SSH
       id: prepare-ssh
       shell: bash
@@ -225,6 +234,7 @@ jobs:
 
         cat "/tmp/private_key.pem" | ssh-add -
         echo "ssh_auth_sock=${SSH_AUTH_SOCK}" >> $GITHUB_OUTPUT
+      if: ${{ matrix.name != 'dummy' }}
     - name: Cache step
       id: cache-step
       uses: actions/cache@v3
@@ -232,6 +242,7 @@ jobs:
         path: |
           agent_build_output/step_output/${{ matrix.step_id }}
         key: ${{ matrix.step_id }}_${{ matrix.cache_version_suffix }}
+      if: ${{ matrix.name != 'dummy' }}
     - name: Get required steps caches
       id: get_required_steps_caches
       uses: ./.github/actions/restore_steps_caches
@@ -240,6 +251,7 @@ jobs:
         cache_version_suffix: ${{ matrix.cache_version_suffix }}
         cache_root: agent_build_output/step_output
         fail_on_cache_miss: true
+      if: ${{ matrix.name != 'dummy' }}
     - name: Run cached step
       shell: bash
       env:
@@ -254,33 +266,36 @@ jobs:
         AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
       run: python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn
         }} run-cacheable-step
+      if: ${{ matrix.name != 'dummy' }}
   run_pre_built_job2:
     name: 2 ${{ matrix.name }}
     runs-on: ubuntu-20.04
     needs:
     - pre_job
     - run_pre_built_job1
-    if: ${{ always() && (needs.run_pre_built_job1.result == 'success' || needs.run_pre_built_job1.result
-      == 'skipped') && needs.pre_job.outputs.matrix_length2 != '0' }}
     strategy:
       matrix: ${{ fromJSON(needs.pre_job.outputs.matrix2) }}
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
+      if: ${{ matrix.name != 'dummy' }}
     - name: Prepare dev requirements.
       uses: ./.github/actions/prepare_python_with_dev_requirements
       with:
         python_version: ${{ inputs.python_version }}
+      if: ${{ matrix.name != 'dummy' }}
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@f03ac48505955848960e80bbb68046aa35c7b9e7
       with:
         driver-opts: network=host
+      if: ${{ matrix.name != 'dummy' }}
     - name: Set up QEMU
       id: qemu
       uses: docker/setup-qemu-action@e81a89b1732b9c48d79cd809d8d81d79c4647a18
       with:
         image: tonistiigi/binfmt:qemu-v6.2.0
         platforms: all
+      if: ${{ matrix.name != 'dummy' }}
     - name: Prepare SSH
       id: prepare-ssh
       shell: bash
@@ -291,6 +306,7 @@ jobs:
 
         cat "/tmp/private_key.pem" | ssh-add -
         echo "ssh_auth_sock=${SSH_AUTH_SOCK}" >> $GITHUB_OUTPUT
+      if: ${{ matrix.name != 'dummy' }}
     - name: Cache step
       id: cache-step
       uses: actions/cache@v3
@@ -298,6 +314,7 @@ jobs:
         path: |
           agent_build_output/step_output/${{ matrix.step_id }}
         key: ${{ matrix.step_id }}_${{ matrix.cache_version_suffix }}
+      if: ${{ matrix.name != 'dummy' }}
     - name: Get required steps caches
       id: get_required_steps_caches
       uses: ./.github/actions/restore_steps_caches
@@ -306,6 +323,7 @@ jobs:
         cache_version_suffix: ${{ matrix.cache_version_suffix }}
         cache_root: agent_build_output/step_output
         fail_on_cache_miss: true
+      if: ${{ matrix.name != 'dummy' }}
     - name: Run cached step
       shell: bash
       env:
@@ -320,33 +338,36 @@ jobs:
         AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
       run: python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn
         }} run-cacheable-step
+      if: ${{ matrix.name != 'dummy' }}
   run_pre_built_job3:
     name: 3 ${{ matrix.name }}
     runs-on: ubuntu-20.04
     needs:
     - pre_job
     - run_pre_built_job2
-    if: ${{ always() && (needs.run_pre_built_job2.result == 'success' || needs.run_pre_built_job2.result
-      == 'skipped') && needs.pre_job.outputs.matrix_length3 != '0' }}
     strategy:
       matrix: ${{ fromJSON(needs.pre_job.outputs.matrix3) }}
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
+      if: ${{ matrix.name != 'dummy' }}
     - name: Prepare dev requirements.
       uses: ./.github/actions/prepare_python_with_dev_requirements
       with:
         python_version: ${{ inputs.python_version }}
+      if: ${{ matrix.name != 'dummy' }}
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@f03ac48505955848960e80bbb68046aa35c7b9e7
       with:
         driver-opts: network=host
+      if: ${{ matrix.name != 'dummy' }}
     - name: Set up QEMU
       id: qemu
       uses: docker/setup-qemu-action@e81a89b1732b9c48d79cd809d8d81d79c4647a18
       with:
         image: tonistiigi/binfmt:qemu-v6.2.0
         platforms: all
+      if: ${{ matrix.name != 'dummy' }}
     - name: Prepare SSH
       id: prepare-ssh
       shell: bash
@@ -357,6 +378,7 @@ jobs:
 
         cat "/tmp/private_key.pem" | ssh-add -
         echo "ssh_auth_sock=${SSH_AUTH_SOCK}" >> $GITHUB_OUTPUT
+      if: ${{ matrix.name != 'dummy' }}
     - name: Cache step
       id: cache-step
       uses: actions/cache@v3
@@ -364,6 +386,7 @@ jobs:
         path: |
           agent_build_output/step_output/${{ matrix.step_id }}
         key: ${{ matrix.step_id }}_${{ matrix.cache_version_suffix }}
+      if: ${{ matrix.name != 'dummy' }}
     - name: Get required steps caches
       id: get_required_steps_caches
       uses: ./.github/actions/restore_steps_caches
@@ -372,6 +395,7 @@ jobs:
         cache_version_suffix: ${{ matrix.cache_version_suffix }}
         cache_root: agent_build_output/step_output
         fail_on_cache_miss: true
+      if: ${{ matrix.name != 'dummy' }}
     - name: Run cached step
       shell: bash
       env:
@@ -386,33 +410,36 @@ jobs:
         AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
       run: python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn
         }} run-cacheable-step
+      if: ${{ matrix.name != 'dummy' }}
   run_pre_built_job4:
     name: 4 ${{ matrix.name }}
     runs-on: ubuntu-20.04
     needs:
     - pre_job
     - run_pre_built_job3
-    if: ${{ always() && (needs.run_pre_built_job3.result == 'success' || needs.run_pre_built_job3.result
-      == 'skipped') && needs.pre_job.outputs.matrix_length4 != '0' }}
     strategy:
       matrix: ${{ fromJSON(needs.pre_job.outputs.matrix4) }}
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
+      if: ${{ matrix.name != 'dummy' }}
     - name: Prepare dev requirements.
       uses: ./.github/actions/prepare_python_with_dev_requirements
       with:
         python_version: ${{ inputs.python_version }}
+      if: ${{ matrix.name != 'dummy' }}
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@f03ac48505955848960e80bbb68046aa35c7b9e7
       with:
         driver-opts: network=host
+      if: ${{ matrix.name != 'dummy' }}
     - name: Set up QEMU
       id: qemu
       uses: docker/setup-qemu-action@e81a89b1732b9c48d79cd809d8d81d79c4647a18
       with:
         image: tonistiigi/binfmt:qemu-v6.2.0
         platforms: all
+      if: ${{ matrix.name != 'dummy' }}
     - name: Prepare SSH
       id: prepare-ssh
       shell: bash
@@ -423,6 +450,7 @@ jobs:
 
         cat "/tmp/private_key.pem" | ssh-add -
         echo "ssh_auth_sock=${SSH_AUTH_SOCK}" >> $GITHUB_OUTPUT
+      if: ${{ matrix.name != 'dummy' }}
     - name: Cache step
       id: cache-step
       uses: actions/cache@v3
@@ -430,6 +458,7 @@ jobs:
         path: |
           agent_build_output/step_output/${{ matrix.step_id }}
         key: ${{ matrix.step_id }}_${{ matrix.cache_version_suffix }}
+      if: ${{ matrix.name != 'dummy' }}
     - name: Get required steps caches
       id: get_required_steps_caches
       uses: ./.github/actions/restore_steps_caches
@@ -438,6 +467,7 @@ jobs:
         cache_version_suffix: ${{ matrix.cache_version_suffix }}
         cache_root: agent_build_output/step_output
         fail_on_cache_miss: true
+      if: ${{ matrix.name != 'dummy' }}
     - name: Run cached step
       shell: bash
       env:
@@ -452,33 +482,36 @@ jobs:
         AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
       run: python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn
         }} run-cacheable-step
+      if: ${{ matrix.name != 'dummy' }}
   run_pre_built_job5:
     name: 5 ${{ matrix.name }}
     runs-on: ubuntu-20.04
     needs:
     - pre_job
     - run_pre_built_job4
-    if: ${{ always() && (needs.run_pre_built_job4.result == 'success' || needs.run_pre_built_job4.result
-      == 'skipped') && needs.pre_job.outputs.matrix_length5 != '0' }}
     strategy:
       matrix: ${{ fromJSON(needs.pre_job.outputs.matrix5) }}
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
+      if: ${{ matrix.name != 'dummy' }}
     - name: Prepare dev requirements.
       uses: ./.github/actions/prepare_python_with_dev_requirements
       with:
         python_version: ${{ inputs.python_version }}
+      if: ${{ matrix.name != 'dummy' }}
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@f03ac48505955848960e80bbb68046aa35c7b9e7
       with:
         driver-opts: network=host
+      if: ${{ matrix.name != 'dummy' }}
     - name: Set up QEMU
       id: qemu
       uses: docker/setup-qemu-action@e81a89b1732b9c48d79cd809d8d81d79c4647a18
       with:
         image: tonistiigi/binfmt:qemu-v6.2.0
         platforms: all
+      if: ${{ matrix.name != 'dummy' }}
     - name: Prepare SSH
       id: prepare-ssh
       shell: bash
@@ -489,6 +522,7 @@ jobs:
 
         cat "/tmp/private_key.pem" | ssh-add -
         echo "ssh_auth_sock=${SSH_AUTH_SOCK}" >> $GITHUB_OUTPUT
+      if: ${{ matrix.name != 'dummy' }}
     - name: Cache step
       id: cache-step
       uses: actions/cache@v3
@@ -496,6 +530,7 @@ jobs:
         path: |
           agent_build_output/step_output/${{ matrix.step_id }}
         key: ${{ matrix.step_id }}_${{ matrix.cache_version_suffix }}
+      if: ${{ matrix.name != 'dummy' }}
     - name: Get required steps caches
       id: get_required_steps_caches
       uses: ./.github/actions/restore_steps_caches
@@ -504,6 +539,7 @@ jobs:
         cache_version_suffix: ${{ matrix.cache_version_suffix }}
         cache_root: agent_build_output/step_output
         fail_on_cache_miss: true
+      if: ${{ matrix.name != 'dummy' }}
     - name: Run cached step
       shell: bash
       env:
@@ -518,3 +554,4 @@ jobs:
         AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
       run: python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn
         }} run-cacheable-step
+      if: ${{ matrix.name != 'dummy' }}

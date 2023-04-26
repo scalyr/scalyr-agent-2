@@ -168,6 +168,13 @@ def get_missing_caches_matrices(existing_result_steps_ids_file: pl.Path):
                 }
             )
 
+            if len(matrix_include) == 0:
+                matrix_include.append(
+                    {
+                        "name": "dummy"
+                    }
+                )
+
         matrix = {"include": matrix_include}
         result_matrices.append(matrix)
 
@@ -198,13 +205,14 @@ def generate_workflow_yaml():
             stage_run_pre_built_job["needs"].append(
                 previous_run_pre_built_job_object_name
             )
-            stage_run_pre_built_job[
-                "if"
-            ] = f"${{{{ always() && (needs.{previous_run_pre_built_job_object_name}.result == 'success' || needs.{previous_run_pre_built_job_object_name}.result == 'skipped') && needs.pre_job.outputs.matrix_length{counter} != '0' }}}}"
-        else:
-            stage_run_pre_built_job[
-                "if"
-            ] = f"${{{{ needs.pre_job.outputs.matrix_length{counter} != '0' }}}}"
+        #     stage_run_pre_built_job[
+        #         "if"
+        #     ] = f"${{{{ always() && (needs.{previous_run_pre_built_job_object_name}.result == 'success' || needs.{previous_run_pre_built_job_object_name}.result == 'skipped') && needs.pre_job.outputs.matrix_length{counter} != '0' }}}}"
+        # else:
+        #
+        #     stage_run_pre_built_job[
+        #         "if"
+        #     ] = f"${{{{ needs.pre_job.outputs.matrix_length{counter} != '0' }}}}"
 
         stage_run_pre_built_job["name"] = f"{counter} ${{{{ matrix.name }}}}"
         stage_run_pre_built_job["strategy"][
@@ -222,6 +230,9 @@ def generate_workflow_yaml():
             f"{run_pre_built_job_object_name}{counter}"
         )
         jobs[stage_run_pre_built_job_object_name] = stage_run_pre_built_job
+
+        for step in stage_run_pre_built_job["steps"]:
+            step["if"] = "${{ matrix.name != 'dummy' }}"
 
     pre_job = jobs["pre_job"]
     pre_job["outputs"] = pre_job_outputs
