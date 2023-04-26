@@ -105,13 +105,13 @@ def get_missing_caches_matrices(existing_result_steps_ids_file: pl.Path, github_
 
             matrix = {"include": stage_jobs}
 
-            f.write(f"stage_{i}_matrix={json.dumps(matrix)}")
+            f.write(f"stage_{i}_matrix={json.dumps(matrix)}\n")
             if len(stage_jobs) == 0:
                 stage_skip = "true"
             else:
                 stage_skip = "false"
 
-            f.write(f"stage_{i}_skip={stage_skip}")
+            f.write(f"stage_{i}_skip={stage_skip}\n")
 
 
 def generate_workflow_yaml():
