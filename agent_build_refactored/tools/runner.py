@@ -796,6 +796,7 @@ class EnvironmentRunnerStep(RunnerStep):
     def _run_script_in_docker(
             self,
             work_dir: pl.Path,
+            isolated_source_root: pl.Path,
             temp_output_directory: pl.Path,
             remote_docker_host: str):
         """
@@ -804,6 +805,7 @@ class EnvironmentRunnerStep(RunnerStep):
 
         super(EnvironmentRunnerStep, self)._run_script_in_docker(
             work_dir=work_dir,
+            isolated_source_root=isolated_source_root,
             temp_output_directory=temp_output_directory,
             remote_docker_host=remote_docker_host
         )
