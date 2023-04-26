@@ -68,6 +68,9 @@ def chown_directory_in_docker(path: pl.Path):
 
 
 def remove_root_owned_directory(path: pl.Path):
+    """
+    Remove directory with potential permissions issue, since it may be created inside docker, which runs under root user.
+    """
     to_chown = False
     try:
         shutil.rmtree(path)
@@ -350,6 +353,10 @@ class RunnerStep:
     def get_in_docker_isolated_root(self):
         return pl.Path("/tmp/agent_source")
 
+    @property
+    def is_step_script_is_python(self) -> bool:
+        return self.script_path.suffix == ".py"
+
     def _get_required_steps_output_directories(
         self, work_dir: pl.Path
     ) -> Dict[str, pl.Path]:
@@ -397,6 +404,10 @@ class RunnerStep:
 
         result_env_variables["SOURCE_ROOT"] = str(source_root_value)
         result_env_variables["STEP_OUTPUT_PATH"] = str(step_output_path_value)
+
+        if self.is_step_script_is_python:
+            result_env_variables["PYTHONPATH"] = source_root_value
+
 
         # Set path of the required steps as env. variables.
         for step_env_var_name, step_output_path in req_steps_env_variables.items():
@@ -598,10 +609,10 @@ class RunnerStep:
         Get list with command arguments that has to be executed by step.
         :return:
         """
-        if self.script_path.suffix == ".sh":
-            executable = "bash"
-        elif self.script_path.suffix == ".py":
+        if self.is_step_script_is_python:
             executable = sys.executable
+        elif self.script_path.suffix == ".sh":
+            executable = "bash"
         else:
             raise Exception(
                 f"Unknown script type '{self.script_path.suffix}' for the step {self}"
