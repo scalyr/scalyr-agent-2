@@ -23,7 +23,7 @@ import logging
 import inspect
 import subprocess
 import sys
-from typing import Union, Optional, List, Dict, Type, Callable, Set
+from typing import Union, Optional, List, Dict, Type, Callable, Iterable
 
 
 from agent_build_refactored.tools.constants import (
@@ -1347,7 +1347,7 @@ def group_steps_by_stages(steps: List[RunnerStep]):
 
 def remove_steps_from_stages(
     stages: List[Dict[str, RunnerStep]],
-    steps_to_remove: Set[str],
+    steps_to_remove: Iterable[str],
 ):
     """
     Get the stages list that are produces by the `group_steps_by_stages` function and filter out steps that are
@@ -1358,10 +1358,12 @@ def remove_steps_from_stages(
     """
     result_stages = []
 
+    final_steps_to_remove = set(steps_to_remove)
+
     for stage in stages:
         current_stage = {}
         for step_id, step in stage.items():
-            if step_id not in steps_to_remove:
+            if step_id not in final_steps_to_remove:
                 current_stage[step_id] = step
 
         result_stages.append(current_stage)

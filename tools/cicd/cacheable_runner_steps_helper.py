@@ -48,14 +48,15 @@ from agent_build_refactored.tools.runner import remove_steps_from_stages
 from tools.cicd import step_stages, steps_runners, all_used_steps, CACHE_VERSION_SUFFIX
 
 
-def get_missing_caches_matrices(existing_result_steps_ids_file: pl.Path, github_step_output_file: pl.Path):
+def get_missing_caches_matrices(
+        existing_result_steps_ids: List[str],
+        github_step_output_file: pl.Path
+):
     """
     Create GitHub Actions job matrix for each stage of steps.
     :param existing_result_steps_ids_file:
     :return:
     """
-    json_content = existing_result_steps_ids_file.read_text()
-    existing_result_steps_ids = json.loads(json_content)
 
     filtered_stages = remove_steps_from_stages(
         stages=step_stages, steps_to_remove=existing_result_steps_ids
@@ -220,9 +221,9 @@ if __name__ == "__main__":
     missing_caches_matrices_parser = subparsers.add_parser(
         "get-missing-caches-matrices"
     )
-    missing_caches_matrices_parser.add_argument(
-        "--existing-result-step-ids-file", required=True
-    )
+    # missing_caches_matrices_parser.add_argument(
+    #     "--existing-result-step-ids-file", required=True
+    # )
     missing_caches_matrices_parser.add_argument(
         "--github-step-output-file", required=True
     )
@@ -236,8 +237,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.command == "get-missing-caches-matrices":
+
+        existing_result_steps_ids_json = sys.stdin.read()
+        existing_result_steps_ids = json.loads(existing_result_steps_ids_json)
         get_missing_caches_matrices(
-            existing_result_steps_ids_file=pl.Path(args.existing_result_step_ids_file),
+            existing_result_steps_ids=existing_result_steps_ids,
             github_step_output_file=pl.Path(args.github_step_output_file)
         )
     elif args.command == "get-all-steps-ids":

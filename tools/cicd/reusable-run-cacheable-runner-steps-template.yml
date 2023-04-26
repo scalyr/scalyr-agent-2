@@ -116,7 +116,8 @@ jobs:
           
           
           
-          python3  tools/cicd/cacheable_runner_steps_helper.py get-missing-caches-matrices --existing-result-step-ids-file /tmp/existing_result_steps_ids.json --github-step-output-file "${GITHUB_OUTPUT}"
+          cat <<< '${{ steps.get_missing_caches_steps.outputs.steps_ids_with_cache_hit }}' | \
+            python3  tools/cicd/cacheable_runner_steps_helper.py get-missing-caches-matrices --github-step-output-file "${GITHUB_OUTPUT}"
           echo "MISSING"
           cat $GITHUB_OUTPUT
 
