@@ -47,6 +47,7 @@ sys.path.append(str(SOURCE_ROOT))
 from agent_build_refactored.tools.runner import remove_steps_from_stages
 from tools.cicd import step_stages, steps_runners, all_used_steps, CACHE_VERSION_SUFFIX
 
+SKIPPED_STAGE_JOB_NAME = "All Steps Are Reused From Cache"
 
 def get_missing_caches_matrices(
         existing_result_steps_ids: List[str],
@@ -101,7 +102,7 @@ def get_missing_caches_matrices(
 
             if add_skip_job:
                 stage_jobs.append({
-                    "name": "All Reused From Cache"
+                    "name": SKIPPED_STAGE_JOB_NAME
                 })
 
             matrix = {"include": stage_jobs}
@@ -150,27 +151,16 @@ def generate_workflow_yaml():
             )
 
         stage_job["if"] = f"${{{{ needs.pre_job.outputs.{stage_skip_output_name} != 'true' }}}}"
-        #     stage_run_pre_built_job[
-        #         "if"
-        #     ] = f"${{{{ always() && (needs.{previous_run_pre_built_job_object_name}.result == 'success' || needs.{previous_run_pre_built_job_object_name}.result == 'skipped') && needs.pre_job.outputs.matrix_length{counter} != '0' }}}}"
-        # else:
-        #
-        #     stage_run_pre_built_job[
-        #         "if"
-        #     ] = f"${{{{ needs.pre_job.outputs.matrix_length{counter} != '0' }}}}"
 
         stage_job["name"] = f"{counter} ${{{{ matrix.name }}}}"
         stage_job["strategy"][
             "matrix"
         ] = f"${{{{ fromJSON(needs.pre_job.outputs.{stage_matrix_output_name}) }}}}"
 
-        # stage_run_pre_built_job_object_name = (
-        #     f"{stage_job_name}{counter}"
-        # )
         jobs[stage_job_name] = stage_job
 
         for step in stage_job["steps"]:
-            step["if"] = "${{ matrix.name != 'dummy' }}"
+            step["if"] = f"${{ matrix.name != '{SKIPPED_STAGE_JOB_NAME}' }}"
 
     pre_job = jobs["pre_job"]
     pre_job["outputs"] = pre_job_outputs
