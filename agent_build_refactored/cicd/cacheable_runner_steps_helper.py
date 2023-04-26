@@ -168,12 +168,12 @@ def get_missing_caches_matrices(existing_result_steps_ids_file: pl.Path):
                 }
             )
 
-            if len(matrix_include) == 0:
-                matrix_include.append(
-                    {
-                        "name": "dummy"
-                    }
-                )
+        if len(matrix_include) == 0:
+            matrix_include.append(
+                {
+                    "name": "dummy"
+                }
+            )
 
         matrix = {"include": matrix_include}
         result_matrices.append(matrix)
