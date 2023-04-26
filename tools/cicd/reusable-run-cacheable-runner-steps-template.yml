@@ -120,7 +120,7 @@ jobs:
           echo "MISSING"
           cat $GITHUB_OUTPUT
 
-  run_pre_built_job:
+  stage:
     name: Level 0 ${{ matrix.name }}
     runs-on: ubuntu-20.04
     needs:

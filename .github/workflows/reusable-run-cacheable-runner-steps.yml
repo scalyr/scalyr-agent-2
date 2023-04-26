@@ -112,31 +112,31 @@ jobs:
         echo "MISSING"
         cat $GITHUB_OUTPUT
     outputs:
-      matrix0: ${{ steps.print_missing_caches_matrices.outputs.matrix0 }}
-      matrix_length0: ${{ steps.print_missing_caches_matrices.outputs.matrix_length0
+      stage_matrix0: ${{ steps.print_missing_caches_matrices.outputs.stage_matrix0
         }}
-      matrix1: ${{ steps.print_missing_caches_matrices.outputs.matrix1 }}
-      matrix_length1: ${{ steps.print_missing_caches_matrices.outputs.matrix_length1
+      stage_skip0: ${{ steps.print_missing_caches_matrices.outputs.stage_skip0 }}
+      stage_matrix1: ${{ steps.print_missing_caches_matrices.outputs.stage_matrix1
         }}
-      matrix2: ${{ steps.print_missing_caches_matrices.outputs.matrix2 }}
-      matrix_length2: ${{ steps.print_missing_caches_matrices.outputs.matrix_length2
+      stage_skip1: ${{ steps.print_missing_caches_matrices.outputs.stage_skip1 }}
+      stage_matrix2: ${{ steps.print_missing_caches_matrices.outputs.stage_matrix2
         }}
-      matrix3: ${{ steps.print_missing_caches_matrices.outputs.matrix3 }}
-      matrix_length3: ${{ steps.print_missing_caches_matrices.outputs.matrix_length3
+      stage_skip2: ${{ steps.print_missing_caches_matrices.outputs.stage_skip2 }}
+      stage_matrix3: ${{ steps.print_missing_caches_matrices.outputs.stage_matrix3
         }}
-      matrix4: ${{ steps.print_missing_caches_matrices.outputs.matrix4 }}
-      matrix_length4: ${{ steps.print_missing_caches_matrices.outputs.matrix_length4
+      stage_skip3: ${{ steps.print_missing_caches_matrices.outputs.stage_skip3 }}
+      stage_matrix4: ${{ steps.print_missing_caches_matrices.outputs.stage_matrix4
         }}
-      matrix5: ${{ steps.print_missing_caches_matrices.outputs.matrix5 }}
-      matrix_length5: ${{ steps.print_missing_caches_matrices.outputs.matrix_length5
+      stage_skip4: ${{ steps.print_missing_caches_matrices.outputs.stage_skip4 }}
+      stage_matrix5: ${{ steps.print_missing_caches_matrices.outputs.stage_matrix5
         }}
-  run_pre_built_job0:
+      stage_skip5: ${{ steps.print_missing_caches_matrices.outputs.stage_skip5 }}
+  stage_0:
     name: 0 ${{ matrix.name }}
     runs-on: ubuntu-20.04
     needs:
     - pre_job
     strategy:
-      matrix: ${{ fromJSON(needs.pre_job.outputs.matrix0) }}
+      matrix: ${{ fromJSON(needs.pre_job.outputs.stage_matrix0) }}
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
@@ -201,14 +201,15 @@ jobs:
       run: python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn
         }} run-cacheable-step
       if: ${{ matrix.name != 'dummy' }}
-  run_pre_built_job1:
+    if: ${{ needs.pre_job.outputs.stage_skip0 != 'true' }}
+  stage_1:
     name: 1 ${{ matrix.name }}
     runs-on: ubuntu-20.04
     needs:
     - pre_job
-    - run_pre_built_job0
+    - stage_0
     strategy:
-      matrix: ${{ fromJSON(needs.pre_job.outputs.matrix1) }}
+      matrix: ${{ fromJSON(needs.pre_job.outputs.stage_matrix1) }}
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
@@ -273,14 +274,15 @@ jobs:
       run: python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn
         }} run-cacheable-step
       if: ${{ matrix.name != 'dummy' }}
-  run_pre_built_job2:
+    if: ${{ needs.pre_job.outputs.stage_skip1 != 'true' }}
+  stage_2:
     name: 2 ${{ matrix.name }}
     runs-on: ubuntu-20.04
     needs:
     - pre_job
-    - run_pre_built_job1
+    - stage_1
     strategy:
-      matrix: ${{ fromJSON(needs.pre_job.outputs.matrix2) }}
+      matrix: ${{ fromJSON(needs.pre_job.outputs.stage_matrix2) }}
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
@@ -345,14 +347,15 @@ jobs:
       run: python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn
         }} run-cacheable-step
       if: ${{ matrix.name != 'dummy' }}
-  run_pre_built_job3:
+    if: ${{ needs.pre_job.outputs.stage_skip2 != 'true' }}
+  stage_3:
     name: 3 ${{ matrix.name }}
     runs-on: ubuntu-20.04
     needs:
     - pre_job
-    - run_pre_built_job2
+    - stage_2
     strategy:
-      matrix: ${{ fromJSON(needs.pre_job.outputs.matrix3) }}
+      matrix: ${{ fromJSON(needs.pre_job.outputs.stage_matrix3) }}
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
@@ -417,14 +420,15 @@ jobs:
       run: python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn
         }} run-cacheable-step
       if: ${{ matrix.name != 'dummy' }}
-  run_pre_built_job4:
+    if: ${{ needs.pre_job.outputs.stage_skip3 != 'true' }}
+  stage_4:
     name: 4 ${{ matrix.name }}
     runs-on: ubuntu-20.04
     needs:
     - pre_job
-    - run_pre_built_job3
+    - stage_3
     strategy:
-      matrix: ${{ fromJSON(needs.pre_job.outputs.matrix4) }}
+      matrix: ${{ fromJSON(needs.pre_job.outputs.stage_matrix4) }}
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
@@ -489,14 +493,15 @@ jobs:
       run: python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn
         }} run-cacheable-step
       if: ${{ matrix.name != 'dummy' }}
-  run_pre_built_job5:
+    if: ${{ needs.pre_job.outputs.stage_skip4 != 'true' }}
+  stage_5:
     name: 5 ${{ matrix.name }}
     runs-on: ubuntu-20.04
     needs:
     - pre_job
-    - run_pre_built_job4
+    - stage_4
     strategy:
-      matrix: ${{ fromJSON(needs.pre_job.outputs.matrix5) }}
+      matrix: ${{ fromJSON(needs.pre_job.outputs.stage_matrix5) }}
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
@@ -561,3 +566,4 @@ jobs:
       run: python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn
         }} run-cacheable-step
       if: ${{ matrix.name != 'dummy' }}
+    if: ${{ needs.pre_job.outputs.stage_skip5 != 'true' }}

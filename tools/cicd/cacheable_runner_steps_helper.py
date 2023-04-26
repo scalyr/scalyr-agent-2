@@ -105,13 +105,13 @@ def get_missing_caches_matrices(existing_result_steps_ids_file: pl.Path, github_
 
             matrix = {"include": stage_jobs}
 
-            f.write(f"stage_{i}_matrix={json.dumps(matrix)}\n")
+            f.write(f"stage_matrix{i}={json.dumps(matrix)}\n")
             if len(stage_jobs) == 0:
                 stage_skip = "true"
             else:
                 stage_skip = "false"
 
-            f.write(f"stage_{i}_skip={stage_skip}\n")
+            f.write(f"stage_skip{i}={stage_skip}\n")
 
 
 def generate_workflow_yaml():
@@ -125,19 +125,30 @@ def generate_workflow_yaml():
 
     jobs = workflow["jobs"]
 
-    run_pre_built_job_object_name = "run_pre_built_job"
-    run_pre_built_job = jobs.pop(run_pre_built_job_object_name)
+    stage_job_template = jobs.pop("stage")
 
     pre_job_outputs = {}
     for counter in range(len(step_stages)):
-        stage_run_pre_built_job = copy.deepcopy(run_pre_built_job)
+        stage_job = copy.deepcopy(stage_job_template)
+        stage_job_name = f"stage_{counter}"
+
+        stage_matrix_output_name = f"stage_matrix{counter}"
+        stage_matrix_output_value = f"${{{{ steps.print_missing_caches_matrices.outputs.{stage_matrix_output_name} }}}}"
+        pre_job_outputs[stage_matrix_output_name] = stage_matrix_output_value
+
+        stage_skip_output_name = f"stage_skip{counter}"
+        stage_skip_output_value = f"${{{{ steps.print_missing_caches_matrices.outputs.{stage_skip_output_name} }}}}"
+        pre_job_outputs[stage_skip_output_name] = stage_skip_output_value
+
         if counter > 0:
-            previous_run_pre_built_job_object_name = (
-                f"{run_pre_built_job_object_name}{counter - 1}"
+            previous_stage_job_name = (
+                f"stage_{counter - 1}"
             )
-            stage_run_pre_built_job["needs"].append(
-                previous_run_pre_built_job_object_name
+            stage_job["needs"].append(
+                previous_stage_job_name
             )
+
+        stage_job["if"] = f"${{{{ needs.pre_job.outputs.{stage_skip_output_name} != 'true' }}}}"
         #     stage_run_pre_built_job[
         #         "if"
         #     ] = f"${{{{ always() && (needs.{previous_run_pre_built_job_object_name}.result == 'success' || needs.{previous_run_pre_built_job_object_name}.result == 'skipped') && needs.pre_job.outputs.matrix_length{counter} != '0' }}}}"
@@ -147,24 +158,17 @@ def generate_workflow_yaml():
         #         "if"
         #     ] = f"${{{{ needs.pre_job.outputs.matrix_length{counter} != '0' }}}}"
 
-        stage_run_pre_built_job["name"] = f"{counter} ${{{{ matrix.name }}}}"
-        stage_run_pre_built_job["strategy"][
+        stage_job["name"] = f"{counter} ${{{{ matrix.name }}}}"
+        stage_job["strategy"][
             "matrix"
-        ] = f"${{{{ fromJSON(needs.pre_job.outputs.matrix{counter}) }}}}"
+        ] = f"${{{{ fromJSON(needs.pre_job.outputs.{stage_matrix_output_name}) }}}}"
 
-        pre_job_outputs[
-            f"matrix{counter}"
-        ] = f"${{{{ steps.print_missing_caches_matrices.outputs.matrix{counter} }}}}"
-        pre_job_outputs[
-            f"matrix_length{counter}"
-        ] = f"${{{{ steps.print_missing_caches_matrices.outputs.matrix_length{counter} }}}}"
+        # stage_run_pre_built_job_object_name = (
+        #     f"{stage_job_name}{counter}"
+        # )
+        jobs[stage_job_name] = stage_job
 
-        stage_run_pre_built_job_object_name = (
-            f"{run_pre_built_job_object_name}{counter}"
-        )
-        jobs[stage_run_pre_built_job_object_name] = stage_run_pre_built_job
-
-        for step in stage_run_pre_built_job["steps"]:
+        for step in stage_job["steps"]:
             step["if"] = "${{ matrix.name != 'dummy' }}"
 
     pre_job = jobs["pre_job"]
