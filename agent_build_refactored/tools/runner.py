@@ -1080,7 +1080,7 @@ class Runner(metaclass=RunnerMeta):
 
         all_steps = self.get_all_steps(recursive=True)
 
-        full_stages = get_all_required_steps_stages(steps=all_steps)
+        full_stages = group_steps_by_stages(steps=all_steps)
 
         steps_with_missing_results = get_steps_with_missing_results(
             steps=all_steps, work_dir=self.work_dir
@@ -1281,12 +1281,28 @@ def get_steps_with_missing_results(steps: List[RunnerStep], work_dir: pl.Path):
     return result
 
 
-def get_all_required_steps_stages(steps: List[RunnerStep]):
+def group_steps_by_stages(steps: List[RunnerStep]):
+    """
+    This function groups given steps into "stages" ensuring that the "dependency" steps are in the
+    lower indexed stage than "dependent" steps.
+
+    Example: There is stage 0, with the most "basic" steps, that are not dependent on anything. Then there is stage 1,
+    where all steps depend on steps from the stage 0, etc.
+
+    By having such grouping we can guarantee that a particular step will not be executed before its "dependency" step.
+
+    :param steps: Steps to group.
+    """
     remaining_steps = {step.id: step for step in steps}
     result_stages = []
 
-    while remaining_steps:
+    # We go through the list of steps in multiple iterations and in each iteration has to produce its own "stage"
+    while True:
+
         current_stage = {}
+
+        # Each iteration we go through remaining steps and pick steps that do not have any dependencies in the same
+        # remaining steps list and put it into the current stage.
         for step_id, step in remaining_steps.items():
             add = True
 
@@ -1298,10 +1314,16 @@ def get_all_required_steps_stages(steps: List[RunnerStep]):
             if add:
                 current_stage[step_id] = step
 
+        # Add newly formed stage.
         result_stages.append(current_stage)
 
+        # Remove processed steps from the remaining steps list.
         for step_id, step in current_stage.items():
             remaining_steps.pop(step_id)
+
+        # Repeat until there are any remaining unprocessed steps
+        if len(remaining_steps) == 0:
+            break
 
     return result_stages
 

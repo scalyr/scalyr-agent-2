@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-This script helps GitHub Actions CI/CD to get information about runners that can be run in a parallel jobs, that
+This script helps GitHub Actions CI/CD to get information about steps that can be run and cached in parallel jobs. That
 has to decrease overall build time.
 """
 
@@ -51,18 +51,16 @@ import tests.end_to_end_tests.managed_packages_tests.conftest  # NOQA
 # Import ALL_RUNNERS global collection only after all modules that define any runner are imported.
 from agent_build_refactored.tools.runner import ALL_RUNNERS
 
-from agent_build_refactored.tools.runner import Runner, RunnerStep, get_all_required_steps_stages, get_steps_with_missing_results, filter_steps_with_existing_output, sort_and_filter_steps
+from agent_build_refactored.tools.runner import Runner, RunnerStep, group_steps_by_stages, filter_steps_with_existing_output, sort_and_filter_steps
 
 # Suffix that is appended to all steps cache keys. CI/CD cache can be easily invalidated by changing this value.
 CACHE_VERSION_SUFFIX = "v14"
 
-used_builders = []
 
-#existing_runners = {}
-# builders_to_prebuilt_runners = {}
-
-
-def get_all_used_steps():
+def get_all_used_steps() -> List[RunnerStep]:
+    """
+    Get list of all steps that are used in the whole project.
+    """
     all_steps = []
     for runner_cls in ALL_RUNNERS:
         for step in runner_cls.get_all_steps(recursive=True):
@@ -74,10 +72,13 @@ def get_all_used_steps():
 all_used_steps: Dict[str, RunnerStep] = {step.id: step for step in get_all_used_steps()}
 
 
-step_stages = get_all_required_steps_stages(steps=list(all_used_steps.values()))
+step_stages = group_steps_by_stages(steps=list(all_used_steps.values()))
 
 
 class CacheableStepRunner(Runner):
+    """
+    A "wrapper" runner class that is needed to locate and run cacheable steps.
+    """
     STEP: RunnerStep
 
     @classmethod
@@ -109,7 +110,6 @@ class CacheableStepRunner(Runner):
             print(f"Unknown command: {args.command}", file=sys.stderr)
 
 
-
 def get_steps_runners():
     result_runners = {}
 
@@ -122,7 +122,6 @@ def get_steps_runners():
                     CLASS_NAME_ALIAS = f"{step_id}_cached"
 
                 result_runners[step_id] = _RunnerCls
-
 
     return result_runners
 
