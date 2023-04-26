@@ -782,6 +782,8 @@ class RunnerStep:
             raise
 
         output_directory = self.get_output_directory(work_dir=work_dir)
+        if output_directory.exists():
+            shutil.rmtree(output_directory)
         shutil.copytree(temp_output_directory, output_directory)
         shutil.rmtree(temp_output_directory)
 

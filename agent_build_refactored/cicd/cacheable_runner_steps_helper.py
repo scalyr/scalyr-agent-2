@@ -146,9 +146,11 @@ def get_missing_caches_matrices(existing_result_steps_ids_file: pl.Path):
         stages=step_stages, steps_to_remove=existing_result_steps_ids
     )
 
-    result_matrices = []
-    for stage in filtered_stages:
-        matrix_include = []
+    matrices = []
+    last_non_empty_matrix_index = -1
+
+    for i, stage in enumerate(filtered_stages):
+        matrix = []
 
         for step_id, step in stage.items():
 
@@ -158,7 +160,7 @@ def get_missing_caches_matrices(existing_result_steps_ids_file: pl.Path):
 
             runner_cls = steps_runners[step_id]
 
-            matrix_include.append(
+            matrix.append(
                 {
                     "step_runner_fqdn": runner_cls.FULLY_QUALIFIED_NAME,
                     "step_id": step.id,
@@ -168,15 +170,29 @@ def get_missing_caches_matrices(existing_result_steps_ids_file: pl.Path):
                 }
             )
 
-        if len(matrix_include) == 0:
-            matrix_include.append(
-                {
-                    "name": "dummy"
-                }
-            )
+        if len(matrix) > 0:
+            last_non_empty_matrix_index = i
 
-        matrix = {"include": matrix_include}
-        result_matrices.append(matrix)
+        matrices.append(matrix)
+
+    result_matrices = []
+
+    for i, matrix in enumerate(matrices):
+        result_matrix_include = []
+        if last_non_empty_matrix_index < 0:
+            continue
+
+        if i > last_non_empty_matrix_index:
+            continue
+
+        if len(matrix) == 0:
+            result_matrix_include.append({
+                "name": "dummy"
+            })
+
+        result_matrices.append({
+            "include": result_matrix_include
+        })
 
     return result_matrices
 
