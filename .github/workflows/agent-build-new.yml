@@ -59,7 +59,7 @@ jobs:
         run: |
           commands=(
             "bash tools/cicd/nodejs_actions/update_nodejs_actions.sh"
-            "python3 generate_workflow_yml.py"
+            "python3 tools/cicd/cacheable_steps/generate_workflow_yml.py"
           )
 
           for command in "${commands[@]}"; do
