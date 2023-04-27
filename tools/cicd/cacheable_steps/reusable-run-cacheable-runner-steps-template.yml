@@ -68,6 +68,7 @@ jobs:
         run: |          
           cat <<< '${{ steps.get_missing_caches_steps.outputs.steps_ids_with_cache_hit }}' | \
             python3  tools/cicd/cacheable_steps/create_output_with_missing_results_steps_matrices.py >> "${GITHUB_OUTPUT}"
+          
           cat $GITHUB_OUTPUT
 
   stage:

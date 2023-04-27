@@ -1,4 +1,4 @@
-# Copyright 2014-2022 Scalyr Inc.
+# Copyright 2014-2023 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,9 +25,6 @@ import io
 import json
 import pathlib as pl
 import sys
-import logging
-from typing import List
-
 
 
 # This file can be executed as script. Add source root to the PYTHONPATH in order to be able to import

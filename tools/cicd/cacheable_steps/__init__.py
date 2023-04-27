@@ -38,8 +38,8 @@ from agent_build_refactored.tools.runner import ALL_RUNNERS
 
 from agent_build_refactored.tools.runner import Runner, RunnerStep, group_steps_by_stages, remove_steps_from_stages, sort_and_filter_steps
 
-# Suffix that is appended to all steps cache keys. CI/CD cache can be easily invalidated by changing this value.
 CACHE_VERSION_SUFFIX_FILE = pl.Path(__file__).parent / "CACHE_VERSION_SUFFIX"
+# Suffix that is appended to all steps cache keys. CI/CD cache can be easily invalidated by changing this value.
 CACHE_VERSION_SUFFIX = CACHE_VERSION_SUFFIX_FILE.read_text().strip()
 
 SKIPPED_STAGE_JOB_NAME = "All Steps Are Reused From Cache"

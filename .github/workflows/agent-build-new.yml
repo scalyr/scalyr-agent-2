@@ -66,12 +66,14 @@ jobs:
             
             $command
             set +e
-            git diff --exit-code
+            DIFF="$(git diff --exit-code)"
             EXIT_CODE=$?
             set -e
   
             if [ $EXIT_CODE -ne 0 ]; then
               echo -e "Not all files are not up to date, please run the command '${command}' and commit required changes."
+              echo -e "Diff:"
+              echo -e "${DIFF}"
               exit 1
             fi
           done
