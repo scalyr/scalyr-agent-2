@@ -28,7 +28,7 @@ jobs:
       aws_prefix_list_id: pl-04a16228a97704d23
       aws_region: us-east-1
       aws_objects_name_prefix: ${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}
-      python_version: 3.8.13
+      python_version: ${{ steps.define_constants.outputs.python_version }}
       cache_version_suffix: v6
     steps:
 #      - id: skip_check
@@ -39,10 +39,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Define constants
+        id: define_constants
+        run: |
+          echo "python_version=3.8.13" >> ${GITHUB_OUTPUT}
+
       - name: Prepare dev requirements.
         uses: ./.github/actions/prepare_python_with_dev_requirements
         with:
-          python_version: ${{ inputs.python_version }}
+          python_version: ${{ steps.define_constants.outputs.python_version }}
 
       - name: Get npm cache directory
         id: npm-cache-dir

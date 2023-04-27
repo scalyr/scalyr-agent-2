@@ -1,13 +1,5 @@
 {
-  "name": "restore_steps_caches",
-  "version": "1.0.0",
-  "description": "This action uses python module `agent_build_refactored/scripts/runner_helper.py` to execute some Runner. The main purpose of the action is to cache results of this runner to the GitHub Actions cache. Since runner consist of  steps, and different runners can use the same step, then it's more reasonable to cache each step separately. That means that the regular [@actions/cache](https://github.com/actions/cache)  is not enough, and we need to use more flexible JS scripting to call GitHub Actions caching dynamically.",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "author": "",
-  "license": "ISC",
+  "name": "nodejs_actions",
   "dependencies": {
     "@actions/cache": "^3.2.1",
     "@actions/core": "^1.10.0",
