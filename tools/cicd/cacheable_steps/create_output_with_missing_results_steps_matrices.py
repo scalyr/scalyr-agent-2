@@ -13,12 +13,9 @@
 # limitations under the License.
 
 """
-This script helps GitHub Actions CI/CD to get information about steps that can be run and cached in parallel jobs. That
-has to decrease overall build time.
-
-How it works:
-
-
+This script create GitHub Actions job matrices for steps with missing caches.
+The output of this script has to be written directly to the "GITHUB_OUTPUT" environment variable of the job step.
+The output defines job matrix for each stage job and whether this job has to be skipped.
 """
 
 import io

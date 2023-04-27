@@ -29,8 +29,8 @@ pushd "${PARENT_PATH}"
 rm -rf "${PARENT_PATH:?}/node_modules"
 
 # Install dependencies for all actions in a centralized node_modules folder.
-npm install
 
+npm install
 
 actions=(
   "restore_steps_caches"

@@ -13,13 +13,10 @@
 # limitations under the License.
 
 """
-This script helps GitHub Actions CI/CD to get information about steps that can be run and cached in parallel jobs. That
-has to decrease overall build time.
-
-How it works:
-
-
+This module defines all runner steps that are used in the project.
 """
+
+
 import argparse
 import sys
 import pathlib as pl
@@ -92,25 +89,31 @@ class CacheableStepRunner(Runner):
             print(f"Unknown command: {args.command}", file=sys.stderr)
 
 
-def get_steps_runners(stages: List):
+def get_steps_runners(steps: Dict[str, RunnerStep]):
+    """
+    Create wrapper runner class for each given step and put it into result mapping where key is a step ID and value
+        is a wrapper runner.
+    """
     result_runners = {}
 
-    for stage in stages:
-        for step_id, step in stage.items():
-            _RunnerCls = result_runners.get(step.id)
-            if _RunnerCls is None:
-                class _RunnerCls(CacheableStepRunner):
-                    STEP = step
-                    CLASS_NAME_ALIAS = f"{step_id}_cached"
+    for step_id, step in steps.items():
+        _RunnerCls = result_runners.get(step_id)
+        if _RunnerCls is None:
+            class _RunnerCls(CacheableStepRunner):
+                STEP = step
+                CLASS_NAME_ALIAS = f"{step_id}_cached"
 
-                result_runners[step_id] = _RunnerCls
+            result_runners[step_id] = _RunnerCls
 
     return result_runners
 
 
+# Get all steps used in project.
 all_used_steps: Dict[str, RunnerStep] = {step.id: step for step in get_all_used_steps()}
 
-step_stages = group_steps_by_stages(steps=list(all_used_steps.values()))
+# Create wrapper runner classes from each step.
+steps_runners = get_steps_runners(steps=all_used_steps)
 
-steps_runners = get_steps_runners(stages=step_stages)
+# Groups steps by stages.
+step_stages = group_steps_by_stages(steps=list(all_used_steps.values()))
 

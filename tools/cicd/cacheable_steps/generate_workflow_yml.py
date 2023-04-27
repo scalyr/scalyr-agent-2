@@ -12,6 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+This script generates yml file for the cacheable steps workflow.
+For each stage it creates GitHub Actions job where steps of this stage has to run.
+
+"""
 
 import copy
 import sys
@@ -29,10 +34,6 @@ from tools.cicd.cacheable_steps import step_stages, SKIPPED_STAGE_JOB_NAME
 
 
 def generate_workflow_yaml():
-    """
-    This function generates yml file for workflow that run pre-built steps.
-
-    """
     template_path = SCRIPT_PATH.parent / "reusable-run-cacheable-runner-steps-template.yml"
     template_ymp = strictyaml.load(template_path.read_text())
     workflow = template_ymp.data
@@ -58,13 +59,17 @@ def generate_workflow_yaml():
             previous_stage_job_name = (
                 f"stage_{counter - 1}"
             )
+            # Next stage job can start only after previous stage job is finished.
             stage_job["needs"].append(
                 previous_stage_job_name
             )
 
+        # Add if statement that will skip the job if that is needed.
         stage_job["if"] = f"${{{{ needs.pre_job.outputs.{stage_skip_output_name} != 'true' }}}}"
 
         stage_job["name"] = f"{counter} ${{{{ matrix.name }}}}"
+
+        # Add job matrix
         stage_job["strategy"][
             "matrix"
         ] = f"${{{{ fromJSON(needs.pre_job.outputs.{stage_matrix_output_name}) }}}}"
@@ -82,7 +87,6 @@ def generate_workflow_yaml():
     yaml_content = strictyaml.as_document(workflow).as_yaml()
 
     # Add notification comment, that this YAML was auto-generated.
-
     script_rel_path = SCRIPT_PATH.relative_to(SOURCE_ROOT)
     template_rel_path = template_path.relative_to(SOURCE_ROOT)
     comment = f"# IMPORTANT: Do not modify.\n" \

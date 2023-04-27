@@ -1144,7 +1144,7 @@ def group_steps_by_stages(steps: List[RunnerStep]):
     lower indexed stage than "dependent" steps.
 
     Example: There is stage 0, with the most "basic" steps, that are not dependent on anything. Then there is stage 1,
-    where all steps depend on steps from the stage 0, etc.
+    where all steps depend on steps from the stage 0, stage 2 depends on stage 1, etc.
 
     By having such grouping we can guarantee that a particular step will not be executed before its "dependency" step.
 

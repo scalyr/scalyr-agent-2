@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+This script print JSON-formatted list of all steps that are used in the projects.
+"""
 
 import json
 import sys
