@@ -71,9 +71,12 @@ jobs:
             set -e
   
             if [ $EXIT_CODE -ne 0 ]; then
-              echo -e "Not all files are not up to date, please run the command '${command}' and commit required changes."
+              echo -e "================================================================================================"
+              echo -e "Not all files are up to date, please run the command '${command}' and commit required changes."
+              echo -e "------------------------------------------------------------------------------------------------"
               echo -e "Diff:"
               echo -e "${DIFF}"
+              echo -e "================================================================================================"
               exit 1
             fi
           done
