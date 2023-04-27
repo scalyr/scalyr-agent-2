@@ -51,6 +51,7 @@ jobs:
           echo "all_steps_ids_json=$(python3  tools/cicd/cacheable_steps/get_all_steps_ids.py)" >> $GITHUB_OUTPUT
           echo "cache_version_suffix=$(cat tools/cicd/cacheable_steps/CACHE_VERSION_SUFFIX)" >> $GITHUB_OUTPUT
           
+          
           cat $GITHUB_OUTPUT
 
       - name: Get missing caches steps

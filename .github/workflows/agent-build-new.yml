@@ -55,7 +55,7 @@ jobs:
           path: ${{ steps.npm-cache-dir.outputs.dir }}
           key: ${{ runner.os }}-node-${{ hashFiles('tools/cicd/nodejs_actions/package-lock.json') }}
 
-      - name: Check that the nodejs actions are up-to-date
+      - name: Check that all files are up-to-date
         run: |
           commands=(
             "bash tools/cicd/nodejs_actions/update_nodejs_actions.sh"
@@ -71,7 +71,7 @@ jobs:
             set -e
   
             if [ $EXIT_CODE -ne 0 ]; then
-              echo -e "Files of the nodejs actions are not up to date, please run the command '${command}' and commit required changes."
+              echo -e "Not all files are not up to date, please run the command '${command}' and commit required changes."
               exit 1
             fi
           done
