@@ -39,6 +39,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Prepare dev requirements.
+        uses: ./.github/actions/prepare_python_with_dev_requirements
+        with:
+          python_version: ${{ inputs.python_version }}
+
       - name: Get npm cache directory
         id: npm-cache-dir
         shell: bash
@@ -52,17 +57,24 @@ jobs:
 
       - name: Check that the nodejs actions are up-to-date
         run: |
-          bash tools/cicd/nodejs_actions/update_nodejs_actions.sh
+          commands=(
+            "bash tools/cicd/nodejs_actions/update_nodejs_actions.sh"
+            "python3 generate_workflow_yml.py"
+          )
 
-          set +e
-          git diff --exit-code
-          EXIT_CODE=$?
-          set -e
-
-          if [ $EXIT_CODE -ne 0 ]; then
-            echo -e "Files of the nodejs actions are not up to date, please run the command 'bash tools/cicd/nodejs_actions/update_nodejs_actions.sh' and commit required changes."
-            exit 1
-          fi
+          for command in "${commands[@]}"; do
+            
+            $command
+            set +e
+            git diff --exit-code
+            EXIT_CODE=$?
+            set -e
+  
+            if [ $EXIT_CODE -ne 0 ]; then
+              echo -e "Files of the nodejs actions are not up to date, please run the command '${command}' and commit required changes."
+              exit 1
+            fi
+          done
 
   run_cacheable_steps:
     name: "Run cacheable steps"

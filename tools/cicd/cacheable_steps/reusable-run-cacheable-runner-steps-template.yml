@@ -48,8 +48,8 @@ jobs:
       - name: Get all steps ids
         id: get_all_steps_ids
         run: |
-          echo "all_steps_ids_json=$(python3  tools/cicd/cacheable_steps/cacheable_runner_steps_helper.py get-all-steps-ids)" >> $GITHUB_OUTPUT
-          echo "cache_version_suffix=$(python3 tools/cicd/cacheable_steps/cacheable_runner_steps_helper.py get-cache-version-suffix)" >> $GITHUB_OUTPUT
+          echo "all_steps_ids_json=$(python3  tools/cicd/cacheable_steps/get_all_steps_ids.py)" >> $GITHUB_OUTPUT
+          echo "cache_version_suffix=$(cat tools/cicd/cacheable_steps/CACHE_VERSION_SUFFIX)" >> $GITHUB_OUTPUT
           
           cat $GITHUB_OUTPUT
 
@@ -67,7 +67,7 @@ jobs:
         shell: bash
         run: |          
           cat <<< '${{ steps.get_missing_caches_steps.outputs.steps_ids_with_cache_hit }}' | \
-            python3  tools/cicd/cacheable_steps/cacheable_runner_steps_helper.py get-missing-caches-matrices >> "${GITHUB_OUTPUT}"
+            python3  tools/cicd/cacheable_steps/create_output_with_missing_results_steps_matrices.py >> "${GITHUB_OUTPUT}"
           cat $GITHUB_OUTPUT
 
   stage:

@@ -37,8 +37,7 @@ actions=(
 )
 
 # Go through all nodejs actions and compile required source
-for action_name in "${actions[@]}"
-do
+for action_name in "${actions[@]}"; do
 	ACTION_PATH="${SOURCE_ROOT}/.github/actions/${action_name}"
 	# ncc does not work properly when node_modules does not exist in the actions folder, so we make a symlink
 	ln -s -f "${PARENT_PATH}/node_modules" "${ACTION_PATH}/node_modules"
