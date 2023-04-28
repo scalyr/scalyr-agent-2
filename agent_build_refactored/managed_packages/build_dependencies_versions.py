@@ -17,7 +17,7 @@ This module defines version for Python interpreter that is used in our dependenc
 of some of its dependencies.
 """
 
-EMBEDDED_PYTHON_VERSION = "3.11.1"
+EMBEDDED_PYTHON_VERSION = "3.11.3"
 
 # Versions of OpenSSL libraries to build for Python.
 PYTHON_PACKAGE_SSL_1_1_1_VERSION = "1.1.1s"
