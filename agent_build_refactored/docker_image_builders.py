@@ -52,7 +52,6 @@ from agent_build_refactored.tools import (
 from agent_build_refactored.tools.runner import (
     Runner,
     RunnerStep,
-    ArtifactRunnerStep,
 )
 
 log = logging.getLogger(__name__)
@@ -84,7 +83,7 @@ class BaseDistroSpec:
     python_base_image: str
 
 
-class BaseImagePlatformBuilderStep(ArtifactRunnerStep):
+class BaseImagePlatformBuilderStep(RunnerStep):
     """
     Runner step which builds one particular platform of the base image for the agent's final docker image.
     This step, as a result, produces tarball with base image for a particular platform/architecture of the final docker
@@ -126,7 +125,7 @@ class BaseImagePlatformBuilderStep(ArtifactRunnerStep):
         )
 
 
-class BaseImageBuilderStep(ArtifactRunnerStep):
+class BaseImageBuilderStep(RunnerStep):
     """
     This step combines all platform-specific images  from its required steps into one multi-arch base image
     """

@@ -83,7 +83,7 @@ class RunnerStep:
         script_path: Union[pl.Path, str],
         tracked_files_globs: List[Union[str, pl.Path]] = None,
         base: Union["EnvironmentRunnerStep", DockerImageSpec] = None,
-        dependency_steps: Dict[str, "ArtifactRunnerStep"] = None,
+        dependency_steps: Dict[str, "RunnerStep"] = None,
         environment_variables: Dict[str, str] = None,
         user: str = "root",
         run_in_remote_docker_if_available: bool = False
@@ -629,12 +629,6 @@ class RunnerStep:
     def cleanup(self):
         if self._step_container_name:
             run_docker_command(["rm", "-f", self._step_container_name])
-
-
-class ArtifactRunnerStep(RunnerStep):
-    """
-    Specialised step which produces some artifact as a result of its execution.
-    """
 
 
 class EnvironmentRunnerStep(RunnerStep):

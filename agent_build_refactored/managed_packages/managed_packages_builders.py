@@ -108,7 +108,6 @@ from agent_build_refactored.managed_packages.build_dependencies_versions import 
 from agent_build_refactored.tools.runner import (
     Runner,
     RunnerStep,
-    ArtifactRunnerStep,
     RunnerMappedPath,
     EnvironmentRunnerStep,
     DockerImageSpec,
@@ -628,7 +627,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         python_hashlib_bindings_glob = "_hashlib.cpython-*-*-*-*.so"
 
         def copy_openssl_files(
-            build_python_step: ArtifactRunnerStep,
+            build_python_step: RunnerStep,
             openssl_variant_name: str,
         ):
             """# This function copies Python's ssl module related files."""
@@ -946,7 +945,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         )
 
     @classmethod
-    def _get_build_package_root_step(cls, package_name: str) -> ArtifactRunnerStep:
+    def _get_build_package_root_step(cls, package_name: str) -> RunnerStep:
         """
         Return runner step that builds root for a given package.
         :param package_name: name of the package.
@@ -1545,7 +1544,7 @@ _PYTHON_BUILD_DEPENDENCIES_VERSIONS = {
 }
 
 # Step that downloads all Python dependencies.
-DOWNLOAD_PYTHON_DEPENDENCIES = ArtifactRunnerStep(
+DOWNLOAD_PYTHON_DEPENDENCIES = RunnerStep(
     name="download_build_dependencies",
     script_path="agent_build_refactored/managed_packages/steps/download_build_dependencies/download_build_dependencies.sh",
     tracked_files_globs=[
@@ -1562,7 +1561,7 @@ DOWNLOAD_PYTHON_DEPENDENCIES = ArtifactRunnerStep(
 
 def create_build_openssl_steps(
     openssl_version_type: str,
-) -> Dict[Architecture, ArtifactRunnerStep]:
+) -> Dict[Architecture, RunnerStep]:
     """
     Create steps that build openssl library with given version.
     :param openssl_version_type: type of the OpenSSL, eg. 1_1_1, or 3
@@ -1578,7 +1577,7 @@ def create_build_openssl_steps(
     for architecture in SUPPORTED_ARCHITECTURES:
         run_in_remote_docker = architecture != Architecture.X86_64
 
-        step = ArtifactRunnerStep(
+        step = RunnerStep(
             name=f"build_openssl_{openssl_version_type}_{architecture.value}",
             script_path=f"agent_build_refactored/managed_packages/steps/build_openssl/{script_name}",
             base=INSTALL_BUILD_ENVIRONMENT_STEPS[architecture],
@@ -1621,7 +1620,7 @@ def create_install_build_environment_steps() -> Dict[
     return steps
 
 
-def create_build_python_dependencies_steps() -> Dict[Architecture, ArtifactRunnerStep]:
+def create_build_python_dependencies_steps() -> Dict[Architecture, RunnerStep]:
     """
     This function creates step that builds Python dependencies.
     """
@@ -1630,7 +1629,7 @@ def create_build_python_dependencies_steps() -> Dict[Architecture, ArtifactRunne
     for architecture in SUPPORTED_ARCHITECTURES:
         run_in_remote_docker = architecture != Architecture.X86_64
 
-        step = ArtifactRunnerStep(
+        step = RunnerStep(
             name=f"build_python_dependencies_{architecture.value}",
             script_path="agent_build_refactored/managed_packages/steps/build_python_dependencies.sh",
             base=INSTALL_BUILD_ENVIRONMENT_STEPS[architecture],
@@ -1648,9 +1647,9 @@ def create_build_python_dependencies_steps() -> Dict[Architecture, ArtifactRunne
 
 
 def create_build_python_steps(
-    build_openssl_steps: Dict[Architecture, ArtifactRunnerStep],
+    build_openssl_steps: Dict[Architecture, RunnerStep],
     name_suffix: str,
-) -> Dict[Architecture, ArtifactRunnerStep]:
+) -> Dict[Architecture, RunnerStep]:
     """
     Function that creates step instances that build Python interpreter.
     :return: Result steps mapped to architectures..
@@ -1668,7 +1667,7 @@ def create_build_python_steps(
         if architecture == Architecture.X86_64:
             additional_options += "--with-lto"
 
-        build_python = ArtifactRunnerStep(
+        build_python = RunnerStep(
             name=f"build_python_{name_suffix}_{architecture.value}",
             script_path="agent_build_refactored/managed_packages/steps/build_python.sh",
             base=INSTALL_BUILD_ENVIRONMENT_STEPS[architecture],
@@ -1717,7 +1716,7 @@ _SUPPORTED_ARCHITECTURES_TO_BUILD_ENVIRONMENTS = {
 }
 
 
-def create_build_python_package_root_steps() -> Dict[Architecture, ArtifactRunnerStep]:
+def create_build_python_package_root_steps() -> Dict[Architecture, RunnerStep]:
     """
     Function that creates step instances that build Python interpreter.
     :return: Result steps dict mapped to architectures.
@@ -1731,7 +1730,7 @@ def create_build_python_package_root_steps() -> Dict[Architecture, ArtifactRunne
         else:
             libssl_dir = "/usr/local/lib"
 
-        step = ArtifactRunnerStep(
+        step = RunnerStep(
             name="build_python_package_root",
             script_path="agent_build_refactored/managed_packages/steps/build_python_package_root.sh",
             tracked_files_globs=[
@@ -1764,7 +1763,7 @@ def create_build_python_package_root_steps() -> Dict[Architecture, ArtifactRunne
     return steps
 
 
-def create_build_dev_requirements_steps() -> Dict[Architecture, ArtifactRunnerStep]:
+def create_build_dev_requirements_steps() -> Dict[Architecture, RunnerStep]:
     """
     Create steps that build all agent project requirements.
     """
@@ -1779,7 +1778,7 @@ def create_build_dev_requirements_steps() -> Dict[Architecture, ArtifactRunnerSt
         else:
             raise Exception(f"Unknown architecture '{architecture.value}'")
 
-        build_dev_requirements_step = ArtifactRunnerStep(
+        build_dev_requirements_step = RunnerStep(
             name=f"build_dev_requirements_{architecture.value}",
             script_path="agent_build_refactored/managed_packages/steps/build_dev_requirements.sh",
             tracked_files_globs=[
@@ -1805,7 +1804,7 @@ def create_build_dev_requirements_steps() -> Dict[Architecture, ArtifactRunnerSt
     return steps
 
 
-def create_build_agent_libs_venv_steps() -> Dict[Architecture, ArtifactRunnerStep]:
+def create_build_agent_libs_venv_steps() -> Dict[Architecture, RunnerStep]:
     """
     Function that creates steps that install agent requirement libraries.
     :return: Result steps dict mapped to architectures..
@@ -1816,7 +1815,7 @@ def create_build_agent_libs_venv_steps() -> Dict[Architecture, ArtifactRunnerSte
 
         run_in_remote_docker = architecture != Architecture.X86_64
 
-        build_agent_libs_step = ArtifactRunnerStep(
+        build_agent_libs_step = RunnerStep(
             name=f"build_agent_libs_venv_{architecture.value}",
             script_path="agent_build_refactored/managed_packages/steps/build_agent_libs_venv.sh",
             tracked_files_globs=[
@@ -1842,7 +1841,7 @@ def create_build_agent_libs_venv_steps() -> Dict[Architecture, ArtifactRunnerSte
 
 
 def create_build_agent_libs_package_root_steps() -> Dict[
-    Architecture, ArtifactRunnerStep
+    Architecture, RunnerStep
 ]:
     """
     Function that creates steps that builds agent requirement libraries package roots.
@@ -1852,7 +1851,7 @@ def create_build_agent_libs_package_root_steps() -> Dict[
     steps = {}
     for architecture in SUPPORTED_ARCHITECTURES:
 
-        step = ArtifactRunnerStep(
+        step = RunnerStep(
             name="build_agent_libs_package_root",
             script_path="agent_build_refactored/managed_packages/steps/build_agent_libs_package_root.sh",
             tracked_files_globs=[

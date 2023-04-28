@@ -27,7 +27,6 @@ from typing import Dict, List
 from agent_build_refactored.tools.constants import SOURCE_ROOT, Architecture
 from agent_build_refactored.tools.runner import (
     Runner,
-    ArtifactRunnerStep,
     RunnerStep,
 )
 from agent_build_refactored.managed_packages.managed_packages_builders import (
@@ -39,14 +38,14 @@ PORTABLE_RUNNER_NAME = "portable_runner"
 
 
 def create_build_portable_pytest_runner_step() -> Dict[
-    Architecture, ArtifactRunnerStep
+    Architecture, RunnerStep
 ]:
 
     steps = {}
     for architecture in SUPPORTED_ARCHITECTURES:
         run_in_remote_docker = architecture != Architecture.X86_64
 
-        step = ArtifactRunnerStep(
+        step = RunnerStep(
             name=f"build_portable_pytest_runner_{architecture.value}",
             script_path="tests/end_to_end_tests/run_in_remote_machine/steps/build_pytest_runner.py",
             tracked_files_globs=[
