@@ -52,7 +52,7 @@ if __name__ == "__main__":
         for step_id, step in stage.items():
 
             required_steps_ids = []
-            for req_step in step.get_all_required_steps():
+            for req_step in step.get_all_dependency_steps():
                 required_steps_ids.append(req_step.id)
 
             runner_cls = steps_runners[step_id]

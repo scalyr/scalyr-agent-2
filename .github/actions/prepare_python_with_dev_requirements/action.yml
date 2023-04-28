@@ -1,9 +1,9 @@
-name: "Prepare Python with dev. requirements"
-description: "This action accepts matrices for the jobs that are used in the agent-build workflow and excludes job that are must not be executed in mon-master runs."
+name: "Prepare Python with dev requirements"
+description: "Installs Python with all dev requirements of the agent preoject"
 
 inputs:
   python_version:
-    description: ""
+    description: "Version of the Python to install"
 
 
 runs:

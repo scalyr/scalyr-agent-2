@@ -163,7 +163,7 @@ class BaseImageBuilderStep(ArtifactRunnerStep):
                 "agent_build_refactored/tools/steps_libs/build_logging.py",
                 "agent_build_refactored/tools/steps_libs/constants.py",
             ],
-            required_steps=required_steps,
+            dependency_steps=required_steps,
             environment_variables={
                 "BASE_IMAGE_NAME_PREFIX": self.base_image_name_prefix,
             },
@@ -301,7 +301,7 @@ class ContainerImageBuilder(Runner):
 
         # execute runner in order to execute all dependency steps.
 
-        self.run_required()
+        self.prepare_runer()
 
         output_registry_dir_path = output_registry_dir and pl.Path(output_registry_dir)
         result_registry_data_root = output_registry_dir_path / "registry"

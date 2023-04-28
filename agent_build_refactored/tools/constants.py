@@ -25,6 +25,8 @@ AGENT_BUILD_PATH = SOURCE_ROOT / "agent_build"
 
 IN_CICD = bool(os.environ.get("AGENT_BUILD_IN_CICD"))
 
+FAIL_ON_MISSING_STEP_CACHE = bool(os.environ.get("FAIL_ON_MISSING_STEP_CACHE"))
+
 
 @dataclasses.dataclass(frozen=True)
 class DockerPlatformInfo:

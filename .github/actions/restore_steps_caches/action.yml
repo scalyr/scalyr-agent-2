@@ -1,6 +1,6 @@
 name: 'Restore steps caches'
 description: |
-  Restores caches if the steps with given ids.
+  Restores caches of the steps with given ids.
 inputs:
   steps_ids:
     description: "JSON-encoded list of steps ids"

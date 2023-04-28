@@ -83,7 +83,7 @@ class RunnerStep:
         script_path: Union[pl.Path, str],
         tracked_files_globs: List[Union[str, pl.Path]] = None,
         base: Union["EnvironmentRunnerStep", DockerImageSpec] = None,
-        required_steps: Dict[str, "ArtifactRunnerStep"] = None,
+        dependency_steps: Dict[str, "ArtifactRunnerStep"] = None,
         environment_variables: Dict[str, str] = None,
         user: str = "root",
         run_in_remote_docker_if_available: bool = False
@@ -95,7 +95,7 @@ class RunnerStep:
             a step.
         :param base: Another 'EnvironmentRunnerStep' or docker image that will be used as base environment where this
             step will run.
-        :param required_steps: Collection (dict) of other steps that has to be executed in order to run this step.
+        :param dependency_steps: Collection (dict) of other steps that has to be executed in order to run this step.
             Key - Name of the env. variable that points to step's output directory with it;s result artifacts.
             Value - Step instance.
         :param environment_variables: Dist with environment variables to pass to step's script.
@@ -118,7 +118,7 @@ class RunnerStep:
         self.tracked_files_globs = tracked_files_globs
         self._tracked_files = self._get_tracked_files(tracked_files_globs)
 
-        self.required_steps = required_steps or {}
+        self.dependency_steps = dependency_steps or {}
         self.environment_variables = environment_variables or {}
 
         if isinstance(base, EnvironmentRunnerStep):
@@ -207,30 +207,12 @@ class RunnerStep:
 
         return sorted(list(set(tracked_files)))
 
-    @staticmethod
-    def get_steps_child_steps(steps: List['RunnerStep'], recursive: bool = False):
-
-        result_steps = steps[:]
-        if not recursive:
-            return sort_and_filter_steps(steps=result_steps)
-
-        child_steps = list()
-
-        for step in steps:
-            for child_step in step.required_steps.values():
-                child_steps.append(child_step)
-
-        if not child_steps:
-            return []
-
-        nested_steps = RunnerStep.get_steps_child_steps(steps=child_steps, recursive=True)
-        result_steps.extend(nested_steps)
-
-        return sort_and_filter_steps(steps=result_steps)
-
-    def get_all_required_steps(self, recursive: bool = False) -> List['RunnerStep']:
-
-        result_steps = list(self.required_steps.values())
+    def get_all_dependency_steps(self, recursive: bool = False) -> List['RunnerStep']:
+        """
+        Return dependency steps of all given steps.
+        :param recursive: If True, get all dependencies recursively.
+        """
+        result_steps = list(self.dependency_steps.values())
 
         if self._base_step:
             result_steps.append(self._base_step)
@@ -240,7 +222,7 @@ class RunnerStep:
 
         nested_child_steps = []
         for step in result_steps:
-            for child_step in step.get_all_required_steps(recursive=True):
+            for child_step in step.get_all_dependency_steps(recursive=True):
                 nested_child_steps.append(child_step)
 
         result_steps.extend(nested_child_steps)
@@ -313,7 +295,7 @@ class RunnerStep:
         """
         result = {}
 
-        for step_env_var_name, step in self.required_steps.items():
+        for step_env_var_name, step in self.dependency_steps.items():
             result[step_env_var_name] = step.get_output_directory(work_dir=work_dir)
 
         return result
@@ -326,7 +308,7 @@ class RunnerStep:
         """
         result = {}
 
-        for step_env_var_name, step in self.required_steps.items():
+        for step_env_var_name, step in self.dependency_steps.items():
             step_out_dir = step.get_output_directory(work_dir=work_dir)
             step_dir = pl.Path("/tmp") / f"required_step_{step_out_dir.name}"
             result[step_env_var_name] = step_dir
@@ -350,6 +332,7 @@ class RunnerStep:
             source_root_value = self.get_isolated_root(work_dir=work_dir)
             step_output_path_value = self.get_temp_output_directory(work_dir=work_dir)
 
+        # Those environment variables are used by the step scripts.
         result_env_variables["SOURCE_ROOT"] = str(source_root_value)
         result_env_variables["STEP_OUTPUT_PATH"] = str(step_output_path_value)
 
@@ -362,9 +345,6 @@ class RunnerStep:
 
         result_env_variables.update(self.environment_variables)
 
-        if IN_CICD:
-            result_env_variables["IN_CICD"] = "1"
-
         return result_env_variables
 
     def _calculate_checksum(self) -> str:
@@ -376,7 +356,7 @@ class RunnerStep:
         sha256 = hashlib.sha256()
 
         # Add checksums of the required steps.
-        for step in self.required_steps.values():
+        for step in self.dependency_steps.values():
             sha256.update(step.checksum.encode())
 
         # Add base step's checksum.
@@ -422,9 +402,7 @@ class RunnerStep:
         env = os.environ.copy()
         env.update(env_variables_to_pass)
 
-        command_args = self._get_command_args(
-            tmp_output_directory=temp_output_directory
-        )
+        command_args = self._get_command_args()
 
         check_call_with_log(command_args, env=env, cwd=str(isolated_source_root))
 
@@ -482,9 +460,7 @@ class RunnerStep:
             remote_docker_host=remote_docker_host,
         )
 
-        command_args = self._get_command_args(
-            tmp_output_directory=in_docker_tmp_output_directory,
-        )
+        command_args = self._get_command_args()
 
         # Create intermediate container
         run_docker_command(
@@ -548,13 +524,9 @@ class RunnerStep:
                 remote_docker_host=remote_docker_host,
             )
 
-    def _get_command_args(
-            self,
-            tmp_output_directory: pl.Path
-    ):
+    def _get_command_args(self):
         """
         Get list with command arguments that has to be executed by step.
-        :return:
         """
         if self.is_step_script_is_python:
             executable = "python3"
@@ -570,7 +542,8 @@ class RunnerStep:
             str(self.script_path),
         ]
 
-    def is_output_exists(self, work_dir: pl.Path):
+    def is_output_result_exists(self, work_dir: pl.Path):
+        """Returns True if the result of this step already exists and there's no need to run it."""
         return self.get_output_directory(work_dir=work_dir).exists()
 
     def run(
@@ -614,12 +587,10 @@ class RunnerStep:
             f"Passed env. variables:\n    {env_variables_str}\n"
         )
 
-        self.get_isolated_root(work_dir=work_dir).mkdir(parents=True, exist_ok=True)
-
         # Check that all required steps results exists.
         missing_steps_ids = []
-        for step in self.get_all_required_steps():
-            if not step.is_output_exists(work_dir=work_dir):
+        for step in self.get_all_dependency_steps():
+            if not step.is_output_result_exists(work_dir=work_dir):
                 missing_steps_ids.append(step.id)
 
         if missing_steps_ids:
@@ -627,7 +598,6 @@ class RunnerStep:
                 f"Can not run step '{self.id}' because not all required steps have their result outputs.\n"
                 f"Required steps with missing outputs: {missing_steps_ids}"
             )
-
 
         try:
             if self.runs_in_docker:
@@ -653,6 +623,7 @@ class RunnerStep:
             )
             raise
 
+        # Remove temporary output directory to normal output directory
         chown_directory_in_docker(temp_output_directory)
         temp_output_directory.rename(output_directory)
         self.cleanup()
@@ -660,9 +631,6 @@ class RunnerStep:
     def cleanup(self):
         if self._step_container_name:
             run_docker_command(["rm", "-f", self._step_container_name])
-
-    def __eq__(self, other: "RunnerStep"):
-        return self.id == other.id
 
 
 class ArtifactRunnerStep(RunnerStep):
@@ -722,7 +690,10 @@ ALL_RUNNERS = []
 
 
 class RunnerMeta(abc.ABCMeta):
-    """This is a metaclass for all Runner classes."""
+    """This is a metaclass for all Runner classes.
+    It's main purpose to track creation of all runner classes and tracking them in the global collection
+    In order to be able to access them from CI/CD or docker.
+    """
 
     def __init__(cls, name, bases, attrs):
         global ALL_RUNNERS
@@ -767,8 +738,11 @@ class Runner(metaclass=RunnerMeta):
     # This class attribute is used to find and load this runner class without direct access to it.
     FULLY_QUALIFIED_NAME: str
 
+    # If used, this alias will be used as the class name in its FULLY_QUALIFIED_NAME.
+    # This may be helpful when class is created dynamically and its original name can't be used.
     CLASS_NAME_ALIAS: str = None
 
+    # If True this class will be added to a global collection of runners
     ADD_TO_GLOBAL_RUNNER_COLLECTION: bool = False
 
     def __init__(self, work_dir: pl.Path = None):
@@ -777,26 +751,27 @@ class Runner(metaclass=RunnerMeta):
         """
 
         self.base_environment = type(self).get_base_environment()
-        self.required_runners = {}
 
         self.work_dir = pl.Path(work_dir or SOURCE_ROOT / "agent_build_output")
         output_name = type(self).FULLY_QUALIFIED_NAME.replace(".", "_")
         self.output_path = self.work_dir / "runner_outputs" / output_name
 
-        self._input_values = {}
-
     @classmethod
-    def get_base_environment(cls) -> Optional[EnvironmentRunnerStep]:
+    def get_base_environment(cls) -> Optional[Union[EnvironmentRunnerStep, DockerImageSpec]]:
+        """
+        Docker image or Environment step that is used as base environment where this runner is executed.
+        """
         return None
 
     @classmethod
     def get_all_required_steps(cls) -> List[RunnerStep]:
+        """Return all steps that are required by this runner"""
         return []
 
     @classmethod
     def get_all_steps(cls, recursive: bool = False) -> List[RunnerStep]:
         """
-        Gather all (including nested) RunnerSteps from all possible plases which are used by this runner.
+        Gather all (including nested) RunnerSteps which are used by this runner.
         """
 
         result_steps = cls.get_all_required_steps()
@@ -810,13 +785,12 @@ class Runner(metaclass=RunnerMeta):
 
         nested_steps = []
         for step in result_steps:
-            for child_step in step.get_all_required_steps(recursive=True):
+            for child_step in step.get_all_dependency_steps(recursive=True):
                 nested_steps.append(child_step)
 
         result_steps.extend(nested_steps)
 
         return sort_and_filter_steps(steps=result_steps)
-
 
     @property
     def base_docker_image(self) -> Optional[DockerImageSpec]:
@@ -837,13 +811,17 @@ class Runner(metaclass=RunnerMeta):
     def run_in_docker(
         self, command_args: List = None, python_executable: str = "python3"
     ):
-
+        """
+        Run this Runner in docker.
+        :param command_args: Command line argument for the runner.
+        """
         command_args = command_args or []
 
         final_command_args = []
 
         mount_args = []
 
+        # Mount paths that may be passed to the command line arguments.
         for arg in command_args:
             if not isinstance(arg, RunnerMappedPath):
                 final_command_args.append(str(arg))
@@ -859,6 +837,7 @@ class Runner(metaclass=RunnerMeta):
             mount_args.extend(["-v", f"{arg.path}:{in_docker_path}"])
             final_command_args.append(str(in_docker_path))
 
+        # Pass this env variable so runner knows that it runs inside docker.
         env_args = ["-e", "AGENT_BUILD_IN_DOCKER=1"]
 
         base_step_output = self.base_environment.get_output_directory(
@@ -894,9 +873,9 @@ class Runner(metaclass=RunnerMeta):
         # error that can be due to using root user inside the docker.
         chown_directory_in_docker(self.output_path)
 
-    def run_required(self):
+    def prepare_runer(self):
         """
-        Function where Runner performs its main actions.
+        Prepare runner and all its steps. This has to be done before executing runner's main functionality.
         """
 
         # Cleanup output if needed.
@@ -904,13 +883,16 @@ class Runner(metaclass=RunnerMeta):
             remove_root_owned_directory(path=self.output_path)
         self.output_path.mkdir(parents=True)
 
+        # If runner is inside the docker, then we do not need to prepare all required steps because
+        # they have to be prepared before.
+        # We also do the same if we are in CI/CD and all used steps results have to be restored from the cache
         if IN_CICD or IN_DOCKER:
 
             all_steps = self.get_all_steps()
 
             missing_steps = []
             for step in all_steps:
-                if not step.is_output_exists(work_dir=self.work_dir):
+                if not step.is_output_result_exists(work_dir=self.work_dir):
                     missing_steps.append(step)
 
             if missing_steps:
@@ -921,12 +903,14 @@ class Runner(metaclass=RunnerMeta):
 
             return
 
+        # Otherwise we have to find all required steps that don't have already existing results and run them.
+
         all_steps = self.get_all_steps(recursive=True)
 
         # Find steps that do not have already existing results.
         steps_with_existing_results = {}
         for step in all_steps:
-            if step.is_output_exists(work_dir=self.work_dir):
+            if step.is_output_result_exists(work_dir=self.work_dir):
                 steps_with_existing_results[step.id] = step
 
         # Group steps by "stages" according to their dependencies.
@@ -1123,21 +1107,6 @@ def sort_and_filter_steps(steps: List['RunnerStep']) -> List['RunnerStep']:
     return sorted(steps_ids.values(), key=lambda s: s.id)
 
 
-def get_steps_with_missing_results(steps: List[RunnerStep], work_dir: pl.Path):
-    """
-
-    :param steps:
-    :param work_dir:
-    :return:
-    """
-    result = {}
-    for step in steps:
-        if not step.is_output_exists(work_dir=work_dir):
-            result[step.id] = step
-
-    return result
-
-
 def group_steps_by_stages(steps: List[RunnerStep]):
     """
     This function groups given steps into "stages" ensuring that the "dependency" steps are in the
@@ -1163,7 +1132,7 @@ def group_steps_by_stages(steps: List[RunnerStep]):
         for step_id, step in remaining_steps.items():
             add = True
 
-            for req_step in step.get_all_required_steps():
+            for req_step in step.get_all_dependency_steps():
                 if req_step.id in remaining_steps:
                     add = False
                     break

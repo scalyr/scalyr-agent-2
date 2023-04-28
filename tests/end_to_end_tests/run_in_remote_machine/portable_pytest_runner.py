@@ -85,7 +85,7 @@ class PortablePytestRunnerBuilder(Runner):
 
     def build(self):
 
-        self.run_required()
+        self.prepare_runer()
 
         build_step = BUILD_PORTABLE_PYTEST_RUNNER_STEPS[self.ARCHITECTURE]
         build_step_output = build_step.get_output_directory(work_dir=self.work_dir)

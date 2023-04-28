@@ -162,7 +162,7 @@ class RepoBuilder(Runner):
         packages_dir_path: pl.Path,
     ):
 
-        self.run_required()
+        self.prepare_runer()
 
         if self.runs_in_docker:
             self.run_in_docker(

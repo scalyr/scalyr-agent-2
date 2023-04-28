@@ -353,7 +353,7 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
         replace_code(post_install_scriptlet)
 
     def build_agent_package(self):
-        self.run_required()
+        self.prepare_runer()
 
         # Run inside the docker if needed.
         if self.runs_in_docker:
@@ -849,7 +849,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         var_opt_dir.mkdir(parents=True)
 
     def build_agent_package(self):
-        self.run_required()
+        self.prepare_runer()
 
         # Run inside the docker if needed.
         if self.runs_in_docker:
@@ -1000,7 +1000,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         :param stable_versions_file: Path to JSON file with stable versions to reuse.
         """
 
-        self.run_required()
+        self.prepare_runer()
 
         # Run inside the docker if needed.
         if self.runs_in_docker:
@@ -1149,7 +1149,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
             dependency package from this path will be reused instead of building a new one.
         """
 
-        self.run_required()
+        self.prepare_runer()
 
         # Run inside the docker if needed.
         if self.runs_in_docker:
@@ -1582,7 +1582,7 @@ def create_build_openssl_steps(
             name=f"build_openssl_{openssl_version_type}_{architecture.value}",
             script_path=f"agent_build_refactored/managed_packages/steps/build_openssl/{script_name}",
             base=INSTALL_BUILD_ENVIRONMENT_STEPS[architecture],
-            required_steps={
+            dependency_steps={
                 "DOWNLOAD_BUILD_DEPENDENCIES": DOWNLOAD_PYTHON_DEPENDENCIES,
             },
             environment_variables={
@@ -1634,7 +1634,7 @@ def create_build_python_dependencies_steps() -> Dict[Architecture, ArtifactRunne
             name=f"build_python_dependencies_{architecture.value}",
             script_path="agent_build_refactored/managed_packages/steps/build_python_dependencies.sh",
             base=INSTALL_BUILD_ENVIRONMENT_STEPS[architecture],
-            required_steps={
+            dependency_steps={
                 "DOWNLOAD_BUILD_DEPENDENCIES": DOWNLOAD_PYTHON_DEPENDENCIES
             },
             environment_variables={
@@ -1672,7 +1672,7 @@ def create_build_python_steps(
             name=f"build_python_{name_suffix}_{architecture.value}",
             script_path="agent_build_refactored/managed_packages/steps/build_python.sh",
             base=INSTALL_BUILD_ENVIRONMENT_STEPS[architecture],
-            required_steps={
+            dependency_steps={
                 "DOWNLOAD_BUILD_DEPENDENCIES": DOWNLOAD_PYTHON_DEPENDENCIES,
                 "BUILD_PYTHON_DEPENDENCIES": BUILD_PYTHON_DEPENDENCIES_STEPS[
                     architecture
@@ -1742,7 +1742,7 @@ def create_build_python_package_root_steps() -> Dict[Architecture, ArtifactRunne
                 "agent_build_refactored/managed_packages/scalyr_agent_python3/install-scriptlets/preuninstall.sh",
             ],
             base=PREPARE_TOOLSET_STEPS[Architecture.X86_64],
-            required_steps={
+            dependency_steps={
                 "BUILD_OPENSSL_1_1_1": BUILD_OPENSSL_1_1_1_STEPS[architecture],
                 "BUILD_OPENSSL_3": BUILD_OPENSSL_3_STEPS[architecture],
                 "BUILD_PYTHON_WITH_OPENSSL_1_1_1": BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[
@@ -1786,7 +1786,7 @@ def create_build_dev_requirements_steps() -> Dict[Architecture, ArtifactRunnerSt
                 "dev-requirements-new.txt",
             ],
             base=INSTALL_BUILD_ENVIRONMENT_STEPS[architecture],
-            required_steps={
+            dependency_steps={
                 "BUILD_PYTHON_DEPENDENCIES": BUILD_PYTHON_DEPENDENCIES_STEPS[
                     architecture
                 ],
@@ -1823,7 +1823,7 @@ def create_build_agent_libs_venv_steps() -> Dict[Architecture, ArtifactRunnerSte
                 "dev-requirements-new.txt",
             ],
             base=INSTALL_BUILD_ENVIRONMENT_STEPS[architecture],
-            required_steps={
+            dependency_steps={
                 "BUILD_OPENSSL": BUILD_OPENSSL_1_1_1_STEPS[architecture],
                 "BUILD_PYTHON": BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[architecture],
                 "BUILD_DEV_REQUIREMENTS": BUILD_DEV_REQUIREMENTS_STEPS[architecture],
@@ -1862,7 +1862,7 @@ def create_build_agent_libs_package_root_steps() -> Dict[
                 "agent_build_refactored/managed_packages/scalyr_agent_libs/install-scriptlets/postinstall.sh",
             ],
             base=PREPARE_TOOLSET_STEPS[Architecture.X86_64],
-            required_steps={
+            dependency_steps={
                 "BUILD_AGENT_LIBS": BUILD_AGENT_LIBS_VENV_STEPS[architecture],
             },
             environment_variables={
@@ -1918,7 +1918,7 @@ def create_prepare_toolset_steps() -> Dict[Architecture, EnvironmentRunnerStep]:
             name=f"prepare_toolset_{architecture.value}",
             script_path="agent_build_refactored/managed_packages/steps/prepare_toolset.sh",
             base=base_image,
-            required_steps={
+            dependency_steps={
                 "BUILD_OPENSSL_1_1_1": BUILD_OPENSSL_1_1_1_STEPS[architecture],
                 "BUILD_PYTHON_1_1_1": BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[
                     architecture
@@ -1955,7 +1955,7 @@ def create_prepare_python_environment_steps() -> Dict[
                 name=_SUPPORTED_ARCHITECTURES_TO_BUILD_ENVIRONMENTS[architecture].image,
                 platform=architecture.as_docker_platform.value,
             ),
-            required_steps={
+            dependency_steps={
                 "BUILD_OPENSSL_1_1_1": BUILD_OPENSSL_1_1_1_STEPS[architecture],
                 "BUILD_PYTHON_1_1_1": BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[
                     architecture
