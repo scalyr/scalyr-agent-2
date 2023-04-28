@@ -1,0 +1,5 @@
+FROM ubuntu:22.04
+
+ARG ARCH_DIR_NAME
+
+ADD ${ARCH_DIR_NAME}/python /
