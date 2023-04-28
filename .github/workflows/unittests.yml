@@ -57,7 +57,7 @@ jobs:
           coverage xml -i -o coverage.xml
 
       - name: Upload Coverage to Codecov.io
-        uses: codecov/codecov-action@d9f34f8cd5cb3b3eb79b3e4b5dae3a16df499a70 # pin@v3
+        uses: codecov/codecov-action@40a12dcee2df644d47232dde008099a3e9e4f865 # pin@v3.1.2
         with:
           files: ./coverage.xml
           fail_ci_if_error: true
@@ -298,6 +298,6 @@ jobs:
         with:
           path: reports
       - name: Publish Test Results
-        uses: EnricoMi/publish-unit-test-result-action@26dda2fabf18a9c6329223e653166444edbb7e78 # pin@v2
+        uses: EnricoMi/publish-unit-test-result-action@39ee91a16bb587a6c2b4791d4954cf5299736efd # pin@v2
         with:
           junit_files: "reports/**/junit*.xml"

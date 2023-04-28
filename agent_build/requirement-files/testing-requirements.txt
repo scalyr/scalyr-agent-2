@@ -20,7 +20,6 @@ pytest-benchmark==3.2.3; python_version < '3.11'
 pytest-benchmark==4.0.0; python_version == '3.11'
 pytest-xdist==1.31.0
 coverage==4.5.4
-codecov==2.1.9
 decorator==4.4.1
 requests-mock==1.9.3
 six==1.13.0

@@ -73,7 +73,7 @@ jobs:
           coverage xml -i -o coverage.xml
 
       - name: Upload Coverage to Codecov.io
-        uses: codecov/codecov-action@d9f34f8cd5cb3b3eb79b3e4b5dae3a16df499a70 # pin@v3
+        uses: codecov/codecov-action@40a12dcee2df644d47232dde008099a3e9e4f865 # pin@v3.1.2
         with:
           files: ./coverage.xml
           fail_ci_if_error: true
@@ -546,7 +546,7 @@ jobs:
     container: ${{ matrix.container }}
     strategy:
       matrix:
-        os: [ "macos-11", "ubuntu-18.04" ]
+        os: [ "macos-11", "ubuntu-20.04" ]
         python-version: [ "3.7.13" ]
         # Uncomment when windows platform and service related issues are fixed.
     #        include:
