@@ -146,28 +146,11 @@ jobs:
         with:
           driver-opts: network=host
 
-#
-#      - name: Prepare environment.
-#        uses: ./.github/actions/execute-runner
-#        with:
-#          runner-fqdn: "agent_build_refactored.__init__.BuildTestEnvironment"
-
       - name: Download built packages.
         uses: actions/download-artifact@v3
         with:
           name:  linux-packages-${{ matrix.configuration.name }}
           path: /tmp/packages
-
-#      - name: Prepare everything that is needed by builder '${{ matrix.configuration.name }}'
-#        uses: ./.github/actions/execute-runner
-#        with:
-#          runner-fqdn: ${{ matrix.builder-fqdn }}
-
-#      - name: Prepare cached steps for package '${{ matrix.configuration.name }}' tests
-#        uses: ./.github/actions/execute-runner
-#        with:
-#          runner-fqdn: "tests.end_to_end_tests.run_in_remote_machine.portable_pytest_runner.PortablePytestRunnerBuilder_${{ matrix.arch }}"
-
 
       - name: Get required steps ids
         id: get_required_steps_ids

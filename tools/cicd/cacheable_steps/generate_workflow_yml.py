@@ -48,11 +48,11 @@ def generate_workflow_yaml():
         stage_job_name = f"stage_{counter}"
 
         stage_matrix_output_name = f"stage_matrix{counter}"
-        stage_matrix_output_value = f"${{{{ steps.print_missing_caches_matrices.outputs.{stage_matrix_output_name} }}}}"
+        stage_matrix_output_value = f"${{{{ steps.get_missing_steps_matrices.outputs.{stage_matrix_output_name} }}}}"
         pre_job_outputs[stage_matrix_output_name] = stage_matrix_output_value
 
         stage_skip_output_name = f"stage_skip{counter}"
-        stage_skip_output_value = f"${{{{ steps.print_missing_caches_matrices.outputs.{stage_skip_output_name} }}}}"
+        stage_skip_output_value = f"${{{{ steps.get_missing_steps_matrices.outputs.{stage_skip_output_name} }}}}"
         pre_job_outputs[stage_skip_output_name] = stage_skip_output_value
 
         if counter > 0:

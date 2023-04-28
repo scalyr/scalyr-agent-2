@@ -390,7 +390,6 @@ class RunnerStep:
         self,
         work_dir: pl.Path,
         isolated_source_root: pl.Path,
-        temp_output_directory: pl.Path
     ):
         """
         Run the step's script, whether in docker or in current system.
@@ -612,7 +611,6 @@ class RunnerStep:
                 self._run_script_locally(
                     work_dir=work_dir,
                     isolated_source_root=isolated_source_root,
-                    temp_output_directory=temp_output_directory
                 )
         except Exception:
             files = [str(g) for g in self._tracked_files]

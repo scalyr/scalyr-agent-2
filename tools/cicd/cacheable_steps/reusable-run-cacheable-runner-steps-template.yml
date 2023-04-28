@@ -1,3 +1,5 @@
+# This is a template for the final workflow file that runs all cacheable steps in separate jobs to speed up the builds.
+# It is processed by the 'tools/cicd/cacheable_steps/generate_workflow_yml.py' script in order to create the final version.
 name: Run pre-built jobs.
 
 on:
@@ -63,7 +65,7 @@ jobs:
           lookup_only: true
 
       - name: Print missing steps caches matrices
-        id: print_missing_caches_matrices
+        id: get_missing_steps_matrices
         shell: bash
         run: |          
           cat <<< '${{ steps.get_missing_caches_steps.outputs.steps_ids_with_cache_hit }}' | \
