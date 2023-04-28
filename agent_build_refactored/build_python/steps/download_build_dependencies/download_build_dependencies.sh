@@ -159,7 +159,7 @@ sMB+Qkul/Hc+0BLBe+OVT6Ml1IAL
 " | gpg --import
 
 
-GNU_KEYRING_PATH="${SOURCE_ROOT}/agent_build_refactored/managed_packages/steps/download_build_dependencies/gnu-keyring.gpg"
+GNU_KEYRING_PATH="${SOURCE_ROOT}/agent_build_refactored/build_python/steps/download_build_dependencies/gnu-keyring.gpg"
 
 
 
@@ -226,7 +226,7 @@ popd
 clear_public_keys
 
 
-BZIP2_GPG_KEY_PATH="${SOURCE_ROOT}/agent_build_refactored/managed_packages/steps/download_build_dependencies/gpgkey-5C1D1AA44BE649DE760A.gpg"
+BZIP2_GPG_KEY_PATH="${SOURCE_ROOT}/agent_build_refactored/build_python/steps/download_build_dependencies/gpgkey-5C1D1AA44BE649DE760A.gpg"
 
 mkdir "${STEP_OUTPUT_PATH}/bzip2"
 pushd "${STEP_OUTPUT_PATH}/bzip2"
