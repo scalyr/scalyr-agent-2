@@ -59,7 +59,7 @@ jobs:
         cache_root: agent_build_output/step_output
         lookup_only: true
     - name: Print missing steps caches matrices
-      id: print_missing_caches_matrices
+      id: get_missing_steps_matrices
       shell: bash
       run: |
         cat <<< '${{ steps.get_missing_caches_steps.outputs.steps_ids_with_cache_hit }}' | \
@@ -67,24 +67,18 @@ jobs:
 
         cat $GITHUB_OUTPUT
     outputs:
-      stage_matrix0: ${{ steps.print_missing_caches_matrices.outputs.stage_matrix0
-        }}
-      stage_skip0: ${{ steps.print_missing_caches_matrices.outputs.stage_skip0 }}
-      stage_matrix1: ${{ steps.print_missing_caches_matrices.outputs.stage_matrix1
-        }}
-      stage_skip1: ${{ steps.print_missing_caches_matrices.outputs.stage_skip1 }}
-      stage_matrix2: ${{ steps.print_missing_caches_matrices.outputs.stage_matrix2
-        }}
-      stage_skip2: ${{ steps.print_missing_caches_matrices.outputs.stage_skip2 }}
-      stage_matrix3: ${{ steps.print_missing_caches_matrices.outputs.stage_matrix3
-        }}
-      stage_skip3: ${{ steps.print_missing_caches_matrices.outputs.stage_skip3 }}
-      stage_matrix4: ${{ steps.print_missing_caches_matrices.outputs.stage_matrix4
-        }}
-      stage_skip4: ${{ steps.print_missing_caches_matrices.outputs.stage_skip4 }}
-      stage_matrix5: ${{ steps.print_missing_caches_matrices.outputs.stage_matrix5
-        }}
-      stage_skip5: ${{ steps.print_missing_caches_matrices.outputs.stage_skip5 }}
+      stage_matrix0: ${{ steps.get_missing_steps_matrices.outputs.stage_matrix0 }}
+      stage_skip0: ${{ steps.get_missing_steps_matrices.outputs.stage_skip0 }}
+      stage_matrix1: ${{ steps.get_missing_steps_matrices.outputs.stage_matrix1 }}
+      stage_skip1: ${{ steps.get_missing_steps_matrices.outputs.stage_skip1 }}
+      stage_matrix2: ${{ steps.get_missing_steps_matrices.outputs.stage_matrix2 }}
+      stage_skip2: ${{ steps.get_missing_steps_matrices.outputs.stage_skip2 }}
+      stage_matrix3: ${{ steps.get_missing_steps_matrices.outputs.stage_matrix3 }}
+      stage_skip3: ${{ steps.get_missing_steps_matrices.outputs.stage_skip3 }}
+      stage_matrix4: ${{ steps.get_missing_steps_matrices.outputs.stage_matrix4 }}
+      stage_skip4: ${{ steps.get_missing_steps_matrices.outputs.stage_skip4 }}
+      stage_matrix5: ${{ steps.get_missing_steps_matrices.outputs.stage_matrix5 }}
+      stage_skip5: ${{ steps.get_missing_steps_matrices.outputs.stage_skip5 }}
   stage_0:
     name: 0 ${{ matrix.name }}
     runs-on: ubuntu-20.04
