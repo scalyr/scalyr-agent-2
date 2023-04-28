@@ -29,7 +29,7 @@ from agent_build_refactored.tools.runner import (
     Runner,
     RunnerStep,
 )
-from agent_build_refactored.managed_packages.managed_packages_builders import (
+from agent_build_refactored.build_python.build_python_steps import (
     PREPARE_PYTHON_ENVIRONMENT_STEPS,
     SUPPORTED_ARCHITECTURES,
 )

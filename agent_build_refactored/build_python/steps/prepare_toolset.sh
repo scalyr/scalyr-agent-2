@@ -25,7 +25,6 @@
 #   BUILD_PYTHON: output path of the previous step that provides Python interpreter.
 #   BUILD_AGENT_LIBS: output path of the previous step that provides dev libraries for the Python.
 #   FPM_VERSION: Version of the fpm tool.
-#   PACKAGE_CLOUD_VERSION: Version of the package_cloud tools. used to manipulate Packagecloud packages.
 #
 
 set -e
@@ -42,7 +41,7 @@ source ~/.bashrc
 
 apt update
 DEBIAN_FRONTEND=noninteractive apt install -y ruby ruby-dev rubygems build-essential rpm git reprepro createrepo-c gnupg2 patchelf binutils aptly
-gem install "fpm:${FPM_VERSION}" "package_cloud:${PACKAGECLOUD_VERSION}"
+gem install "fpm:${FPM_VERSION}"
 
 
 
