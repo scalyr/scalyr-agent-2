@@ -10,6 +10,7 @@ venv/
 env/
 .env/
 bin/
+!agent_build_refactored/build_python/files/bin
 !agent_build_refactored/managed_packages/files/bin/
 !agent_build_refactored/managed_packages/non-aio/files/bin/
 build/

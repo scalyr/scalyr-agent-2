@@ -139,9 +139,14 @@ from agent_build_refactored.build_python.build_python_steps import (
     BUILD_PYTHON_WITH_OPENSSL_3_STEPS,
     create_build_agent_libs_venv_steps,
     PREPARE_TOOLSET_STEPS,
+    create_python_files,
+    render_python_wrapper_executable,
+    create_libs_venv_files,
 )
 
 logger = logging.getLogger(__name__)
+
+FILES_DIR = pl.Path(__file__).parent.absolute() / "files"
 
 # Name of the dependency package with Python interpreter.
 PYTHON_PACKAGE_NAME = "scalyr-agent-python3"
@@ -465,18 +470,21 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         ]
         build_python_with_openssl_3_step = BUILD_PYTHON_WITH_OPENSSL_3_STEPS[step_arch]
 
-        # Copy Python interpreter to package.
-        shutil.copytree(
-            build_python_with_openssl_1_1_1_step.get_output_directory(
+        build_python_with_openssl_3_step_output = build_python_with_openssl_1_1_1_step.get_output_directory(
                 work_dir=self.work_dir
-            ),
-            package_root,
-            dirs_exist_ok=True,
-            symlinks=True,
         )
 
         relative_python_install_prefix = pl.Path(PYTHON_INSTALL_PREFIX).relative_to("/")
         package_opt_dir = package_root / AGENT_OPT_DIR.relative_to("/")
+
+        package_python_dir = package_root / relative_python_install_prefix
+
+        create_python_files(
+            build_python_step_output=build_python_with_openssl_3_step_output,
+            output=package_root,
+            additional_ld_library_paths=f"{AGENT_OPT_DIR}/lib/openssl/current/libs"
+        )
+
         package_openssl_dir = package_opt_dir / "lib/openssl"
 
         python_ssl_bindings_glob = "_ssl.cpython-*-*-*-*.so"
@@ -552,7 +560,6 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         package_current_openssl_dir.symlink_to("./embedded")
 
         # Remove original bindings from Python interpreter and replace them with symlinks.
-        package_python_dir = package_root / relative_python_install_prefix
         package_python_lib_dir = (
             package_python_dir / f"lib/python{EMBEDDED_PYTHON_SHORT_VERSION}"
         )
@@ -572,26 +579,13 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
             f"../../../../lib/openssl/current/bindings/{hashlib_binding_path.name}"
         )
 
-        # Rename main Python executable to be 'python3-original' and copy our wrapper script instead of it
-        source_bin_dir = (
-            SOURCE_ROOT / "agent_build_refactored/managed_packages/files/bin"
-        )
-        package_python_bin_dir = package_python_dir / "bin"
-        package_python_bin_executable_full_name = (
-            package_python_bin_dir / f"python{EMBEDDED_PYTHON_SHORT_VERSION}"
-        )
-        package_python_bin_original_executable = (
-            package_python_bin_dir / "python3-original"
-        )
-        package_python_bin_executable_full_name.rename(
-            package_python_bin_original_executable
-        )
-        shutil.copy(source_bin_dir / "python3", package_python_bin_executable_full_name)
-
         # Copy executables that allows to configure the Python interpreter.
         package_opt_bin_dir = package_opt_dir / "bin"
         package_opt_bin_dir.mkdir(parents=True)
-        shutil.copy(source_bin_dir / "agent-python3-config", package_opt_bin_dir)
+        shutil.copy(
+            FILES_DIR / "bin/agent-python3-config",
+            package_opt_bin_dir
+        )
 
         # Copy Python interpreter's configuration files.
         package_opt_etc_dir = package_opt_dir / "etc"
@@ -599,87 +593,15 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         preferred_openssl_file = package_opt_etc_dir / "preferred_openssl"
         preferred_openssl_file.write_text("auto")
 
-        # Remove other executables
-        for _glob in ["pip*", "2to3*", "pydoc*", "idle*"]:
-            for path in package_python_bin_dir.glob(_glob):
-                path.unlink()
-
-        # Remove some unneeded libraries
-        shutil.rmtree(package_python_lib_dir / "ensurepip")
-        shutil.rmtree(package_python_lib_dir / "unittest")
-        shutil.rmtree(package_python_lib_dir / "turtledemo")
-        shutil.rmtree(package_python_lib_dir / "tkinter")
-
-        # These standard libraries are marked as deprecated and will be removed in future versions.
-        # https://peps.python.org/pep-0594/
-        # We do not wait for it and remove them now in order to reduce overall size.
-        # When deprecated libs are removed, this code can be removed as well.
-
-        if EMBEDDED_PYTHON_VERSION < "3.12":
-            os.remove(package_python_lib_dir / "asynchat.py")
-            os.remove(package_python_lib_dir / "smtpd.py")
-
-            # TODO: Do not remove the asyncore library because it is a requirement for our pysnmp monitor.
-            #  We have to update the pysnmp library before the asyncore is removed from Python.
-            # os.remove(package_python_lib_dir / "asyncore.py")
-
-        if EMBEDDED_PYTHON_VERSION < "3.13":
-            os.remove(package_python_lib_dir / "aifc.py")
-            list(package_python_bindings_dir.glob("audioop.*.so"))[0].unlink()
-            os.remove(package_python_lib_dir / "cgi.py")
-            os.remove(package_python_lib_dir / "cgitb.py")
-            os.remove(package_python_lib_dir / "chunk.py")
-            os.remove(package_python_lib_dir / "crypt.py")
-            os.remove(package_python_lib_dir / "imghdr.py")
-            os.remove(package_python_lib_dir / "mailcap.py")
-            os.remove(package_python_lib_dir / "nntplib.py")
-            list(package_python_bindings_dir.glob("nis.*.so"))[0].unlink()
-            list(package_python_bindings_dir.glob("ossaudiodev.*.so"))[0].unlink()
-            os.remove(package_python_lib_dir / "pipes.py")
-            os.remove(package_python_lib_dir / "sndhdr.py")
-            list(package_python_bindings_dir.glob("spwd.*.so"))[0].unlink()
-            os.remove(package_python_lib_dir / "sunau.py")
-            os.remove(package_python_lib_dir / "telnetlib.py")
-            os.remove(package_python_lib_dir / "uu.py")
-            os.remove(package_python_lib_dir / "xdrlib.py")
-
         # Copy agent libraries venv
-        package_venv_dir = package_opt_dir / "venv"
-        package_venv_dir.mkdir()
         build_agent_libs_venv_step = BUILD_AGENT_LIBS_VENV_STEPS[step_arch]
-        shutil.copytree(
-            build_agent_libs_venv_step.get_output_directory(work_dir=self.work_dir)
-            / "venv",
-            package_venv_dir,
-            dirs_exist_ok=True,
-            symlinks=True,
+        build_agent_libs_venv_step_output = build_agent_libs_venv_step.get_output_directory(
+            work_dir=self.work_dir
         )
-
-        # Recreate Python executables in venv and delete everything except them, since they are not needed.
-        package_venv_bin_dir = package_venv_dir / "bin"
-        shutil.rmtree(package_venv_bin_dir)
-        package_venv_bin_dir.mkdir()
-        package_venv_bin_dir_original_executable = (
-            package_venv_bin_dir / "python3-original"
+        create_libs_venv_files(
+            build_libs_venv_step_output=build_agent_libs_venv_step_output,
+            output=package_opt_dir / "venv"
         )
-        package_venv_bin_dir_original_executable.symlink_to(
-            AGENT_OPT_DIR / "python3/bin/python3-original"
-        )
-
-        package_venv_bin_python3_executable = package_venv_bin_dir / "python3"
-        shutil.copy(
-            SOURCE_ROOT
-            / "agent_build_refactored/managed_packages/files/bin/venv-python3",
-            package_venv_bin_python3_executable,
-        )
-
-        package_venv_bin_python_executable = package_venv_bin_dir / "python"
-        package_venv_bin_python_executable.symlink_to("python3")
-
-        package_venv_bin_python_full_executable = (
-            package_venv_bin_dir / f"python{EMBEDDED_PYTHON_SHORT_VERSION}"
-        )
-        package_venv_bin_python_full_executable.symlink_to("python3")
 
         # Create core requirements file.
         core_requirements_file = package_opt_dir / "core-requirements.txt"
@@ -687,15 +609,13 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
 
         # Copy additional requirements file.
         shutil.copy(
-            SOURCE_ROOT
-            / "agent_build_refactored/managed_packages/files/additional-requirements.txt",
+            FILES_DIR / "additional-requirements.txt",
             package_opt_etc_dir,
         )
 
         # Copy script that allows configuring of the agent requirements.
         shutil.copy(
-            SOURCE_ROOT
-            / "agent_build_refactored/managed_packages/files/bin/agent-libs-config",
+            FILES_DIR / "bin/agent-libs-config",
             package_opt_bin_dir,
         )
 

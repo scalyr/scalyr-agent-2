@@ -1,9 +1,12 @@
+import os
 import dataclasses
 import pathlib as pl
+import shutil
+import stat
 from typing import Dict
 
 
-from agent_build_refactored.tools.constants import Architecture, DockerPlatform
+from agent_build_refactored.tools.constants import Architecture, DockerPlatform, SOURCE_ROOT
 from agent_build_refactored.tools.runner import RunnerStep, EnvironmentRunnerStep, DockerImageSpec
 
 from agent_build_refactored.managed_packages.build_dependencies_versions import (
@@ -26,13 +29,14 @@ PYTHON_INSTALL_PREFIX = f"{AGENT_OPT_DIR}/python3"
 EMBEDDED_PYTHON_SHORT_VERSION = ".".join(EMBEDDED_PYTHON_VERSION.split(".")[:2])
 
 
-
 PYTHON_PACKAGE_SSL_VERSIONS = {
     OPENSSL_VERSION_TYPE_1_1_1: PYTHON_PACKAGE_SSL_1_1_1_VERSION,
     OPENSSL_VERSION_TYPE_3: PYTHON_PACKAGE_SSL_3_VERSION,
 }
 
-STEPS_SCRIPTS_DIR = pl.Path(__file__).parent.absolute() / "steps"
+PARENT_DIR = pl.Path(__file__).parent.absolute()
+STEPS_SCRIPTS_DIR = PARENT_DIR / "steps"
+FILES_DIR = PARENT_DIR / "files"
 
 
 # Simple dataclass to store information about base environment step.
@@ -408,3 +412,154 @@ def create_prepare_python_environment_steps() -> Dict[
 
 
 PREPARE_PYTHON_ENVIRONMENT_STEPS = create_prepare_python_environment_steps()
+
+
+def create_python_files(
+        build_python_step_output: pl.Path,
+        output: pl.Path,
+        additional_ld_library_paths: str = None
+):
+
+    output.mkdir(parents=True)
+    shutil.copytree(
+        build_python_step_output,
+        output,
+        dirs_exist_ok=True,
+        symlinks=True
+    )
+
+    # Rename main Python executable to be 'python3-original' and copy our wrapper script instead of it
+    opt_dir = output / AGENT_OPT_DIR.relative_to("/")
+    python_dir = opt_dir / "python3"
+    python_bin_dir = python_dir / "bin"
+
+    python_executable_full_name = python_bin_dir / f"python{EMBEDDED_PYTHON_SHORT_VERSION}"
+    python_original_executable = python_bin_dir / "python3-original"
+    python_executable_full_name.rename(python_original_executable)
+
+    render_python_wrapper_executable(
+        executable_path=AGENT_OPT_DIR / "python3/bin/python3-original",
+        output_file=python_executable_full_name,
+        additional_ld_library_paths=additional_ld_library_paths,
+    )
+
+    remove_python_unused_files(install_prefix=python_dir)
+
+
+def render_python_wrapper_executable(
+        executable_path: pl.Path,
+        output_file: pl.Path,
+        additional_ld_library_paths: str = None
+):
+    template_path = FILES_DIR / "bin/python3_template.sh"
+
+    content = template_path.read_text()
+
+    content = content.replace(
+        "%{{ REPLACE_PYTHON_EXECUTABLE }}", str(executable_path)
+    )
+
+    final_additional_ld_library_paths = f"{AGENT_OPT_DIR}/python3/lib"
+
+    if additional_ld_library_paths:
+        final_additional_ld_library_paths = f"{final_additional_ld_library_paths}:{additional_ld_library_paths}"
+
+    content = content.replace(
+        "%{{ REPLACE_ADDITIONAL_LD_LIBRARY_PATH }}", str(final_additional_ld_library_paths)
+    )
+
+    output_file.write_text(content)
+
+    output_file.chmod(output_file.stat().st_mode | stat.S_IEXEC)
+
+
+def remove_python_unused_files(
+        install_prefix: pl.Path
+):
+    bin_dir = install_prefix / "bin"
+    stdlib_dir = install_prefix / "lib" / f"python{EMBEDDED_PYTHON_SHORT_VERSION}"
+    # Remove other executables
+    for _glob in ["pip*", "2to3*", "pydoc*", "idle*"]:
+        for path in bin_dir.glob(_glob):
+            path.unlink()
+
+    # Remove some unneeded libraries
+    shutil.rmtree(stdlib_dir / "ensurepip")
+    shutil.rmtree(stdlib_dir / "unittest")
+    shutil.rmtree(stdlib_dir / "turtledemo")
+    shutil.rmtree(stdlib_dir / "tkinter")
+
+    # These standard libraries are marked as deprecated and will be removed in future versions.
+    # https://peps.python.org/pep-0594/
+    # We do not wait for it and remove them now in order to reduce overall size.
+    # When deprecated libs are removed, this code can be removed as well.
+
+    if EMBEDDED_PYTHON_VERSION < "3.12":
+        os.remove(stdlib_dir / "asynchat.py")
+        os.remove(stdlib_dir / "smtpd.py")
+
+        # TODO: Do not remove the asyncore library because it is a requirement for our pysnmp monitor.
+        #  We have to update the pysnmp library before the asyncore is removed from Python.
+        # os.remove(package_python_lib_dir / "asyncore.py")
+
+    if EMBEDDED_PYTHON_VERSION < "3.13":
+        lib_bindings_dir = stdlib_dir / "lib-dynload"
+
+        os.remove(stdlib_dir / "aifc.py")
+        list(lib_bindings_dir.glob("audioop.*.so"))[0].unlink()
+        os.remove(stdlib_dir / "cgi.py")
+        os.remove(stdlib_dir / "cgitb.py")
+        os.remove(stdlib_dir / "chunk.py")
+        os.remove(stdlib_dir / "crypt.py")
+        os.remove(stdlib_dir / "imghdr.py")
+        os.remove(stdlib_dir / "mailcap.py")
+        os.remove(stdlib_dir / "nntplib.py")
+        list(lib_bindings_dir.glob("nis.*.so"))[0].unlink()
+        list(lib_bindings_dir.glob("ossaudiodev.*.so"))[0].unlink()
+        os.remove(stdlib_dir / "pipes.py")
+        os.remove(stdlib_dir / "sndhdr.py")
+        list(lib_bindings_dir.glob("spwd.*.so"))[0].unlink()
+        os.remove(stdlib_dir / "sunau.py")
+        os.remove(stdlib_dir / "telnetlib.py")
+        os.remove(stdlib_dir / "uu.py")
+        os.remove(stdlib_dir / "xdrlib.py")
+
+
+def create_libs_venv_files(
+    build_libs_venv_step_output: pl.Path,
+    output: pl.Path
+):
+    output.mkdir()
+    shutil.copytree(
+        build_libs_venv_step_output / "venv",
+        output,
+        dirs_exist_ok=True,
+        symlinks=True,
+    )
+
+    # Recreate Python executables in venv and delete everything except them, since they are not needed.
+    venv_bin_dir = output / "bin"
+    shutil.rmtree(venv_bin_dir)
+    venv_bin_dir.mkdir()
+    venv_bin_dir_original_executable = (
+            venv_bin_dir / "python3-original"
+    )
+    venv_bin_dir_original_executable.symlink_to(
+        AGENT_OPT_DIR / "python3/bin/python3-original"
+    )
+
+    venv_bin_python3_executable = venv_bin_dir / "python3"
+
+    render_python_wrapper_executable(
+        executable_path=pl.Path("/var/opt/scalyr-agent-2/venv/bin/python3-original"),
+        output_file=venv_bin_python3_executable,
+        additional_ld_library_paths=f"{AGENT_OPT_DIR}/lib/openssl/current/libs"
+    )
+
+    venv_bin_python_executable = venv_bin_dir / "python"
+    venv_bin_python_executable.symlink_to("python3")
+
+    venv_bin_python_full_executable = (
+            venv_bin_dir / f"python{EMBEDDED_PYTHON_SHORT_VERSION}"
+    )
+    venv_bin_python_full_executable.symlink_to("python3")
