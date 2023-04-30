@@ -32,15 +32,9 @@ from typing import List, Dict
 import pytest
 
 from agent_build_refactored.tools.constants import SOURCE_ROOT
-
-from agent_build_refactored.managed_packages.build_dependencies_versions import (
-    PYTHON_PACKAGE_SSL_1_VERSION,
-    PYTHON_PACKAGE_SSL_3_VERSION,
-)
-
 from agent_build_refactored.managed_packages.managed_packages_builders import (
     AGENT_SUBDIR_NAME,
-    #DEFAULT_PYTHON_PACKAGE_OPENSSL_VERSION,
+    DEFAULT_PYTHON_PACKAGE_OPENSSL_VERSION,
     AGENT_AIO_PACKAGE_NAME,
 )
 from tests.end_to_end_tests.tools import AgentPaths, AgentCommander, TimeoutTracker
@@ -706,7 +700,7 @@ def _install_from_convenience_script(
             assert "Looking for system OpenSSL >= 3: Not found" in output
             assert "Looking for system OpenSSL >= 1.1.1: Not found" in output
             assert (
-                f"Using embedded OpenSSL == OpenSSL {PYTHON_PACKAGE_SSL_3_VERSION}"
+                f"Using embedded OpenSSL == OpenSSL {DEFAULT_PYTHON_PACKAGE_OPENSSL_VERSION}"
                 in output
             )
 

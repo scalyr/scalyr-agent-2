@@ -28,17 +28,13 @@ set -e
 
 mkdir /tmp/build-openssl_3
 pushd /tmp/build-openssl_3
-tar -xf "${DOWNLOAD_BUILD_DEPENDENCIES}/openssl_3/openssl.tar.gz"
+tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/openssl_3/openssl.tar.gz"
 pushd "openssl-${OPENSSL_VERSION}"
 ./config
 make -j "$(nproc)"
 make DESTDIR="${STEP_OUTPUT_PATH}" install_sw
 popd
 popd
-
-if [ "${DISTRO_NAME}" = "centos:6" ]; then
-  mv "${STEP_OUTPUT_PATH}/usr/local/lib64" "${STEP_OUTPUT_PATH}/usr/local/lib"
-fi
 
 mkdir -p "${STEP_OUTPUT_PATH}/etc/ld.so.conf.d"
 echo "/usr/local/lib" >> "${STEP_OUTPUT_PATH}/etc/ld.so.conf.d/local.conf"

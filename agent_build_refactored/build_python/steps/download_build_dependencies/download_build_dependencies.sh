@@ -30,7 +30,7 @@
 #   LIBEDIT_VERSION: version of libedit to build. Python requirement. Provides non-GPL alternative for readline module.
 #   GDBM_VERSION: version of gdbm to build. Python requirement. Provides dbm module.
 #   LIBFFI_VERSION: version of libffi to build. Python requirement. Provides ctypes module and essential for C bindings.
-#   OPENSSL_1_VERSION: version of OpenSSL 1.1.1 to build. Python requirement. Provides ssl module.
+#   OPENSSL_1_1_1_VERSION: version of OpenSSL 1.1.1 to build. Python requirement. Provides ssl module.
 #   OPENSSL_3_VERSION: version of OpenSSL 3 to build. Python requirement. Provides ssl module.
 #   PYTHON_VERSION: version of Python.
 
@@ -552,10 +552,10 @@ TIdjvGbJ/k4qxw==
 
 
 
-mkdir "${STEP_OUTPUT_PATH}/openssl_1"
-pushd "${STEP_OUTPUT_PATH}/openssl_1"
-curl -L "https://www.openssl.org/source/openssl-${OPENSSL_1_VERSION}.tar.gz" > openssl.tar.gz
-curl -L "https://www.openssl.org/source/openssl-${OPENSSL_1_VERSION}.tar.gz.asc" > openssl.tar.gz.asc
+mkdir "${STEP_OUTPUT_PATH}/openssl_1_1_1"
+pushd "${STEP_OUTPUT_PATH}/openssl_1_1_1"
+curl -L "https://www.openssl.org/source/openssl-${OPENSSL_1_1_1_VERSION}.tar.gz" > openssl.tar.gz
+curl -L "https://www.openssl.org/source/openssl-${OPENSSL_1_1_1_VERSION}.tar.gz.asc" > openssl.tar.gz.asc
 gpg --verify openssl.tar.gz.asc openssl.tar.gz
 popd
 

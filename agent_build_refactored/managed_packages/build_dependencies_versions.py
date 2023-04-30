@@ -20,14 +20,14 @@ of some of its dependencies.
 EMBEDDED_PYTHON_VERSION = "3.11.2"
 
 # Versions of OpenSSL libraries to build for Python.
-PYTHON_PACKAGE_SSL_1_VERSION = "1.1.1s"
+PYTHON_PACKAGE_SSL_1_1_1_VERSION = "1.1.1s"
 PYTHON_PACKAGE_SSL_3_VERSION = "3.0.7"
 
 # Version of the OpenSSL library, which is bundled with the package
-EMBEDDED_OPENSSL_VERSION = PYTHON_PACKAGE_SSL_1_VERSION
+EMBEDDED_OPENSSL_VERSION = PYTHON_PACKAGE_SSL_1_1_1_VERSION
 
 # Integer (hex) representation of the OpenSSL version.
-EMBEDDED_OPENSSL_VERSION_NUMBER = 0x30000070
+EMBEDDED_OPENSSL_VERSION_NUMBER = 0x1010113F
 
 # Version of Rust to use in order to build some of agent's requirements, e.g. orjson.
 RUST_VERSION = "1.63.0"
