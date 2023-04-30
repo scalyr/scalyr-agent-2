@@ -748,9 +748,10 @@ BUILD_AGENT_LIBS_VENV_STEPS = create_build_agent_libs_venv_steps(
 
 ALL_MANAGED_PACKAGE_BUILDERS: Dict[str, Type[LinuxPackageBuilder]] = UniqueDict()
 
-# Iterate through all supported architectures and create package builders classes for each.
-for arch in SUPPORTED_ARCHITECTURES:
-    for package_type in ["deb", "rpm"]:
+
+for package_type in ["deb", "rpm"]:
+    # Iterate through all supported architectures and create package builders classes for each.
+    for arch in SUPPORTED_ARCHITECTURES:
         class _LinuxAIOPackagesBuilder(LinuxAIOPackagesBuilder):
             PACKAGE_TYPE = package_type
             DEPENDENCY_PACKAGES_ARCHITECTURE = arch
@@ -760,9 +761,9 @@ for arch in SUPPORTED_ARCHITECTURES:
         builder_name = f"{package_type}-aio-{arch.value}"
         ALL_MANAGED_PACKAGE_BUILDERS[builder_name] = _LinuxAIOPackagesBuilder
 
-for package_type in ["deb", "rpm"]:
+    # Also create non-aio package builder for each package type
     class _LinuxNonAIOPackageBuilder(LinuxNonAIOPackageBuilder):
-        PACKAGE_TYPE = "deb"
+        PACKAGE_TYPE = package_type
         CLASS_NAME_ALIAS = f"{package_type}LinuxNonAIOPackagesBuilder"
         ADD_TO_GLOBAL_RUNNER_COLLECTION = True
 
