@@ -21,7 +21,7 @@
 #
 #
 # This script is a wrapper that calls real Python executable with additional path for  'LD_LIBRARY_PATH' variable in
-# order make Python work.
+# order make Pytho work.
 #
 
 set -e

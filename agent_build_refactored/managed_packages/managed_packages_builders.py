@@ -122,6 +122,7 @@ from agent_build_refactored.prepare_agent_filesystem import (
     build_linux_fhs_agent_files,
     add_config,
     create_change_logs,
+    render_agent_executable_script,
 )
 
 from agent_build_refactored.build_python.build_python_steps import (
@@ -141,7 +142,7 @@ from agent_build_refactored.build_python.build_python_steps import (
     PREPARE_TOOLSET_STEPS,
     create_python_files,
     render_python_wrapper_executable,
-    create_libs_venv_files,
+    create_agent_libs_venv_files,
 )
 
 logger = logging.getLogger(__name__)
@@ -209,6 +210,10 @@ class LinuxPackageBuilder(Runner):
             "--config-files", f"/etc/{AGENT_SUBDIR_NAME}/agent.json",
             "--config-files", f"/etc/{AGENT_SUBDIR_NAME}/agent.d",
             "--config-files", f"/usr/share/{AGENT_SUBDIR_NAME}/monitors",
+            # NOTE: We leave those two files in place since they are symlinks which might have been
+            # updated by scalyr-switch-python and we want to leave this in place - aka make sure
+            # selected Python version is preserved on upgrade
+            "--config-files", f"/usr/share/{AGENT_SUBDIR_NAME}/bin/scalyr-agent-2",
             "--directories", f"/usr/share/{AGENT_SUBDIR_NAME}",
             "--directories", f"/var/lib/{AGENT_SUBDIR_NAME}",
             "--directories", f"/var/log/{AGENT_SUBDIR_NAME}",
@@ -229,7 +234,7 @@ class LinuxPackageBuilder(Runner):
         :param package_root_path: Path with package root.
         """
         build_linux_fhs_agent_files(
-            output_path=package_root_path, copy_agent_source=True
+            output_path=package_root_path
         )
 
         # remove Python cache directories from agent's source code.
@@ -598,7 +603,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         build_agent_libs_venv_step_output = build_agent_libs_venv_step.get_output_directory(
             work_dir=self.work_dir
         )
-        create_libs_venv_files(
+        create_agent_libs_venv_files(
             build_libs_venv_step_output=build_agent_libs_venv_step_output,
             output=package_opt_dir / "venv"
         )
@@ -643,11 +648,12 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         install_root_executable_path = (
             agent_package_root / f"usr/share/{AGENT_SUBDIR_NAME}/bin/scalyr-agent-2-new"
         )
-        # Add agent's executable script.
-        shutil.copy(
-            SOURCE_ROOT
-            / "agent_build_refactored/managed_packages/files/bin/scalyr-agent-2",
-            install_root_executable_path,
+
+        # Create agent's executable script.
+        render_agent_executable_script(
+            python_executable="/var/opt/scalyr-agent-2/venv/bin/python3",
+            agent_main_script_path=pl.Path("/usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py"),
+            output_file=install_root_executable_path
         )
 
         # Also link agent executable to usr/sbin

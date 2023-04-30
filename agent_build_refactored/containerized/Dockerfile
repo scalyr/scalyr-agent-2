@@ -1,5 +1,10 @@
 FROM ubuntu:22.04
 
-ARG ARCH_DIR_NAME
+ARG TARGETOS
+ARG TARGETARCH
+ARG TARGETVARIANT
+ARG ARCH_DIR_NAME="${TARGETOS}_${TARGETARCH}_${TARGETVARIANT}"
 
-ADD ${ARCH_DIR_NAME}/python /
+ADD architectures/${ARCH_DIR_NAME}/python /
+ADD architectures/${ARCH_DIR_NAME}/venv /
+ADD agent_filesystem_root /
