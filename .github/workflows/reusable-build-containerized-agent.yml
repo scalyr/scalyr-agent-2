@@ -1,55 +1,30 @@
 name: "Kubernetes End to End Tests"
 
 on:
-  push:
-    branches:
-      - master
-  pull_request:
-    branches:
-      - master
-  schedule:
-    - cron: '0 4 * * *'
-
-permissions:
-  actions: write  # Needed for skip-duplicate-jobs job
-  contents: read
+  workflow_call:
 
 jobs:
-  # Special job which automatically cancels old runs for the same branch, prevents runs for the
-  # same file set which has already passed, etc.
-  pre_job:
-    name: Skip Duplicate Jobs Pre Job
-    runs-on: ubuntu-latest
-    outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+  build_images:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        images:
+          - { "name": "deb-aio-x86_64" }
+          - { "name": "rpm-aio-x86_64" }
+          - { "name": "deb-aio-arm64" }
+          - { "name": "rpm-aio-arm64" }
+          - { "name": "deb-non-aio" }
+          - { "name": "rpm-non-aio" }
     steps:
-        # Since we allow triggering of this workflow with 'push' and 'pull_request' events,
-        # there has to be a duplicated triggering when we push into a branch which has also a PR opened.
-        # This job has to skip duplicates in this case, but it's also important, in case of opened PR,
-        # to not skip the 'pull_request' event because it has to perform more extra tests, rather that regular 'push'
-        # event triggered workflow.
-      - name: "Determine which trigger event can not be skipped."
-        id: get_events_to_not_skip
-        run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo 'events_to_not_skip=["workflow_dispatch", "schedule", "pull_request"]' >> $GITHUB_OUTPUT
-          else
-            echo 'events_to_not_skip=["workflow_dispatch", "schedule"]' >> $GITHUB_OUTPUT
-          fi
+      - name: Checkout Repository
+        uses: actions/checkout@v3
 
-      - id: skip_check
-        uses: fkirc/skip-duplicate-actions@12aca0a884f6137d619d6a8a09fcc3406ced5281 # v4.0.0
-        with:
-          cancel_others: 'true'
-          concurrent_skipping: 'same_content'
-          do_not_skip: "${{ steps.get_events_to_not_skip.outputs.events_to_not_skip }}"
-          github_token: ${{ github.token }}
+
 
   coverage:
     runs-on: ubuntu-latest
     if: success() || failure()
     needs:
-      - pre_job
       - k8s-smoketest
       - docker-smoketest
     steps:

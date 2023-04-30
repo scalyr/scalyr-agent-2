@@ -1,9 +1,11 @@
 import argparse
+import dataclasses
 import shutil
 import pathlib as pl
 import subprocess
-from typing import List
+from typing import List, Dict
 
+from agent_build_refactored.tools import UniqueDict
 from agent_build_refactored.tools.constants import Architecture, SOURCE_ROOT
 from agent_build_refactored.tools.runner import Runner, RunnerStep
 
@@ -15,14 +17,16 @@ from agent_build_refactored.managed_packages.managed_packages_builders import (
     AGENT_SUBDIR_NAME,
 )
 from agent_build_refactored.build_python.build_python_steps import create_python_files, create_agent_libs_venv_files
-from agent_build_refactored.prepare_agent_filesystem import build_linux_fhs_agent_files, add_config, render_agent_executable_script
+from agent_build_refactored.prepare_agent_filesystem import add_config, render_agent_executable_script, build_agent_linux_fhs_common_files
 
 SUPPORTED_IMAGE_ARCHITECTURES = [
     Architecture.X86_64,
 ]
 
 
-class AgentImageBuilder(Runner):
+class ContainerizedAgentBuilder(Runner):
+    CONFIG_PATH: pl.Path
+
     @classmethod
     def get_all_required_steps(cls) -> List[RunnerStep]:
         result = []
@@ -41,14 +45,14 @@ class AgentImageBuilder(Runner):
         agent_filesystem_root = build_context_path / "agent_filesystem_root"
 
         # Build 'FHS-structured' filesystem.
-        build_linux_fhs_agent_files(
+        build_agent_linux_fhs_common_files(
             output_path=agent_filesystem_root,
+            agent_executable_name="scalyr-agent-2"
         )
 
         add_config(
-            base_config_source_path=SOURCE_ROOT / "docker" / "docker-json-config",
+            base_config_source_path=self.CONFIG_PATH,
             output_path=agent_filesystem_root / "etc/scalyr-agent-2",
-            #additional_config_paths=type(self).IMAGE_TYPE_SPEC.additional_config_paths,
         )
 
         install_root_executable_path = (
@@ -56,7 +60,7 @@ class AgentImageBuilder(Runner):
         )
 
         render_agent_executable_script(
-            python_executable="/var/opt/scalyr-agent-2/venv/bin/python3",
+            python_executable=pl.Path("/var/opt/scalyr-agent-2/venv/bin/python3"),
             agent_main_script_path=pl.Path("/usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py"),
             output_file=install_root_executable_path
         )
@@ -123,18 +127,46 @@ class AgentImageBuilder(Runner):
             ]
         )
 
-
-
     @classmethod
     def handle_command_line_arguments(
         cls,
         args,
     ):
-        super(AgentImageBuilder, cls).handle_command_line_arguments(args=args)
+        super(ContainerizedAgentBuilder, cls).handle_command_line_arguments(args=args)
 
         builder = cls(work_dir=args.work_dir)
 
         builder.build()
+
+
+ALL_AGENT_IMAGE_BUILDERS: Dict = UniqueDict()
+
+
+@dataclasses.dataclass
+class PythonBuildStepsInfo:
+    openssl_1_1_1: RunnerStep
+    openssl_3: RunnerStep
+    python_with_openssl_1_1_1: RunnerStep
+    python_with_openssl_3: RunnerStep
+    agent_libs_venv: RunnerStep
+
+
+# for architecture in SUPPORTED_IMAGE_ARCHITECTURES:
+#     PythonBuildStepsInfo(
+#         openssl_1_1_1=None,
+#         openssl_3=BUILD_OPENSSL_3_STEPS[architecture],
+#         python_with_openssl_1_1_1=None,
+#         python_with_openssl_3=BUILD_PYTHON_WITH_OPENSSL_3_STEPS[architecture],
+#         agent_libs_venv=BUILD_AGENT_LIBS_VENV_STEPS[architecture]
+#     )
+
+
+class DockerJsonContainerizedBuilder(ContainerizedAgentBuilder):
+    CONFIG_PATH = SOURCE_ROOT / "docker/docker-json-config"
+    ADD_TO_GLOBAL_RUNNER_COLLECTION = True
+
+
+ALL_AGENT_IMAGE_BUILDERS["containerized-k8s"] = DockerJsonContainerizedBuilder
 
 
 
