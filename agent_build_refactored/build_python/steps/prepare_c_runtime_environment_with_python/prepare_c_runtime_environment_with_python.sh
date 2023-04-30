@@ -30,8 +30,8 @@
 
 set -e
 
-cp -a "${BUILD_PYTHON_1_1_1}/." /
-cp -a "${BUILD_OPENSSL_1_1_1}/." /
+cp -a "${BUILD_PYTHON_WITH_OPENSSL_1}/." /
+cp -a "${BUILD_OPENSSL_1}/." /
 cp -a "${BUILD_DEV_REQUIREMENTS}/root/." /
 
 echo "${PYTHON_INSTALL_PREFIX}/lib" >> /etc/ld.so.conf.d/python3.conf
