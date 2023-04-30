@@ -227,7 +227,7 @@ def get_install_info(install_type: str) -> dict:
 
 
 def render_agent_executable_script(
-    python_executable: str,
+    python_executable: pl.Path,
     agent_main_script_path: pl.Path,
     output_file: pl.Path,
 ):
@@ -242,7 +242,7 @@ def render_agent_executable_script(
     content = template_path.read_text()
 
     content = content.replace(
-        "%{{ REPLACE_PYTHON_EXECUTABLE }}%", python_executable
+        "%{{ REPLACE_PYTHON_EXECUTABLE }}%", str(python_executable)
     )
 
     content = content.replace(
@@ -256,16 +256,12 @@ def render_agent_executable_script(
 def build_agent_base_files(
     output_path: pl.Path,
     install_type: str,
-    version: str = None,
 ):
     """
     Create directory with agent's core files.
     :param output_path: Output path for the root of the agent's base files.
     :param install_type: String with install type of the future package.
         See 'install_info' in scalyr_agent/__scalyr__.py module.
-    :param version: Version string to assign to the future package, uses version from the VERSION file if None.
-    :param copy_agent_source: If True, then agent's source code is also copied into the '<output_path>/py' directory.
-        In opposite, it is expected that a frozen binaries will be placed instead of source code later.
     """
     if output_path.exists():
         shutil.rmtree(output_path)
@@ -278,11 +274,10 @@ def build_agent_base_files(
     recursively_delete_files_by_name(output_path / monitors_path, "README.md")
 
     # Add VERSION file.
-    result_version_path = output_path / "VERSION"
-    if version:
-        result_version_path.write_text(version)
-    else:
-        shutil.copy2(SOURCE_ROOT / "VERSION", output_path / "VERSION")
+    shutil.copy2(
+        SOURCE_ROOT / "VERSION",
+        output_path / "VERSION"
+    )
 
     # Create bin directory with executables.
     bin_path = output_path / "bin"
@@ -290,11 +285,6 @@ def build_agent_base_files(
     source_code_path = output_path / "py"
 
     shutil.copytree(SOURCE_ROOT / "scalyr_agent", source_code_path / "scalyr_agent")
-
-    agent_main_executable_path = bin_path / "scalyr-agent-2"
-    agent_main_executable_path.symlink_to(
-        pl.Path("..", "py", "scalyr_agent", "agent_main.py")
-    )
 
     # Copy wrapper script for removed 'scalyr-agent-2-config' executable for backward compatibility.
     shutil.copy2(
@@ -322,24 +312,13 @@ def build_agent_base_files(
     )
 
 
-def build_linux_agent_files(
+def build_agent_linux_common_files(
     output_path: pl.Path,
-    install_type: str,
-    version: str = None,
 ):
     """
     Extend agent core files with files that are common for all Linux based distributions.
     :param output_path: Output path for the root of the agent's base files.
-    :param install_type: String with install type of the future package.
-        See 'install_info' in scalyr_agent/__scalyr__.py module.
-    :param version: Version string to assign to the future package, uses version from the VERSION file if None.
     """
-
-    build_agent_base_files(
-        output_path=output_path,
-        install_type=install_type,
-        version=version,
-    )
 
     # Add certificates.
     certs_path = output_path / "certs"
@@ -355,21 +334,25 @@ def build_linux_agent_files(
         shutil.copy2(SOURCE_ROOT / "docker" / f, misc_path / f)
 
 
-def build_linux_fhs_agent_files(
+def build_agent_linux_fhs_common_files(
     output_path: pl.Path,
-    version: str = None,
+    agent_executable_name: str
 ):
     """
     Adapt agent's Linux based files for FHS based packages such DEB,RPM or for the filesystems for our docker images.
         In opposite, it is expected that a frozen binaries will be placed instead of source code later.
     :param output_path: Output path for the root of the agent's base files.
-    :param version: Version string to assign to the future package, uses version from the VERSION file if None.
+    :param agent_executable_name: Name of agent's executable in its install root.
     """
     agent_install_root = output_path / "usr/share/scalyr-agent-2"
-    build_linux_agent_files(
+
+    build_agent_base_files(
         output_path=agent_install_root,
         install_type="package",
-        version=version,
+    )
+
+    build_agent_linux_common_files(
+        output_path=agent_install_root,
     )
 
     pl.Path(output_path, "var/log/scalyr-agent-2").mkdir(parents=True)
@@ -378,11 +361,9 @@ def build_linux_fhs_agent_files(
     usr_sbin_path = output_path / "usr/sbin"
     usr_sbin_path.mkdir(parents=True)
 
-    agent_binary_symlink_path = output_path / "usr/sbin/scalyr-agent-2"
-    frozen_binary_symlink_target_path = pl.Path(
-        "..", "share", "scalyr-agent-2", "bin", "scalyr-agent-2"
-    )
-    agent_binary_symlink_path.symlink_to(frozen_binary_symlink_target_path)
+    # Also link agent executable to usr/sbin
+    usr_sbin_executable = output_path / "usr/sbin/scalyr-agent-2"
+    usr_sbin_executable.symlink_to(f"../share/scalyr-agent-2/bin/{agent_executable_name}")
 
     scalyr_agent_config_symlink_path = (
         output_path / "usr/sbin" / "scalyr-agent-2-config"

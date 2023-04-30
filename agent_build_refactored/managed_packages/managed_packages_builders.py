@@ -119,7 +119,7 @@ from agent_build_refactored.tools.constants import (
 )
 from agent_build_refactored.tools import check_call_with_log
 from agent_build_refactored.prepare_agent_filesystem import (
-    build_linux_fhs_agent_files,
+    build_agent_linux_fhs_common_files,
     add_config,
     create_change_logs,
     render_agent_executable_script,
@@ -210,10 +210,6 @@ class LinuxPackageBuilder(Runner):
             "--config-files", f"/etc/{AGENT_SUBDIR_NAME}/agent.json",
             "--config-files", f"/etc/{AGENT_SUBDIR_NAME}/agent.d",
             "--config-files", f"/usr/share/{AGENT_SUBDIR_NAME}/monitors",
-            # NOTE: We leave those two files in place since they are symlinks which might have been
-            # updated by scalyr-switch-python and we want to leave this in place - aka make sure
-            # selected Python version is preserved on upgrade
-            "--config-files", f"/usr/share/{AGENT_SUBDIR_NAME}/bin/scalyr-agent-2",
             "--directories", f"/usr/share/{AGENT_SUBDIR_NAME}",
             "--directories", f"/var/lib/{AGENT_SUBDIR_NAME}",
             "--directories", f"/var/log/{AGENT_SUBDIR_NAME}",
@@ -228,13 +224,18 @@ class LinuxPackageBuilder(Runner):
         pass
 
     @staticmethod
-    def _build_packages_common_files(package_root_path: pl.Path):
+    def _build_packages_common_files(
+        package_root_path: pl.Path,
+        agent_executable_name: str
+    ):
         """
         Build files that are common for all types of linux packages.
         :param package_root_path: Path with package root.
+        :param agent_executable_name: Name of the agent's executable in its install root.
         """
-        build_linux_fhs_agent_files(
-            output_path=package_root_path
+        build_agent_linux_fhs_common_files(
+            output_path=package_root_path,
+            agent_executable_name=agent_executable_name
         )
 
         # remove Python cache directories from agent's source code.
@@ -358,7 +359,17 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
 
         agent_package_root = self.output_path / "agent_package_root"
 
-        self._build_packages_common_files(package_root_path=agent_package_root)
+        self._build_packages_common_files(
+            package_root_path=agent_package_root,
+            agent_executable_name="scalyr-agent-2"
+        )
+
+        agent_install_root = agent_package_root / f"usr/share" / AGENT_SUBDIR_NAME
+        bin_path = agent_install_root / "bin"
+        agent_main_executable_path = bin_path / "scalyr-agent-2"
+        agent_main_executable_path.symlink_to(
+            pl.Path("..", "py", "scalyr_agent", "agent_main.py")
+        )
 
         # Copy switch python executable script to package's bin
         switch_python_source = (
@@ -367,10 +378,7 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
         )
 
         switch_python_executable_name = "scalyr-switch-python"
-        package_bin_path = agent_package_root / f"usr/share/{AGENT_SUBDIR_NAME}/bin"
-        package_switch_python_executable = (
-            package_bin_path / switch_python_executable_name
-        )
+        package_switch_python_executable = bin_path / switch_python_executable_name
         shutil.copy(switch_python_source, package_switch_python_executable)
         sbin_python_switch_executable = (
             agent_package_root / "usr/sbin" / switch_python_executable_name
@@ -381,9 +389,8 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
 
         # Create copies of the agent_main.py with python2 and python3 shebang.
         agent_main_path = SOURCE_ROOT / "scalyr_agent/agent_main.py"
-        agent_package_path = (
-            agent_package_root / f"usr/share/{AGENT_SUBDIR_NAME}/py/scalyr_agent"
-        )
+        agent_package_path = agent_install_root / "py/scalyr_agent"
+
         agent_main_py2_path = agent_package_path / "agent_main_py2.py"
         agent_main_py3_path = agent_package_path / "agent_main_py3.py"
 
@@ -431,6 +438,10 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
                 "-n", AGENT_NON_AIO_AIO_PACKAGE_NAME,
                 "--provides", AGENT_NON_AIO_AIO_PACKAGE_NAME,
                 "--description", description,
+                # NOTE: We leave those two files in place since they are symlinks which might have been
+                # updated by scalyr-switch-python and we want to leave this in place - aka make sure
+                # selected Python version is preserved on upgrade
+                "--config-files", f"/usr/share/{AGENT_SUBDIR_NAME}/bin/scalyr-agent-2",
                 "--before-install", scriptlets_path / "preinstall.sh",
                 "--after-install", scriptlets_path / "postinstall.sh",
                 "--before-remove", scriptlets_path / "preuninstall.sh",
@@ -643,23 +654,22 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
             package_root=agent_package_root
         )
 
-        self._build_packages_common_files(package_root_path=agent_package_root)
+        agent_executable_name = "scalyr-agent-2-new"
+        self._build_packages_common_files(
+            package_root_path=agent_package_root,
+            agent_executable_name=agent_executable_name
+        )
 
         install_root_executable_path = (
-            agent_package_root / f"usr/share/{AGENT_SUBDIR_NAME}/bin/scalyr-agent-2-new"
+            agent_package_root / f"usr/share/{AGENT_SUBDIR_NAME}/bin/{agent_executable_name}"
         )
 
         # Create agent's executable script.
         render_agent_executable_script(
-            python_executable="/var/opt/scalyr-agent-2/venv/bin/python3",
+            python_executable=pl.Path("/var/opt/scalyr-agent-2/venv/bin/python3"),
             agent_main_script_path=pl.Path("/usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py"),
             output_file=install_root_executable_path
         )
-
-        # Also link agent executable to usr/sbin
-        usr_sbin_executable = agent_package_root / "usr/sbin/scalyr-agent-2"
-        usr_sbin_executable.unlink()
-        usr_sbin_executable.symlink_to("../share/scalyr-agent-2/bin/scalyr-agent-2-new")
 
         # Also remove third party libraries except tcollector.
         agent_module_path = (

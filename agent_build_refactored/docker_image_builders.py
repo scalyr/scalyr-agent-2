@@ -35,7 +35,7 @@ import shutil
 from typing import List, Type, Dict
 
 from agent_build_refactored.prepare_agent_filesystem import (
-    build_linux_fhs_agent_files,
+    build_agent_linux_fhs_common_files,
     add_config,
 )
 from agent_build_refactored.tools.constants import (
@@ -246,8 +246,9 @@ class ContainerImageBuilder(Runner):
         package_root_path.mkdir(parents=True)
 
         # Build 'FHS-structured' filesystem.
-        build_linux_fhs_agent_files(
+        build_agent_linux_fhs_common_files(
             output_path=package_root_path,
+            agent_executable_name="scalyr-agent-2",
         )
 
         add_config(
