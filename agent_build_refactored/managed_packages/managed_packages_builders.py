@@ -389,7 +389,7 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
 
         # Create copies of the agent_main.py with python2 and python3 shebang.
         agent_main_path = SOURCE_ROOT / "scalyr_agent/agent_main.py"
-        agent_package_path = agent_install_root / "/py/scalyr_agent"
+        agent_package_path = agent_install_root / "py/scalyr_agent"
 
         agent_main_py2_path = agent_package_path / "agent_main_py2.py"
         agent_main_py3_path = agent_package_path / "agent_main_py3.py"
