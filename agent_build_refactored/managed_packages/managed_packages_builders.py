@@ -86,6 +86,7 @@ The structure of the package has to guarantee that files of these packages does 
 
 import abc
 import dataclasses
+import functools
 import hashlib
 import json
 import logging
@@ -125,24 +126,30 @@ from agent_build_refactored.prepare_agent_filesystem import (
     render_agent_executable_script,
 )
 
+from agent_build_refactored.build_python.steps import build_agent_libs_venv
+
 from agent_build_refactored.build_python.build_python_steps import (
     SUPPORTED_ARCHITECTURES,
-    SUPPORTED_ARCHITECTURES_TO_BUILD_ENVIRONMENTS,
-    OPENSSL_VERSION_TYPE_1_1_1,
-    PYTHON_PACKAGE_SSL_VERSIONS,
+    # OPENSSL_VERSION_TYPE_1_1_1,
+    # PYTHON_PACKAGE_SSL_VERSIONS,
     AGENT_SUBDIR_NAME,
     AGENT_OPT_DIR,
     PYTHON_INSTALL_PREFIX,
     EMBEDDED_PYTHON_SHORT_VERSION,
-    BUILD_OPENSSL_1_1_1_STEPS,
-    BUILD_OPENSSL_3_STEPS,
-    BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS,
-    BUILD_PYTHON_WITH_OPENSSL_3_STEPS,
-    create_build_agent_libs_venv_steps,
-    PREPARE_TOOLSET_STEPS,
+    EMBEDDED_PYTHON_PIP_VERSION,
+    #BUILD_OPENSSL_1_STEPS,
+    #BUILD_OPENSSL_3_STEPS,
+    #BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS,
+    #BUILD_PYTHON_WITH_OPENSSL_3_STEPS,
+    #PREPARE_TOOLSET_STEPS,
     create_python_files,
     render_python_wrapper_executable,
     create_agent_libs_venv_files,
+    ALL_DEPENDENCY_TOOLCHAINS,
+    CRuntime,
+    PREPARE_TOOLSET_STEP_GLIBC_X86_64,
+    create_new_steps_for_all_toolchains,
+    DependencyToolchain
 )
 
 logger = logging.getLogger(__name__)
@@ -159,11 +166,15 @@ AGENT_AIO_PACKAGE_NAME = "scalyr-agent-2-aio"
 AGENT_NON_AIO_AIO_PACKAGE_NAME = "scalyr-agent-2"
 
 
-DEFAULT_OPENSSL_VERSION_TYPE = OPENSSL_VERSION_TYPE_1_1_1
+# DEFAULT_OPENSSL_VERSION_TYPE = OPENSSL_VERSION_TYPE_1_1_1
+#
+# DEFAULT_PYTHON_PACKAGE_OPENSSL_VERSION = PYTHON_PACKAGE_SSL_VERSIONS[
+#     DEFAULT_OPENSSL_VERSION_TYPE
+# ]
 
-DEFAULT_PYTHON_PACKAGE_OPENSSL_VERSION = PYTHON_PACKAGE_SSL_VERSIONS[
-    DEFAULT_OPENSSL_VERSION_TYPE
-]
+AGENT_LIBS_REQUIREMENTS_CONTENT = (
+    f"{REQUIREMENTS_COMMON}\n" f"{REQUIREMENTS_COMMON_PLATFORM_DEPENDENT}"
+)
 
 
 class LinuxPackageBuilder(Runner):
@@ -177,8 +188,10 @@ class LinuxPackageBuilder(Runner):
 
     @classmethod
     def get_base_environment(cls) -> EnvironmentRunnerStep:
-        """Packages should be built inside our "toolset" image."""
-        return PREPARE_TOOLSET_STEPS[Architecture.X86_64]
+        """
+        Packages should be built inside our "toolset" image, which has toos required for package build, like fpm.
+        """
+        return PREPARE_TOOLSET_STEP_GLIBC_X86_64
 
     @property
     def packages_output_path(self) -> pl.Path:
@@ -455,6 +468,8 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
 
 
 class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
+
+    C_RUNTIME = CRuntime.GLIBC
     """
     This builder creates "all in one" (aio) version of the agent package.
     That means that this package does not have any system dependencies, except glibc.
@@ -465,13 +480,28 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
 
     @classmethod
     def get_all_required_steps(cls) -> List[RunnerStep]:
+
+        toolchain = cls._get_toolchain()
         return [
-            BUILD_OPENSSL_1_1_1_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
-            BUILD_OPENSSL_3_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
-            BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
-            BUILD_PYTHON_WITH_OPENSSL_3_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
-            BUILD_AGENT_LIBS_VENV_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
+            toolchain.openssl_1,
+            toolchain.openssl_3,
+            toolchain.python_with_openssl_1,
+            toolchain.python_with_openssl_3,
+            # BUILD_OPENSSL_1_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
+            # BUILD_OPENSSL_3_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
+            # BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
+            # BUILD_PYTHON_WITH_OPENSSL_3_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
+            # BUILD_AGENT_LIBS_VENV_STEPS[cls.C_RUNTIME][cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
+            cls._get_agent_libs_step(),
         ]
+
+    @classmethod
+    def _get_toolchain(cls):
+        return ALL_DEPENDENCY_TOOLCHAINS[cls.C_RUNTIME][cls.DEPENDENCY_PACKAGES_ARCHITECTURE]
+
+    @classmethod
+    def _get_agent_libs_step(cls):
+        return BUILD_AGENT_LIBS_VENV_STEPS[cls.C_RUNTIME][cls.DEPENDENCY_PACKAGES_ARCHITECTURE]
 
     def _prepare_package_python_and_libraries_files(self, package_root: pl.Path):
         """
@@ -481,13 +511,13 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
 
         step_arch = self.DEPENDENCY_PACKAGES_ARCHITECTURE
 
-        build_python_with_openssl_1_1_1_step = BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[
-            step_arch
-        ]
-        build_python_with_openssl_3_step = BUILD_PYTHON_WITH_OPENSSL_3_STEPS[step_arch]
+        toolchain = self._get_toolchain()
 
-        build_python_with_openssl_3_step_output = build_python_with_openssl_1_1_1_step.get_output_directory(
-                work_dir=self.work_dir
+        python_with_openssl_1_step = toolchain.python_with_openssl_1
+        python_with_openssl_3_step = toolchain.python_with_openssl_3
+
+        build_python_with_openssl_3_step_output = toolchain.python_with_openssl_3.get_output_directory(
+            work_dir=self.work_dir
         )
 
         relative_python_install_prefix = pl.Path(PYTHON_INSTALL_PREFIX).relative_to("/")
@@ -506,9 +536,9 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         python_ssl_bindings_glob = "_ssl.cpython-*-*-*-*.so"
         python_hashlib_bindings_glob = "_hashlib.cpython-*-*-*-*.so"
 
-        def copy_openssl_files(
+        def copy_openssl_binding_files(
             build_python_step: RunnerStep,
-            openssl_variant_name: str,
+            openssl_major_version: int,
         ):
             """# This function copies Python's ssl module related files."""
 
@@ -529,47 +559,49 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
                 python_step_bindings_dir.glob(python_hashlib_bindings_glob)
             )[0]
 
-            bindings_dir = package_openssl_dir / openssl_variant_name / "bindings"
+            bindings_dir = package_openssl_dir / str(openssl_major_version) / "bindings"
             bindings_dir.mkdir(parents=True)
 
             shutil.copy(ssl_binding_path, bindings_dir)
             shutil.copy(hashlib_binding_path, bindings_dir)
 
         # Copy ssl modules which are compiled for OpenSSL 1.1.1
-        copy_openssl_files(
-            build_python_step=build_python_with_openssl_1_1_1_step,
-            openssl_variant_name="1_1_1",
+        copy_openssl_binding_files(
+            build_python_step=python_with_openssl_1_step,
+            openssl_major_version=1,
         )
 
         # Copy ssl modules which are compiled for OpenSSL 3
-        copy_openssl_files(
-            build_python_step=build_python_with_openssl_3_step, openssl_variant_name="3"
+        copy_openssl_binding_files(
+            build_python_step=python_with_openssl_3_step,
+            openssl_major_version=3
         )
 
         # Create directory for the embedded OpenSSL files.
         embedded_openssl_dir = package_openssl_dir / "embedded"
         embedded_openssl_dir.mkdir()
-        # Since we use OpenSSL 1.1.1 for embedded, we link to the previously created C bindings of the OpenSSL 1.1.1.
+        # Since we use OpenSSL 3 for embedded, we link to the previously created C bindings of the OpenSSL 3.
         embedded_openssl_bindings = embedded_openssl_dir / "bindings"
-        embedded_openssl_bindings.symlink_to("../1_1_1/bindings")
-        # Copy shared libraries of the embedded OpenSSL 1.1.1 from the step that builds it.
-        embedded_openssl_libs_dir = embedded_openssl_dir / "libs"
-        embedded_openssl_libs_dir.mkdir(parents=True)
+        embedded_openssl_bindings.symlink_to("../3/bindings")
+        # Copy shared libraries of the embedded OpenSSL 3 from the step that builds it.
+        embedded_openssl_3_libs_dir = embedded_openssl_dir / "libs"
+        embedded_openssl_3_libs_dir.mkdir(parents=True)
 
-        build_openssl_1_1_1_step = BUILD_OPENSSL_1_1_1_STEPS[step_arch]
-        build_openssl_step_dir = build_openssl_1_1_1_step.get_output_directory(
+        build_openssl_3_step = toolchain.openssl_3
+        build_openssl_3_step_dir = build_openssl_3_step.get_output_directory(
             work_dir=self.work_dir
         )
-        build_env_info = SUPPORTED_ARCHITECTURES_TO_BUILD_ENVIRONMENTS[step_arch]
 
-        if "centos:6" in build_env_info.image:
-            libssl_dir = "usr/local/lib64"
-        else:
-            libssl_dir = "usr/local/lib"
+        # build_env_info = SUPPORTED_ARCHITECTURES_TO_BUILD_ENVIRONMENTS[step_arch]
+        #
+        # if "centos:6" in build_env_info.image:
+        #     libssl_dir = "usr/local/lib64"
+        # else:
+        #     libssl_dir = "usr/local/lib"
 
-        build_openssl_libs_dir = build_openssl_step_dir / libssl_dir
-        for path in build_openssl_libs_dir.glob("*.so.*"):
-            shutil.copy(path, embedded_openssl_libs_dir)
+        build_openssl_3_libs_dir = build_openssl_3_step_dir / "usr/local/lib"
+        for path in build_openssl_3_libs_dir.glob("*.so.*"):
+            shutil.copy(path, embedded_openssl_3_libs_dir)
 
         # Create the `current` symlink which by default targets the embedded OpenSSL.
         package_current_openssl_dir = package_openssl_dir / "current"
@@ -610,7 +642,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         preferred_openssl_file.write_text("auto")
 
         # Copy agent libraries venv
-        build_agent_libs_venv_step = BUILD_AGENT_LIBS_VENV_STEPS[step_arch]
+        build_agent_libs_venv_step = self._get_agent_libs_step()
         build_agent_libs_venv_step_output = build_agent_libs_venv_step.get_output_directory(
             work_dir=self.work_dir
         )
@@ -737,13 +769,27 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         )
 
 
-AGENT_LIBS_REQUIREMENTS_CONTENT = (
-    f"{REQUIREMENTS_COMMON}\n" f"{REQUIREMENTS_COMMON_PLATFORM_DEPENDENT}"
-)
-
 # Create steps that build agent requirement libs inside venv.
-BUILD_AGENT_LIBS_VENV_STEPS = create_build_agent_libs_venv_steps(
-    requirements_file_content=AGENT_LIBS_REQUIREMENTS_CONTENT
+def create_build_agent_libs_venv_step_for_linux_packages(
+        toolchain: DependencyToolchain
+):
+
+    name_suffix = f"{toolchain.c_runtime.value}_{toolchain.architecture.value}"
+    return build_agent_libs_venv.create_step(
+        name_suffix=name_suffix,
+        install_build_environment_step=toolchain.install_build_environment,
+        build_openssl_step=toolchain.openssl_1,
+        build_python_step=toolchain.python_with_openssl_1,
+        build_dev_requirements_step=toolchain.dev_requirements,
+        python_install_prefix=PYTHON_INSTALL_PREFIX,
+        agent_subdir_name=AGENT_SUBDIR_NAME,
+        pip_version=EMBEDDED_PYTHON_PIP_VERSION,
+        requirements_file_content=AGENT_LIBS_REQUIREMENTS_CONTENT,
+    )
+
+
+BUILD_AGENT_LIBS_VENV_STEPS = create_new_steps_for_all_toolchains(
+    create_step_fn=create_build_agent_libs_venv_step_for_linux_packages
 )
 
 ALL_MANAGED_PACKAGE_BUILDERS: Dict[str, Type[LinuxPackageBuilder]] = UniqueDict()
