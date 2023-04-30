@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This is main executable for the agent for Linux, it expects that the dependency package 'scalyr-agent-libs' is
-# installed, and its virtualenv (or venv) is initialized, so it can use it as a base Python interpreter.
 
-exec "/var/opt/scalyr-agent-2/venv/bin/python3" "/usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py" "$@"
+PYTHON_EXECUTABLE="%{{ REPLACE_PYTHON_EXECUTABLE }}%"
+AGENT_MAIN_SCRIPT="%{{ REPLACE_AGENT_MAIN_SCRIPT }}%"
+
+exec "${PYTHON_EXECUTABLE}" "${AGENT_MAIN_SCRIPT}" "$@"

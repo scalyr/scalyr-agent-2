@@ -525,11 +525,11 @@ def remove_python_unused_files(
         os.remove(stdlib_dir / "xdrlib.py")
 
 
-def create_libs_venv_files(
+def create_agent_libs_venv_files(
     build_libs_venv_step_output: pl.Path,
     output: pl.Path
 ):
-    output.mkdir()
+    output.mkdir(parents=True)
     shutil.copytree(
         build_libs_venv_step_output / "venv",
         output,
