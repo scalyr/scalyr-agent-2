@@ -31,7 +31,7 @@ docker==4.4.4; python_version < '3.6'
 # to prevent versions conflict, install the appropriate version of 'requests', to force 'docker' to reuse it.
 # NOTE: We can't use requests >= 2.22.0 since we still need to support Python 2.6
 # Needed by MockHTTPServer class and related tests
-flask==2.0.3; python_version >= '3.8'
+flask==2.3.2; python_version >= '3.8'
 flask==1.1.1; python_version < '3.8'
 Jinja2==3.0.3; python_version ~= '3.7.0'
 # flask is unable to import Jinja2 in python 3.7. The fix is to pin Jinja2 to version prior to 3.1.0
