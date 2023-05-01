@@ -36,6 +36,17 @@ def create_step(
 ):
     """
     Create step that downloads source code for python and all its dependencies.
+    :param xz_version: version of XZ Utils to build. Python requirement. ALso required by some make and configure scripts.
+    :param libffi_version: version of libffi to build. Python requirement. Provides ctypes module and essential for C bindings.
+    :param util_linux_version: version of util linux to build. Python requirement. Provides uuid module.
+    :param ncurses_version: version of ncurses to build. Python requirement. Provides curses module.
+    :param libedit_version_commit:  version of libedit to build. Python requirement. Provides non-GPL alternative for readline module.
+    :param gdbm_version: version of gdbm to build. Python requirement. Provides dbm module.
+    :param zlib_version: version of zlib to build. Python requirement. Provides zlib module.
+    :param bzip_version: version of bzip to build. Python requirement. Provides bz2 module.
+    :param openssl_1_version: Version of OpenSSL 1 to build
+    :param openssl_3_version: Version of OpenSSL 3 to build
+    :param python_version: Version of Python to download.
     """
     # Step that downloads all Python dependencies.
     return RunnerStep(

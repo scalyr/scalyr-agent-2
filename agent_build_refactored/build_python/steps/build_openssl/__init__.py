@@ -26,6 +26,18 @@ def create_step(
     download_build_dependencies_step: RunnerStep,
     run_in_remote_docker: bool = False
 ):
+    """
+    Create step that builds OpenSSL.
+    :param name_suffix: Suffix fot the step name
+    :param openssl_version: Version of OpenSSL
+    :param openssl_major_version: Major version of the OpenSSL version.
+    :param install_build_environment_step: Step that acts like a base for the result step.
+    :param download_build_dependencies_step: Step that downloads source code for python interpreter and its
+        dependencies.
+    :param run_in_remote_docker: Run in remote docker engine, if needed.
+
+    :return:
+    """
     script_name = f"build_openssl_{openssl_major_version}.sh"
 
     return RunnerStep(

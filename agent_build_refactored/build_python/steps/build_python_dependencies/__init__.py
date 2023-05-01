@@ -36,6 +36,23 @@ def create_step(
 
 ) -> RunnerStep:
 
+    """
+    Create step that build all dependencies for the Python interpreter.
+    :param name_suffix: Suffix fot the step name
+    :param install_build_environment_step: Step that acts like a base for the result step.
+    :param download_build_dependencies_step: Step that downloads source code for python interpreter and its
+    :param xz_version: version of XZ Utils to build. Python requirement. ALso required by some make and configure scripts.
+    :param libffi_version: version of libffi to build. Python requirement. Provides ctypes module and essential for C bindings.
+    :param util_linux_version: version of util linux to build. Python requirement. Provides uuid module.
+    :param ncurses_version: version of ncurses to build. Python requirement. Provides curses module.
+    :param libedit_version_commit:  version of libedit to build. Python requirement. Provides non-GPL alternative for readline module.
+    :param gdbm_version: version of gdbm to build. Python requirement. Provides dbm module.
+    :param zlib_version: version of zlib to build. Python requirement. Provides zlib module.
+    :param bzip_version: version of bzip to build. Python requirement. Provides bz2 module.
+    :param openssl_1_version: Version of OpenSSL 1 to build
+    :param openssl_3_version: Version of OpenSSL 3 to build
+    :param run_in_remote_docker: Run in remote docker engine, if needed.
+    """
     return RunnerStep(
         name=f"build_python_dependencies_{name_suffix}",
         script_path=pl.Path(__file__).parent / "build_python_dependencies.sh",

@@ -39,5 +39,10 @@ ldconfig
 
 ln -s "${PYTHON_INSTALL_PREFIX}/bin/python3" /usr/bin/python3
 
-# shellcheck disable=SC1090
-source ~/.bashrc
+PIP_CACHE_DIR="$(python3 -m pip cache dir)"
+mkdir -p "${PIP_CACHE_DIR}"
+
+cp -a "${BUILD_DEV_REQUIREMENTS}/cache/." "${PIP_CACHE_DIR}"
+
+## shellcheck disable=SC1090
+#source ~/.bashrc

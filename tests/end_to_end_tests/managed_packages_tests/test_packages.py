@@ -34,13 +34,11 @@ import pytest
 from agent_build_refactored.tools.constants import SOURCE_ROOT
 
 from agent_build_refactored.managed_packages.build_dependencies_versions import (
-    PYTHON_PACKAGE_SSL_1_VERSION,
     PYTHON_PACKAGE_SSL_3_VERSION,
 )
 
 from agent_build_refactored.managed_packages.managed_packages_builders import (
     AGENT_SUBDIR_NAME,
-    #DEFAULT_PYTHON_PACKAGE_OPENSSL_VERSION,
     AGENT_AIO_PACKAGE_NAME,
 )
 from tests.end_to_end_tests.tools import AgentPaths, AgentCommander, TimeoutTracker

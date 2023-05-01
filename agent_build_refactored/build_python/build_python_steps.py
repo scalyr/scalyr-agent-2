@@ -30,8 +30,6 @@ from agent_build_refactored.managed_packages.build_dependencies_versions import 
     RUST_VERSION,
 )
 
-# OPENSSL_VERSION_TYPE_1_1_1 = "1_1_1"
-# OPENSSL_VERSION_TYPE_3 = "3"
 
 # Name of the subdirectory of the agent packages.
 AGENT_SUBDIR_NAME = "scalyr-agent-2"
@@ -41,11 +39,6 @@ PYTHON_INSTALL_PREFIX = f"{AGENT_OPT_DIR}/python3"
 
 EMBEDDED_PYTHON_SHORT_VERSION = ".".join(EMBEDDED_PYTHON_VERSION.split(".")[:2])
 
-
-# PYTHON_PACKAGE_SSL_VERSIONS = {
-#     OPENSSL_VERSION_TYPE_1_1_1: PYTHON_PACKAGE_SSL_1_1_1_VERSION,
-#     OPENSSL_VERSION_TYPE_3: PYTHON_PACKAGE_SSL_3_VERSION,
-# }
 
 PARENT_DIR = pl.Path(__file__).parent.absolute()
 STEPS_SCRIPTS_DIR = PARENT_DIR / "steps"

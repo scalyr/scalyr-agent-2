@@ -85,12 +85,7 @@ The structure of the package has to guarantee that files of these packages does 
 
 
 import abc
-import dataclasses
-import functools
-import hashlib
-import json
 import logging
-import operator
 import os
 import shutil
 import subprocess
@@ -130,20 +125,12 @@ from agent_build_refactored.build_python.steps import build_agent_libs_venv
 
 from agent_build_refactored.build_python.build_python_steps import (
     SUPPORTED_ARCHITECTURES,
-    # OPENSSL_VERSION_TYPE_1_1_1,
-    # PYTHON_PACKAGE_SSL_VERSIONS,
     AGENT_SUBDIR_NAME,
     AGENT_OPT_DIR,
     PYTHON_INSTALL_PREFIX,
     EMBEDDED_PYTHON_SHORT_VERSION,
     EMBEDDED_PYTHON_PIP_VERSION,
-    #BUILD_OPENSSL_1_STEPS,
-    #BUILD_OPENSSL_3_STEPS,
-    #BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS,
-    #BUILD_PYTHON_WITH_OPENSSL_3_STEPS,
-    #PREPARE_TOOLSET_STEPS,
     create_python_files,
-    render_python_wrapper_executable,
     create_agent_libs_venv_files,
     ALL_DEPENDENCY_TOOLCHAINS,
     CRuntime,
@@ -165,12 +152,6 @@ AGENT_LIBS_PACKAGE_NAME = "scalyr-agent-libs"
 AGENT_AIO_PACKAGE_NAME = "scalyr-agent-2-aio"
 AGENT_NON_AIO_AIO_PACKAGE_NAME = "scalyr-agent-2"
 
-
-# DEFAULT_OPENSSL_VERSION_TYPE = OPENSSL_VERSION_TYPE_1_1_1
-#
-# DEFAULT_PYTHON_PACKAGE_OPENSSL_VERSION = PYTHON_PACKAGE_SSL_VERSIONS[
-#     DEFAULT_OPENSSL_VERSION_TYPE
-# ]
 
 AGENT_LIBS_REQUIREMENTS_CONTENT = (
     f"{REQUIREMENTS_COMMON}\n" f"{REQUIREMENTS_COMMON_PLATFORM_DEPENDENT}"
@@ -468,7 +449,7 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
 
 
 class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
-
+    # C runtime which has to be used to ompile package dependencies.
     C_RUNTIME = CRuntime.GLIBC
     """
     This builder creates "all in one" (aio) version of the agent package.
@@ -487,11 +468,6 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
             toolchain.openssl_3,
             toolchain.python_with_openssl_1,
             toolchain.python_with_openssl_3,
-            # BUILD_OPENSSL_1_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
-            # BUILD_OPENSSL_3_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
-            # BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
-            # BUILD_PYTHON_WITH_OPENSSL_3_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
-            # BUILD_AGENT_LIBS_VENV_STEPS[cls.C_RUNTIME][cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
             cls._get_agent_libs_step(),
         ]
 
@@ -508,8 +484,6 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         Prepare package files of the Python interpreter and agent libraries.
         :param package_root: Path to the package root.
         """
-
-        step_arch = self.DEPENDENCY_PACKAGES_ARCHITECTURE
 
         toolchain = self._get_toolchain()
 
@@ -592,12 +566,6 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
             work_dir=self.work_dir
         )
 
-        # build_env_info = SUPPORTED_ARCHITECTURES_TO_BUILD_ENVIRONMENTS[step_arch]
-        #
-        # if "centos:6" in build_env_info.image:
-        #     libssl_dir = "usr/local/lib64"
-        # else:
-        #     libssl_dir = "usr/local/lib"
 
         build_openssl_3_libs_dir = build_openssl_3_step_dir / "usr/local/lib"
         for path in build_openssl_3_libs_dir.glob("*.so.*"):

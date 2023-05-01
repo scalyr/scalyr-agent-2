@@ -31,6 +31,20 @@ def create_step(
         pip_version: str,
         run_in_remote_docker: bool = False
 ):
+    """
+    Create step that build Python interpreter.
+    :param name_suffix: Suffix fot the step name
+    :param download_build_dependencies_step: Step that downloads source code for python interpreter and its
+    dependencies.
+    :param install_build_environment_step: Step that acts like a base for the result step.
+    :param build_python_dependencies_step: Steps that build all dependencies for the Python interpreter.
+    :param build_openssl_step: Step that builds openssl
+    :param python_version: Version of Python.
+    :param python_short_version: Short version of Python, without last patch part.
+    :param python_install_prefix: Install prefix for the Python installation
+    :param pip_version: Version of the pip.
+    :param run_in_remote_docker:  Run in remote docker engine, if needed.
+    """
     additional_options = ""
 
     # TODO: find out why enabling LTO optimization of ARM ends with error.

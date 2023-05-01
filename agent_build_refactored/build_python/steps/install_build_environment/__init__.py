@@ -23,7 +23,14 @@ def create_step(
     base_image: DockerImageSpec,
     run_in_remote_docker: bool = False
 ) -> EnvironmentRunnerStep:
-
+    """
+    Create step that prepares its result environment by installing gcc and other build tools that bay be needed
+        in order to compile Python interpreter and other.
+    :param name_suffix: Suffix for the step name.
+    :param base_image: Spec if the docker image that is used as the base for this step.
+    :param run_in_remote_docker: Run in remote docker engine, if needed.
+    :return:
+    """
     if base_image.name == "centos:6":
         script_name = "install_gcc_centos_6.sh"
     else:

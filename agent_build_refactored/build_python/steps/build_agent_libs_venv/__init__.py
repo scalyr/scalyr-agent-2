@@ -31,18 +31,19 @@ def create_step(
     run_in_remote_docker: bool = False
 ):
     """
-    Create step that builds venv with all requirements of the agent project.
-    :param name_suffix:
-    :param install_build_environment_step:
-    :param build_openssl_step:
-    :param build_python_step:
-    :param build_dev_requirements_step:
-    :param python_install_prefix:
-    :param agent_subdir_name:
-    :param pip_version:
-    :param requirements_file_content:
-    :param run_in_remote_docker:
-    :return:
+    Create step that builds venv with given requirements.
+    :param name_suffix: Suffix fot the step name
+    :param install_build_environment_step: Step that acts like a base for the result step.
+        In thi case this is the step that has to have guild tools such as gcc installed.
+    :param build_openssl_step: Step that builds openssl
+    :param build_python_step: Step that builds python
+    :param build_dev_requirements_step: Step that builds all agent project requirements.
+        The requirements for the result venv will be reused from those dev requirements.
+    :param python_install_prefix: Install prefix for the Python installation
+    :param agent_subdir_name: Name of the agent subdirectory
+    :param pip_version: Version of pip.
+    :param requirements_file_content: Content of the requirements.txt file that has to be installed to a result venv.
+    :param run_in_remote_docker: Run in remote docker engine, if needed.
     """
 
     return RunnerStep(

@@ -26,8 +26,18 @@ def create_step(
         build_dev_requirements_step: RunnerStep,
         python_install_prefix: str,
         run_in_remote_docker: bool = False
+) -> RunnerStep:
+    """
+    Create step with OS distribution, where version of C library (like glibc) matches version of the glibc
 
-):
+    :param name_suffix: Suffix fot the step name
+    :param base_image: Spec for the base image, it's OS distro has to be with the same C runtime version as Python.
+    :param build_openssl_step: Step that builds openssl
+    :param build_python_step: Step that builds Python
+    :param build_dev_requirements_step: Step that builds all agent project requirements.
+    :param python_install_prefix: Install prefix for the Python installation
+    :param run_in_remote_docker: Run in remote docker engine, if needed.
+    """
     return EnvironmentRunnerStep(
         name=f"prepare_c_runtime_environment_with_python_{name_suffix}",
         script_path=pl.Path(__file__).parent / "prepare_c_runtime_environment_with_python.sh",

@@ -17,7 +17,6 @@ This module defines logic that allows to build single-file, standalone executabl
 This executable is used in ec2 and docker end-to-end tests to run those tests in completely clean environment
 without Python and other dependencies.
 """
-import collections
 import os
 import shutil
 import pathlib as pl

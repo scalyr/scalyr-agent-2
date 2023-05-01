@@ -29,6 +29,19 @@ def create_step(
         python_install_prefix: str,
         run_in_remote_docker: bool = False
 ):
+    """
+    Create step that builds all Python libraries that are required by the projects.
+    :param name_suffix: Suffix fot the step name
+    :param install_build_environment_step: Step that acts like a base for the result step.
+    :param build_python_dependencies_step: Steps that build all dependencies for the Python interpreter.
+        In thi case this is the step that has to have guild tools such as gcc installed.
+    :param build_openssl_step: Step that builds openssl
+    :param build_python_step: Step that builds python
+    :param rust_version: Version of rust to use in order to build some libraries, like orjson.
+    :param python_install_prefix: Install prefix for the Python installation
+    :param run_in_remote_docker: Run in remote docker engine, if needed.
+    :return:
+    """
     architecture = install_build_environment_step.architecture
     if architecture == Architecture.X86_64:
         rust_target_platform = "x86_64-unknown-linux-gnu"

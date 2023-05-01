@@ -30,7 +30,6 @@ source ~/.bashrc
 cp -a "${BUILD_PYTHON}/." /
 cp -a "${BUILD_OPENSSL}/." /
 cp -a "${BUILD_DEV_REQUIREMENTS}/root/." /
-cp -a "${BUILD_DEV_REQUIREMENTS}/cache" /tmp/pip_cache
 ldconfig
 
 # Prepare requirements file.
@@ -42,14 +41,17 @@ export LD_LIBRARY_PATH="${PYTHON_INSTALL_PREFIX}/lib:${LD_LIBRARY_PATH}"
 VENV_DIR="/var/opt/${SUBDIR_NAME}/venv"
 "${PYTHON_INSTALL_PREFIX}/bin/python3" -m venv "${VENV_DIR}"
 
+# Copy pip cache
+PIP_CACHE_DIR="$("${PYTHON_INSTALL_PREFIX}/bin/python3" -m pip cache dir)"
+mkdir -p "${PIP_CACHE_DIR}"
+cp -a "${BUILD_DEV_REQUIREMENTS}/cache/." "${PIP_CACHE_DIR}"
+
 # Install version of pip that we need to venv
 "${VENV_DIR}/bin/python3" -m pip install -v \
-  --cache-dir /tmp/pip_cache \
   "pip==${PIP_VERSION}"
 
 # Install requirements to venv.
 "${VENV_DIR}/bin/python3" -m pip install -v \
-  --cache-dir /tmp/pip_cache \
   -r "${REQUIREMENTS_FILE}"
 
 # Remove cache files.

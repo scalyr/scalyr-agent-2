@@ -49,7 +49,7 @@ pushd "rust-${RUST_VERSION}-${RUST_PLATFORM}"
 popd
 popd
 
-cargo install cargo-update -v
+#cargo install cargo-update -v
 
 export LD_LIBRARY_PATH="${PYTHON_INSTALL_PREFIX}/lib:${LD_LIBRARY_PATH}"
 # Install all requirements and save them and their cache.
