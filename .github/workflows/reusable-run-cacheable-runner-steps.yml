@@ -79,6 +79,8 @@ jobs:
       stage_skip4: ${{ steps.get_missing_steps_matrices.outputs.stage_skip4 }}
       stage_matrix5: ${{ steps.get_missing_steps_matrices.outputs.stage_matrix5 }}
       stage_skip5: ${{ steps.get_missing_steps_matrices.outputs.stage_skip5 }}
+      stage_matrix6: ${{ steps.get_missing_steps_matrices.outputs.stage_matrix6 }}
+      stage_skip6: ${{ steps.get_missing_steps_matrices.outputs.stage_skip6 }}
   stage_0:
     name: 0 ${{ matrix.name }}
     runs-on: ubuntu-20.04
@@ -516,3 +518,76 @@ jobs:
         }} run-cacheable-step
       if: ${{ matrix.name != 'All Steps Are Reused From Cache' }}
     if: ${{ needs.pre_job.outputs.stage_skip5 != 'true' }}
+  stage_6:
+    name: 6 ${{ matrix.name }}
+    runs-on: ubuntu-20.04
+    needs:
+    - pre_job
+    - stage_5
+    strategy:
+      matrix: ${{ fromJSON(needs.pre_job.outputs.stage_matrix6) }}
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      if: ${{ matrix.name != 'All Steps Are Reused From Cache' }}
+    - name: Prepare dev requirements.
+      uses: ./.github/actions/prepare_python_with_dev_requirements
+      with:
+        python_version: ${{ inputs.python_version }}
+      if: ${{ matrix.name != 'All Steps Are Reused From Cache' }}
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@f03ac48505955848960e80bbb68046aa35c7b9e7
+      with:
+        driver-opts: network=host
+      if: ${{ matrix.name != 'All Steps Are Reused From Cache' }}
+    - name: Set up QEMU
+      id: qemu
+      uses: docker/setup-qemu-action@e81a89b1732b9c48d79cd809d8d81d79c4647a18
+      with:
+        image: tonistiigi/binfmt:qemu-v6.2.0
+        platforms: all
+      if: ${{ matrix.name != 'All Steps Are Reused From Cache' }}
+    - name: Prepare SSH
+      id: prepare-ssh
+      shell: bash
+      run: |
+        echo '${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}' > /tmp/private_key.pem
+        chmod 600 /tmp/private_key.pem
+        eval `ssh-agent -s`
+
+        cat "/tmp/private_key.pem" | ssh-add -
+        echo "ssh_auth_sock=${SSH_AUTH_SOCK}" >> $GITHUB_OUTPUT
+      if: ${{ matrix.name != 'All Steps Are Reused From Cache' }}
+    - name: Cache step
+      id: cache-step
+      uses: actions/cache@v3
+      with:
+        path: |
+          agent_build_output/step_output/${{ matrix.step_id }}
+        key: ${{ matrix.step_id }}_${{ matrix.cache_version_suffix }}
+      if: ${{ matrix.name != 'All Steps Are Reused From Cache' }}
+    - name: Get required steps caches
+      id: get_required_steps_caches
+      uses: ./.github/actions/restore_steps_caches
+      with:
+        steps_ids: ${{ toJSON(matrix.required_steps) }}
+        cache_version_suffix: ${{ matrix.cache_version_suffix }}
+        cache_root: agent_build_output/step_output
+        fail_on_cache_miss: true
+      if: ${{ matrix.name != 'All Steps Are Reused From Cache' }}
+    - name: Run cached step
+      shell: bash
+      env:
+        SSH_AUTH_SOCK: ${{ steps.prepare-ssh.outputs.ssh_auth_sock }}
+        AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
+        AWS_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
+        AWS_PRIVATE_KEY_NAME: ${{ inputs.aws_private_key_name }}
+        AWS_PRIVATE_KEY_PATH: /tmp/private_key.pem
+        AWS_REGION: ${{ inputs.aws_region }}
+        AWS_SECURITY_GROUP: ${{ inputs.aws_security_group }}
+        AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ inputs.aws_prefix_list_id }}
+        AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
+      run: python3 agent_build_refactored/scripts/runner_helper.py ${{ matrix.step_runner_fqdn
+        }} run-cacheable-step
+      if: ${{ matrix.name != 'All Steps Are Reused From Cache' }}
+    if: ${{ needs.pre_job.outputs.stage_skip6 != 'true' }}
