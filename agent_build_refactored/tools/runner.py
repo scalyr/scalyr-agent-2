@@ -562,7 +562,8 @@ class RunnerStep:
             logger.info(f"Image {image_name} is already in docker.")
         else:
             run_docker_command(
-                ["import", str(image_tarball), image_name]
+                ["import", str(image_tarball), image_name],
+                remote_docker_host=remote_docker_host
             )
 
     def restore_base_image_tarball_from_diff_if_needed(self, work_dir: pl.Path, remote_docker_host: str = None):
