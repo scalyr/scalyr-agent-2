@@ -765,7 +765,7 @@ class EnvironmentRunnerStep(RunnerStep):
             result_new_file_name=temp_image_tarball.name,
             image_name=RDIFF_STEP.id
         )
-
+        chown_directory_in_docker(step_output_dir)
         temp_image_tarball.rename(image_tarball)
 
     def restore_image_from_diff_if_needed(self, work_dir: pl.Path, remote_docker_host: str = None):
@@ -837,6 +837,7 @@ class EnvironmentRunnerStep(RunnerStep):
             result_delta_file_name="delta",
             image_name=RDIFF_STEP.id
         )
+        chown_directory_in_docker(temp_output_directory)
 
 @dataclasses.dataclass
 class RunnerMappedPath:
