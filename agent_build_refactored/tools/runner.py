@@ -824,7 +824,7 @@ class EnvironmentRunnerStep(RunnerStep):
                 delta_file_name="delta",
                 result_new_file_dir=temp_image_tarball.parent,
                 result_new_file_name=temp_image_tarball.name,
-                image_name=RDIFF_STEP.result_image.name
+                image_name=ESSENTIAL_TOOLS_STEP.result_image.name
             )
             chown_directory_in_docker(temp_image_tarball.parent)
             temp_image_tarball.rename(image_tarball)
@@ -1513,7 +1513,7 @@ ESSENTIAL_STEPS = {}
 
 
 ESSENTIAL_TOOLS_STEP = EnvironmentRunnerStep(
-    name="essential_tools",
+    name="prepare_essential_step_tools",
     script_path=SOURCE_ROOT / "agent_build_refactored/tools/rdiff/install.sh",
     tracked_files_globs=[
         SOURCE_ROOT / "agent_build_refactored/tools/rdiff/create_diff.sh",
