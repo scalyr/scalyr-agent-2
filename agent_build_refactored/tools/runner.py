@@ -1444,7 +1444,7 @@ def remove_root_owned_directory(path: pl.Path):
 
 def remove_docker_container(name: str, remote_docker_host: str = None):
     run_docker_command(
-        [,
+        [
             "rm",
             "-f",
             name
