@@ -18,6 +18,7 @@ import hashlib
 import json
 import os
 import pathlib as pl
+import shlex
 import shutil
 import logging
 import inspect
@@ -36,7 +37,6 @@ from agent_build_refactored.tools.constants import (
 from agent_build_refactored.tools import (
     check_call_with_log,
     check_output_with_log_debug,
-    DockerContainer,
     UniqueDict,
     IN_DOCKER,
 )
@@ -67,7 +67,7 @@ class DockerImageSpec:
 
     def pull(self):
         run_docker_command(
-            ["pull", "--platform", str(self.platform), self.name]
+            ["pull", "--quiet", "--platform", str(self.platform), self.name]
         )
 
 
@@ -936,18 +936,63 @@ class EnvironmentRunnerStep(RunnerStep):
         base_image_tarball = self.get_base_image_tarball_path(work_dir=work_dir)
 
         ESSENTIAL_TOOLS_STEP.import_image_tarball_if_needed(work_dir=work_dir)
-        create_files_diff_with_rdiff(
-            original_file_dir=base_image_tarball.parent,
-            original_file_name=base_image_tarball.name,
-            new_file_dir=image_tarball.parent,
-            new_file_name=image_tarball.name,
-            result_signature_file_dir=temp_output_directory,
-            result_signature_file_name="signature",
-            result_delta_file_dir=temp_output_directory,
-            result_delta_file_name="delta",
-            image_name=ESSENTIAL_TOOLS_STEP.result_image.name
+
+        """
+        rdiff signature "${ORIGINAL_FILE}" "${SIGNATURE_FILE}"
+        rdiff delta "${SIGNATURE_FILE}" "${NEW_FILE}" "${DELTA_FILE}
+        """
+        step_output_dir = self.get_output_directory(work_dir=work_dir)
+
+        create_signature_command_args = [
+            "rdiff",
+            "signature",
+            f"/tmp/base_image_dir/{base_image_tarball.name}",
+            "/tmp/output/signature",
+        ]
+
+        create_delta_command_args = [
+            "rdiff",
+            "delta",
+            "/tmp/output/signature",
+            f"/tmp/image_dir/{image_tarball.name}",
+            "/tmp/output/delta",
+        ]
+
+        create_signature_command = shlex.join(create_signature_command_args)
+
+        create_delta_command = shlex.join(create_delta_command_args)
+
+        subprocess.run(
+            [
+                "docker",
+                "run",
+                "-i",
+                "--rm",
+                "-v",
+                f"{base_image_tarball.parent}:/tmp/base_image_dir",
+                "-v",
+                f"{step_output_dir}:/tmp/output",
+                "-v",
+                f"{image_tarball.parent}:/tmp/image_dir",
+                ESSENTIAL_TOOLS_STEP.result_image.name,
+                "/bin/bash",
+                "-c",
+                f"{create_signature_command};{create_delta_command}"
+            ],
+            check=True
         )
-        #chown_directory_in_docker(temp_output_directory)
+
+        # create_files_diff_with_rdiff(
+        #     original_file_dir=base_image_tarball.parent,
+        #     original_file_name=base_image_tarball.name,
+        #     new_file_dir=image_tarball.parent,
+        #     new_file_name=image_tarball.name,
+        #     result_signature_file_dir=temp_output_directory,
+        #     result_signature_file_name="signature",
+        #     result_delta_file_dir=temp_output_directory,
+        #     result_delta_file_name="delta",
+        #     image_name=ESSENTIAL_TOOLS_STEP.result_image.name
+        # )
 
         step_images_dir = self.get_images_dir(work_dir=work_dir)
         temp_images_dir.rename(step_images_dir)
