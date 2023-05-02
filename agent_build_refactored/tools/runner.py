@@ -822,7 +822,7 @@ class EnvironmentRunnerStep(RunnerStep):
                 "-o",
                 str(image_tarball)
             ],
-            remote_docker_host=remote_docker_host
+            #remote_docker_host=remote_docker_host
         )
 
         prepare_rdiff_image(work_dir=work_dir)
