@@ -766,7 +766,6 @@ class EnvironmentRunnerStep(RunnerStep):
         image_tarball = self.get_image_tarball_path(work_dir=work_dir)
         image_name = self.result_image.name
 
-        logger.info(f"Import image {image_name} filesystem to docker.")
         output_bytes = run_docker_command(
             ["images", "-q", image_name],
             remote_docker_host=remote_docker_host,
@@ -776,11 +775,15 @@ class EnvironmentRunnerStep(RunnerStep):
 
         if output:
             logger.info(f"Image {image_name} is already in docker.")
-        else:
-            run_docker_command(
-                ["import", str(image_tarball), image_name],
-                remote_docker_host=remote_docker_host
-            )
+            return
+
+        logger.info(f"Import filesystem of the image {image_name} to docker")
+        if remote_docker_host:
+            logger.info("    NOTE: Importing to a remote docker. It may take some time...")
+        run_docker_command(
+            ["import", str(image_tarball), image_name],
+            remote_docker_host=remote_docker_host
+        )
 
     def restore_result_image_from_diff_if_needed(self, work_dir: pl.Path, remote_docker_host: str = None):
 
