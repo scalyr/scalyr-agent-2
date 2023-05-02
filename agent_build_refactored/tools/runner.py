@@ -555,6 +555,7 @@ class RunnerStep:
                 export_image_to_tarball(
                     image_name=image_name,
                     output_path=temp_base_image_image_tarball,
+                    platform=str(self.architecture.as_docker_platform.value),
                 )
                 temp_base_image_image_tarball.rename(base_image_tarball)
                 logger.info(
@@ -801,7 +802,7 @@ class EnvironmentRunnerStep(RunnerStep):
         )
 
         subprocess.run(
-            ["docker", "inspect", image_name]
+            ["docker", "inspect", image_name], check=True
         )
 
     def restore_result_image_from_diff_if_needed(self, work_dir: pl.Path):
@@ -1528,13 +1529,13 @@ def remove_docker_container(name: str, remote_docker_host: str = None):
     )
 
 
-def export_image_to_tarball(image_name: str, output_path: pl.Path):
+def export_image_to_tarball(image_name: str, output_path: pl.Path, platform: str):
     container_name = image_name.replace(":", "-")
     remove_docker_container(name=container_name)
     try:
         run_docker_command(
             [
-                "create", "--name", container_name, image_name
+                "create", "--name", container_name, "--platform", platform, image_name
             ],
         )
 
