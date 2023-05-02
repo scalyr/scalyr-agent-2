@@ -66,8 +66,9 @@ class DockerImageSpec:
         )
 
     def pull(self):
-        run_docker_command(
-            ["pull", "--quiet", "--platform", str(self.platform), self.name]
+        pull_image(
+            image_name=self.name,
+            platform=self.platform
         )
 
 
@@ -499,6 +500,7 @@ class RunnerStep:
                 *command_args,
             ],
             remote_docker_host=remote_docker_host,
+            quiet=True
         )
         logger.info("PULL8")
 
@@ -632,7 +634,6 @@ class RunnerStep:
         logging.info(
             f"Start step: {self.id}\n"
             f"Passed env. variables:\n    {env_variables_str}\n"
-            f"Arch: {self.architecture.value}\n"
         )
 
         # Check that all required steps results exists.
@@ -1465,6 +1466,7 @@ def run_docker_command(
     stderr=None,
     stdout=None,
     remote_docker_host: str = None,
+    quiet: bool = False
 ):
     """
     Run docker command.
@@ -1483,19 +1485,38 @@ def run_docker_command(
 
     final_command = ["docker", *command]
 
-    return subprocess.run(
+    if quiet:
+        stderr = subprocess.STDOUT
+        stdout = subprocess.PIPE
+
+    result = subprocess.run(
         final_command,
         env=env,
-        check=check,
+        check=False,
         input=input,
         capture_output=capture_output,
         stdout=stdout,
         stderr=stderr
     )
+    if check and result.returncode != 0:
 
-def pull_image(image_name: str, platform: DockerPlatform):
+        if quiet:
+            logger.error(f"Command {final_command} failed. Output:\n{result.stdout}")
+
+        raise subprocess.CalledProcessError(
+            returncode=result.returncode,
+            cmd=final_command,
+            output=result.stdout,
+            stderr=result.stderr
+        )
+
+    return result
+
+
+def pull_image(image_name: str, platform: DockerPlatformInfo):
     run_docker_command(
-        ["pull", "--quiet", "--platform", str(platform.value), image_name]
+        ["pull", "--quiet", "--platform", str(platform), image_name],
+        quiet=True
     )
 
 
@@ -1564,25 +1585,17 @@ def export_image_to_tarball(image_name: str, output_path: pl.Path, platform: str
     container_name = image_name.replace(":", "-")
     remove_docker_container(name=container_name)
     try:
-        try:
-            run_docker_command(
-                [
-                    "create",
-                    "--name",
-                    container_name,
-                    "--platform",
-                    platform,
-                    image_name
-                ],
-                stderr=subprocess.STDOUT,
-                stdout=subprocess.PIPE
-            )
-        except subprocess.CalledProcessError as e:
-            logger.error(
-                f"Can not create container '{container_name}'. Command output:\n"
-                f"{e.stdout.decode()}"
-            )
-            raise e
+        run_docker_command(
+            [
+                "create",
+                "--name",
+                container_name,
+                "--platform",
+                platform,
+                image_name
+            ],
+            quiet=True
+        )
 
 
         logger.info("PULL, EXPORT")
