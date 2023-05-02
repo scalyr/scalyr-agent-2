@@ -776,7 +776,6 @@ class EnvironmentRunnerStep(RunnerStep):
             #logger.info(f"Image {image_name} is already in docker.")
             return
 
-        logger.info(f"Import filesystem of the image {image_name} to docker")
         if remote_docker_host:
             logger.info("    NOTE: Importing to a remote docker. It may take some time...")
 
@@ -812,6 +811,8 @@ class EnvironmentRunnerStep(RunnerStep):
         #     remote_docker_host=remote_docker_host
         # )
 
+        logger.info(f"Filesystem of the image of the step {self.name} is imported to docker.")
+
     def restore_result_image_from_diff_if_needed(self, work_dir: pl.Path):
 
         initial_images_dir = self.get_initial_images_dir(work_dir=work_dir)
@@ -823,8 +824,6 @@ class EnvironmentRunnerStep(RunnerStep):
 
         if image_tarball.exists():
             return
-
-        logger.info(f"Restore result image for step '{self.name}'")
 
         if not base_image_tarball.exists():
             if self._base_step is None:
@@ -838,9 +837,6 @@ class EnvironmentRunnerStep(RunnerStep):
                     platform=str(self.architecture.as_docker_platform.value),
                 )
                 temp_base_image_image_tarball.rename(base_image_tarball)
-                logger.info(
-                    f"    Initial docker image '{base_image_name}' has been exported."
-                )
 
             else:
                 base_step = self._base_step
@@ -889,7 +885,7 @@ class EnvironmentRunnerStep(RunnerStep):
         chown_directory_in_docker(temp_images_dir)
         images_dir = self.get_images_dir(work_dir=work_dir)
         temp_images_dir.rename(images_dir)
-        logger.info(f"    Result image for step '{self.name}' is restored from diff.")
+        logger.info(f"Result image for step '{self.name}' is restored from diff.")
 
     def _run_script_in_docker(
             self,
@@ -936,8 +932,6 @@ class EnvironmentRunnerStep(RunnerStep):
         base_image_tarball = self.get_base_image_tarball_path(work_dir=work_dir)
 
         ESSENTIAL_TOOLS_STEP.import_image_tarball_if_needed(work_dir=work_dir)
-
-        #step_output_dir = self.get_output_directory(work_dir=work_dir)
 
         create_signature_command_args = [
             "rdiff",
@@ -1264,7 +1258,6 @@ class Runner(metaclass=RunnerMeta):
                 AWSSettings,
             )
 
-            logger.info(f"RUNS IN REMOTE? - {step.run_in_remote_docker}")
             if not step.run_in_remote_docker:
                 return None
 
