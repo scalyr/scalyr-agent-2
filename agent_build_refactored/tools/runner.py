@@ -1563,7 +1563,7 @@ def export_image_to_tarball(image_name: str, output_path: pl.Path, platform: str
         try:
             run_docker_command(
                 [
-                    "create",
+                    "createe",
                     "--name",
                     container_name,
                     "--platform",
@@ -1578,6 +1578,7 @@ def export_image_to_tarball(image_name: str, output_path: pl.Path, platform: str
                 f"Can not create container '{container_name}'. Command output:\n"
                 f"{e.stdout.decode()}"
             )
+            raise e
 
 
         logger.info("PULL, EXPORT")
