@@ -548,7 +548,6 @@ class RunnerStep:
             )
 
     def restore_base_image_tarball_from_diff_if_needed(self, work_dir: pl.Path, remote_docker_host: str = None):
-        prepare_rdiff_image(work_dir=work_dir)
         base_image_tarball = self.get_base_image_tarball_path(work_dir=work_dir)
 
         if not base_image_tarball.exists():
