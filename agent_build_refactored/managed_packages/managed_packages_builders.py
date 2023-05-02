@@ -745,7 +745,7 @@ def create_build_agent_libs_venv_step_for_linux_packages(
     name_suffix = f"{toolchain.c_runtime.value}_{toolchain.architecture.value}"
     return build_agent_libs_venv.create_step(
         name_suffix=name_suffix,
-        install_build_environment_step=toolchain.install_build_environment,
+        prepare_c_runtime_environment_with_python=toolchain.c_runtime_environment_with_python,
         build_openssl_step=toolchain.openssl_1,
         build_python_step=toolchain.python_with_openssl_1,
         build_dev_requirements_step=toolchain.dev_requirements,

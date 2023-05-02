@@ -20,7 +20,7 @@ from agent_build_refactored.tools.runner import RunnerStep, EnvironmentRunnerSte
 
 def create_step(
     name_suffix: str,
-    install_build_environment_step: EnvironmentRunnerStep,
+    prepare_c_runtime_environment_with_python: EnvironmentRunnerStep,
     build_openssl_step: RunnerStep,
     build_python_step: RunnerStep,
     build_dev_requirements_step: RunnerStep,
@@ -33,7 +33,7 @@ def create_step(
     """
     Create step that builds venv with given requirements.
     :param name_suffix: Suffix fot the step name
-    :param install_build_environment_step: Step that acts like a base for the result step.
+    :param prepare_c_runtime_environment_with_python: Step that acts like a base for the result step.
         In thi case this is the step that has to have guild tools such as gcc installed.
     :param build_openssl_step: Step that builds openssl
     :param build_python_step: Step that builds python
@@ -52,7 +52,7 @@ def create_step(
         tracked_files_globs=[
             "dev-requirements-new.txt",
         ],
-        base=install_build_environment_step,
+        base=prepare_c_runtime_environment_with_python,
         dependency_steps={
             "BUILD_OPENSSL": build_openssl_step,
             "BUILD_PYTHON": build_python_step,
