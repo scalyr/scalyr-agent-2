@@ -224,6 +224,7 @@ class RunnerStep:
 
         if self._base_step:
             result_steps.append(self._base_step)
+            result_steps.extend(self._base_step.get_all_dependency_steps(recursive=False))
 
         if not recursive:
             return sort_and_filter_steps(steps=result_steps)
@@ -1375,31 +1376,31 @@ def run_docker_command(
     subprocess.check_call(final_command, env=env)
 
 
-def _load_image(image_name: str, image_path: pl.Path, remote_docker_host: str = None):
-    """
-    Load image from file, if needed.
-    :param image_path: Image name, if presented in docker, then skip loading.
-    :param image_name: Path to image file to load.
-    :param remote_docker_host: Host name of the remote docker engine to execute command within this engine.
-    """
-    output_bytes = run_docker_command(
-        ["images", "-q", image_name],
-        remote_docker_host=remote_docker_host,
-        return_output=True,
-    )
-    output = output_bytes.decode().strip()
-
-    if output:
-        logger.info(f"Image {image_name} is already in docker.")
-        return
-
-    logger.info(f"Loading image {image_name} from file {image_path}.")
-
-    if remote_docker_host:
-        logger.info("    Loading to remote host, it may take some time.")
-    run_docker_command(
-        ["load", "-i", str(image_path)], remote_docker_host=remote_docker_host
-    )
+# def _load_image(image_name: str, image_path: pl.Path, remote_docker_host: str = None):
+#     """
+#     Load image from file, if needed.
+#     :param image_path: Image name, if presented in docker, then skip loading.
+#     :param image_name: Path to image file to load.
+#     :param remote_docker_host: Host name of the remote docker engine to execute command within this engine.
+#     """
+#     output_bytes = run_docker_command(
+#         ["images", "-q", image_name],
+#         remote_docker_host=remote_docker_host,
+#         return_output=True,
+#     )
+#     output = output_bytes.decode().strip()
+#
+#     if output:
+#         logger.info(f"Image {image_name} is already in docker.")
+#         return
+#
+#     logger.info(f"Loading image {image_name} from file {image_path}.")
+#
+#     if remote_docker_host:
+#         logger.info("    Loading to remote host, it may take some time.")
+#     run_docker_command(
+#         ["load", "-i", str(image_path)], remote_docker_host=remote_docker_host
+#     )
 
 
 def chown_directory_in_docker(path: pl.Path):
@@ -1442,15 +1443,14 @@ def remove_root_owned_directory(path: pl.Path):
 
 
 def remove_docker_container(name: str, remote_docker_host: str = None):
-    subprocess.run(
+    run_docker_command(
         [
             "docker",
             "rm",
             "-f",
             name
         ],
-        check=True,
-        capture_output=True
+        remote_docker_host=remote_docker_host
     )
 
 
