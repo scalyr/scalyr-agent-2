@@ -691,6 +691,31 @@ class EnvironmentRunnerStep(RunnerStep):
         new image with the result environment.
         If step does not run in docker, then its actions are executed directly on current system.
     """
+    def __init__(
+        self,
+        name: str,
+        script_path: Union[pl.Path, str],
+        tracked_files_globs: List[Union[str, pl.Path]] = None,
+        base: Union["EnvironmentRunnerStep", DockerImageSpec] = None,
+        dependency_steps: Dict[str, "RunnerStep"] = None,
+        environment_variables: Dict[str, str] = None,
+        user: str = "root",
+        run_in_remote_docker_if_available: bool = False
+    ):
+        dependency_steps = dependency_steps or {}
+
+        dependency_steps["RDIFF"] = RDIFF_STEP
+
+        super(EnvironmentRunnerStep, self).__init__(
+            name=name,
+            script_path=script_path,
+            tracked_files_globs=tracked_files_globs,
+            base=base,
+            dependency_steps=dependency_steps,
+            environment_variables=environment_variables,
+            user=user,
+            run_in_remote_docker_if_available=run_in_remote_docker_if_available
+        )
 
     def get_all_dependency_steps(self, recursive: bool = False) -> List['RunnerStep']:
         """
@@ -699,7 +724,6 @@ class EnvironmentRunnerStep(RunnerStep):
         """
 
         steps = super(EnvironmentRunnerStep, self).get_all_dependency_steps(recursive=recursive)
-        steps.append(RDIFF_STEP)
 
         if not recursive and self._base_step is not None:
             steps.append(self._base_step)
