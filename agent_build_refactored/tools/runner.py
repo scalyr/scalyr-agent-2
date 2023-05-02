@@ -800,6 +800,10 @@ class EnvironmentRunnerStep(RunnerStep):
             remote_docker_host=remote_docker_host
         )
 
+        subprocess.run(
+            ["docker", "inspect", image_name]
+        )
+
     def restore_result_image_from_diff_if_needed(self, work_dir: pl.Path):
 
         logger.info(f"Restore result image for step {self.id}")
