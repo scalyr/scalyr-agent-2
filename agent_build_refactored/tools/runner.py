@@ -464,11 +464,11 @@ class RunnerStep:
         for env_var_name, env_var_val in env_variables_to_pass.items():
             env_options.extend(["-e", f"{env_var_name}={env_var_val}"])
 
-        if self._base_step is not None:
-            self._base_step.import_image_tarball_if_needed(
-                work_dir=work_dir,
-                remote_docker_host=remote_docker_host
-            )
+        # if self._base_step is not None:
+        #     self._base_step.import_image_tarball_if_needed(
+        #         work_dir=work_dir,
+        #         remote_docker_host=remote_docker_host
+        #     )
 
         remove_docker_container(
             name=self._step_container_name,
@@ -483,7 +483,6 @@ class RunnerStep:
             remote_docker_host=remote_docker_host
         )
 
-        logger.info("PULL7")
         run_docker_command(
             [
                 "create",
@@ -502,7 +501,6 @@ class RunnerStep:
             remote_docker_host=remote_docker_host,
             quiet=True
         )
-        logger.info("PULL8")
 
         # Instead of mounting we have to copy files to an intermediate container,
         # because mounts does not work with remote docker.
@@ -550,18 +548,14 @@ class RunnerStep:
         if not base_image_tarball.exists():
             if self._base_step is None:
                 temp_base_image_image_tarball = pl.Path(f"{base_image_tarball}_temp")
-                logger.info("PULL1")
                 self._base_docker_image.pull()
-                logger.info("PULL2")
 
                 base_image_name = self._base_docker_image.name
-                logger.info("PULL3")
                 export_image_to_tarball(
                     image_name=base_image_name,
                     output_path=temp_base_image_image_tarball,
                     platform=str(self.architecture.as_docker_platform.value),
                 )
-                logger.info("PULL4")
                 temp_base_image_image_tarball.rename(base_image_tarball)
                 logger.info(
                     f"Initial docker image {base_image_name} has been exported to file {base_image_tarball}"
@@ -651,10 +645,16 @@ class RunnerStep:
         try:
             if self.runs_in_docker:
                 remote_docker_host = remote_docker_host_getter(self)
-                logger.info(f"Run in remote docker = {bool(remote_docker_host)}")
-                self.restore_base_image_tarball_from_diff_if_needed(
-                    work_dir=work_dir,
-                )
+
+                if self._base_step:
+                # self.restore_base_image_tarball_from_diff_if_needed(
+                #     work_dir=work_dir,
+                # )
+                    self._base_step.import_image_tarball_if_needed(
+                        work_dir=work_dir,
+                        remote_docker_host=remote_docker_host
+                    )
+
 
                 self._run_script_in_docker(
                     work_dir=work_dir,
@@ -761,6 +761,10 @@ class EnvironmentRunnerStep(RunnerStep):
         image_tarball = self.get_image_tarball_path(work_dir=work_dir)
         image_name = self.result_image.name
 
+        self.restore_result_image_from_diff_if_needed(
+            work_dir=work_dir
+        )
+
         result = run_docker_command(
             ["images", "-q", image_name],
             capture_output=True,
@@ -769,7 +773,7 @@ class EnvironmentRunnerStep(RunnerStep):
         output = result.stdout.decode().strip()
 
         if output:
-            logger.info(f"Image {image_name} is already in docker.")
+            #logger.info(f"Image {image_name} is already in docker.")
             return
 
         logger.info(f"Import filesystem of the image {image_name} to docker")
@@ -779,7 +783,6 @@ class EnvironmentRunnerStep(RunnerStep):
         # Due to the know issue with 'docker import' - https://github.com/moby/moby/pull/43103,
         # we can not use it to import images with platform that is different from host, so
         # we have to do a workaround suggested here https://github.com/docker/cli/issues/3408#issuecomment-1023098736
-        logger.info("PULL5")
         run_docker_command(
             [
                 "build",
@@ -792,12 +795,10 @@ class EnvironmentRunnerStep(RunnerStep):
                 "--quiet",
                 str(image_tarball.parent)
             ],
-            check=True,
             input=f"FROM scratch\nADD {image_tarball.name} /".encode(),
             remote_docker_host=remote_docker_host,
             quiet=True
         )
-        logger.info("PULL6")
 
         # TODO: uncomment this when docker issue mentioned above is fixed (including in docker versions in CI/CD)
         # run_docker_command(
@@ -811,24 +812,41 @@ class EnvironmentRunnerStep(RunnerStep):
         #     remote_docker_host=remote_docker_host
         # )
 
-
     def restore_result_image_from_diff_if_needed(self, work_dir: pl.Path):
-
-        logger.info(f"Restore result image for step {self.id}")
 
         initial_images_dir = self.get_initial_images_dir(work_dir=work_dir)
         initial_images_dir.mkdir(parents=True, exist_ok=True)
 
         image_tarball = self.get_image_tarball_path(work_dir=work_dir)
 
+        base_image_tarball = self.get_base_image_tarball_path(work_dir=work_dir)
+
         if image_tarball.exists():
             return
 
-        self.restore_base_image_tarball_from_diff_if_needed(
-            work_dir=work_dir,
-        )
+        logger.info(f"Restore result image for step '{self.name}'")
 
-        base_image_tarball = self.get_base_image_tarball_path(work_dir=work_dir)
+        if not base_image_tarball.exists():
+            if self._base_step is None:
+                temp_base_image_image_tarball = pl.Path(f"{base_image_tarball}_temp")
+                self._base_docker_image.pull()
+
+                base_image_name = self._base_docker_image.name
+                export_image_to_tarball(
+                    image_name=base_image_name,
+                    output_path=temp_base_image_image_tarball,
+                    platform=str(self.architecture.as_docker_platform.value),
+                )
+                temp_base_image_image_tarball.rename(base_image_tarball)
+                logger.info(
+                    f"    Initial docker image '{base_image_name}' has been exported."
+                )
+
+            else:
+                base_step = self._base_step
+                base_step.restore_result_image_from_diff_if_needed(
+                    work_dir=work_dir,
+                )
 
         temp_images_dir = self.get_images_dir(work_dir=work_dir, temp=True)
         if temp_images_dir.exists():
@@ -871,7 +889,7 @@ class EnvironmentRunnerStep(RunnerStep):
         chown_directory_in_docker(temp_images_dir)
         images_dir = self.get_images_dir(work_dir=work_dir)
         temp_images_dir.rename(images_dir)
-        logger.info(f"Result image {self._base_docker_image.name} is restored from diff.")
+        logger.info(f"    Result image for step '{self.name}' is restored from diff.")
 
     def _run_script_in_docker(
             self,
@@ -912,6 +930,8 @@ class EnvironmentRunnerStep(RunnerStep):
 
         if not self.save_result_image_as_diff:
             return
+
+        logger.info(f"    Create image diff for step '{self.name}'")
 
         base_image_tarball = self.get_base_image_tarball_path(work_dir=work_dir)
 
@@ -960,6 +980,7 @@ class EnvironmentRunnerStep(RunnerStep):
 
         step_images_dir = self.get_images_dir(work_dir=work_dir)
         temp_images_dir.rename(step_images_dir)
+        logger.info(f"    Diff for the image of the step '{self.name}' is created.")
 
 
 @dataclasses.dataclass
@@ -1124,10 +1145,11 @@ class Runner(metaclass=RunnerMeta):
         env_args = ["-e", "AGENT_BUILD_IN_DOCKER=1"]
 
         if isinstance(self.base_environment, EnvironmentRunnerStep):
-            self.base_environment.restore_result_image_from_diff_if_needed(
-                work_dir=self.work_dir,
-            )
             self.base_environment.import_image_tarball_if_needed(work_dir=self.work_dir)
+            # self.base_environment.restore_result_image_from_diff_if_needed(
+            #     work_dir=self.work_dir,
+            # )
+
 
         run_docker_command(
             [
@@ -1596,8 +1618,6 @@ def export_image_to_tarball(image_name: str, output_path: pl.Path, platform: str
             quiet=True
         )
 
-
-        logger.info("PULL, EXPORT")
         run_docker_command(
             [
                 "export", container_name, "-o", str(output_path)
