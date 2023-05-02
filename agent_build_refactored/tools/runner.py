@@ -1438,7 +1438,7 @@ def remove_root_owned_directory(path: pl.Path):
         shutil.rmtree(path)
 
 
-def remove_docker_container(name: str):
+def remove_docker_container(name: str, remote_docker_host: str = None):
     subprocess.run(
         [
             "docker",
@@ -1453,21 +1453,27 @@ def remove_docker_container(name: str):
 
 def export_image_to_tarball(image_name: str, output_path: pl.Path, remote_docker_host: str = None):
     container_name = image_name.replace(":", "-")
-    remove_docker_container(name=container_name)
+    remove_docker_container(name=container_name, remote_docker_host=remote_docker_host)
     try:
         run_docker_command(
             [
                 "create", "--name", container_name, image_name
-            ]
+            ],
+            remote_docker_host=remote_docker_host
         )
 
         run_docker_command(
             [
                 "export", container_name, "-o", str(output_path)
-            ]
+            ],
+            remote_docker_host=remote_docker_host
         )
     finally:
-        remove_docker_container(name=container_name)
+        remove_docker_container(name=container_name, remote_docker_host=remote_docker_host)
+
+    logger.info(
+        f"Initial docker image {image_name} has been exported to file {output_path}"
+    )
 
 
 def cleanup():
