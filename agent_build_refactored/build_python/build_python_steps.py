@@ -203,7 +203,7 @@ def create_all_toolchains():
 
             prepare_c_runtime_environment_with_python_step = prepare_c_runtime_environment_with_python.create_step(
                 name_suffix=steps_name_suffix,
-                base_image=base_image,
+                install_build_environment_step=install_build_environment_step,
                 build_openssl_step=build_openssl_1_step,
                 build_python_step=build_python_with_openssl_1_step,
                 build_dev_requirements_step=build_dev_requirements_step,

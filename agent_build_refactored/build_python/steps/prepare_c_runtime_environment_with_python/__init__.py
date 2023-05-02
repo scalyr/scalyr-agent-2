@@ -20,7 +20,7 @@ from agent_build_refactored.tools.runner import RunnerStep, EnvironmentRunnerSte
 
 def create_step(
         name_suffix: str,
-        base_image: DockerImageSpec,
+        install_build_environment_step: EnvironmentRunnerStep,
         build_openssl_step: RunnerStep,
         build_python_step: RunnerStep,
         build_dev_requirements_step: RunnerStep,
@@ -32,6 +32,7 @@ def create_step(
 
     :param name_suffix: Suffix fot the step name
     :param base_image: Spec for the base image, it's OS distro has to be with the same C runtime version as Python.
+    :param install_build_environment_step: Step that acts like a base for the result step.
     :param build_openssl_step: Step that builds openssl
     :param build_python_step: Step that builds Python
     :param build_dev_requirements_step: Step that builds all agent project requirements.
@@ -41,7 +42,7 @@ def create_step(
     return EnvironmentRunnerStep(
         name=f"prepare_c_runtime_environment_with_python_{name_suffix}",
         script_path=pl.Path(__file__).parent / "prepare_c_runtime_environment_with_python.sh",
-        base=base_image,
+        base=install_build_environment_step,
         dependency_steps={
             "BUILD_OPENSSL_1": build_openssl_step,
             "BUILD_PYTHON_WITH_OPENSSL_1": build_python_step,

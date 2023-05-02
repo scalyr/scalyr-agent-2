@@ -1519,15 +1519,29 @@ def chown_directory_in_docker(path: pl.Path):
         shutil.rmtree(path)
         return
 
-    # In order to be able to remove the whole directory, we mount parent directory.
-    with DockerContainer(
-        name="agent_build_step_chown",
-        image_name=UBUNTU_22_04,
-        mounts=[f"{path.parent}:/parent"],
-        command=["chown", "-R", f"{os.getuid()}:{os.getuid()}", f"/parent/{path.name}"],
-        detached=False,
-    ):
-        pass
+    run_docker_command(
+        [
+            "run",
+            "-i",
+            "--rm",
+            "--name",
+            "agent_build_step_chown",
+            "-v",
+            f"{path.parent}:/parent",
+            UBUNTU_22_04,
+            *["chown", "-R", f"{os.getuid()}:{os.getuid()}", f"/parent/{path.name}"]
+        ]
+    )
+    #
+    # # In order to be able to remove the whole directory, we mount parent directory.
+    # with DockerContainer(
+    #     name="agent_build_step_chown",
+    #     image_name=UBUNTU_22_04,
+    #     mounts=[f"{path.parent}:/parent"],
+    #     command=["chown", "-R", f"{os.getuid()}:{os.getuid()}", f"/parent/{path.name}"],
+    #     detached=False,
+    # ):
+    #     pass
 
 
 def remove_root_owned_directory(path: pl.Path):
