@@ -40,7 +40,6 @@ from agent_build_refactored.tools import (
     UniqueDict,
     IN_DOCKER,
 )
-from agent_build_refactored.tools.rdiff import create_files_diff_with_rdiff, restore_new_file_from_diff
 
 from agent_build_refactored.tools.run_in_ec2.constants import EC2DistroImage
 
@@ -937,10 +936,6 @@ class EnvironmentRunnerStep(RunnerStep):
 
         ESSENTIAL_TOOLS_STEP.import_image_tarball_if_needed(work_dir=work_dir)
 
-        """
-        rdiff signature "${ORIGINAL_FILE}" "${SIGNATURE_FILE}"
-        rdiff delta "${SIGNATURE_FILE}" "${NEW_FILE}" "${DELTA_FILE}
-        """
         step_output_dir = self.get_output_directory(work_dir=work_dir)
 
         create_signature_command_args = [
@@ -981,18 +976,6 @@ class EnvironmentRunnerStep(RunnerStep):
             ],
             check=True
         )
-
-        # create_files_diff_with_rdiff(
-        #     original_file_dir=base_image_tarball.parent,
-        #     original_file_name=base_image_tarball.name,
-        #     new_file_dir=image_tarball.parent,
-        #     new_file_name=image_tarball.name,
-        #     result_signature_file_dir=temp_output_directory,
-        #     result_signature_file_name="signature",
-        #     result_delta_file_dir=temp_output_directory,
-        #     result_delta_file_name="delta",
-        #     image_name=ESSENTIAL_TOOLS_STEP.result_image.name
-        # )
 
         step_images_dir = self.get_images_dir(work_dir=work_dir)
         temp_images_dir.rename(step_images_dir)
@@ -1649,11 +1632,7 @@ ESSENTIAL_STEPS = {}
 
 ESSENTIAL_TOOLS_STEP = EnvironmentRunnerStep(
     name="prepare_essential_step_tools",
-    script_path=SOURCE_ROOT / "agent_build_refactored/tools/rdiff/install.sh",
-    tracked_files_globs=[
-        SOURCE_ROOT / "agent_build_refactored/tools/rdiff/create_diff.sh",
-        SOURCE_ROOT / "agent_build_refactored/tools/rdiff/restore_from_diff.sh",
-    ],
+    script_path=SOURCE_ROOT / "agent_build_refactored/tools/essential_runner_steps/preapre_essential_tools.sh",
     base=DockerImageSpec(
         name=UBUNTU_22_04,
         platform=Architecture.X86_64.as_docker_platform.value
@@ -1662,41 +1641,3 @@ ESSENTIAL_TOOLS_STEP = EnvironmentRunnerStep(
 )
 
 ESSENTIAL_STEPS["ESSENTIAL_TOOLS"] = ESSENTIAL_TOOLS_STEP
-
-
-
-
-
-
-
-def is_image_already_exists_in_docker(
-        image_name: str,
-        remote_docker_host: str = None
-):
-    result = run_docker_command(
-        ["images", "-q", image_name],
-        capture_output=True,
-        remote_docker_host=remote_docker_host,
-    )
-    output = result.stdout.decode().strip()
-
-    return bool(output)
-
-
-def prepare_rdiff_image(work_dir: pl.Path, remote_docker_host: str = None):
-    if is_image_already_exists_in_docker(
-        image_name=ESSENTIAL_TOOLS_STEP.result_image.name,
-    ):
-        return
-
-    image_tarball = ESSENTIAL_TOOLS_STEP.get_image_tarball_path(work_dir=work_dir)
-
-    run_docker_command(
-        ["load", "-i", str(image_tarball)],
-        remote_docker_host=remote_docker_host,
-    )
-
-    run_docker_command(
-        ["tag", "rdiff", ESSENTIAL_TOOLS_STEP.id],
-        remote_docker_host=remote_docker_host
-    )
