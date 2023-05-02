@@ -30,6 +30,7 @@ from typing import Union, Optional, List, Dict, Type, Callable, Iterable
 from agent_build_refactored.tools.dependabot_aware_docker_images import UBUNTU_22_04
 from agent_build_refactored.tools.constants import (
     SOURCE_ROOT,
+    DockerPlatform,
     DockerPlatformInfo,
     Architecture,
     IN_CICD,
@@ -1486,6 +1487,12 @@ def run_docker_command(
         capture_output=capture_output
     )
 
+def pull_image(image_name: str, platform: DockerPlatform):
+    run_docker_command(
+        ["pull", "--quiet", "--platform", str(platform.value), image_name]
+    )
+
+
 
 def chown_directory_in_docker(path: pl.Path):
     """
@@ -1497,6 +1504,11 @@ def chown_directory_in_docker(path: pl.Path):
     if IN_DOCKER:
         shutil.rmtree(path)
         return
+
+    pull_image(
+        image_name=UBUNTU_22_04,
+        platform=Architecture.X86_64.as_docker_platform
+    )
 
     run_docker_command(
         [
@@ -1573,9 +1585,13 @@ def cleanup():
     check_output_with_log_debug(["docker", "system", "prune", "-f"])
 
 
+# When a step is added to this collection, all steps that are created later will have this step as a dependency.
 ESSENTIAL_STEPS = {}
 
 
+# Create a special step that prepares essential tools.
+# Without those tools, steps can not operate normally, for example it has tool named rdiff, which
+# is needed to restore step docker images from diffs.
 ESSENTIAL_TOOLS_STEP = EnvironmentRunnerStep(
     name="prepare_essential_step_tools",
     script_path=SOURCE_ROOT / "agent_build_refactored/tools/essential_runner_steps/prepare_essential_tools.sh",
