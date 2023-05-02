@@ -790,15 +790,36 @@ class EnvironmentRunnerStep(RunnerStep):
         logger.info(f"Import filesystem of the image {image_name} to docker")
         if remote_docker_host:
             logger.info("    NOTE: Importing to a remote docker. It may take some time...")
-        run_docker_command(
+
+
+        # run_docker_command(
+        #     [
+        #         "import",
+        #         "--platform",
+        #         str(self.architecture.as_docker_platform.value),
+        #         str(image_tarball),
+        #         image_name
+        #     ],
+        #     remote_docker_host=remote_docker_host
+        # )
+        """
+        echo -e 'FROM scratch\nADD busybox-rootfs.tar /\nCMD ["sh"]' | docker build -t busy --platform=linux/arm64 -f- .
+        """
+
+        subprocess.run(
             [
-                "import",
+                "docker",
+                "build",
+                "-t",
+                image_name,
                 "--platform",
                 str(self.architecture.as_docker_platform.value),
-                str(image_tarball),
-                image_name
+                "-f",
+                "-",
+                str(image_tarball.parent)
             ],
-            remote_docker_host=remote_docker_host
+            check=True,
+            input=f"FROM scratch\nADD {image_tarball.name} /\n".encode()
         )
 
         subprocess.run(
