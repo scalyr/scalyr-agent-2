@@ -72,6 +72,7 @@ class DockerImageSpec:
 
 RDIFF_STEP = None
 
+
 class RunnerStep:
     """
     Base abstraction that represents a shell/python script that has to be executed by the Runner. The step can be
@@ -634,7 +635,7 @@ class RunnerStep:
         logging.info(
             f"Start step: {self.id}\n"
             f"Passed env. variables:\n    {env_variables_str}\n"
-            f"Arch: {self.architecture.value}"
+            f"Arch: {self.architecture.value}\n"
         )
 
         # Check that all required steps results exists.
@@ -1144,6 +1145,7 @@ class Runner(metaclass=RunnerMeta):
                 AWSSettings,
             )
 
+            logger.info(f"RUNS IN REMOTE? - {step.run_in_remote_docker}")
             if not step.run_in_remote_docker:
                 return None
 
