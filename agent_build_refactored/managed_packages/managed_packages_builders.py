@@ -753,6 +753,7 @@ def create_build_agent_libs_venv_step_for_linux_packages(
         agent_subdir_name=AGENT_SUBDIR_NAME,
         pip_version=EMBEDDED_PYTHON_PIP_VERSION,
         requirements_file_content=AGENT_LIBS_REQUIREMENTS_CONTENT,
+        run_in_remote_docker=toolchain.architecture != Architecture.X86_64
     )
 
 

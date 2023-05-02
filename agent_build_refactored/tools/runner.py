@@ -283,9 +283,6 @@ class RunnerStep:
     def get_in_docker_temp_output_directory(self):
         return pl.Path("/tmp/step_output")
 
-    def get_cache_directory(self, work_dir: pl.Path):
-        return work_dir / "step_cache" / self.id
-
     def get_isolated_root(self, work_dir: pl.Path):
         return work_dir / "step_isolated_root" / self.id
 
@@ -472,17 +469,17 @@ class RunnerStep:
                 remote_docker_host=remote_docker_host
             )
 
-        run_docker_command(
-            ["rm", "-f", self._step_container_name],
-            remote_docker_host=remote_docker_host,
+        remove_docker_container(
+            name=self._step_container_name,
+            remote_docker_host=remote_docker_host
         )
 
         command_args = self._get_command_args()
 
         # Create intermediate container
-        run_docker_command(
-            ["rm", "-f", self._step_container_name],
-            remote_docker_host=remote_docker_host,
+        remove_docker_container(
+            name=self._step_container_name,
+            remote_docker_host=remote_docker_host
         )
 
         run_docker_command(
@@ -541,7 +538,7 @@ class RunnerStep:
                 remote_docker_host=remote_docker_host,
             )
 
-    def restore_base_image_tarball_from_diff_if_needed(self, work_dir: pl.Path, remote_docker_host: str = None):
+    def restore_base_image_tarball_from_diff_if_needed(self, work_dir: pl.Path):
         base_image_tarball = self.get_base_image_tarball_path(work_dir=work_dir)
 
         logger.info(f"Restore base image for the step {self.id}")
@@ -650,7 +647,6 @@ class RunnerStep:
                 logger.info(f"Run in remote docker = {bool(remote_docker_host)}")
                 self.restore_base_image_tarball_from_diff_if_needed(
                     work_dir=work_dir,
-                    #remote_docker_host=remote_docker_host
                 )
 
                 self._run_script_in_docker(
@@ -680,7 +676,9 @@ class RunnerStep:
 
     def cleanup(self):
         if self._step_container_name:
-            run_docker_command(["rm", "-f", self._step_container_name])
+            remove_docker_container(
+                name=self._step_container_name,
+            )
 
 
 class EnvironmentRunnerStep(RunnerStep):
@@ -791,7 +789,27 @@ class EnvironmentRunnerStep(RunnerStep):
         if remote_docker_host:
             logger.info("    NOTE: Importing to a remote docker. It may take some time...")
 
+        # Due to the know issue with 'docker import' - https://github.com/moby/moby/pull/43103,
+        # we can not use it to import images with platform that is different from host, so
+        # we have to do a workaround suggested here https://github.com/docker/cli/issues/3408#issuecomment-1023098736
+        run_docker_command(
+            [
+                "build",
+                "-t",
+                image_name,
+                "--platform",
+                str(self.architecture.as_docker_platform.value),
+                "-f",
+                "-",
+                "--quiet",
+                str(image_tarball.parent)
+            ],
+            check=True,
+            input=f"FROM scratch\nADD {image_tarball.name} /".encode(),
+            remote_docker_host=remote_docker_host,
+        )
 
+        # TODO: uncomment this when docker issue mentioned above is fixed (including in docker versions in CI/CD)
         # run_docker_command(
         #     [
         #         "import",
@@ -802,29 +820,7 @@ class EnvironmentRunnerStep(RunnerStep):
         #     ],
         #     remote_docker_host=remote_docker_host
         # )
-        """
-        echo -e 'FROM scratch\nADD busybox-rootfs.tar /\nCMD ["sh"]' | docker build -t busy --platform=linux/arm64 -f- .
-        """
 
-        run_docker_command(
-            [
-                "build",
-                "-t",
-                image_name,
-                "--platform",
-                str(self.architecture.as_docker_platform.value),
-                "-f",
-                "-",
-                str(image_tarball.parent)
-            ],
-            check=True,
-            input=f"FROM scratch\nADD {image_tarball.name} /\n".encode(),
-            remote_docker_host=remote_docker_host,
-        )
-
-        run_docker_command(
-            ["inspect", image_name], check=True, remote_docker_host=remote_docker_host,
-        )
 
     def restore_result_image_from_diff_if_needed(self, work_dir: pl.Path):
 
@@ -1042,7 +1038,7 @@ class Runner(metaclass=RunnerMeta):
     @classmethod
     def get_all_required_steps(cls) -> List[RunnerStep]:
         """Return all steps that are required by this runner"""
-        return []
+        return sort_and_filter_steps(steps=list(ESSENTIAL_STEPS.values()))
 
     @classmethod
     def get_all_steps(cls, recursive: bool = False) -> List[RunnerStep]:
@@ -1556,6 +1552,7 @@ def remove_docker_container(name: str, remote_docker_host: str = None):
             "-f",
             name
         ],
+        capture_output=True,
         remote_docker_host=remote_docker_host
     )
 
