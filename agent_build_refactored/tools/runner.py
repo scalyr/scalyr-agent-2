@@ -1462,6 +1462,7 @@ def run_docker_command(
     check: bool = True,
     capture_output: bool = False,
     input: bytes = None,
+    stderr = None,
     remote_docker_host: str = None,
 ):
     """
@@ -1484,7 +1485,8 @@ def run_docker_command(
         env=env,
         check=check,
         input=input,
-        capture_output=capture_output
+        capture_output=capture_output,
+        stderr=stderr
     )
 
 def pull_image(image_name: str, platform: DockerPlatform):
@@ -1558,16 +1560,26 @@ def export_image_to_tarball(image_name: str, output_path: pl.Path, platform: str
     container_name = image_name.replace(":", "-")
     remove_docker_container(name=container_name)
     try:
-        run_docker_command(
-            [
-                "create",
-                "--name",
-                container_name,
-                "--platform",
-                platform,
-                image_name
-            ],
-        )
+        try:
+            run_docker_command(
+                [
+                    "create",
+                    "--name",
+                    container_name,
+                    "--platform",
+                    platform,
+                    image_name
+                ],
+                stderr=subprocess.STDOUT,
+                check=False
+            )
+        except subprocess.CalledProcessError as e:
+            logger.error(
+                f"Can not create container '{container_name}'. Command output:\n"
+                f"{e.stdout.decode()}"
+            )
+
+
         logger.info("PULL, EXPORT")
         run_docker_command(
             [
