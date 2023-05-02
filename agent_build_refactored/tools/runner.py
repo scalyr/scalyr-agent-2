@@ -481,6 +481,7 @@ class RunnerStep:
             remote_docker_host=remote_docker_host
         )
 
+        logger.info("PULL7")
         run_docker_command(
             [
                 "create",
@@ -498,6 +499,7 @@ class RunnerStep:
             ],
             remote_docker_host=remote_docker_host,
         )
+        logger.info("PULL8")
 
         # Instead of mounting we have to copy files to an intermediate container,
         # because mounts does not work with remote docker.
@@ -775,6 +777,7 @@ class EnvironmentRunnerStep(RunnerStep):
         # Due to the know issue with 'docker import' - https://github.com/moby/moby/pull/43103,
         # we can not use it to import images with platform that is different from host, so
         # we have to do a workaround suggested here https://github.com/docker/cli/issues/3408#issuecomment-1023098736
+        logger.info("PULL5")
         run_docker_command(
             [
                 "build",
@@ -791,6 +794,7 @@ class EnvironmentRunnerStep(RunnerStep):
             input=f"FROM scratch\nADD {image_tarball.name} /".encode(),
             remote_docker_host=remote_docker_host,
         )
+        logger.info("PULL6")
 
         # TODO: uncomment this when docker issue mentioned above is fixed (including in docker versions in CI/CD)
         # run_docker_command(
