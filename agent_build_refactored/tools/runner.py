@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+
 import abc
 import argparse
 import dataclasses
@@ -293,6 +295,7 @@ class RunnerStep:
         return pl.Path("/tmp/agent_source")
 
     def get_initial_images_dir(self, work_dir: pl.Path):
+        """Get path to directory where all initial images are stored."""
         path = work_dir / "initial_images"
         if not path.exists():
             path.mkdir(parents=True)
@@ -1191,7 +1194,7 @@ class Runner(metaclass=RunnerMeta):
 
             if missing_steps:
                 raise Exception(
-                    f"Can not execute runner '{self.FULLY_QUALIFIED_NAME}' because some of its required steps"
+                    f"Can not execute runner '{self.FULLY_QUALIFIED_NAME}' because some of its required steps "
                     f"don't have result directories.\nMissing steps: {missing_steps}"
                 )
 
