@@ -470,12 +470,8 @@ class RunnerStep:
             env_options.extend(["-e", f"{env_var_name}={env_var_val}"])
 
         if self._base_step is not None:
-            base_step_images_tarball = self._base_step.get_image_tarball_path(
-                work_dir=work_dir
-            )
             self._base_step.import_image_tarball_if_needed(
-                image_tarball=base_step_images_tarball,
-                image_name=self._base_step.result_image.name,
+                work_dir=work_dir,
                 remote_docker_host=remote_docker_host
             )
 
@@ -546,24 +542,6 @@ class RunnerStep:
                     str(dst),
                 ],
                 remote_docker_host=remote_docker_host,
-            )
-
-    @staticmethod
-    def import_image_tarball_if_needed(image_tarball: pl.Path, image_name: str, remote_docker_host: str = None):
-        logger.info(f"Import image {image_name} filesystem to docker.")
-        output_bytes = run_docker_command(
-            ["images", "-q", image_name],
-            remote_docker_host=remote_docker_host,
-            return_output=True,
-        )
-        output = output_bytes.decode().strip()
-
-        if output:
-            logger.info(f"Image {image_name} is already in docker.")
-        else:
-            run_docker_command(
-                ["import", str(image_tarball), image_name],
-                remote_docker_host=remote_docker_host
             )
 
     def restore_base_image_tarball_from_diff_if_needed(self, work_dir: pl.Path, remote_docker_host: str = None):
@@ -782,6 +760,27 @@ class EnvironmentRunnerStep(RunnerStep):
         )
         chown_directory_in_docker(temp_image_tarball.parent)
         temp_image_tarball.rename(image_tarball)
+
+    def import_image_tarball_if_needed(self, work_dir: pl.Path, remote_docker_host: str = None):
+
+        image_tarball = self.get_image_tarball_path(work_dir=work_dir)
+        image_name = self.result_image.name
+
+        logger.info(f"Import image {image_name} filesystem to docker.")
+        output_bytes = run_docker_command(
+            ["images", "-q", image_name],
+            remote_docker_host=remote_docker_host,
+            return_output=True,
+        )
+        output = output_bytes.decode().strip()
+
+        if output:
+            logger.info(f"Image {image_name} is already in docker.")
+        else:
+            run_docker_command(
+                ["import", str(image_tarball), image_name],
+                remote_docker_host=remote_docker_host
+            )
 
     def restore_result_image_from_diff_if_needed(self, work_dir: pl.Path, remote_docker_host: str = None):
 
