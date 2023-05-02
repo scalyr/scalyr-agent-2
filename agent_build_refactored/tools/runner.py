@@ -545,17 +545,21 @@ class RunnerStep:
         if not base_image_tarball.exists():
             if self._base_step is None:
                 temp_base_image_image_tarball = pl.Path(f"{base_image_tarball}_temp")
+                logger.info("PULL1")
                 self._base_docker_image.pull()
+                logger.info("PULL2")
 
-                image_name = self._base_docker_image.name
+                base_image_name = self._base_docker_image.name
+                logger.info("PULL3")
                 export_image_to_tarball(
-                    image_name=image_name,
+                    image_name=base_image_name,
                     output_path=temp_base_image_image_tarball,
                     platform=str(self.architecture.as_docker_platform.value),
                 )
+                logger.info("PULL4")
                 temp_base_image_image_tarball.rename(base_image_tarball)
                 logger.info(
-                    f"Initial docker image {image_name} has been exported to file {base_image_tarball}"
+                    f"Initial docker image {base_image_name} has been exported to file {base_image_tarball}"
                 )
 
             else:
