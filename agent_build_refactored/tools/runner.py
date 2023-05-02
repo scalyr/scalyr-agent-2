@@ -1038,7 +1038,7 @@ class Runner(metaclass=RunnerMeta):
     @classmethod
     def get_all_required_steps(cls) -> List[RunnerStep]:
         """Return all steps that are required by this runner"""
-        return sort_and_filter_steps(steps=list(ESSENTIAL_STEPS.values()))
+        return []
 
     @classmethod
     def get_all_steps(cls, recursive: bool = False) -> List[RunnerStep]:
@@ -1047,6 +1047,8 @@ class Runner(metaclass=RunnerMeta):
         """
 
         result_steps = cls.get_all_required_steps()
+
+        result_steps.extend(list(ESSENTIAL_STEPS.values()))
 
         base_environment = cls.get_base_environment()
         if base_environment:
