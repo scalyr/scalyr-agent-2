@@ -121,6 +121,8 @@ def create_all_toolchains():
 
             run_in_remote_docker = architecture != Architecture.X86_64
 
+            print(f"ARCH: {architecture},  RUNSSS: {run_in_remote_docker}")
+
             if architecture == Architecture.X86_64:
                 base_image_name = "centos:6"
             else:
@@ -176,7 +178,9 @@ def create_all_toolchains():
                     python_version=EMBEDDED_PYTHON_VERSION,
                     python_short_version=EMBEDDED_PYTHON_SHORT_VERSION,
                     python_install_prefix=PYTHON_INSTALL_PREFIX,
-                    pip_version=EMBEDDED_PYTHON_PIP_VERSION
+                    pip_version=EMBEDDED_PYTHON_PIP_VERSION,
+                    run_in_remote_docker=run_in_remote_docker
+
                 )
 
             build_python_with_openssl_1_step = create_python_step(
