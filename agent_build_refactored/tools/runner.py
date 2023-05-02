@@ -543,29 +543,30 @@ class RunnerStep:
     def restore_base_image_tarball_from_diff_if_needed(self, work_dir: pl.Path):
         base_image_tarball = self.get_base_image_tarball_path(work_dir=work_dir)
 
-        logger.info(f"Restore base image for the step {self.id}")
+        if base_image_tarball.exists():
+            return
 
-        if not base_image_tarball.exists():
-            if self._base_step is None:
-                temp_base_image_image_tarball = pl.Path(f"{base_image_tarball}_temp")
-                self._base_docker_image.pull()
+        if self._base_step:
+            base_step = self._base_step
+            base_step.restore_result_image_from_diff_if_needed(
+                work_dir=work_dir,
+            )
+            return
 
-                base_image_name = self._base_docker_image.name
-                export_image_to_tarball(
-                    image_name=base_image_name,
-                    output_path=temp_base_image_image_tarball,
-                    platform=str(self.architecture.as_docker_platform.value),
-                )
-                temp_base_image_image_tarball.rename(base_image_tarball)
-                logger.info(
-                    f"Initial docker image {base_image_name} has been exported to file {base_image_tarball}"
-                )
+        temp_base_image_image_tarball = pl.Path(f"{base_image_tarball}_temp")
+        self._base_docker_image.pull()
 
-            else:
-                base_step = self._base_step
-                base_step.restore_result_image_from_diff_if_needed(
-                    work_dir=work_dir,
-                )
+        base_image_name = self._base_docker_image.name
+        export_image_to_tarball(
+            image_name=base_image_name,
+            output_path=temp_base_image_image_tarball,
+            platform=str(self.architecture.as_docker_platform.value),
+        )
+        temp_base_image_image_tarball.rename(base_image_tarball)
+        logger.debug(
+            f"Initial docker image {base_image_name} has been exported to file {base_image_tarball}"
+        )
+
 
     def _get_command_args(self):
         """
@@ -646,15 +647,12 @@ class RunnerStep:
             if self.runs_in_docker:
                 remote_docker_host = remote_docker_host_getter(self)
 
+                self.restore_base_image_tarball_from_diff_if_needed(work_dir=work_dir)
                 if self._base_step:
-                # self.restore_base_image_tarball_from_diff_if_needed(
-                #     work_dir=work_dir,
-                # )
                     self._base_step.import_image_tarball_if_needed(
                         work_dir=work_dir,
                         remote_docker_host=remote_docker_host
                     )
-
 
                 self._run_script_in_docker(
                     work_dir=work_dir,
@@ -680,6 +678,7 @@ class RunnerStep:
         chown_directory_in_docker(temp_output_directory)
         temp_output_directory.rename(output_directory)
         self.cleanup()
+        logger.info(f"Step {self.name} is finished.\n")
 
     def cleanup(self):
         if self._step_container_name:
@@ -811,7 +810,7 @@ class EnvironmentRunnerStep(RunnerStep):
         #     remote_docker_host=remote_docker_host
         # )
 
-        logger.info(f"Filesystem of the image of the step {self.name} is imported to docker.")
+        logger.info(f"Filesystem of the image of the step '{self.name}' is imported to docker.")
 
     def restore_result_image_from_diff_if_needed(self, work_dir: pl.Path):
 
@@ -825,24 +824,9 @@ class EnvironmentRunnerStep(RunnerStep):
         if image_tarball.exists():
             return
 
-        if not base_image_tarball.exists():
-            if self._base_step is None:
-                temp_base_image_image_tarball = pl.Path(f"{base_image_tarball}_temp")
-                self._base_docker_image.pull()
-
-                base_image_name = self._base_docker_image.name
-                export_image_to_tarball(
-                    image_name=base_image_name,
-                    output_path=temp_base_image_image_tarball,
-                    platform=str(self.architecture.as_docker_platform.value),
-                )
-                temp_base_image_image_tarball.rename(base_image_tarball)
-
-            else:
-                base_step = self._base_step
-                base_step.restore_result_image_from_diff_if_needed(
-                    work_dir=work_dir,
-                )
+        self.restore_base_image_tarball_from_diff_if_needed(
+            work_dir=work_dir
+        )
 
         temp_images_dir = self.get_images_dir(work_dir=work_dir, temp=True)
         if temp_images_dir.exists():
@@ -926,8 +910,6 @@ class EnvironmentRunnerStep(RunnerStep):
 
         if not self.save_result_image_as_diff:
             return
-
-        logger.info(f"    Create image diff for step '{self.name}'")
 
         base_image_tarball = self.get_base_image_tarball_path(work_dir=work_dir)
 
