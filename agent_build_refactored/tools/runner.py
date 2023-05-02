@@ -651,6 +651,7 @@ class RunnerStep:
         try:
             if self.runs_in_docker:
                 remote_docker_host = remote_docker_host_getter(self)
+                logger.info(f"Run in remote docker = {bool(remote_docker_host)}")
                 self.restore_base_image_tarball_from_diff_if_needed(
                     work_dir=work_dir,
                     #remote_docker_host=remote_docker_host
