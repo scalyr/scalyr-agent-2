@@ -291,7 +291,9 @@ class RunnerStep:
         return pl.Path("/tmp/agent_source")
 
     def get_initial_images_dir(self, work_dir: pl.Path):
-        return work_dir / "initial_images"
+        path = work_dir / "initial_images"
+        if not path.exists():
+            path.mkdir(parents=True)
 
     def get_base_image_tarball_path(self, work_dir: pl.Path):
         if self._base_step is None:
