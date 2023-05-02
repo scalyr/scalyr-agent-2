@@ -795,6 +795,7 @@ class EnvironmentRunnerStep(RunnerStep):
             check=True,
             input=f"FROM scratch\nADD {image_tarball.name} /".encode(),
             remote_docker_host=remote_docker_host,
+            quiet=True
         )
         logger.info("PULL6")
 
@@ -1519,8 +1520,6 @@ def pull_image(image_name: str, platform: DockerPlatformInfo):
         quiet=True
     )
 
-
-
 def chown_directory_in_docker(path: pl.Path):
     """
     Since we produce some artifacts inside docker containers, we may face difficulties with
@@ -1534,7 +1533,7 @@ def chown_directory_in_docker(path: pl.Path):
 
     pull_image(
         image_name=UBUNTU_22_04,
-        platform=Architecture.X86_64.as_docker_platform
+        platform=Architecture.X86_64.as_docker_platform.value
     )
 
     run_docker_command(
