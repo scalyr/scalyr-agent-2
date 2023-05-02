@@ -295,6 +295,8 @@ class RunnerStep:
         if not path.exists():
             path.mkdir(parents=True)
 
+        return path
+
     def get_base_image_tarball_path(self, work_dir: pl.Path):
         if self._base_step is None:
             tarball_name = self._base_docker_image.name.replace(":", "-")
