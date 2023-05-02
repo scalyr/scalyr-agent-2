@@ -469,6 +469,15 @@ class RunnerStep:
         for env_var_name, env_var_val in env_variables_to_pass.items():
             env_options.extend(["-e", f"{env_var_name}={env_var_val}"])
 
+        if self._base_step is not None:
+            base_step_images_tarball = self._base_step.get_image_tarball_path(
+                work_dir=work_dir
+            )
+            self._base_step.import_image_tarball_if_needed(
+                image_tarball=base_step_images_tarball,
+                image_name=self._base_step.result_image.name,
+                remote_docker_host=remote_docker_host
+            )
 
         run_docker_command(
             ["rm", "-f", self._step_container_name],
@@ -576,14 +585,14 @@ class RunnerStep:
                 base_step = self._base_step
                 base_step.restore_result_image_from_diff_if_needed(
                     work_dir=work_dir,
-                    remote_docker_host=remote_docker_host
+                    #remote_docker_host=remote_docker_host
                 )
 
-        self.import_image_tarball_if_needed(
-            image_tarball=base_image_tarball,
-            image_name=self._base_docker_image.name,
-            remote_docker_host=remote_docker_host
-        )
+        # self.import_image_tarball_if_needed(
+        #     image_tarball=base_image_tarball,
+        #     image_name=self._base_docker_image.name,
+        #     remote_docker_host=remote_docker_host
+        # )
 
     def _get_command_args(self):
         """
@@ -665,7 +674,7 @@ class RunnerStep:
                 remote_docker_host = remote_docker_host_getter(self)
                 self.restore_base_image_tarball_from_diff_if_needed(
                     work_dir=work_dir,
-                    remote_docker_host=remote_docker_host
+                    #remote_docker_host=remote_docker_host
                 )
 
                 self._run_script_in_docker(
@@ -785,18 +794,18 @@ class EnvironmentRunnerStep(RunnerStep):
         if not image_tarball.exists():
             self.restore_base_image_tarball_from_diff_if_needed(
                 work_dir=work_dir,
-                remote_docker_host=remote_docker_host
+                #remote_docker_host=remote_docker_host
             )
 
             prepare_rdiff_image(work_dir=work_dir)
             self.res(work_dir=work_dir)
             logger.info(f"Result image {self._base_docker_image.name} is restored from diff.")
 
-        self.import_image_tarball_if_needed(
-            image_tarball=image_tarball,
-            image_name=self.result_image.name,
-            remote_docker_host=remote_docker_host
-        )
+        # self.import_image_tarball_if_needed(
+        #     image_tarball=image_tarball,
+        #     image_name=self.result_image.name,
+        #     remote_docker_host=remote_docker_host
+        # )
 
 
     def _run_script_in_docker(
