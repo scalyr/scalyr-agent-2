@@ -867,7 +867,8 @@ class EnvironmentRunnerStep(RunnerStep):
         #     image_name=ESSENTIAL_TOOLS_STEP.result_image.name
         # )
         chown_directory_in_docker(temp_images_dir)
-        temp_images_dir.rename(image_tarball)
+        images_dir = self.get_images_dir(work_dir=work_dir)
+        temp_images_dir.rename(images_dir)
         logger.info(f"Result image {self._base_docker_image.name} is restored from diff.")
 
     def _run_script_in_docker(
