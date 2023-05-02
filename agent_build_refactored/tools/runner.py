@@ -747,26 +747,6 @@ class EnvironmentRunnerStep(RunnerStep):
             else:
                 output_dir = self.get_output_directory(work_dir=work_dir)
             return output_dir / "image.tar"
-    #
-    # def res(self, work_dir: pl.Path):
-    #     base_image_tarball = self.get_base_image_tarball_path(work_dir=work_dir)
-    #
-    #     image_tarball = self.get_image_tarball_path(work_dir=work_dir)
-    #     temp_image_tarball = pl.Path(f"{image_tarball}_temp")
-    #
-    #     step_output_dir = self.get_output_directory(work_dir=work_dir)
-    #
-    #     restore_new_file_from_diff(
-    #         original_file_dir=base_image_tarball.parent,
-    #         original_file_name=base_image_tarball.name,
-    #         delta_file_dir=step_output_dir,
-    #         delta_file_name="delta",
-    #         result_new_file_dir=temp_image_tarball.parent,
-    #         result_new_file_name=temp_image_tarball.name,
-    #         image_name=RDIFF_STEP.id
-    #     )
-    #     chown_directory_in_docker(temp_image_tarball.parent)
-    #     temp_image_tarball.rename(image_tarball)
 
     def import_image_tarball_if_needed(self, work_dir: pl.Path, remote_docker_host: str = None):
 
@@ -877,16 +857,6 @@ class EnvironmentRunnerStep(RunnerStep):
             check=True
         )
 
-
-        # restore_new_file_from_diff(
-        #     original_file_dir=base_image_tarball.parent,
-        #     original_file_name=base_image_tarball.name,
-        #     delta_file_dir=step_output_dir,
-        #     delta_file_name="delta",
-        #     result_new_file_dir=temp_image_tarball.parent,
-        #     result_new_file_name=temp_image_tarball.name,
-        #     image_name=ESSENTIAL_TOOLS_STEP.result_image.name
-        # )
         chown_directory_in_docker(temp_images_dir)
         images_dir = self.get_images_dir(work_dir=work_dir)
         temp_images_dir.rename(images_dir)
@@ -936,7 +906,7 @@ class EnvironmentRunnerStep(RunnerStep):
 
         ESSENTIAL_TOOLS_STEP.import_image_tarball_if_needed(work_dir=work_dir)
 
-        step_output_dir = self.get_output_directory(work_dir=work_dir)
+        #step_output_dir = self.get_output_directory(work_dir=work_dir)
 
         create_signature_command_args = [
             "rdiff",
@@ -966,7 +936,7 @@ class EnvironmentRunnerStep(RunnerStep):
                 "-v",
                 f"{base_image_tarball.parent}:/tmp/base_image_dir",
                 "-v",
-                f"{step_output_dir}:/tmp/output",
+                f"{temp_output_directory}:/tmp/output",
                 "-v",
                 f"{image_tarball.parent}:/tmp/image_dir",
                 ESSENTIAL_TOOLS_STEP.result_image.name,
@@ -1509,33 +1479,6 @@ def run_docker_command(
     )
 
 
-# def _load_image(image_name: str, image_path: pl.Path, remote_docker_host: str = None):
-#     """
-#     Load image from file, if needed.
-#     :param image_path: Image name, if presented in docker, then skip loading.
-#     :param image_name: Path to image file to load.
-#     :param remote_docker_host: Host name of the remote docker engine to execute command within this engine.
-#     """
-#     output_bytes = run_docker_command(
-#         ["images", "-q", image_name],
-#         remote_docker_host=remote_docker_host,
-#         return_output=True,
-#     )
-#     output = output_bytes.decode().strip()
-#
-#     if output:
-#         logger.info(f"Image {image_name} is already in docker.")
-#         return
-#
-#     logger.info(f"Loading image {image_name} from file {image_path}.")
-#
-#     if remote_docker_host:
-#         logger.info("    Loading to remote host, it may take some time.")
-#     run_docker_command(
-#         ["load", "-i", str(image_path)], remote_docker_host=remote_docker_host
-#     )
-
-
 def chown_directory_in_docker(path: pl.Path):
     """
     Since we produce some artifacts inside docker containers, we may face difficulties with
@@ -1560,16 +1503,6 @@ def chown_directory_in_docker(path: pl.Path):
             *["chown", "-R", f"{os.getuid()}:{os.getuid()}", f"/parent/{path.name}"]
         ]
     )
-    #
-    # # In order to be able to remove the whole directory, we mount parent directory.
-    # with DockerContainer(
-    #     name="agent_build_step_chown",
-    #     image_name=UBUNTU_22_04,
-    #     mounts=[f"{path.parent}:/parent"],
-    #     command=["chown", "-R", f"{os.getuid()}:{os.getuid()}", f"/parent/{path.name}"],
-    #     detached=False,
-    # ):
-    #     pass
 
 
 def remove_root_owned_directory(path: pl.Path):
@@ -1607,7 +1540,12 @@ def export_image_to_tarball(image_name: str, output_path: pl.Path, platform: str
     try:
         run_docker_command(
             [
-                "create", "--name", container_name, "--platform", platform, image_name
+                "create",
+                "--name",
+                container_name,
+                "--platform",
+                platform,
+                image_name
             ],
         )
 
@@ -1632,7 +1570,7 @@ ESSENTIAL_STEPS = {}
 
 ESSENTIAL_TOOLS_STEP = EnvironmentRunnerStep(
     name="prepare_essential_step_tools",
-    script_path=SOURCE_ROOT / "agent_build_refactored/tools/essential_runner_steps/preapre_essential_tools.sh",
+    script_path=SOURCE_ROOT / "agent_build_refactored/tools/essential_runner_steps/prepare_essential_tools.sh",
     base=DockerImageSpec(
         name=UBUNTU_22_04,
         platform=Architecture.X86_64.as_docker_platform.value
