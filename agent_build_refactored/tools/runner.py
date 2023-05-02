@@ -776,12 +776,12 @@ class EnvironmentRunnerStep(RunnerStep):
         image_tarball = self.get_image_tarball_path(work_dir=work_dir)
         image_name = self.result_image.name
 
-        output_bytes = run_docker_command(
+        result = run_docker_command(
             ["images", "-q", image_name],
+            capture_output=True,
             remote_docker_host=remote_docker_host,
-            return_output=True,
         )
-        output = output_bytes.decode().strip()
+        output = result.stdout.decode().strip()
 
         if output:
             logger.info(f"Image {image_name} is already in docker.")
@@ -806,9 +806,8 @@ class EnvironmentRunnerStep(RunnerStep):
         echo -e 'FROM scratch\nADD busybox-rootfs.tar /\nCMD ["sh"]' | docker build -t busy --platform=linux/arm64 -f- .
         """
 
-        subprocess.run(
+        run_docker_command(
             [
-                "docker",
                 "build",
                 "-t",
                 image_name,
@@ -1453,13 +1452,19 @@ def remove_steps_from_stages(
 
 
 def run_docker_command(
-    command: List, remote_docker_host: str = None, return_output: bool = False
+    command: List,
+    check: bool = True,
+    capture_output: bool = False,
+    input: bytes = None,
+    remote_docker_host: str = None,
 ):
     """
     Run docker command.
     :param command: Command to run.
     :param remote_docker_host: Host name of the remote docker engine to execute command  within this engine.
-    :param return_output: If true, return output of the command.
+    :param capture_output: The same as in subprocess.run.
+    :param input: The same as in subprocess.run.
+    :param check: The same as in subprocess.run.
     """
     env = os.environ.copy()
 
@@ -1467,10 +1472,14 @@ def run_docker_command(
         env["DOCKER_HOST"] = remote_docker_host
 
     final_command = ["docker", *command]
-    if return_output:
-        return subprocess.check_output(final_command, env=env)
 
-    subprocess.check_call(final_command, env=env)
+    return subprocess.run(
+        final_command,
+        env=env,
+        check=check,
+        input=input,
+        capture_output=capture_output
+    )
 
 
 # def _load_image(image_name: str, image_path: pl.Path, remote_docker_host: str = None):
@@ -1605,12 +1614,12 @@ def is_image_already_exists_in_docker(
         image_name: str,
         remote_docker_host: str = None
 ):
-    output_bytes = run_docker_command(
+    result = run_docker_command(
         ["images", "-q", image_name],
+        capture_output=True,
         remote_docker_host=remote_docker_host,
-        return_output=True,
     )
-    output = output_bytes.decode().strip()
+    output = result.stdout.decode().strip()
 
     return bool(output)
 
