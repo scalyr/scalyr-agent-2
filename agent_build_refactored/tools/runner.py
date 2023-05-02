@@ -26,6 +26,7 @@ import sys
 from typing import Union, Optional, List, Dict, Type, Callable, Iterable
 
 
+from agent_build_refactored.tools.dependabot_aware_docker_images import UBUNTU_22_04
 from agent_build_refactored.tools.constants import (
     SOURCE_ROOT,
     DockerPlatformInfo,
@@ -39,6 +40,7 @@ from agent_build_refactored.tools import (
     UniqueDict,
     IN_DOCKER,
 )
+from agent_build_refactored.tools.rdiff import create_files_diff_with_rdiff, restore_new_file_from_diff
 
 from agent_build_refactored.tools.run_in_ec2.constants import EC2DistroImage
 
@@ -61,6 +63,11 @@ class DockerImageSpec:
         run_docker_command(
             ["save", self.name, "--output", str(output_path)],
             remote_docker_host=remote_docker_host,
+        )
+
+    def pull(self):
+        run_docker_command(
+            ["pull", "--platform", str(self.platform), self.name]
         )
 
 
@@ -283,6 +290,17 @@ class RunnerStep:
     def get_in_docker_isolated_root(self):
         return pl.Path("/tmp/agent_source")
 
+    def get_initial_images_dir(self, work_dir: pl.Path):
+        return work_dir / "initial_images"
+
+    def get_base_image_tarball_path(self, work_dir: pl.Path):
+        if self._base_step is None:
+            tarball_name = self._base_docker_image.name.replace(":", "-")
+            tarball_name = f"{tarball_name}-{self.architecture.as_docker_platform.value.to_dashed_str}"
+            return self.get_initial_images_dir(work_dir=work_dir) / tarball_name
+        else:
+            return self._base_step.get_images_dir(work_dir=work_dir) / "image.tar"
+
     @property
     def is_step_script_is_python(self) -> bool:
         return self.script_path.suffix == ".py"
@@ -442,17 +460,6 @@ class RunnerStep:
         for env_var_name, env_var_val in env_variables_to_pass.items():
             env_options.extend(["-e", f"{env_var_name}={env_var_val}"])
 
-        if self._base_step is not None:
-            base_output_directory = self._base_step.get_output_directory(
-                work_dir=work_dir
-            )
-            image_path = base_output_directory / self._base_docker_image.name
-            # Load base image.
-            _load_image(
-                image_name=self._base_docker_image.name,
-                image_path=image_path,
-                remote_docker_host=remote_docker_host,
-            )
 
         run_docker_command(
             ["rm", "-f", self._step_container_name],
@@ -522,6 +529,46 @@ class RunnerStep:
                 ],
                 remote_docker_host=remote_docker_host,
             )
+
+    @staticmethod
+    def import_image_tarball_if_needed(image_tarball: pl.Path, image_name: str, remote_docker_host: str = None):
+
+        output_bytes = run_docker_command(
+            ["images", "-q", image_name],
+            remote_docker_host=remote_docker_host,
+            return_output=True,
+        )
+        output = output_bytes.decode().strip()
+
+        if output:
+            logger.info(f"Image {image_name} is already in docker.")
+        else:
+            run_docker_command(
+                ["import", str(image_tarball), image_name]
+            )
+
+    def restore_base_image_tarball_from_diff_if_needed(self, work_dir: pl.Path, remote_docker_host: str = None):
+        prepare_rdiff_image(work_dir=work_dir)
+        base_image_tarball = self.get_base_image_tarball_path(work_dir=work_dir)
+
+        if not base_image_tarball.exists():
+            if self._base_step is None:
+                temp_base_image_image_tarball = pl.Path(f"{base_image_tarball}_temp")
+                self._base_docker_image.pull()
+                export_image_to_tarball(
+                    image_name=self._base_docker_image.name,
+                    output_path=temp_base_image_image_tarball
+                )
+                temp_base_image_image_tarball.rename(base_image_tarball)
+
+            else:
+                base_step = self._base_step
+                base_step.restore_image_from_diff_if_needed(work_dir=work_dir)
+
+        self.import_image_tarball_if_needed(
+            image_tarball=base_image_tarball,
+            image_name=self._base_docker_image.name
+        )
 
     def _get_command_args(self):
         """
@@ -600,6 +647,9 @@ class RunnerStep:
 
         try:
             if self.runs_in_docker:
+                self.restore_base_image_tarball_from_diff_if_needed(
+                    work_dir=work_dir
+                )
                 remote_docker_host = remote_docker_host_getter(self)
                 self._run_script_in_docker(
                     work_dir=work_dir,
@@ -639,6 +689,65 @@ class EnvironmentRunnerStep(RunnerStep):
         If step does not run in docker, then its actions are executed directly on current system.
     """
 
+    def get_all_dependency_steps(self, recursive: bool = False) -> List['RunnerStep']:
+        """
+        Return dependency steps of all given steps.
+        :param recursive: If True, get all dependencies recursively.
+        """
+
+        steps = super(EnvironmentRunnerStep, self).get_all_dependency_steps(recursive=recursive)
+        steps.append(RDIFF_STEP)
+
+        if not recursive and self._base_step is not None:
+            steps.append(self._base_step)
+            steps.extend(self._base_step.get_all_dependency_steps(recursive=False))
+
+        return sort_and_filter_steps(steps=steps)
+
+    def get_images_dir(self, work_dir: pl.Path):
+        return pl.Path(
+            f"{self.get_output_directory(work_dir=work_dir)}_images"
+        )
+
+    def get_image_tarball_path(self, work_dir: pl.Path):
+        return self.get_images_dir(work_dir=work_dir) / "image.tar"
+
+    def res(self, work_dir: pl.Path):
+        base_image_tarball = self.get_base_image_tarball_path(work_dir=work_dir)
+
+        image_tarball = self.get_image_tarball_path(work_dir=work_dir)
+        temp_image_tarball = pl.Path(f"{image_tarball}_temp")
+
+        step_output_dir = self.get_output_directory(work_dir=work_dir)
+
+        restore_new_file_from_diff(
+            original_file_dir=base_image_tarball.parent,
+            original_file_name=base_image_tarball.name,
+            delta_file_dir=step_output_dir,
+            delta_file_name="delta",
+            result_new_file_dir=temp_image_tarball.parent,
+            result_new_file_name=temp_image_tarball.name,
+            image_name=RDIFF_STEP.id
+        )
+
+        temp_image_tarball.rename(image_tarball)
+
+    def restore_image_from_diff_if_needed(self, work_dir: pl.Path, remote_docker_host: str = None):
+        prepare_rdiff_image(work_dir=work_dir)
+        initial_images_dir = self.get_initial_images_dir(work_dir=work_dir)
+        initial_images_dir.mkdir(parents=True, exist_ok=True)
+
+        image_tarball = self.get_image_tarball_path(work_dir=work_dir)
+
+        if not image_tarball.exists():
+            self.restore_base_image_tarball_from_diff_if_needed(work_dir=work_dir)
+            self.res(work_dir=work_dir)
+
+        self.import_image_tarball_if_needed(
+            image_tarball=image_tarball,
+            image_name=self.result_image.name
+        )
+
     def _run_script_in_docker(
             self,
             work_dir: pl.Path,
@@ -656,22 +765,35 @@ class EnvironmentRunnerStep(RunnerStep):
             remote_docker_host=remote_docker_host
         )
 
+        step_images_dir = self.get_images_dir(work_dir=work_dir)
+        if step_images_dir.exists():
+            shutil.rmtree(step_images_dir)
+
+        step_images_dir.mkdir(exist_ok=True)
+
+        base_image_tarball = self.get_base_image_tarball_path(work_dir=work_dir)
+
+        image_tarball = step_images_dir / "image.tar"
         run_docker_command(
-            ["commit", self._step_container_name, self.result_image.name],
-            remote_docker_host=remote_docker_host,
+            [
+                "export",
+                self._step_container_name,
+                "-o",
+                str(image_tarball)
+            ],
         )
 
-        temp_output_directory = self.get_temp_output_directory(work_dir=work_dir)
-        image_path = temp_output_directory / self.result_image.name
-
-        logger.info(f"Saving image {self.result_image.name}.")
-        if remote_docker_host:
-            logger.info("    Saving from remote docker, it may take some time.")
-        run_docker_command(
-            ["save", self.result_image.name, "--output", str(image_path)],
-            remote_docker_host=remote_docker_host,
+        create_files_diff_with_rdiff(
+            original_file_dir=base_image_tarball.parent,
+            original_file_name=base_image_tarball.name,
+            new_file_dir=image_tarball.parent,
+            new_file_name=image_tarball.name,
+            result_signature_file_dir=temp_output_directory,
+            result_signature_file_name="signature",
+            result_delta_file_dir=temp_output_directory,
+            result_delta_file_name="delta",
+            image_name=RDIFF_STEP.id
         )
-
 
 @dataclasses.dataclass
 class RunnerMappedPath:
@@ -832,15 +954,13 @@ class Runner(metaclass=RunnerMeta):
         # Pass this env variable so runner knows that it runs inside docker.
         env_args = ["-e", "AGENT_BUILD_IN_DOCKER=1"]
 
+        if isinstance(self.base_environment, EnvironmentRunnerStep):
+            self.base_environment.restore_image_from_diff_if_needed(
+                work_dir=self.work_dir
+            )
+
         base_step_output = self.base_environment.get_output_directory(
             work_dir=self.work_dir
-        )
-
-        base_image_path = base_step_output / self.base_environment.result_image.name
-
-        _load_image(
-            image_name=self.base_environment.result_image.name,
-            image_path=base_image_path,
         )
 
         run_docker_command(
@@ -1234,7 +1354,7 @@ def chown_directory_in_docker(path: pl.Path):
     # In order to be able to remove the whole directory, we mount parent directory.
     with DockerContainer(
         name="agent_build_step_chown",
-        image_name="ubuntu:22.04",
+        image_name=UBUNTU_22_04,
         mounts=[f"{path.parent}:/parent"],
         command=["chown", "-R", f"{os.getuid()}:{os.getuid()}", f"/parent/{path.name}"],
         detached=False,
@@ -1259,8 +1379,91 @@ def remove_root_owned_directory(path: pl.Path):
         shutil.rmtree(path)
 
 
+def remove_docker_container(name: str):
+    subprocess.run(
+        [
+            "docker",
+            "rm",
+            "-f",
+            name
+        ],
+        check=True,
+        capture_output=True
+    )
+
+
+def export_image_to_tarball(image_name: str, output_path: pl.Path):
+    container_name = image_name.replace(":", "-")
+    remove_docker_container(name=container_name)
+    try:
+        run_docker_command(
+            [
+                "create", "--name", container_name, image_name
+            ]
+        )
+
+        run_docker_command(
+            [
+                "export", container_name, "-o", str(output_path)
+            ]
+        )
+    finally:
+        remove_docker_container(name=container_name)
+
+
 def cleanup():
     if IN_DOCKER:
         return
     check_output_with_log_debug(["docker", "system", "prune", "-f", "--volumes"])
     check_output_with_log_debug(["docker", "system", "prune", "-f"])
+
+
+RDIFF_STEP = RunnerStep(
+    name="rdiff",
+    script_path=SOURCE_ROOT / "agent_build_refactored/tools/rdiff/install.sh",
+    tracked_files_globs=[
+        SOURCE_ROOT / "agent_build_refactored/tools/rdiff/create_diff.sh",
+        SOURCE_ROOT / "agent_build_refactored/tools/rdiff/restore_from_diff.sh",
+        SOURCE_ROOT / "agent_build_refactored/tools/rdiff/Dockerfile",
+    ],
+    environment_variables={
+        "IMAGE_NAME": "rdiff",
+    },
+    # base=DockerImageSpec(
+    #     name=UBUNTU_22_04,
+    #     platform=Architecture.X86_64.as_docker_platform.value
+    # )
+)
+
+def is_image_already_exists_in_docker(
+        image_name: str,
+        remote_docker_host: str = None
+):
+    output_bytes = run_docker_command(
+        ["images", "-q", image_name],
+        remote_docker_host=remote_docker_host,
+        return_output=True,
+    )
+    output = output_bytes.decode().strip()
+
+    return bool(output)
+
+
+def prepare_rdiff_image(work_dir: pl.Path, remote_docker_host: str = None):
+    if is_image_already_exists_in_docker(
+        image_name=RDIFF_STEP.id,
+    ):
+        return
+
+    step_output_dir = RDIFF_STEP.get_output_directory(work_dir=work_dir)
+    image_tarball = step_output_dir / "img.tar"
+
+    run_docker_command(
+        ["load", "-i", str(image_tarball)],
+        remote_docker_host=remote_docker_host,
+    )
+
+    run_docker_command(
+        ["tag", "rdiff", RDIFF_STEP.id],
+        remote_docker_host=remote_docker_host
+    )

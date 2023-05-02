@@ -11,6 +11,7 @@ from typing import Dict, Callable
 from agent_build_refactored.tools.constants import Architecture, DockerPlatform, SOURCE_ROOT
 from agent_build_refactored.tools.runner import RunnerStep, EnvironmentRunnerStep, DockerImageSpec, Runner
 
+from agent_build_refactored.tools.dependabot_aware_docker_images import UBUNTU_22_04
 from agent_build_refactored.build_python.steps import (
     download_build_dependencies,
     install_build_environment,
@@ -232,7 +233,7 @@ GLIBC_X86_64_TOOLCHAIN = ALL_DEPENDENCY_TOOLCHAINS[CRuntime.GLIBC][Architecture.
 PREPARE_TOOLSET_STEP_GLIBC_X86_64 = prepare_toolset.create_step(
     name_suffix=f"{GLIBC_X86_64_TOOLCHAIN.c_runtime.value}-{GLIBC_X86_64_TOOLCHAIN.architecture.value}",
     base_image=DockerImageSpec(
-        name="ubuntu:22.04",
+        name=UBUNTU_22_04,
         platform=GLIBC_X86_64_TOOLCHAIN.architecture.as_docker_platform.value
     ),
     build_openssl_step=GLIBC_X86_64_TOOLCHAIN.openssl_3,

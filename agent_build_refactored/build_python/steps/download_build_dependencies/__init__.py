@@ -15,6 +15,7 @@
 
 import pathlib as pl
 
+from agent_build_refactored.tools.dependabot_aware_docker_images import UBUNTU_22_04
 from agent_build_refactored.tools.constants import DockerPlatform
 from agent_build_refactored.tools.runner import RunnerStep, DockerImageSpec
 
@@ -56,7 +57,7 @@ def create_step(
             PARENT_PATH / "gnu-keyring.gpg",
             PARENT_PATH / "gpgkey-5C1D1AA44BE649DE760A.gpg",
         ],
-        base=DockerImageSpec(name="ubuntu:22.04", platform=DockerPlatform.AMD64.value),
+        base=DockerImageSpec(name=UBUNTU_22_04, platform=DockerPlatform.AMD64.value),
         environment_variables={
             "XZ_VERSION": xz_version,
             "LIBFFI_VERSION": libffi_version,
