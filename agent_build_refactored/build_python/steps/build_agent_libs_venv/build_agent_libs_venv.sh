@@ -25,18 +25,10 @@ set -e
 # shellcheck disable=SC1090
 source ~/.bashrc
 
-## Copy python interpreter, which is built by the previous step.
-#
-#cp -a "${BUILD_PYTHON}/." /
-#cp -a "${BUILD_OPENSSL}/." /
-#cp -a "${BUILD_DEV_REQUIREMENTS}/root/." /
-#ldconfig
-
 # Prepare requirements file.
 REQUIREMENTS_FILE=/tmp/requirements.txt
 echo "${REQUIREMENTS}" > "${REQUIREMENTS_FILE}"
 
-export LD_LIBRARY_PATH="${PYTHON_INSTALL_PREFIX}/lib:${LD_LIBRARY_PATH}"
 # Create venv.
 VENV_DIR="/var/opt/${SUBDIR_NAME}/venv"
 python3 -m venv "${VENV_DIR}"

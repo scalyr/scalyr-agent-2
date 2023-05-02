@@ -87,8 +87,10 @@ DOWNLOAD_PYTHON_DEPENDENCIES_STEP = download_build_dependencies.create_step(
 
 
 class CRuntime(enum.Enum):
+    """
+    Set of constants that represent type of C language runtime such, for example  as glibc.
+    """
     GLIBC = "glibc"
-    MUSL = "musl"
 
 
 @dataclasses.dataclass
@@ -99,12 +101,19 @@ class DependencyToolchain:
     """
     c_runtime: CRuntime
     architecture: Architecture
+
+    # Base step with everything that is required for compilation of Python.
     install_build_environment: EnvironmentRunnerStep
+    # Step that builds OpenSSL 1
     openssl_1: RunnerStep
+    # Step that builds OpenSSL 3
     openssl_3: RunnerStep
+    # Steps that build Python
     python_with_openssl_1: RunnerStep
     python_with_openssl_3: RunnerStep
+    # Step that build all requirement libraries for the agent.
     dev_requirements: RunnerStep
+    # Same as base build environment, but also with Python.
     c_runtime_environment_with_python: EnvironmentRunnerStep
 
 
@@ -273,7 +282,14 @@ def create_python_files(
         output: pl.Path,
         additional_ld_library_paths: str = None
 ):
-
+    """
+    Create Python interpreter files.
+    :param build_python_step_output: Step that build Python.
+    :param output: output directory with result files.
+    :param additional_ld_library_paths:
+    :return: Additional paths for the LD_LIBRARY_PATH variable that Python's executable script.
+        can overrides during execution.
+    """
     output.mkdir(parents=True)
     shutil.copytree(
         build_python_step_output,
@@ -305,6 +321,14 @@ def render_python_wrapper_executable(
         output_file: pl.Path,
         additional_ld_library_paths: str = None
 ):
+    """
+    Create Python's executable script by replacing placeholders from the template.
+    :param executable_path: Python's original binary executable that this script has to execute.
+    :param output_file: Path for the result.
+    :param additional_ld_library_paths: Additional paths for the LD_LIBRARY_PATH variable that Python's executable
+        can overrides during execution.
+    :return:
+    """
     template_path = FILES_DIR / "bin/python3_template.sh"
 
     content = template_path.read_text()
@@ -330,6 +354,10 @@ def render_python_wrapper_executable(
 def remove_python_unused_files(
         install_prefix: pl.Path
 ):
+    """
+    Remove files from Python interpreter, that are not used in our packages.
+    :param install_prefix: Install prefix of the Python.
+    """
     bin_dir = install_prefix / "bin"
     stdlib_dir = install_prefix / "lib" / f"python{EMBEDDED_PYTHON_SHORT_VERSION}"
     # Remove other executables
@@ -383,6 +411,11 @@ def create_agent_libs_venv_files(
     build_libs_venv_step_output: pl.Path,
     output: pl.Path
 ):
+    """
+    `Create files for venv with agent requirements.
+    :param build_libs_venv_step_output: Step that builds venv.
+    :param output: Path wit hresult venv files.
+    """
     output.mkdir(parents=True)
     shutil.copytree(
         build_libs_venv_step_output / "venv",

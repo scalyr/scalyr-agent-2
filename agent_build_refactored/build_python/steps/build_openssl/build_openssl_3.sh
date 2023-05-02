@@ -36,6 +36,7 @@ make DESTDIR="${STEP_OUTPUT_PATH}" install_sw
 popd
 popd
 
+
 if [ "${DISTRO_NAME}" = "centos:6" ]; then
   mv "${STEP_OUTPUT_PATH}/usr/local/lib64" "${STEP_OUTPUT_PATH}/usr/local/lib"
 fi

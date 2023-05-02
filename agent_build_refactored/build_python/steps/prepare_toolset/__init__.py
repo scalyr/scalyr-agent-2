@@ -15,7 +15,6 @@
 
 import pathlib as pl
 
-from agent_build_refactored.tools.constants import Architecture
 from agent_build_refactored.tools.runner import RunnerStep, DockerImageSpec, EnvironmentRunnerStep
 
 

@@ -473,10 +473,12 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
 
     @classmethod
     def _get_toolchain(cls):
+        """Get dependencies toolchain that is used by this builder."""
         return ALL_DEPENDENCY_TOOLCHAINS[cls.C_RUNTIME][cls.DEPENDENCY_PACKAGES_ARCHITECTURE]
 
     @classmethod
     def _get_agent_libs_step(cls):
+        """Get step that builds venv with agent requirement libraries for this paricular packahe."""
         return BUILD_AGENT_LIBS_VENV_STEPS[cls.C_RUNTIME][cls.DEPENDENCY_PACKAGES_ARCHITECTURE]
 
     def _prepare_package_python_and_libraries_files(self, package_root: pl.Path):

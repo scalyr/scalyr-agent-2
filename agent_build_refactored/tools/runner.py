@@ -30,7 +30,6 @@ from typing import Union, Optional, List, Dict, Type, Callable, Iterable
 from agent_build_refactored.tools.dependabot_aware_docker_images import UBUNTU_22_04
 from agent_build_refactored.tools.constants import (
     SOURCE_ROOT,
-    DockerPlatform,
     DockerPlatformInfo,
     Architecture,
     IN_CICD,
@@ -127,6 +126,9 @@ class RunnerStep:
         self._tracked_files = self._get_tracked_files(tracked_files_globs)
 
         self.dependency_steps = dependency_steps or {}
+
+        # Add steps from the essentail steps collection as dependencies.
+        self.dependency_steps.update(ESSENTIAL_STEPS)
 
         self.environment_variables = environment_variables or {}
 
@@ -464,11 +466,6 @@ class RunnerStep:
         for env_var_name, env_var_val in env_variables_to_pass.items():
             env_options.extend(["-e", f"{env_var_name}={env_var_val}"])
 
-        # if self._base_step is not None:
-        #     self._base_step.import_image_tarball_if_needed(
-        #         work_dir=work_dir,
-        #         remote_docker_host=remote_docker_host
-        #     )
 
         remove_docker_container(
             name=self._step_container_name,
@@ -540,7 +537,10 @@ class RunnerStep:
                 remote_docker_host=remote_docker_host,
             )
 
-    def restore_base_image_tarball_from_diff_if_needed(self, work_dir: pl.Path):
+    def restore_base_image_tarball_if_needed(self, work_dir: pl.Path):
+        """
+        Restore image tarball of the base step.
+        """
         base_image_tarball = self.get_base_image_tarball_path(work_dir=work_dir)
 
         if base_image_tarball.exists():
@@ -553,6 +553,7 @@ class RunnerStep:
             )
             return
 
+        # If there's no base step, then just pull and export the base docker image.
         temp_base_image_image_tarball = pl.Path(f"{base_image_tarball}_temp")
         self._base_docker_image.pull()
 
@@ -566,7 +567,6 @@ class RunnerStep:
         logger.debug(
             f"Initial docker image {base_image_name} has been exported to file {base_image_tarball}"
         )
-
 
     def _get_command_args(self):
         """
@@ -647,7 +647,7 @@ class RunnerStep:
             if self.runs_in_docker:
                 remote_docker_host = remote_docker_host_getter(self)
 
-                self.restore_base_image_tarball_from_diff_if_needed(work_dir=work_dir)
+                self.restore_base_image_tarball_if_needed(work_dir=work_dir)
                 if self._base_step:
                     self._base_step.import_image_tarball_if_needed(
                         work_dir=work_dir,
@@ -706,9 +706,19 @@ class EnvironmentRunnerStep(RunnerStep):
         run_in_remote_docker_if_available: bool = False,
         save_result_image_as_diff: bool = True
     ):
-        dependency_steps = dependency_steps or {}
+        """
 
-        dependency_steps.update(ESSENTIAL_STEPS)
+        :param name: Same as for parent RunnerStep class.
+        :param script_path: Same as for parent RunnerStep class.
+        :param tracked_files_globs: Same as for parent RunnerStep class.
+        :param base: Same as for parent RunnerStep class.
+        :param dependency_steps: Same as for parent RunnerStep class.
+        :param environment_variables: Same as for parent RunnerStep class.
+        :param user: Same as for parent RunnerStep class.
+        :param run_in_remote_docker_if_available: Same as for parent RunnerStep class.
+        :param save_result_image_as_diff: If true, the diff between image
+            of the base step and result image is saved. Otherwise, the full image is saved.
+        """
 
         super(EnvironmentRunnerStep, self).__init__(
             name=name,
@@ -772,7 +782,6 @@ class EnvironmentRunnerStep(RunnerStep):
         output = result.stdout.decode().strip()
 
         if output:
-            #logger.info(f"Image {image_name} is already in docker.")
             return
 
         if remote_docker_host:
@@ -813,6 +822,12 @@ class EnvironmentRunnerStep(RunnerStep):
         logger.info(f"Filesystem of the image of the step '{self.name}' is imported to docker.")
 
     def restore_result_image_from_diff_if_needed(self, work_dir: pl.Path):
+        """
+        Restore step's image tarball by applying diff file on a base step image tarball. Diff file
+            has to be preserved from the previous step run.
+        :param work_dir:
+        :return:
+        """
 
         initial_images_dir = self.get_initial_images_dir(work_dir=work_dir)
         initial_images_dir.mkdir(parents=True, exist_ok=True)
@@ -821,13 +836,16 @@ class EnvironmentRunnerStep(RunnerStep):
 
         base_image_tarball = self.get_base_image_tarball_path(work_dir=work_dir)
 
+        # Return if image tarball already exists
         if image_tarball.exists():
             return
 
-        self.restore_base_image_tarball_from_diff_if_needed(
+        # Make sure that base image exists.
+        self.restore_base_image_tarball_if_needed(
             work_dir=work_dir
         )
 
+        # Restore image tarball by applying diff on the base image tarball.
         temp_images_dir = self.get_images_dir(work_dir=work_dir, temp=True)
         if temp_images_dir.exists():
             shutil.rmtree(temp_images_dir)
@@ -1470,6 +1488,7 @@ def run_docker_command(
     Run docker command.
     :param command: Command to run.
     :param remote_docker_host: Host name of the remote docker engine to execute command  within this engine.
+    :param quiet: Suppress output and print it only on error.
     :param capture_output: The same as in subprocess.run.
     :param input: The same as in subprocess.run.
     :param check: The same as in subprocess.run.
@@ -1578,6 +1597,9 @@ def remove_docker_container(name: str, remote_docker_host: str = None):
 
 
 def export_image_to_tarball(image_name: str, output_path: pl.Path, platform: str):
+    """
+    Export image to tarball.
+    """
     container_name = image_name.replace(":", "-")
     remove_docker_container(name=container_name)
     try:
