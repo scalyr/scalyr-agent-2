@@ -634,6 +634,7 @@ class RunnerStep:
         logging.info(
             f"Start step: {self.id}\n"
             f"Passed env. variables:\n    {env_variables_str}\n"
+            f"Arch: {self.architecture.value}"
         )
 
         # Check that all required steps results exists.
