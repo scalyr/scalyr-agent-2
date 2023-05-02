@@ -818,7 +818,8 @@ class EnvironmentRunnerStep(RunnerStep):
                 str(image_tarball.parent)
             ],
             check=True,
-            input=f"FROM scratch\nADD {image_tarball.name} /\n".encode()
+            input=f"FROM scratch\nADD {image_tarball.name} /\n".encode(),
+            remote_docker_host=remote_docker_host,
         )
 
         subprocess.run(
