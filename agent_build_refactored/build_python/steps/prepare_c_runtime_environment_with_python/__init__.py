@@ -26,7 +26,7 @@ def create_step(
         build_dev_requirements_step: RunnerStep,
         python_install_prefix: str,
         run_in_remote_docker: bool = False
-) -> RunnerStep:
+) -> EnvironmentRunnerStep:
     """
     Create step with OS distribution, where version of C library (like glibc) matches version of the glibc
 

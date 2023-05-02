@@ -121,8 +121,6 @@ def create_all_toolchains():
 
             run_in_remote_docker = architecture != Architecture.X86_64
 
-            print(f"ARCH: {architecture},  RUNSSS: {run_in_remote_docker}")
-
             if architecture == Architecture.X86_64:
                 base_image_name = "centos:6"
             else:
