@@ -572,7 +572,10 @@ class RunnerStep:
 
             else:
                 base_step = self._base_step
-                base_step.restore_image_from_diff_if_needed(work_dir=work_dir)
+                base_step.restore_image_from_diff_if_needed(
+                    work_dir=work_dir,
+                    remote_docker_host=remote_docker_host
+                )
 
         self.import_image_tarball_if_needed(
             image_tarball=base_image_tarball,
@@ -822,7 +825,7 @@ class EnvironmentRunnerStep(RunnerStep):
                 "-o",
                 str(image_tarball)
             ],
-            #remote_docker_host=remote_docker_host
+            remote_docker_host=remote_docker_host
         )
 
         prepare_rdiff_image(work_dir=work_dir)
