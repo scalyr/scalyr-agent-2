@@ -70,6 +70,7 @@ class DockerImageSpec:
             ["pull", "--platform", str(self.platform), self.name]
         )
 
+RDIFF_STEP = None
 
 class RunnerStep:
     """
@@ -126,6 +127,10 @@ class RunnerStep:
         self._tracked_files = self._get_tracked_files(tracked_files_globs)
 
         self.dependency_steps = dependency_steps or {}
+
+        if RDIFF_STEP is not None:
+            self.dependency_steps["RDIFF"] = RDIFF_STEP
+
         self.environment_variables = environment_variables or {}
 
         if isinstance(base, EnvironmentRunnerStep):
@@ -708,7 +713,7 @@ class EnvironmentRunnerStep(RunnerStep):
     ):
         dependency_steps = dependency_steps or {}
 
-        dependency_steps["RDIFF"] = RDIFF_STEP
+        #dependency_steps["RDIFF"] = RDIFF_STEP
 
         super(EnvironmentRunnerStep, self).__init__(
             name=name,
