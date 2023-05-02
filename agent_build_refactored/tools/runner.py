@@ -577,16 +577,10 @@ class RunnerStep:
                     remote_docker_host=remote_docker_host
                 )
 
-        if remote_docker_host:
-            self.import_image_tarball_if_needed(
-                image_tarball=base_image_tarball,
-                image_name=self._base_docker_image.name,
-                remote_docker_host=remote_docker_host
-            )
-
         self.import_image_tarball_if_needed(
             image_tarball=base_image_tarball,
             image_name=self._base_docker_image.name,
+            remote_docker_host=remote_docker_host
         )
 
     def _get_command_args(self):
@@ -792,17 +786,12 @@ class EnvironmentRunnerStep(RunnerStep):
             prepare_rdiff_image(work_dir=work_dir)
             self.res(work_dir=work_dir)
 
-        if remote_docker_host:
-            self.import_image_tarball_if_needed(
-                image_tarball=image_tarball,
-                image_name=self.result_image.name,
-                remote_docker_host=remote_docker_host
-            )
-
         self.import_image_tarball_if_needed(
             image_tarball=image_tarball,
             image_name=self.result_image.name,
+            remote_docker_host=remote_docker_host
         )
+
 
     def _run_script_in_docker(
             self,
