@@ -18,6 +18,7 @@
 # Every RunnerStep provides common environment variables to its script:
 #   SOURCE_ROOT: Path to the projects root.
 #   STEP_OUTPUT_PATH: Path to the step's output directory.
+#   DISTRO_NAME: Name and version of the distribution.
 #
 # This script builds from source the OpenSSL 1.1.1+ library.
 #
@@ -25,9 +26,9 @@
 
 set -e
 
-mkdir /tmp/build-openssl_1_1_1
-pushd /tmp/build-openssl_1_1_1
-tar -xvf "${DOWNLOAD_BUILD_DEPENDENCIES}/openssl_1_1_1/openssl.tar.gz"
+mkdir /tmp/build-openssl_1
+pushd /tmp/build-openssl_1
+tar -xf "${DOWNLOAD_BUILD_DEPENDENCIES}/openssl_1/openssl.tar.gz"
 pushd "openssl-${OPENSSL_VERSION}"
 ./config
 make -j "$(nproc)"
@@ -35,6 +36,10 @@ make DESTDIR="${STEP_OUTPUT_PATH}" install_sw
 popd
 popd
 
+if [ "${DISTRO_NAME}" = "centos:6" ]; then
+  mv "${STEP_OUTPUT_PATH}/usr/local/lib64" "${STEP_OUTPUT_PATH}/usr/local/lib"
+fi
+
 mkdir -p "${STEP_OUTPUT_PATH}/etc/ld.so.conf.d"
-echo "/usr/local/lib" >> "${STEP_OUTPUT_PATH}/etc/ld.so.conf.d/local.conf"
-echo "/usr/local/lib64" >> "${STEP_OUTPUT_PATH}/etc/ld.so.conf.d/local.conf"
+echo "/usr/local/lib" >> "${STEP_OUTPUT_PATH}/etc/ld.so.conf.d/openssl-local.conf"
+echo "/usr/local/lib64" >> "${STEP_OUTPUT_PATH}/etc/ld.so.conf.d/openssl-local.conf"
