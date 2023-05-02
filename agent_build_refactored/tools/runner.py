@@ -559,6 +559,8 @@ class RunnerStep:
     def restore_base_image_tarball_from_diff_if_needed(self, work_dir: pl.Path, remote_docker_host: str = None):
         base_image_tarball = self.get_base_image_tarball_path(work_dir=work_dir)
 
+        logger.info(f"Restore base image for the step {self.id}")
+
         if not base_image_tarball.exists():
             if self._base_step is None:
                 temp_base_image_image_tarball = pl.Path(f"{base_image_tarball}_temp")
@@ -569,11 +571,10 @@ class RunnerStep:
                     remote_docker_host=remote_docker_host
                 )
                 temp_base_image_image_tarball.rename(base_image_tarball)
-                logger.info(f"Base image {self._base_docker_image.name} is restored")
 
             else:
                 base_step = self._base_step
-                base_step.restore_image_from_diff_if_needed(
+                base_step.restore_result_image_from_diff_if_needed(
                     work_dir=work_dir,
                     remote_docker_host=remote_docker_host
                 )
@@ -772,7 +773,10 @@ class EnvironmentRunnerStep(RunnerStep):
         chown_directory_in_docker(temp_image_tarball.parent)
         temp_image_tarball.rename(image_tarball)
 
-    def restore_image_from_diff_if_needed(self, work_dir: pl.Path, remote_docker_host: str = None):
+    def restore_result_image_from_diff_if_needed(self, work_dir: pl.Path, remote_docker_host: str = None):
+
+        logger.info(f"Restore result image for step {self.id}")
+
         initial_images_dir = self.get_initial_images_dir(work_dir=work_dir)
         initial_images_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1005,7 +1009,7 @@ class Runner(metaclass=RunnerMeta):
         env_args = ["-e", "AGENT_BUILD_IN_DOCKER=1"]
 
         if isinstance(self.base_environment, EnvironmentRunnerStep):
-            self.base_environment.restore_image_from_diff_if_needed(
+            self.base_environment.restore_result_image_from_diff_if_needed(
                 work_dir=self.work_dir,
             )
 
