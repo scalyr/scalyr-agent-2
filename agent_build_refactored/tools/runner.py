@@ -70,8 +70,6 @@ class DockerImageSpec:
             ["pull", "--platform", str(self.platform), self.name]
         )
 
-RDIFF_STEP = None
-
 
 class RunnerStep:
     """
@@ -128,9 +126,6 @@ class RunnerStep:
         self._tracked_files = self._get_tracked_files(tracked_files_globs)
 
         self.dependency_steps = dependency_steps or {}
-
-        if RDIFF_STEP is not None:
-            self.dependency_steps["RDIFF"] = RDIFF_STEP
 
         self.environment_variables = environment_variables or {}
 
@@ -554,25 +549,22 @@ class RunnerStep:
             if self._base_step is None:
                 temp_base_image_image_tarball = pl.Path(f"{base_image_tarball}_temp")
                 self._base_docker_image.pull()
+
+                image_name = self._base_docker_image.name
                 export_image_to_tarball(
-                    image_name=self._base_docker_image.name,
+                    image_name=image_name,
                     output_path=temp_base_image_image_tarball,
-                    remote_docker_host=remote_docker_host
                 )
                 temp_base_image_image_tarball.rename(base_image_tarball)
+                logger.info(
+                    f"Initial docker image {image_name} has been exported to file {base_image_tarball}"
+                )
 
             else:
                 base_step = self._base_step
                 base_step.restore_result_image_from_diff_if_needed(
                     work_dir=work_dir,
-                    #remote_docker_host=remote_docker_host
                 )
-
-        # self.import_image_tarball_if_needed(
-        #     image_tarball=base_image_tarball,
-        #     image_name=self._base_docker_image.name,
-        #     remote_docker_host=remote_docker_host
-        # )
 
     def _get_command_args(self):
         """
@@ -709,7 +701,7 @@ class EnvironmentRunnerStep(RunnerStep):
     ):
         dependency_steps = dependency_steps or {}
 
-        #dependency_steps["RDIFF"] = RDIFF_STEP
+        dependency_steps["RDIFF"] = RDIFF_STEP
 
         super(EnvironmentRunnerStep, self).__init__(
             name=name,
@@ -1462,31 +1454,23 @@ def remove_docker_container(name: str, remote_docker_host: str = None):
     )
 
 
-def export_image_to_tarball(image_name: str, output_path: pl.Path, remote_docker_host: str = None):
+def export_image_to_tarball(image_name: str, output_path: pl.Path):
     container_name = image_name.replace(":", "-")
-    remove_docker_container(name=container_name, remote_docker_host=remote_docker_host)
-
-    logger.info(f"Export image {image_name} to tarball.")
+    remove_docker_container(name=container_name)
     try:
         run_docker_command(
             [
                 "create", "--name", container_name, image_name
             ],
-            remote_docker_host=remote_docker_host
         )
 
         run_docker_command(
             [
                 "export", container_name, "-o", str(output_path)
             ],
-            remote_docker_host=remote_docker_host
         )
     finally:
-        remove_docker_container(name=container_name, remote_docker_host=remote_docker_host)
-
-    logger.info(
-        f"Initial docker image {image_name} has been exported to file {output_path}"
-    )
+        remove_docker_container(name=container_name)
 
 
 def cleanup():
