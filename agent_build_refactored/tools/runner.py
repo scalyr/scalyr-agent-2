@@ -569,6 +569,7 @@ class RunnerStep:
                     remote_docker_host=remote_docker_host
                 )
                 temp_base_image_image_tarball.rename(base_image_tarball)
+                logger.info(f"Base image {self._base_docker_image.name} is restored")
 
             else:
                 base_step = self._base_step
@@ -785,6 +786,7 @@ class EnvironmentRunnerStep(RunnerStep):
 
             prepare_rdiff_image(work_dir=work_dir)
             self.res(work_dir=work_dir)
+            logger.info(f"Base image {self._base_docker_image.name} is restored from diff.")
 
         self.import_image_tarball_if_needed(
             image_tarball=image_tarball,
