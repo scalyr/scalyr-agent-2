@@ -560,7 +560,8 @@ class RunnerStep:
                 self._base_docker_image.pull()
                 export_image_to_tarball(
                     image_name=self._base_docker_image.name,
-                    output_path=temp_base_image_image_tarball
+                    output_path=temp_base_image_image_tarball,
+                    remote_docker_host=remote_docker_host
                 )
                 temp_base_image_image_tarball.rename(base_image_tarball)
 
@@ -570,7 +571,8 @@ class RunnerStep:
 
         self.import_image_tarball_if_needed(
             image_tarball=base_image_tarball,
-            image_name=self._base_docker_image.name
+            image_name=self._base_docker_image.name,
+            remote_docker_host=remote_docker_host
         )
 
     def _get_command_args(self):
@@ -650,10 +652,12 @@ class RunnerStep:
 
         try:
             if self.runs_in_docker:
-                self.restore_base_image_tarball_from_diff_if_needed(
-                    work_dir=work_dir
-                )
                 remote_docker_host = remote_docker_host_getter(self)
+                self.restore_base_image_tarball_from_diff_if_needed(
+                    work_dir=work_dir,
+                    remote_docker_host=remote_docker_host
+                )
+
                 self._run_script_in_docker(
                     work_dir=work_dir,
                     isolated_source_root=isolated_source_root,
@@ -766,14 +770,18 @@ class EnvironmentRunnerStep(RunnerStep):
         image_tarball = self.get_image_tarball_path(work_dir=work_dir)
 
         if not image_tarball.exists():
-            self.restore_base_image_tarball_from_diff_if_needed(work_dir=work_dir)
+            self.restore_base_image_tarball_from_diff_if_needed(
+                work_dir=work_dir,
+                remote_docker_host=remote_docker_host
+            )
 
             prepare_rdiff_image(work_dir=work_dir)
             self.res(work_dir=work_dir)
 
         self.import_image_tarball_if_needed(
             image_tarball=image_tarball,
-            image_name=self.result_image.name
+            image_name=self.result_image.name,
+            remote_docker_host=remote_docker_host
         )
 
     def _run_script_in_docker(
@@ -1421,7 +1429,7 @@ def remove_docker_container(name: str):
     )
 
 
-def export_image_to_tarball(image_name: str, output_path: pl.Path):
+def export_image_to_tarball(image_name: str, output_path: pl.Path, remote_docker_host: str = None):
     container_name = image_name.replace(":", "-")
     remove_docker_container(name=container_name)
     try:
@@ -1458,10 +1466,6 @@ RDIFF_STEP = RunnerStep(
     environment_variables={
         "IMAGE_NAME": "rdiff",
     },
-    # base=DockerImageSpec(
-    #     name=UBUNTU_22_04,
-    #     platform=Architecture.X86_64.as_docker_platform.value
-    # )
 )
 
 def is_image_already_exists_in_docker(
