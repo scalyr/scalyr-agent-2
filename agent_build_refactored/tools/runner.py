@@ -790,7 +790,13 @@ class EnvironmentRunnerStep(RunnerStep):
         if remote_docker_host:
             logger.info("    NOTE: Importing to a remote docker. It may take some time...")
         run_docker_command(
-            ["import", str(image_tarball), image_name],
+            [
+                "import",
+                "--platform",
+                str(self.architecture.as_docker_platform.value),
+                str(image_tarball),
+                image_name
+            ],
             remote_docker_host=remote_docker_host
         )
 
@@ -803,32 +809,66 @@ class EnvironmentRunnerStep(RunnerStep):
 
         image_tarball = self.get_image_tarball_path(work_dir=work_dir)
 
-        if not image_tarball.exists():
-            self.restore_base_image_tarball_from_diff_if_needed(
-                work_dir=work_dir,
-            )
+        if image_tarball.exists():
+            return
 
-            base_image_tarball = self.get_base_image_tarball_path(work_dir=work_dir)
+        self.restore_base_image_tarball_from_diff_if_needed(
+            work_dir=work_dir,
+        )
 
-            image_tarball = self.get_image_tarball_path(work_dir=work_dir)
-            temp_image_tarball = pl.Path(f"{image_tarball}_temp")
+        base_image_tarball = self.get_base_image_tarball_path(work_dir=work_dir)
 
-            step_output_dir = self.get_output_directory(work_dir=work_dir)
+        temp_images_dir = self.get_images_dir(work_dir=work_dir, temp=True)
+        if temp_images_dir.exists():
+            shutil.rmtree(temp_images_dir)
 
-            #prepare_rdiff_image(work_dir=work_dir)
-            ESSENTIAL_TOOLS_STEP.import_image_tarball_if_needed(work_dir=work_dir)
-            restore_new_file_from_diff(
-                original_file_dir=base_image_tarball.parent,
-                original_file_name=base_image_tarball.name,
-                delta_file_dir=step_output_dir,
-                delta_file_name="delta",
-                result_new_file_dir=temp_image_tarball.parent,
-                result_new_file_name=temp_image_tarball.name,
-                image_name=ESSENTIAL_TOOLS_STEP.result_image.name
-            )
-            chown_directory_in_docker(temp_image_tarball.parent)
-            temp_image_tarball.rename(image_tarball)
-            logger.info(f"Result image {self._base_docker_image.name} is restored from diff.")
+        temp_images_dir.mkdir(parents=True)
+
+        image_tarball = self.get_image_tarball_path(work_dir=work_dir, temp=True)
+
+        ESSENTIAL_TOOLS_STEP.import_image_tarball_if_needed(work_dir=work_dir)
+
+        command_args = [
+            "rdiff",
+            "patch",
+            f"/tmp/base_image_dir/{base_image_tarball.name}",
+            "/tmp/output/delta",
+            f"/tmp/image_dir/{image_tarball.name}",
+        ]
+
+        step_output_dir = self.get_output_directory(work_dir=work_dir)
+
+        subprocess.run(
+            [
+                "docker",
+                "run",
+                "-i",
+                "--rm",
+                "-v",
+                f"{base_image_tarball.parent}:/tmp/base_image_dir",
+                "-v",
+                f"{step_output_dir}:/tmp/output",
+                "-v",
+                f"{image_tarball.parent}:/tmp/image_dir",
+                ESSENTIAL_TOOLS_STEP.result_image.name,
+                *command_args
+            ],
+            check=True
+        )
+
+
+        # restore_new_file_from_diff(
+        #     original_file_dir=base_image_tarball.parent,
+        #     original_file_name=base_image_tarball.name,
+        #     delta_file_dir=step_output_dir,
+        #     delta_file_name="delta",
+        #     result_new_file_dir=temp_image_tarball.parent,
+        #     result_new_file_name=temp_image_tarball.name,
+        #     image_name=ESSENTIAL_TOOLS_STEP.result_image.name
+        # )
+        chown_directory_in_docker(temp_images_dir)
+        temp_images_dir.rename(image_tarball)
+        logger.info(f"Result image {self._base_docker_image.name} is restored from diff.")
 
     def _run_script_in_docker(
             self,
