@@ -25,30 +25,22 @@
 #   BUILD_PYTHON: output path of the previous step that provides Python interpreter.
 #   BUILD_AGENT_LIBS: output path of the previous step that provides dev libraries for the Python.
 #   FPM_VERSION: Version of the fpm tool.
+#   PACKAGE_CLOUD_VERSION: Version of the package_cloud tools. used to manipulate Packagecloud packages.
 #
 
 set -e
 
-cp -a "${BUILD_PYTHON_1_1_1}/." /
-cp -a "${BUILD_OPENSSL_1_1_1}/." /
+cp -a "${BUILD_PYTHON_WITH_OPENSSL_1}/." /
+cp -a "${BUILD_OPENSSL_1}/." /
 cp -a "${BUILD_DEV_REQUIREMENTS}/root/." /
 
 echo "${PYTHON_INSTALL_PREFIX}/lib" >> /etc/ld.so.conf.d/python3.conf
 ldconfig
 
-# shellcheck disable=SC1090
-source ~/.bashrc
-
-apt update
-DEBIAN_FRONTEND=noninteractive apt install -y ruby ruby-dev rubygems build-essential rpm git reprepro createrepo-c gnupg2 patchelf binutils aptly
-gem install "fpm:${FPM_VERSION}"
-
-
-
-
 ln -s "${PYTHON_INSTALL_PREFIX}/bin/python3" /usr/bin/python3
 
-# Generate keypair to sign and verify test repos for packages.
-gpg --batch --passphrase '' --quick-gen-key test default default
+# Copy pip cache
+PIP_CACHE_DIR="$(python3 -m pip cache dir)"
+mkdir -p "${PIP_CACHE_DIR}"
 
-apt clean
+cp -a "${BUILD_DEV_REQUIREMENTS}/cache/." "${PIP_CACHE_DIR}"

@@ -25,7 +25,7 @@ from agent_build_refactored.tools.runner import (
 )
 from agent_build_refactored.managed_packages.managed_packages_builders import (
     ALL_MANAGED_PACKAGE_BUILDERS,
-    PREPARE_TOOLSET_STEPS,
+    PREPARE_TOOLSET_STEP_GLIBC_X86_64,
     PYTHON_PACKAGE_NAME,
     AGENT_LIBS_PACKAGE_NAME,
     AGENT_AIO_PACKAGE_NAME,
@@ -154,7 +154,7 @@ class RepoBuilder(Runner):
 
     @classmethod
     def get_base_environment(cls) -> Optional[EnvironmentRunnerStep]:
-        return PREPARE_TOOLSET_STEPS[Architecture.X86_64]
+        return PREPARE_TOOLSET_STEP_GLIBC_X86_64
 
     def build(
         self,

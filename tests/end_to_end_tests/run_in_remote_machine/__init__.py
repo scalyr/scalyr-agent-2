@@ -22,6 +22,7 @@ import pathlib as pl
 import subprocess
 from typing import List, Dict, Union
 
+from agent_build_refactored.tools.dependabot_aware_docker_images import UBUNTU_22_04
 from agent_build_refactored.managed_packages.build_dependencies_versions import (
     EMBEDDED_OPENSSL_VERSION_NUMBER,
 )
@@ -57,7 +58,7 @@ DISTROS = {
                     ssh_username="ubuntu",
                 )
             },
-            docker_image="ubuntu:22.04",
+            docker_image=UBUNTU_22_04,
             expected_openssl_version_number=0x30000020,
         ),
         TargetDistro(

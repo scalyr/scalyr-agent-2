@@ -17,7 +17,6 @@ This module defines logic that allows to build single-file, standalone executabl
 This executable is used in ec2 and docker end-to-end tests to run those tests in completely clean environment
 without Python and other dependencies.
 """
-
 import os
 import shutil
 import pathlib as pl
@@ -30,45 +29,51 @@ from agent_build_refactored.tools.runner import (
     RunnerStep,
 )
 from agent_build_refactored.build_python.build_python_steps import (
-    PREPARE_PYTHON_ENVIRONMENT_STEPS,
     SUPPORTED_ARCHITECTURES,
+    CRuntime,
+    DependencyToolchain,
+    create_new_steps_for_all_toolchains
 )
 
 PORTABLE_RUNNER_NAME = "portable_runner"
 
 
-def create_build_portable_pytest_runner_step() -> Dict[
-    Architecture, RunnerStep
-]:
+def create_build_portable_pytest_runner_step(
+        toolchain: DependencyToolchain
+) -> RunnerStep:
+    """
+    Create step that builds pytest runner that is "frozen" by the PyInstaller tool.
+    Such frozen binary can run agent end-to-end tests on any system without any additional dependencies, even Python.
+    :param toolchain: Python dependency toolchain which is used to build the runner.
+    :return:
+    """
 
-    steps = {}
-    for architecture in SUPPORTED_ARCHITECTURES:
-        run_in_remote_docker = architecture != Architecture.X86_64
+    c_runtime = toolchain.c_runtime
+    architecture = toolchain.architecture
+    run_in_remote_docker = architecture != Architecture.X86_64
 
-        step = RunnerStep(
-            name=f"build_portable_pytest_runner_{architecture.value}",
-            script_path="tests/end_to_end_tests/run_in_remote_machine/steps/build_pytest_runner.py",
-            tracked_files_globs=[
-                pl.Path(__file__).relative_to(SOURCE_ROOT),
-                "tests/end_to_end_tests/**/*",
-                "agent_build/**/*",
-                "agent_build_refactored/**/*",
-                "VERSION",
-                "dev-requirements-new.txt",
-            ],
-            base=PREPARE_PYTHON_ENVIRONMENT_STEPS[architecture],
-            environment_variables={
-                "PORTABLE_RUNNER_NAME": PORTABLE_RUNNER_NAME,
-            },
-            run_in_remote_docker_if_available=run_in_remote_docker,
-        )
-
-        steps[architecture] = step
-
-    return steps
+    return RunnerStep(
+        name=f"build_portable_pytest_runner_{c_runtime.value}_{architecture.value}",
+        script_path="tests/end_to_end_tests/run_in_remote_machine/steps/build_pytest_runner.py",
+        tracked_files_globs=[
+            pl.Path(__file__).relative_to(SOURCE_ROOT),
+            "tests/end_to_end_tests/**/*",
+            "agent_build/**/*",
+            "agent_build_refactored/**/*",
+            "VERSION",
+            "dev-requirements-new.txt",
+        ],
+        base=toolchain.c_runtime_environment_with_python,
+        environment_variables={
+            "PORTABLE_RUNNER_NAME": PORTABLE_RUNNER_NAME,
+        },
+        run_in_remote_docker_if_available=run_in_remote_docker,
+    )
 
 
-BUILD_PORTABLE_PYTEST_RUNNER_STEPS = create_build_portable_pytest_runner_step()
+BUILD_PORTABLE_PYTEST_RUNNER_STEPS = create_new_steps_for_all_toolchains(
+    create_step_fn=create_build_portable_pytest_runner_step
+)
 
 
 class PortablePytestRunnerBuilder(Runner):
@@ -76,17 +81,17 @@ class PortablePytestRunnerBuilder(Runner):
     Builder class that builds pytest runner executable by using PyInstaller.
     """
 
-    ARCHITECTURE: Architecture
+    BUILD_PORTABLE_PYTEST_RUNNER_STEP: RunnerStep
 
     @classmethod
     def get_all_required_steps(cls) -> List[RunnerStep]:
-        return [BUILD_PORTABLE_PYTEST_RUNNER_STEPS[cls.ARCHITECTURE]]
+        return [cls.BUILD_PORTABLE_PYTEST_RUNNER_STEP]
 
     def build(self):
 
         self.prepare_runer()
 
-        build_step = BUILD_PORTABLE_PYTEST_RUNNER_STEPS[self.ARCHITECTURE]
+        build_step = self.BUILD_PORTABLE_PYTEST_RUNNER_STEP
         build_step_output = build_step.get_output_directory(work_dir=self.work_dir)
 
         shutil.copy(build_step_output / "dist" / PORTABLE_RUNNER_NAME, self.output_path)
@@ -108,15 +113,12 @@ class PortablePytestRunnerBuilder(Runner):
 PORTABLE_PYTEST_RUNNER_BUILDERS = {}
 # Iterate through all supported architectures and create package builders classes for each.
 for arch in SUPPORTED_ARCHITECTURES:
-
     class BuilderCls(PortablePytestRunnerBuilder):
-        ARCHITECTURE = arch
+        BUILD_PORTABLE_PYTEST_RUNNER_STEP = BUILD_PORTABLE_PYTEST_RUNNER_STEPS[CRuntime.GLIBC][arch]
         CLASS_NAME_ALIAS = f"PortablePytestRunnerBuilder{arch.value}"
         ADD_TO_GLOBAL_RUNNER_COLLECTION = True
 
     PORTABLE_PYTEST_RUNNER_BUILDERS[arch] = BuilderCls
-
-
 
 
 if __name__ == "__main__":

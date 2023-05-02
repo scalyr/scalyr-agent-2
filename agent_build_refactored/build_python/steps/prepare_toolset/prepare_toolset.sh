@@ -18,42 +18,37 @@
 #   SOURCE_ROOT: Path to the projects root.
 #   STEP_OUTPUT_PATH: Path to the step's output directory.
 #
-# This script creates venv with all libraries that are required by the Agent.
+# This script prepares toolset environment that will be used during packages build. For example, it installs
+# the fpm command line tools which is used to create deb and rpm packages.
+#
+# It expects next environment variables:
+#   BUILD_PYTHON: output path of the previous step that provides Python interpreter.
+#   BUILD_AGENT_LIBS: output path of the previous step that provides dev libraries for the Python.
+#   FPM_VERSION: Version of the fpm tool.
+#
 
 set -e
-
-# shellcheck disable=SC1090
-source ~/.bashrc
-
-# Copy python interpreter, which is built by the previous step.
 
 cp -a "${BUILD_PYTHON}/." /
 cp -a "${BUILD_OPENSSL}/." /
 cp -a "${BUILD_DEV_REQUIREMENTS}/root/." /
-cp -a "${BUILD_DEV_REQUIREMENTS}/cache" /tmp/pip_cache
+
+echo "${PYTHON_INSTALL_PREFIX}/lib" >> /etc/ld.so.conf.d/python3.conf
 ldconfig
 
-# Prepare requirements file.
-REQUIREMENTS_FILE=/tmp/requirements.txt
-echo "${REQUIREMENTS}" > "${REQUIREMENTS_FILE}"
+# shellcheck disable=SC1090
+source ~/.bashrc
 
-export LD_LIBRARY_PATH="${PYTHON_INSTALL_PREFIX}/lib:${LD_LIBRARY_PATH}"
-# Create venv.
-VENV_DIR="/var/opt/${SUBDIR_NAME}/venv"
-"${PYTHON_INSTALL_PREFIX}/bin/python3" -m venv "${VENV_DIR}"
+apt update
+DEBIAN_FRONTEND=noninteractive apt install -y ruby ruby-dev rubygems build-essential rpm git reprepro createrepo-c gnupg2 patchelf binutils aptly
+gem install "fpm:${FPM_VERSION}"
 
-# Install version of pip that we need to venv
-"${VENV_DIR}/bin/python3" -m pip install -v \
-  --cache-dir /tmp/pip_cache \
-  "pip==${PIP_VERSION}"
 
-# Install requirements to venv.
-"${VENV_DIR}/bin/python3" -m pip install -v \
-  --cache-dir /tmp/pip_cache \
-  -r "${REQUIREMENTS_FILE}"
 
-# Remove cache files.
-find "${VENV_DIR}" -name "__pycache__" -type d -prune -exec rm -r {} \;
 
-# Copy result venv to result output.
-cp -a "${VENV_DIR}" "${STEP_OUTPUT_PATH}"
+ln -s "${PYTHON_INSTALL_PREFIX}/bin/python3" /usr/bin/python3
+
+# Generate keypair to sign and verify test repos for packages.
+gpg --batch --passphrase '' --quick-gen-key test default default
+
+apt clean

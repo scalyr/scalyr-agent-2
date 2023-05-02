@@ -18,26 +18,31 @@
 #   SOURCE_ROOT: Path to the projects root.
 #   STEP_OUTPUT_PATH: Path to the step's output directory.
 #
-# This script prepares toolset environment that will be used during packages build. For example, it installs
-# the fpm command line tools which is used to create deb and rpm packages.
-#
-# It expects next environment variables:
-#   BUILD_PYTHON: output path of the previous step that provides Python interpreter.
-#   BUILD_AGENT_LIBS: output path of the previous step that provides dev libraries for the Python.
-#   FPM_VERSION: Version of the fpm tool.
-#   PACKAGE_CLOUD_VERSION: Version of the package_cloud tools. used to manipulate Packagecloud packages.
-#
+# This script creates venv with all libraries that are required by the Agent.
 
 set -e
 
-cp -a "${BUILD_PYTHON_1_1_1}/." /
-cp -a "${BUILD_OPENSSL_1_1_1}/." /
-cp -a "${BUILD_DEV_REQUIREMENTS}/root/." /
-
-echo "${PYTHON_INSTALL_PREFIX}/lib" >> /etc/ld.so.conf.d/python3.conf
-ldconfig
-
-ln -s "${PYTHON_INSTALL_PREFIX}/bin/python3" /usr/bin/python3
-
 # shellcheck disable=SC1090
 source ~/.bashrc
+
+# Prepare requirements file.
+REQUIREMENTS_FILE=/tmp/requirements.txt
+echo "${REQUIREMENTS}" > "${REQUIREMENTS_FILE}"
+
+# Create venv.
+VENV_DIR="/var/opt/${SUBDIR_NAME}/venv"
+python3 -m venv "${VENV_DIR}"
+
+# Install version of pip that we need to venv
+"${VENV_DIR}/bin/python3" -m pip install -v \
+  "pip==${PIP_VERSION}"
+
+# Install requirements to venv.
+"${VENV_DIR}/bin/python3" -m pip install -v \
+  -r "${REQUIREMENTS_FILE}"
+
+# Remove cache files.
+find "${VENV_DIR}" -name "__pycache__" -type d -prune -exec rm -r {} \;
+
+# Copy result venv to result output.
+cp -a "${VENV_DIR}" "${STEP_OUTPUT_PATH}"
