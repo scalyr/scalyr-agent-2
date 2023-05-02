@@ -760,7 +760,6 @@ class EnvironmentRunnerStep(RunnerStep):
         temp_image_tarball.rename(image_tarball)
 
     def restore_image_from_diff_if_needed(self, work_dir: pl.Path, remote_docker_host: str = None):
-        prepare_rdiff_image(work_dir=work_dir)
         initial_images_dir = self.get_initial_images_dir(work_dir=work_dir)
         initial_images_dir.mkdir(parents=True, exist_ok=True)
 
@@ -768,6 +767,8 @@ class EnvironmentRunnerStep(RunnerStep):
 
         if not image_tarball.exists():
             self.restore_base_image_tarball_from_diff_if_needed(work_dir=work_dir)
+
+            prepare_rdiff_image(work_dir=work_dir)
             self.res(work_dir=work_dir)
 
         self.import_image_tarball_if_needed(
@@ -810,6 +811,7 @@ class EnvironmentRunnerStep(RunnerStep):
             ],
         )
 
+        prepare_rdiff_image(work_dir=work_dir)
         create_files_diff_with_rdiff(
             original_file_dir=base_image_tarball.parent,
             original_file_name=base_image_tarball.name,
