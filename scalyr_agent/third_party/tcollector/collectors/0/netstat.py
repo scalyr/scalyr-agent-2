@@ -297,7 +297,7 @@ def parse_and_print_metrics(f_netstat, f_sockstat, output_file_success=None,
     print_sockstat("memory", m.group("ip_frag_mem"), " type=ipfrag")
     print_sockstat("ipfragqueues", m.group("ip_frag_nqueues"), output_file_success=output_file_success)
 
-    # /proc/net/netstat has a retarded column-oriented format.  It looks
+    # /proc/net/netstat has a challenging column-oriented format.  It looks
     # like this:
     #   Header: SomeMetric OtherMetric
     #   Header: 1 2
