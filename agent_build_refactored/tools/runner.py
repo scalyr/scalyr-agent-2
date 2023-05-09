@@ -95,6 +95,7 @@ class RunnerStep:
         dependency_steps: Dict[str, "RunnerStep"] = None,
         environment_variables: Dict[str, str] = None,
         user: str = "root",
+        shell: str = None,
         run_in_remote_docker_if_available: bool = False
     ):
         """
@@ -109,12 +110,15 @@ class RunnerStep:
             Value - Step instance.
         :param environment_variables: Dist with environment variables to pass to step's script.
         :param user: Name of the user under which name run the step's script.
+        :param shell: Shell used to execute this step.
         :param run_in_remote_docker_if_available: If possible, run this step in the remote docker engine that
             runs inside AWS EC2 instance. It may be used, for example, to run ARM builds in the ARM-based EC2 instance,
             that is much faster than using QEMU.
         """
         self.name = name
         self.user = user
+
+        self.shell = shell
         script_path = pl.Path(script_path)
         if script_path.is_absolute():
             script_path = script_path.relative_to(SOURCE_ROOT)
@@ -129,7 +133,7 @@ class RunnerStep:
 
         self.dependency_steps = dependency_steps or {}
 
-        # Add steps from the essentail steps collection as dependencies.
+        # Add steps from the essential steps collection as dependencies.
         self.dependency_steps.update(ESSENTIAL_STEPS)
 
         self.environment_variables = environment_variables or {}
@@ -578,7 +582,10 @@ class RunnerStep:
         if self.is_step_script_is_python:
             executable = "python3"
         elif self.script_path.suffix == ".sh":
-            executable = "bash"
+            shell = self.shell
+            if shell is None:
+                shell = "bash"
+            executable = shell
         else:
             raise Exception(
                 f"Unknown script type '{self.script_path.suffix}' for the step {self}"
@@ -706,6 +713,7 @@ class EnvironmentRunnerStep(RunnerStep):
         dependency_steps: Dict[str, "RunnerStep"] = None,
         environment_variables: Dict[str, str] = None,
         user: str = "root",
+        shell: str = None,
         run_in_remote_docker_if_available: bool = False,
         save_result_image_as_diff: bool = True
     ):
@@ -718,6 +726,7 @@ class EnvironmentRunnerStep(RunnerStep):
         :param dependency_steps: Same as for parent RunnerStep class.
         :param environment_variables: Same as for parent RunnerStep class.
         :param user: Same as for parent RunnerStep class.
+        :param shell: Same as for parent RunnerStep class.
         :param run_in_remote_docker_if_available: Same as for parent RunnerStep class.
         :param save_result_image_as_diff: If true, the diff between image
             of the base step and result image is saved. Otherwise, the full image is saved.
@@ -731,6 +740,7 @@ class EnvironmentRunnerStep(RunnerStep):
             dependency_steps=dependency_steps,
             environment_variables=environment_variables,
             user=user,
+            shell=shell,
             run_in_remote_docker_if_available=run_in_remote_docker_if_available
         )
 

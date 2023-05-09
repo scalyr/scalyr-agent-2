@@ -29,21 +29,19 @@
 
 set -e
 
+# shellcheck disable=SC2016
+echo "export LD_LIBRARY_PATH=\"${PYTHON_INSTALL_PREFIX}/lib:\${LD_LIBRARY_PATH}\"" >> ~/.bashrc
+# shellcheck disable=SC1090
+source ~/.bashrc
+
 cp -a "${BUILD_PYTHON}/." /
 cp -a "${BUILD_OPENSSL}/." /
 cp -a "${BUILD_DEV_REQUIREMENTS}/root/." /
 
-echo "${PYTHON_INSTALL_PREFIX}/lib" >> /etc/ld.so.conf.d/python3.conf
-ldconfig
-
-# shellcheck disable=SC1090
-source ~/.bashrc
 
 apt update
 DEBIAN_FRONTEND=noninteractive apt install -y ruby ruby-dev rubygems build-essential rpm git reprepro createrepo-c gnupg2 patchelf binutils aptly
 gem install "fpm:${FPM_VERSION}"
-
-
 
 
 ln -s "${PYTHON_INSTALL_PREFIX}/bin/python3" /usr/bin/python3

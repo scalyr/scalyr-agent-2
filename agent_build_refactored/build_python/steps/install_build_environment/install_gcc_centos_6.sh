@@ -123,7 +123,8 @@ yum install -y centos-release-scl
 yum install -y devtoolset-9 perl-core
 
 echo "source /opt/rh/devtoolset-9/enable" >> ~/.bashrc
-echo -e "/usr/local/lib\n/usr/local/lib64" >> /etc/ld.so.conf.d/local.conf
+# shellcheck disable=SC2016
+echo "export LD_LIBRARY_PATH=\"/usr/local/lib:/usr/local/lib64:\${LD_LIBRARY_PATH}\"" >> ~/.bashrc
 
 yum clean all
 rm -rf /var/cache/yum

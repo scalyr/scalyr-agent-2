@@ -132,11 +132,11 @@ from agent_build_refactored.build_python.build_python_steps import (
     EMBEDDED_PYTHON_PIP_VERSION,
     create_python_files,
     create_agent_libs_venv_files,
-    ALL_DEPENDENCY_TOOLCHAINS,
+    ALL_PYTHON_TOOLCHAINS,
     CRuntime,
     PREPARE_TOOLSET_STEP_GLIBC_X86_64,
     create_new_steps_for_all_toolchains,
-    DependencyToolchain
+    PythonDependencyToolchain
 )
 
 logger = logging.getLogger(__name__)
@@ -474,7 +474,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
     @classmethod
     def _get_toolchain(cls):
         """Get dependencies toolchain that is used by this builder."""
-        return ALL_DEPENDENCY_TOOLCHAINS[cls.C_RUNTIME][cls.DEPENDENCY_PACKAGES_ARCHITECTURE]
+        return ALL_PYTHON_TOOLCHAINS[cls.C_RUNTIME][cls.DEPENDENCY_PACKAGES_ARCHITECTURE]
 
     @classmethod
     def _get_agent_libs_step(cls):
@@ -741,7 +741,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
 
 # Create steps that build agent requirement libs inside venv.
 def create_build_agent_libs_venv_step_for_linux_packages(
-        toolchain: DependencyToolchain
+        toolchain: PythonDependencyToolchain
 ):
 
     name_suffix = f"{toolchain.c_runtime.value}_{toolchain.architecture.value}"

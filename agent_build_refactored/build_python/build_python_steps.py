@@ -8,7 +8,7 @@ import stat
 from typing import Dict, Callable
 
 
-from agent_build_refactored.tools.constants import Architecture, DockerPlatform, SOURCE_ROOT
+from agent_build_refactored.tools.constants import Architecture, REQUIREMENTS_DEV_COVERAGE
 from agent_build_refactored.tools.runner import RunnerStep, EnvironmentRunnerStep, DockerImageSpec, Runner
 
 from agent_build_refactored.tools.dependabot_aware_docker_images import UBUNTU_22_04
@@ -20,7 +20,8 @@ from agent_build_refactored.build_python.steps import (
     build_python,
     build_dev_requirements,
     prepare_c_runtime_environment_with_python,
-    prepare_toolset
+    prepare_toolset,
+    build_agent_libs_venv
 )
 
 from agent_build_refactored.managed_packages.build_dependencies_versions import (
@@ -76,6 +77,8 @@ _PYTHON_BUILD_DEPENDENCIES_VERSIONS = dict(
     gdbm_version="1.23",
     zlib_version="1.2.13",
     bzip_version="1.0.8",
+    tcl_version_commit="338c6692672696a76b6cb4073820426406c6f3f9",  # tag - "core-8-6-13"
+    sqlite_version_commit="e671c4fbc057f8b1505655126eaf90640149ced6",  # tag - "version-3.41.2"
     openssl_1_version=PYTHON_PACKAGE_SSL_1_VERSION,
     openssl_3_version=PYTHON_PACKAGE_SSL_3_VERSION,
 )
@@ -91,10 +94,11 @@ class CRuntime(enum.Enum):
     Set of constants that represent type of C language runtime such, for example  as glibc.
     """
     GLIBC = "glibc"
+    MUSL = "musl"
 
 
 @dataclasses.dataclass
-class DependencyToolchain:
+class PythonDependencyToolchain:
     """
     Data class that contains all steps that are required in order to build Python and other dependencies
         for a particular C runtime (e.g. glibc or musl) and CPU architecture.
@@ -104,6 +108,8 @@ class DependencyToolchain:
 
     # Base step with everything that is required for compilation of Python.
     install_build_environment: EnvironmentRunnerStep
+    # Stap that build all Python dependencies
+    build_python_dependencies_step: RunnerStep
     # Step that builds OpenSSL 1
     openssl_1: RunnerStep
     # Step that builds OpenSSL 3
@@ -116,6 +122,193 @@ class DependencyToolchain:
     # Same as base build environment, but also with Python.
     c_runtime_environment_with_python: EnvironmentRunnerStep
 
+    @staticmethod
+    def create(
+            c_runtime: CRuntime,
+            architecture: Architecture,
+    ):
+        steps_name_suffix = f"{c_runtime.value}_{architecture.value}"
+
+        run_in_remote_docker = architecture != Architecture.X86_64
+
+        if c_runtime == CRuntime.GLIBC:
+            if architecture == Architecture.X86_64:
+                base_image_name = "centos:6"
+                script_name = "install_gcc_centos_6.sh"
+            else:
+                base_image_name = "centos:7"
+                script_name = "install_gcc_centos_7.sh"
+
+            shell = "bash"
+        elif c_runtime == CRuntime.MUSL:
+            base_image_name = "alpine:3.12"
+            script_name = "install_gcc_alpine_13.sh"
+            shell = "sh"
+        else:
+            raise Exception(f"Unknown C runtime {c_runtime}")
+
+        base_image = DockerImageSpec(
+            name=base_image_name,
+            platform=architecture.as_docker_platform.value
+        )
+
+        install_build_environment_step = install_build_environment.create_step(
+            name_suffix=steps_name_suffix,
+            base_image=base_image,
+            script_name=script_name,
+            shell=shell,
+            run_in_remote_docker=run_in_remote_docker
+        )
+
+        build_python_dependencies_step = build_python_dependencies.create_step(
+            name_suffix=steps_name_suffix,
+            install_build_environment_step=install_build_environment_step,
+            download_build_dependencies_step=DOWNLOAD_PYTHON_DEPENDENCIES_STEP,
+            **_PYTHON_BUILD_DEPENDENCIES_VERSIONS,
+            run_in_remote_docker=run_in_remote_docker,
+        )
+
+        if architecture == Architecture.X86_64:
+            openssl_arch_target = "linux-x86_64"
+        elif architecture == Architecture.ARM64:
+            openssl_arch_target = "linux-aarch64"
+        else:
+            raise Exception(f"Unknown architecture {architecture}")
+
+        # Define build options for each variant of the OpenSSL build.
+        openssl_3_configure_args = {
+            # We peek these options from the Ubuntu packages build logs
+            # https://launchpad.net/ubuntu/+source/openssl/3.0.8-1ubuntu2
+            CRuntime.GLIBC: {
+                Architecture.X86_64: 'no-zlib no-idea no-mdc2 no-rc5 no-ssl3 enable-unit-test no-ssl3-method enable-rfc3779 enable-cms no-capieng no-rdrand enable-ec_nistp_64_gcc_128 ',
+                Architecture.ARM64: 'no-zlib no-idea no-mdc2 no-rc5 no-ssl3 enable-unit-test no-ssl3-method enable-rfc3779 enable-cms no-capieng no-rdrand'
+            },
+            # We peek these options from the Apline packages build logs
+            # https://git.alpinelinux.org/aports/tree/main/openssl/APKBUILD?id=d62c0613776b85229a8b2433673dae4ed231a18a
+            CRuntime.MUSL: {
+                Architecture.X86_64: 'no-zlib no-idea no-mdc2 no-rc5 no-ssl3 no-async no-comp no-ec2m no-sm2 no-sm4 no-seed no-weak-ssl-ciphers enable-ktls enable-ec_nistp_64_gcc_128',
+                Architecture.ARM64: 'no-zlib no-idea no-mdc2 no-rc5 no-ssl3 no-async no-comp no-ec2m no-sm2 no-sm4 no-seed no-weak-ssl-ciphers enable-ktls'
+            }
+        }
+
+        openssl_1_configure_args = {
+            # https://launchpad.net/ubuntu/+source/openssl/1.1.1f-1ubuntu2.18
+            CRuntime.GLIBC: {
+                Architecture.X86_64: 'no-zlib no-idea no-mdc2 no-rc5 no-ssl3 enable-unit-test no-ssl3-method enable-rfc3779 enable-cms ',
+                Architecture.ARM64: 'no-zlib no-idea no-mdc2 no-rc5 no-ssl3 enable-unit-test no-ssl3-method enable-rfc3779 enable-cms'
+            },
+            # https://git.alpinelinux.org/aports/tree/main/openssl/APKBUILD?id=b2a5d96795c200f988c74438d46a46f6cf794257
+            CRuntime.MUSL: {
+                Architecture.X86_64: 'no-zlib no-idea no-mdc2 no-rc5 no-ssl3 no-async no-comp no-ec2m no-sm2 no-sm4 no-seed no-weak-ssl-ciphers no-ssl2 enable-ec_nistp_64_gcc_128',
+                Architecture.ARM64: 'no-zlib no-idea no-mdc2 no-rc5 no-ssl3 no-async no-comp no-ec2m no-sm2 no-sm4 no-seed no-weak-ssl-ciphers no-ssl2'
+            }
+        }
+
+        if c_runtime == CRuntime.MUSL:
+            openssl_build_ld_flags = "-Wa,--noexecstack"
+        else:
+            openssl_build_ld_flags = ""
+
+        build_openssl_1_step = build_openssl.create_step(
+            name_suffix=steps_name_suffix,
+            install_build_environment_step=install_build_environment_step,
+            download_build_dependencies_step=DOWNLOAD_PYTHON_DEPENDENCIES_STEP,
+            openssl_version=PYTHON_PACKAGE_SSL_1_VERSION,
+            openssl_major_version=1,
+            arch_target_name=openssl_arch_target,
+            build_ld_flags=openssl_build_ld_flags,
+            additional_configure_options=openssl_1_configure_args[c_runtime][architecture],
+            run_in_remote_docker=run_in_remote_docker
+        )
+
+        build_openssl_3_step = build_openssl.create_step(
+            name_suffix=steps_name_suffix,
+            install_build_environment_step=install_build_environment_step,
+            download_build_dependencies_step=DOWNLOAD_PYTHON_DEPENDENCIES_STEP,
+            openssl_version=PYTHON_PACKAGE_SSL_3_VERSION,
+            openssl_major_version=3,
+            arch_target_name=openssl_arch_target,
+            build_ld_flags=openssl_build_ld_flags,
+            additional_configure_options=openssl_3_configure_args[c_runtime][architecture],
+            run_in_remote_docker=run_in_remote_docker
+        )
+
+        def create_python_step(
+                build_openssl_step: RunnerStep,
+                openssl_major_version: int
+        ):
+            return build_python.create_step(
+                name_suffix=f"_with_openssl_{openssl_major_version}_{steps_name_suffix}",
+                download_build_dependencies_step=DOWNLOAD_PYTHON_DEPENDENCIES_STEP,
+                install_build_environment_step=install_build_environment_step,
+                build_python_dependencies_step=build_python_dependencies_step,
+                build_openssl_step=build_openssl_step,
+                python_version=EMBEDDED_PYTHON_VERSION,
+                python_short_version=EMBEDDED_PYTHON_SHORT_VERSION,
+                python_install_prefix=PYTHON_INSTALL_PREFIX,
+                pip_version=EMBEDDED_PYTHON_PIP_VERSION,
+                run_in_remote_docker=run_in_remote_docker
+
+            )
+
+        build_python_with_openssl_1_step = create_python_step(
+            build_openssl_step=build_openssl_1_step,
+            openssl_major_version=1,
+        )
+        build_python_with_openssl_3_step = create_python_step(
+            build_openssl_step=build_openssl_3_step,
+            openssl_major_version=3
+        )
+        if c_runtime == CRuntime.GLIBC:
+            rust_target_platform_runtime = "gnu"
+        elif c_runtime == CRuntime.MUSL:
+            rust_target_platform_runtime = "musl"
+        else:
+            raise Exception(f"Unknown C runtime {c_runtime}")
+
+        if architecture == Architecture.X86_64:
+            rust_target_platform_arch = "x86_64"
+        elif architecture == Architecture.ARM64:
+            rust_target_platform_arch = "aarch64"
+        else:
+            raise Exception(f"Unknown architecture '{architecture.value}'")
+
+        rust_platform = f"{rust_target_platform_arch}-unknown-linux-{rust_target_platform_runtime}"
+
+        build_dev_requirements_step = build_dev_requirements.create_step(
+            name_suffix=steps_name_suffix,
+            install_build_environment_step=install_build_environment_step,
+            build_python_dependencies_step=build_python_dependencies_step,
+            build_openssl_step=build_openssl_3_step,
+            build_python_step=build_python_with_openssl_3_step,
+            rust_version=RUST_VERSION,
+            rust_target_platform=rust_platform,
+            python_install_prefix=PYTHON_INSTALL_PREFIX,
+            run_in_remote_docker=run_in_remote_docker,
+        )
+
+        prepare_c_runtime_environment_with_python_step = prepare_c_runtime_environment_with_python.create_step(
+            name_suffix=steps_name_suffix,
+            install_build_environment_step=install_build_environment_step,
+            build_openssl_step=build_openssl_3_step,
+            build_python_step=build_python_with_openssl_3_step,
+            build_dev_requirements_step=build_dev_requirements_step,
+            python_install_prefix=PYTHON_INSTALL_PREFIX,
+        )
+
+        return PythonDependencyToolchain(
+            c_runtime=c_runtime,
+            architecture=architecture,
+            install_build_environment=install_build_environment_step,
+            build_python_dependencies_step=build_python_dependencies_step,
+            openssl_1=build_openssl_1_step,
+            openssl_3=build_openssl_3_step,
+            python_with_openssl_1=build_python_with_openssl_1_step,
+            python_with_openssl_3=build_python_with_openssl_3_step,
+            dev_requirements=build_dev_requirements_step,
+            c_runtime_environment_with_python=prepare_c_runtime_environment_with_python_step
+        )
+
 
 def create_all_toolchains():
     """
@@ -126,120 +319,19 @@ def create_all_toolchains():
     for c_runtime in CRuntime:
         for architecture in SUPPORTED_ARCHITECTURES:
 
-            steps_name_suffix = f"{c_runtime.value}_{architecture.value}"
-
-            run_in_remote_docker = architecture != Architecture.X86_64
-
-            if architecture == Architecture.X86_64:
-                base_image_name = "centos:6"
-            else:
-                base_image_name = "centos:7"
-
-            base_image = DockerImageSpec(
-                name=base_image_name,
-                platform=architecture.as_docker_platform.value
-            )
-
-            install_build_environment_step = install_build_environment.create_step(
-                name_suffix=steps_name_suffix,
-                base_image=base_image,
-                run_in_remote_docker=run_in_remote_docker
-            )
-
-            build_python_dependencies_step = build_python_dependencies.create_step(
-                name_suffix=steps_name_suffix,
-                install_build_environment_step=install_build_environment_step,
-                download_build_dependencies_step=DOWNLOAD_PYTHON_DEPENDENCIES_STEP,
-                **_PYTHON_BUILD_DEPENDENCIES_VERSIONS,
-                run_in_remote_docker=run_in_remote_docker,
-            )
-
-            build_openssl_1_step = build_openssl.create_step(
-                name_suffix=steps_name_suffix,
-                openssl_version=PYTHON_PACKAGE_SSL_1_VERSION,
-                openssl_major_version=1,
-                install_build_environment_step=install_build_environment_step,
-                download_build_dependencies_step=DOWNLOAD_PYTHON_DEPENDENCIES_STEP,
-                run_in_remote_docker=run_in_remote_docker
-            )
-
-            build_openssl_3_step = build_openssl.create_step(
-                name_suffix=steps_name_suffix,
-                openssl_version=PYTHON_PACKAGE_SSL_3_VERSION,
-                openssl_major_version=3,
-                install_build_environment_step=install_build_environment_step,
-                download_build_dependencies_step=DOWNLOAD_PYTHON_DEPENDENCIES_STEP,
-                run_in_remote_docker=run_in_remote_docker
-            )
-
-            def create_python_step(
-                    build_openssl_step: RunnerStep,
-                    openssl_major_version: int
-            ):
-                return build_python.create_step(
-                    name_suffix=f"_with_openssl_{openssl_major_version}_{steps_name_suffix}",
-                    download_build_dependencies_step=DOWNLOAD_PYTHON_DEPENDENCIES_STEP,
-                    install_build_environment_step=install_build_environment_step,
-                    build_python_dependencies_step=build_python_dependencies_step,
-                    build_openssl_step=build_openssl_step,
-                    python_version=EMBEDDED_PYTHON_VERSION,
-                    python_short_version=EMBEDDED_PYTHON_SHORT_VERSION,
-                    python_install_prefix=PYTHON_INSTALL_PREFIX,
-                    pip_version=EMBEDDED_PYTHON_PIP_VERSION,
-                    run_in_remote_docker=run_in_remote_docker
-
-                )
-
-            build_python_with_openssl_1_step = create_python_step(
-                build_openssl_step=build_openssl_1_step,
-                openssl_major_version=1,
-            )
-            build_python_with_openssl_3_step = create_python_step(
-                build_openssl_step=build_openssl_3_step,
-                openssl_major_version=3
-            )
-
-            build_dev_requirements_step = build_dev_requirements.create_step(
-                name_suffix=steps_name_suffix,
-                install_build_environment_step=install_build_environment_step,
-                build_python_dependencies_step=build_python_dependencies_step,
-                build_openssl_step=build_openssl_1_step,
-                build_python_step=build_python_with_openssl_1_step,
-                rust_version=RUST_VERSION,
-                python_install_prefix=PYTHON_INSTALL_PREFIX,
-                run_in_remote_docker=run_in_remote_docker,
-            )
-
-            prepare_c_runtime_environment_with_python_step = prepare_c_runtime_environment_with_python.create_step(
-                name_suffix=steps_name_suffix,
-                install_build_environment_step=install_build_environment_step,
-                build_openssl_step=build_openssl_1_step,
-                build_python_step=build_python_with_openssl_1_step,
-                build_dev_requirements_step=build_dev_requirements_step,
-                python_install_prefix=PYTHON_INSTALL_PREFIX,
-            )
-
-            glibc_toolchain = DependencyToolchain(
+            toolchain = PythonDependencyToolchain.create(
                 c_runtime=c_runtime,
-                architecture=architecture,
-                install_build_environment=install_build_environment_step,
-                openssl_1=build_openssl_1_step,
-                openssl_3=build_openssl_3_step,
-                python_with_openssl_1=build_python_with_openssl_1_step,
-                python_with_openssl_3=build_python_with_openssl_3_step,
-                dev_requirements=build_dev_requirements_step,
-                c_runtime_environment_with_python=prepare_c_runtime_environment_with_python_step
+                architecture = architecture
             )
-
-            result_toolchains[c_runtime][architecture] = glibc_toolchain
+            result_toolchains[c_runtime][architecture] = toolchain
 
     return result_toolchains
 
 
-ALL_DEPENDENCY_TOOLCHAINS: Dict[CRuntime, Dict[Architecture, DependencyToolchain]] = create_all_toolchains()
+ALL_PYTHON_TOOLCHAINS: Dict[CRuntime, Dict[Architecture, PythonDependencyToolchain]] = create_all_toolchains()
 
 
-GLIBC_X86_64_TOOLCHAIN = ALL_DEPENDENCY_TOOLCHAINS[CRuntime.GLIBC][Architecture.X86_64]
+GLIBC_X86_64_TOOLCHAIN = ALL_PYTHON_TOOLCHAINS[CRuntime.GLIBC][Architecture.X86_64]
 
 PREPARE_TOOLSET_STEP_GLIBC_X86_64 = prepare_toolset.create_step(
     name_suffix=f"{GLIBC_X86_64_TOOLCHAIN.c_runtime.value}-{GLIBC_X86_64_TOOLCHAIN.architecture.value}",
@@ -255,7 +347,7 @@ PREPARE_TOOLSET_STEP_GLIBC_X86_64 = prepare_toolset.create_step(
 
 
 def create_new_steps_for_all_toolchains(
-    create_step_fn: Callable[[DependencyToolchain], RunnerStep],
+    create_step_fn: Callable[[PythonDependencyToolchain], RunnerStep],
 ):
     """
     Create new steps for each toolchain defined in this module.
@@ -264,7 +356,7 @@ def create_new_steps_for_all_toolchains(
     :return: Dict with new steps for each architecture for each C runtime.
     """
     result_steps = collections.defaultdict(dict)
-    for c_runtime, architectures in ALL_DEPENDENCY_TOOLCHAINS.items():
+    for c_runtime, architectures in ALL_PYTHON_TOOLCHAINS.items():
         for architecture, toolchain in architectures.items():
             step = create_step_fn(
                 toolchain
@@ -278,12 +370,14 @@ def create_new_steps_for_all_toolchains(
 
 
 def create_python_files(
+        build_python_dependencies_step_output: pl.Path,
         build_python_step_output: pl.Path,
         output: pl.Path,
         additional_ld_library_paths: str = None
 ):
     """
     Create Python interpreter files.
+    :param build_python_dependencies_step_output: Output ot a step that build all dependencies for the Python interpreter.
     :param build_python_step_output: Step that build Python.
     :param output: output directory with result files.
     :param additional_ld_library_paths:
@@ -298,9 +392,19 @@ def create_python_files(
         symlinks=True
     )
 
-    # Rename main Python executable to be 'python3-original' and copy our wrapper script instead of it
     opt_dir = output / AGENT_OPT_DIR.relative_to("/")
     python_dir = opt_dir / "python3"
+    python_lib_dir = python_dir / "lib"
+
+    # Copy sqlite shared libraries.
+    deps_lib_dir = build_python_dependencies_step_output / "usr/local/lib"
+    for path in deps_lib_dir.glob("libsqlite3.so*"):
+        shutil.copy(
+            path,
+            python_lib_dir
+        )
+
+    # Rename main Python executable to be 'python3-original' and copy our wrapper script instead of it
     python_bin_dir = python_dir / "bin"
 
     python_executable_full_name = python_bin_dir / f"python{EMBEDDED_PYTHON_SHORT_VERSION}"
@@ -450,3 +554,41 @@ def create_agent_libs_venv_files(
             venv_bin_dir / f"python{EMBEDDED_PYTHON_SHORT_VERSION}"
     )
     venv_bin_python_full_executable.symlink_to("python3")
+
+
+@dataclasses.dataclass
+class AgentLibsVenvToolchain:
+    python_toolchain: PythonDependencyToolchain
+    requirements_file_content: str
+    test_requirements_file_content: str = None
+
+    build_agent_libs_venv: RunnerStep = dataclasses.field(default=None)
+
+    def __post_init__(self):
+        toolchain = self.python_toolchain
+        name_suffix = f"{toolchain.c_runtime.value}_{toolchain.architecture.value}"
+        self.build_agent_libs_venv = build_agent_libs_venv.create_step(
+            name_suffix=name_suffix,
+            prepare_c_runtime_environment_with_python=toolchain.c_runtime_environment_with_python,
+            build_openssl_step=toolchain.openssl_3,
+            build_python_step=toolchain.python_with_openssl_3,
+            build_dev_requirements_step=toolchain.dev_requirements,
+            python_install_prefix=PYTHON_INSTALL_PREFIX,
+            agent_subdir_name=AGENT_SUBDIR_NAME,
+            pip_version=EMBEDDED_PYTHON_PIP_VERSION,
+            requirements_file_content=self.requirements_file_content,
+            test_requirements_file_content=REQUIREMENTS_DEV_COVERAGE,
+            run_in_remote_docker=toolchain.architecture != Architecture.X86_64
+        )
+
+    @staticmethod
+    def create(
+            python_toolchain: PythonDependencyToolchain,
+            requirements_file_content: str,
+            test_requirements_file_content: str = None,
+    ):
+        return AgentLibsVenvToolchain(
+            python_toolchain=python_toolchain,
+            requirements_file_content=requirements_file_content,
+            test_requirements_file_content=test_requirements_file_content,
+        )

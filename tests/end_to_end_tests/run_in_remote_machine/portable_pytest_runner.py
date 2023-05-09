@@ -31,7 +31,7 @@ from agent_build_refactored.tools.runner import (
 from agent_build_refactored.build_python.build_python_steps import (
     SUPPORTED_ARCHITECTURES,
     CRuntime,
-    DependencyToolchain,
+    PythonDependencyToolchain,
     create_new_steps_for_all_toolchains
 )
 
@@ -39,7 +39,7 @@ PORTABLE_RUNNER_NAME = "portable_runner"
 
 
 def create_build_portable_pytest_runner_step(
-        toolchain: DependencyToolchain
+        toolchain: PythonDependencyToolchain
 ) -> RunnerStep:
     """
     Create step that builds pytest runner that is "frozen" by the PyInstaller tool.

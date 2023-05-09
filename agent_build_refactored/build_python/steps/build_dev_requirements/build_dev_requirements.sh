@@ -30,7 +30,6 @@ source ~/.bashrc
 cp -a "${BUILD_PYTHON}/." /
 cp -a "${BUILD_OPENSSL}/." /
 tar -xzf "${BUILD_PYTHON_DEPENDENCIES}/common.tar.gz" -C /
-ldconfig
 
 # First install Rust, in order to be able to build some of required libraries.
 cd ~
@@ -39,7 +38,10 @@ export PKG_CONFIG_PATH="/usr/local/lib64/pkgconfig:/usr/local/lib/pkgconfig:${PK
 
 mkdir -p /tmp/rust
 pushd /tmp/rust
-curl --tlsv1.2 "https://static.rust-lang.org/dist/rust-${RUST_VERSION}-${RUST_PLATFORM}.tar.gz" > rust.tar.gz
+
+RUST_URL="https://static.rust-lang.org/dist/rust-${RUST_VERSION}-${RUST_PLATFORM}.tar.gz"
+echo "Download ${RUST_URL}"
+curl --tlsv1.2 "${RUST_URL}" > rust.tar.gz
 tar -xzf rust.tar.gz
 
 pushd "rust-${RUST_VERSION}-${RUST_PLATFORM}"

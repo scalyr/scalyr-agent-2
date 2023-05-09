@@ -49,6 +49,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--scalyr-api-key",
         dest="scalyr_api_key",
+        required=True,
     )
 
     parser.addoption(

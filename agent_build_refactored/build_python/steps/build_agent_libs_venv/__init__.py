@@ -17,7 +17,6 @@ import pathlib as pl
 
 from agent_build_refactored.tools.runner import RunnerStep, EnvironmentRunnerStep
 
-
 def create_step(
     name_suffix: str,
     prepare_c_runtime_environment_with_python: EnvironmentRunnerStep,
@@ -28,6 +27,7 @@ def create_step(
     agent_subdir_name: str,
     pip_version: str,
     requirements_file_content: str,
+    test_requirements_file_content: str = None,
     run_in_remote_docker: bool = False
 ):
     """
@@ -62,6 +62,7 @@ def create_step(
             "PYTHON_INSTALL_PREFIX": python_install_prefix,
             "SUBDIR_NAME": agent_subdir_name,
             "REQUIREMENTS": requirements_file_content,
+            "TEST_REQUIREMENTS": test_requirements_file_content or "",
             "PIP_VERSION": pip_version,
         },
         run_in_remote_docker_if_available=run_in_remote_docker,

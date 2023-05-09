@@ -20,20 +20,25 @@ from agent_build_refactored.tools.runner import RunnerStep, EnvironmentRunnerSte
 
 def create_step(
     name_suffix: str,
-    openssl_version: str,
-    openssl_major_version: int,
     install_build_environment_step: EnvironmentRunnerStep,
     download_build_dependencies_step: RunnerStep,
+    openssl_version: str,
+    openssl_major_version: int,
+    arch_target_name: str,
+    additional_configure_options: str,
+    build_ld_flags: str,
     run_in_remote_docker: bool = False
 ):
     """
     Create step that builds OpenSSL.
     :param name_suffix: Suffix fot the step name
-    :param openssl_version: Version of OpenSSL
-    :param openssl_major_version: Major version of the OpenSSL version.
     :param install_build_environment_step: Step that acts like a base for the result step.
     :param download_build_dependencies_step: Step that downloads source code for python interpreter and its
-        dependencies.
+    :param openssl_version: Version of OpenSSL
+    :param openssl_major_version: Major version of the OpenSSL version.
+    :param arch_target_name: Name of the build target for the Configure script.
+    :param additional_configure_options: Additional options for the Configure script.
+    :param build_ld_flags:  Additional values to the LDFLAGS env. variable which will go for the Configure script.
     :param run_in_remote_docker: Run in remote docker engine, if needed.
 
     :return:
@@ -49,7 +54,10 @@ def create_step(
         },
         environment_variables={
             "DISTRO_NAME": install_build_environment_step.initial_docker_image.name,
-            "OPENSSL_VERSION": openssl_version
+            "OPENSSL_VERSION": openssl_version,
+            "ARCH_TARGET": arch_target_name,
+            "ADDITIONAL_CONFIGURE_OPTS": additional_configure_options,
+            "BUILD_LDFLAGS": build_ld_flags
         },
         run_in_remote_docker_if_available=run_in_remote_docker,
     )

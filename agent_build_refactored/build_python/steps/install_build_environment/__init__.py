@@ -21,6 +21,8 @@ from agent_build_refactored.tools.runner import DockerImageSpec, EnvironmentRunn
 def create_step(
     name_suffix: str,
     base_image: DockerImageSpec,
+    script_name: str,
+    shell: str,
     run_in_remote_docker: bool = False
 ) -> EnvironmentRunnerStep:
     """
@@ -28,17 +30,16 @@ def create_step(
         in order to compile Python interpreter and other.
     :param name_suffix: Suffix for the step name.
     :param base_image: Spec if the docker image that is used as the base for this step.
+    :param script_name: Name of the script that is used in step.
+    :param shell: Shell to use for the step script.
     :param run_in_remote_docker: Run in remote docker engine, if needed.
     :return:
     """
-    if base_image.name == "centos:6":
-        script_name = "install_gcc_centos_6.sh"
-    else:
-        script_name = "install_gcc_centos_7.sh"
 
     return EnvironmentRunnerStep(
         name=f"install_build_environment_{name_suffix}",
         script_path=pl.Path(__file__).parent / script_name,
         base=base_image,
+        shell=shell,
         run_in_remote_docker_if_available=run_in_remote_docker,
     )

@@ -44,6 +44,10 @@ paramiko==2.12.0
 boto3==1.26.17
 
 # Dev and testing requirements.
+# <COMPONENT:DEV_COVERAGE>
+coverage==7.2.5
+
+# Dev and testing requirements.
 # <COMPONENT:DEV>
 # Testing tools and libraries
 mock==3.0.5

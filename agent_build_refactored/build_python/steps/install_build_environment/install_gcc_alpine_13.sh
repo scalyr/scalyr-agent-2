@@ -18,18 +18,10 @@
 #   SOURCE_ROOT: Path to the projects root.
 #   STEP_OUTPUT_PATH: Path to the step's output directory.
 #
-# This script prepares base build environment for the ARM64 linux GLIBC binary packages, it expects to be run in
-# Centos 7 to compile against lower GLIBS (2.17).
 
 set -e
 
-# Install newer tools, such as gcc-9
-yum install -y centos-release-scl
-yum install -y devtoolset-9 perl-core
+apk add gcc make bash perl musl-dev linux-headers libnsl-dev curl
 
-echo "source /opt/rh/devtoolset-9/enable" >> ~/.bashrc
 # shellcheck disable=SC2016
-echo "export LD_LIBRARY_PATH=\"/usr/local/lib:/usr/local/lib64\:${LD_LIBRARY_PATH}\"" >> ~/.bashrc
-
-yum clean all
-rm -rf /var/cache/yum
+echo "export LD_LIBRARY_PATH=\"/usr/local/lib:/usr/local/lib64:\${LD_LIBRARY_PATH}\"" >> ~/.bashrc

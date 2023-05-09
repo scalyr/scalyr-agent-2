@@ -126,6 +126,18 @@ jobs:
       CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
       CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
 
+  build-agent-container-images:
+    name: "Build Agent container images"
+    needs:
+      - pre_job
+      - run_cacheable_steps
+    uses: ./.github/workflows/reusable-containerized-agent-build.yml
+    with:
+      python_version: ${{ needs.pre_job.outputs.python_version }}
+    secrets:
+      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
+      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
+
 #  build-windows-package:
 #    name: "Build Windows package"
 #    needs: pre_job

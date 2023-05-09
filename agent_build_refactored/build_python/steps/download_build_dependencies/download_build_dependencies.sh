@@ -32,6 +32,8 @@
 #   LIBFFI_VERSION: version of libffi to build. Python requirement. Provides ctypes module and essential for C bindings.
 #   OPENSSL_1_VERSION: version of OpenSSL 1.1.1 to build. Python requirement. Provides ssl module.
 #   OPENSSL_3_VERSION: version of OpenSSL 3 to build. Python requirement. Provides ssl module.
+#   TCL_VERSION_COMMIT: version of tcl to build. Build requirement for sqlite. it does not go to result Python interpreter.
+#   SQLITE_VERSION_COMMIT: version of SQLite to build. Python requirement. Provides sqlite module.
 #   PYTHON_VERSION: version of Python.
 
 set -e
@@ -410,6 +412,18 @@ popd
 
 clear_public_keys
 
+
+pushd "${STEP_OUTPUT_PATH}"
+git clone "https://github.com/tcltk/tcl.git"
+pushd "${STEP_OUTPUT_PATH}/tcl"
+git checkout "${TCL_VERSION_COMMIT}"
+popd
+
+pushd "${STEP_OUTPUT_PATH}"
+git clone "https://github.com/sqlite/sqlite.git"
+pushd "${STEP_OUTPUT_PATH}/sqlite"
+git checkout "${SQLITE_VERSION_COMMIT}"
+popd
 
 pushd "${STEP_OUTPUT_PATH}"
 git clone "https://salsa.debian.org/debian/libedit.git"

@@ -26,6 +26,7 @@ def create_step(
         build_openssl_step: RunnerStep,
         build_python_step: RunnerStep,
         rust_version: str,
+        rust_target_platform: str,
         python_install_prefix: str,
         run_in_remote_docker: bool = False
 ):
@@ -38,17 +39,11 @@ def create_step(
     :param build_openssl_step: Step that builds openssl
     :param build_python_step: Step that builds python
     :param rust_version: Version of rust to use in order to build some libraries, like orjson.
+    :param rust_target_platform: Appropriate Rust platform to install, (e.g. x86_64-unknown-linux-gnu)
     :param python_install_prefix: Install prefix for the Python installation
     :param run_in_remote_docker: Run in remote docker engine, if needed.
     :return:
     """
-    architecture = install_build_environment_step.architecture
-    if architecture == Architecture.X86_64:
-        rust_target_platform = "x86_64-unknown-linux-gnu"
-    elif architecture == Architecture.ARM64:
-        rust_target_platform = "aarch64-unknown-linux-gnu"
-    else:
-        raise Exception(f"Unknown architecture '{architecture.value}'")
 
     return RunnerStep(
         name=f"build_dev_requirements_{name_suffix}",

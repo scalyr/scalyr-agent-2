@@ -152,6 +152,7 @@ def _test(
     # Create agent's daemonset.
     subprocess.check_call(["kubectl", "create", "-f", str(scalyr_agent_manifest_path)])
 
+
     # Get name of the created pod.
     pod_name = (
         subprocess.check_output(

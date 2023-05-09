@@ -31,7 +31,7 @@ echo "${REQUIREMENTS}" > "${REQUIREMENTS_FILE}"
 
 # Create venv.
 VENV_DIR="/var/opt/${SUBDIR_NAME}/venv"
-python3 -m venv "${VENV_DIR}"
+"${PYTHON_INSTALL_PREFIX}/bin/python3" -m venv "${VENV_DIR}"
 
 # Install version of pip that we need to venv
 "${VENV_DIR}/bin/python3" -m pip install -v \
@@ -40,6 +40,15 @@ python3 -m venv "${VENV_DIR}"
 # Install requirements to venv.
 "${VENV_DIR}/bin/python3" -m pip install -v \
   -r "${REQUIREMENTS_FILE}"
+
+
+TEST_REQUIREMENTS_FILE=/tmp/test_requirements.txt
+
+echo "${TEST_REQUIREMENTS}" > "${TEST_REQUIREMENTS_FILE}"
+if [ -n "${TEST_REQUIREMENTS}" ]; then
+"${VENV_DIR}/bin/python3" -m pip install -v \
+      --root "${STEP_OUTPUT_PATH}/venv_test_libs_root" -r "${TEST_REQUIREMENTS_FILE}"
+fi
 
 # Remove cache files.
 find "${VENV_DIR}" -name "__pycache__" -type d -prune -exec rm -r {} \;

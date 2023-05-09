@@ -30,12 +30,14 @@
 
 set -e
 
-cp -a "${BUILD_PYTHON_WITH_OPENSSL_1}/." /
-cp -a "${BUILD_OPENSSL_1}/." /
-cp -a "${BUILD_DEV_REQUIREMENTS}/root/." /
+# shellcheck disable=SC2016
+echo "export LD_LIBRARY_PATH=\"${PYTHON_INSTALL_PREFIX}/lib:\${LD_LIBRARY_PATH}\"" >> ~/.bashrc
+# shellcheck disable=SC1090
+source ~/.bashrc
 
-echo "${PYTHON_INSTALL_PREFIX}/lib" >> /etc/ld.so.conf.d/python3.conf
-ldconfig
+cp -a "${BUILD_PYTHON_WITH_OPENSSL:?}/." /
+cp -a "${BUILD_OPENSSL:?}/." /
+cp -a "${BUILD_DEV_REQUIREMENTS:?}/root/." /
 
 ln -s "${PYTHON_INSTALL_PREFIX}/bin/python3" /usr/bin/python3
 

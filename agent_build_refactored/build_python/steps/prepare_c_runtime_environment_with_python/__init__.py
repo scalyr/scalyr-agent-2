@@ -44,8 +44,8 @@ def create_step(
         script_path=pl.Path(__file__).parent / "prepare_c_runtime_environment_with_python.sh",
         base=install_build_environment_step,
         dependency_steps={
-            "BUILD_OPENSSL_1": build_openssl_step,
-            "BUILD_PYTHON_WITH_OPENSSL_1": build_python_step,
+            "BUILD_OPENSSL": build_openssl_step,
+            "BUILD_PYTHON_WITH_OPENSSL": build_python_step,
             "BUILD_DEV_REQUIREMENTS": build_dev_requirements_step,
         },
         environment_variables={

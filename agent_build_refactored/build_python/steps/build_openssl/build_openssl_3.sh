@@ -22,25 +22,18 @@
 # This script builds from source the OpenSSL 3+ library.
 #
 
-
 set -e
 
+# shellcheck disable=SC1090
+source ~/.bashrc
 
 mkdir /tmp/build-openssl_3
 pushd /tmp/build-openssl_3
 tar -xf "${DOWNLOAD_BUILD_DEPENDENCIES}/openssl_3/openssl.tar.gz"
 pushd "openssl-${OPENSSL_VERSION}"
-./config
+# shellcheck disable=SC2086
+LDFLAGS="${BUILD_LDFLAGS}" ./Configure "${ARCH_TARGET}" --libdir=lib ${ADDITIONAL_CONFIGURE_OPTS}
 make -j "$(nproc)"
 make DESTDIR="${STEP_OUTPUT_PATH}" install_sw
 popd
 popd
-
-
-if [ "${DISTRO_NAME}" = "centos:6" ]; then
-  mv "${STEP_OUTPUT_PATH}/usr/local/lib64" "${STEP_OUTPUT_PATH}/usr/local/lib"
-fi
-
-mkdir -p "${STEP_OUTPUT_PATH}/etc/ld.so.conf.d"
-echo "/usr/local/lib" >> "${STEP_OUTPUT_PATH}/etc/ld.so.conf.d/local.conf"
-echo "/usr/local/lib64" >> "${STEP_OUTPUT_PATH}/etc/ld.so.conf.d/local.conf"

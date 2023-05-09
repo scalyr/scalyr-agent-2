@@ -30,6 +30,7 @@
 #   LIBEDIT_VERSION: version of libedit to build. Python requirement. Provides non-GPL alternative for readline module.
 #   GDBM_VERSION: version of gdbm to build. Python requirement. Provides dbm module.
 #   LIBFFI_VERSION: version of libffi to build. Python requirement. Provides ctypes module and essential for C bindings.
+#   SQLITE_VERSION_COMMIT: version of SQLite to build. Python requirement. Provides sqlite module.
 
 set -e
 
@@ -38,6 +39,16 @@ source ~/.bashrc
 
 
 DESTDIR_ROOT=/tmp/root
+
+mkdir /tmp/build-tcl
+pushd /tmp/build-tcl
+cp -a "${DOWNLOAD_BUILD_DEPENDENCIES}/tcl" "."
+pushd "tcl/unix"
+./configure
+make -j "$(nproc)"
+make install
+popd
+popd
 
 mkdir /tmp/build-xz
 pushd /tmp/build-xz
@@ -57,6 +68,21 @@ pushd "zlib-${ZLIB_VERSION}"
 CFLAGS="-fPIC" ./configure  --static
 make -j "$(nproc)"
 make DESTDIR="${DESTDIR_ROOT}" install
+# Also install it to the current system because it is a dependency for the sqlite.
+make install
+popd
+popd
+
+mkdir /tmp/build-sqlite
+pushd /tmp/build-sqlite
+cp -a "${DOWNLOAD_BUILD_DEPENDENCIES}/sqlite" "."
+pushd "sqlite"
+mkdir build
+pushd build
+CFLAGS="-fPIC" ../configure
+make -j "$(nproc)"
+make DESTDIR="${DESTDIR_ROOT}" install
+popd
 popd
 popd
 
@@ -120,6 +146,9 @@ make DESTDIR="${DESTDIR_ROOT}" install
 popd
 popd
 popd
+
+
+
 
 
 tar -czvf "${STEP_OUTPUT_PATH}/common.tar.gz" -C "${DESTDIR_ROOT}" .

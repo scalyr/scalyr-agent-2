@@ -35,7 +35,6 @@ source ~/.bashrc
 
 tar -xzf "${BUILD_PYTHON_DEPENDENCIES}/common.tar.gz" -C /
 cp -a "${BUILD_OPENSSL}/." /
-ldconfig
 
 
 mkdir /tmp/build-python
@@ -75,7 +74,7 @@ PYTHON_LIBS_PATH="${INSTALL_PREFIX}/lib/python${PYTHON_SHORT_VERSION}"
 find "${PYTHON_LIBS_PATH}" -name "__pycache__" -type d -prune -exec rm -r {} \;
 
 rm -r "${PYTHON_LIBS_PATH}/test"
-rm -r "${PYTHON_LIBS_PATH}"/config-"${PYTHON_SHORT_VERSION}"-*-linux-gnu/
+rm -r "${PYTHON_LIBS_PATH}"/config-"${PYTHON_SHORT_VERSION}"-*-linux-*/
 rm -r "${PYTHON_LIBS_PATH}/lib2to3"
 
 mkdir -p "${STEP_OUTPUT_PATH}${INSTALL_PREFIX}"

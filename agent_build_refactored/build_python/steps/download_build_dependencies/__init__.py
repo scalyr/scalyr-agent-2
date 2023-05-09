@@ -31,6 +31,8 @@ def create_step(
     gdbm_version: str,
     zlib_version: str,
     bzip_version: str,
+    tcl_version_commit: str,
+    sqlite_version_commit: str,
     openssl_1_version: str,
     openssl_3_version: str,
     python_version: str
@@ -45,6 +47,8 @@ def create_step(
     :param gdbm_version: version of gdbm to build. Python requirement. Provides dbm module.
     :param zlib_version: version of zlib to build. Python requirement. Provides zlib module.
     :param bzip_version: version of bzip to build. Python requirement. Provides bz2 module.
+    :param tcl_version_commit: version of tcl to build. Build requirement for sqlite.
+    :param sqlite_version_commit: version of SQLite to build. Python requirement. Provides sqlite module.
     :param openssl_1_version: Version of OpenSSL 1 to build
     :param openssl_3_version: Version of OpenSSL 3 to build
     :param python_version: Version of Python to download.
@@ -67,6 +71,8 @@ def create_step(
             "GDBM_VERSION": gdbm_version,
             "ZLIB_VERSION": zlib_version,
             "BZIP_VERSION": bzip_version,
+            "TCL_VERSION_COMMIT": tcl_version_commit,
+            "SQLITE_VERSION_COMMIT": sqlite_version_commit,
             "OPENSSL_1_VERSION": openssl_1_version,
             "OPENSSL_3_VERSION": openssl_3_version,
             "PYTHON_VERSION": python_version
