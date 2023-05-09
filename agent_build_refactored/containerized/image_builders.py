@@ -293,9 +293,20 @@ def _capitalize_str(string: str):
     return "".join(chars)
 
 
+def _to_camel_case(string: str):
+    parts = string.split("-")
+    new_parts = []
+    for part in parts:
+        new_parts.append(_capitalize_str(part))
+
+    return "".join(new_parts)
+
+
+
 for distro in BaseDistro:
     for image_type in ImageType:
-        class_alias_prefix = f"{_capitalize_str(distro.value)}{_capitalize_str(image_type.value)}"
+        distro_prefix = _to_camel_case(distro.value)
+        image_type_prefix = _to_camel_case(image_type.value)
 
         class _ContainerizedBuilder(ContainerizedAgentBuilder):
             BASE_DISTRO = distro
@@ -304,7 +315,7 @@ for distro in BaseDistro:
             IMAGE_NAMES = IMAGE_TYPES_TO_RESULT_IMAGE_NAMES[image_type][:]
             IMAGE_TAG_SUFFIXES = BASE_DISTROS_TO_RESULT_IMAGE_TAG_SUFFIXES[distro][:]
             CONFIG_PATH = SOURCE_ROOT / "docker" / f"{image_type.value}-config"
-            CLASS_NAME_ALIAS = f"{class_alias_prefix}ContainerizedAgentBuilder"
+            CLASS_NAME_ALIAS = f"{distro_prefix}{image_type_prefix}ContainerizedAgentBuilder"
             ADD_TO_GLOBAL_RUNNER_COLLECTION = True
 
         builder_name = f"containerized-{image_type.value}-{distro.value}"

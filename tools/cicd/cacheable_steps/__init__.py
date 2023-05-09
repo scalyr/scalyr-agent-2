@@ -26,6 +26,8 @@ from typing import Dict, List
 # Import modules that define any runner that is used during the builds.
 # It is important to import them before the import of the 'ALL_RUNNERS' or otherwise, runners from missing mudules
 # won't be presented in the "ALL_RUNNERS" final collection.
+import agent_build_refactored.managed_packages.managed_packages_builders # NOQA
+import agent_build_refactored.containerized.image_builders # NOQA
 import tests.end_to_end_tests  # NOQA
 import tests.end_to_end_tests.run_in_remote_machine.portable_pytest_runner # NOQA
 import tests.end_to_end_tests.managed_packages_tests.conftest  # NOQA
