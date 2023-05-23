@@ -1,4 +1,4 @@
-requests==2.28.1; python_version >= '3.7'
+requests==2.31.0; python_version >= '3.7'
 # used by Python 2.7 tests
 requests==2.26.0; python_version < '3.7'
 # TODO: Add back latest version when we switch to Python 3 only and update benchmarks/scripts/send_usage_data_to_codespeed.py file
