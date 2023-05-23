@@ -6,7 +6,7 @@ orjson==3.8.0; python_version >= '3.7' and platform_system != 'Darwin'
 orjson==3.6.1; python_version == '3.6' and 'armv7' not in platform_machine and platform_system != 'Darwin'
 orjson==2.0.11; python_version == '3.5' and 'armv7' not in platform_machine and platform_system != 'Darwin'
 
-requests==2.28.1; python_version >= '3.7'
+requests==2.31.0; python_version >= '3.7'
 # used by Python 2.7 tests
 requests==2.26.0; python_version < '3.7'
 
