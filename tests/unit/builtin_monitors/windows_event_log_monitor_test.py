@@ -32,6 +32,11 @@ from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase, ScalyrTestCase
 from scalyr_agent.test_base import skipIf
 
 
+def _get_parameter_msg_fixture_path():
+    unit_dir = os.path.dirname(os.path.dirname(__file__))
+    return os.path.join(unit_dir, "fixtures", "parametermsgfixture.dll")
+
+
 @pytest.mark.windows_platform
 class WindowsEventLogMonitorTest(ScalyrTestCase):
     @skipIf(sys.platform != "Windows", "Skipping tests under non-Windows platform")
@@ -227,6 +232,88 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
             ),
             [{"a": "a", "Text": "t"}],
         )
+
+    @skipIf(sys.platform != "Windows", "Skipping tests under non-Windows platform")
+    def test_replace_param_placeholders(self):
+        scalyr_agent.builtin_monitors.windows_event_log_monitor._DLL.dllpath = mock.Mock(return_value=_get_parameter_msg_fixture_path())
+        monitor_config = {
+            "module": "windows_event_log_monitor",
+            "sources": "Application, Security, System",
+            "event_types": "All",
+            "json": True,
+        }
+        scalyr_agent.builtin_monitors.windows_event_log_monitor.windll = mock.Mock()
+        mock_logger = mock.Mock()
+
+        monitor = WindowEventLogMonitor(monitor_config, mock_logger)
+        test_events = [
+            {
+                "Event": {
+                    "System": {
+                        "Channel": "System",
+                        "Provider": {
+                            "Name": "SomethingSilly"
+                        }
+                    },
+                    "EventData": {
+                        "Data": "%%392"
+                    }
+                },
+            },
+            {
+                "Event": {
+                    "System": {
+                        "Channel": "System",
+                        "Provider": {
+                            "Name": "SomethingSilly"
+                        }
+                    },
+                    "EventData": {
+                        "Data": {
+                            "One": "%%553",
+                            "Two": {
+                                "Text": "%%990"
+                            },
+                            "Three": {
+                                "Text": "%%69"
+                            },
+                        }
+                    }
+                },
+            },
+        ]
+
+        result = monitor._replace_param_placeholders(test_events[0])
+        self.assertEqual(result["Event"]["EventData"]["Data"], "blarg")
+
+        result = monitor._replace_param_placeholders(test_events[1])
+        self.assertEqual(result["Event"]["EventData"]["Data"]["One"], "honk")
+        self.assertEqual(result["Event"]["EventData"]["Data"]["Two"]["Text"], "rawr")
+        self.assertEqual(result["Event"]["EventData"]["Data"]["Three"]["Text"], "Nice")
+
+    @skipIf(sys.platform != "Windows", "Skipping tests under non-Windows platform")
+    def test_param_placeholder_value_resolution(self):
+        scalyr_agent.builtin_monitors.windows_event_log_monitor._DLL.dllpath = mock.Mock(return_value=_get_parameter_msg_fixture_path())
+        monitor_config = {
+            "module": "windows_event_log_monitor",
+            "sources": "Application, Security, System",
+            "event_types": "All",
+            "json": True,
+        }
+        scalyr_agent.builtin_monitors.windows_event_log_monitor.windll = mock.Mock()
+        mock_logger = mock.Mock()
+
+        monitor = WindowEventLogMonitor(monitor_config, mock_logger)
+        value = monitor._param_placeholder_value("MyChannel", "MyProvider", "%%392")
+        self.assertEqual(value, "blarg")
+        value = monitor._param_placeholder_value("MyChannel", "MyProvider", "%%553")
+        self.assertEqual(value, "honk")
+        value = monitor._param_placeholder_value("MyChannel", "MyProvider", "%%990")
+        self.assertEqual(value, "rawr")
+        value = monitor._param_placeholder_value("MyChannel", "MyProvider", "%%69")
+        self.assertEqual(value, "Nice")
+        value = monitor._param_placeholder_value("MyChannel", "MyProvider", "%%1111")
+        self.assertEqual(value, "all your base are belong to us")
 
 
 @pytest.mark.windows_platform
