@@ -25,6 +25,8 @@ if sys.platform == "Windows":
     from scalyr_agent.builtin_monitors.windows_event_log_monitor import (
         WindowEventLogMonitor,
     )
+    import win32api
+    import win32con
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
@@ -234,8 +236,8 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
         )
 
     @skipIf(sys.platform != "Windows", "Skipping tests under non-Windows platform")
-    def test_replace_param_placeholders(self):
-        scalyr_agent.builtin_monitors.windows_event_log_monitor._DLL.dllpath = mock.Mock(return_value=_get_parameter_msg_fixture_path())
+    @mock.patch.object(scalyr_agent.builtin_monitors.windows_event_log_monitor._DLL, 'dllpath', return_value=_get_parameter_msg_fixture_path())
+    def test_replace_param_placeholders(self, *args):
         monitor_config = {
             "module": "windows_event_log_monitor",
             "sources": "Application, Security, System",
@@ -292,8 +294,8 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
         self.assertEqual(result["Event"]["EventData"]["Data"]["Three"]["Text"], "Nice")
 
     @skipIf(sys.platform != "Windows", "Skipping tests under non-Windows platform")
-    def test_param_placeholder_value_resolution(self):
-        scalyr_agent.builtin_monitors.windows_event_log_monitor._DLL.dllpath = mock.Mock(return_value=_get_parameter_msg_fixture_path())
+    @mock.patch.object(scalyr_agent.builtin_monitors.windows_event_log_monitor._DLL, 'dllpath', return_value=_get_parameter_msg_fixture_path())
+    def test_param_placeholder_value_resolution(self, *args):
         monitor_config = {
             "module": "windows_event_log_monitor",
             "sources": "Application, Security, System",
@@ -314,6 +316,39 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
         self.assertEqual(value, "Nice")
         value = monitor._param_placeholder_value("MyChannel", "MyProvider", "%%1111")
         self.assertEqual(value, "all your base are belong to us")
+
+    @skipIf(sys.platform != "Windows", "Skipping tests under non-Windows platform")
+    def test_parameter_msg_file_location_lookup(self):
+        msgDLL = _get_parameter_msg_fixture_path()
+        channel = "Application"
+        provider = "Scalyr-Agent-Test"
+
+        # Create registry entry with known value
+        hkey = win32api.RegCreateKey(
+            win32con.HKEY_LOCAL_MACHINE,
+            "SYSTEM\\CurrentControlSet\\Services\\EventLog\\%s\\%s"
+            % (channel, provider),
+        )
+        win32api.RegSetValueEx(
+            hkey,
+            "ParameterMessageFile",  # value name \
+            0,  # reserved \
+            win32con.REG_EXPAND_SZ,  # value type \
+            msgDLL,
+        )
+        win32api.RegCloseKey(hkey)
+
+        # Ensure any mocks on `_DLL.dllpath` were cleaned up
+        self.assertFalse(isinstance(scalyr_agent.builtin_monitors.windows_event_log_monitor._DLL.dllpath, mock.Mock))
+        value = scalyr_agent.builtin_monitors.windows_event_log_monitor._DLL.dllpath(channel, provider)
+        self.assertEqual(value, msgDLL)
+
+        # Cleanup
+        win32api.RegDeleteKey(
+            win32con.HKEY_LOCAL_MACHINE,
+            "SYSTEM\\CurrentControlSet\\Services\\EventLog\\%s\\%s"
+            % (channel, provider),
+        )
 
 
 @pytest.mark.windows_platform
