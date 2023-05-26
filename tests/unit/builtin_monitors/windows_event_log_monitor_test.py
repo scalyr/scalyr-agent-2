@@ -236,7 +236,7 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
         )
 
     @skipIf(sys.platform != "Windows", "Skipping tests under non-Windows platform")
-    @mock.patch.object(scalyr_agent.builtin_monitors.windows_event_log_monitor._DLL, 'dllpath', return_value=_get_parameter_msg_fixture_path())
+    @mock.patch('scalyr_agent.builtin_monitors.windows_event_log_monitor._DLL.dllpath', return_value=_get_parameter_msg_fixture_path())
     def test_replace_param_placeholders(self, *args):
         monitor_config = {
             "module": "windows_event_log_monitor",
@@ -294,7 +294,7 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
         self.assertEqual(result["Event"]["EventData"]["Data"]["Three"]["Text"], "Nice")
 
     @skipIf(sys.platform != "Windows", "Skipping tests under non-Windows platform")
-    @mock.patch.object(scalyr_agent.builtin_monitors.windows_event_log_monitor._DLL, 'dllpath', return_value=_get_parameter_msg_fixture_path())
+    @mock.patch('scalyr_agent.builtin_monitors.windows_event_log_monitor._DLL.dllpath', return_value=_get_parameter_msg_fixture_path())
     def test_param_placeholder_value_resolution(self, *args):
         monitor_config = {
             "module": "windows_event_log_monitor",
