@@ -25,8 +25,8 @@ if sys.platform == "Windows":
     from scalyr_agent.builtin_monitors.windows_event_log_monitor import (
         WindowEventLogMonitor,
     )
-    import win32api
-    import win32con
+    import win32api  # pylint: disable=import-error
+    import win32con  # pylint: disable=import-error
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
@@ -241,6 +241,7 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
         return_value=_get_parameter_msg_fixture_path(),
     )
     def test_replace_param_placeholders(self, *args):
+        # pylint: disable=no-member
         monitor_config = {
             "module": "windows_event_log_monitor",
             "sources": "Application, Security, System",
@@ -292,6 +293,7 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
         return_value=_get_parameter_msg_fixture_path(),
     )
     def test_param_placeholder_value_resolution(self, *args):
+        # pylint: disable=no-member
         monitor_config = {
             "module": "windows_event_log_monitor",
             "sources": "Application, Security, System",
