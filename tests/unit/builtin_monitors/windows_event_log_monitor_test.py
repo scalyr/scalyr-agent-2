@@ -16,7 +16,6 @@ from __future__ import absolute_import
 
 import mock
 import os
-import pathlib
 import pytest
 import sys
 import tempfile
@@ -37,7 +36,11 @@ from scalyr_agent.test_base import skipIf
 
 def _get_parameter_msg_fixture_path():
     # TODO Document how the test dll is created
-    return pathlib.Path(__file__).parent.parent / "fixtures" / "parametermsgfixture.dll"
+    return os.path.join(
+        os.path.dirname(os.path.dirname(__file__)),
+        "fixtures",
+        "parametermsgfixture.dll",
+    )
 
 
 @pytest.mark.windows_platform
@@ -338,8 +341,10 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
         win32api.RegCloseKey(hkey)
 
         try:
-            value = scalyr_agent.builtin_monitors.windows_event_log_monitor._DLL.dllpath(
-                channel, provider
+            value = (
+                scalyr_agent.builtin_monitors.windows_event_log_monitor._DLL.dllpath(
+                    channel, provider
+                )
             )
             self.assertEqual(value, msgDLL)
         finally:
