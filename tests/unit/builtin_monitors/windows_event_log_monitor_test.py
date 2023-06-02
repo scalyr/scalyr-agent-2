@@ -1,4 +1,4 @@
-# Copyright 2011-2022 Scalyr Inc.
+# Copyright 2011-2023 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@ from __future__ import absolute_import
 
 import mock
 import os
+import pathlib
 import pytest
 import sys
 import tempfile
@@ -35,8 +36,8 @@ from scalyr_agent.test_base import skipIf
 
 
 def _get_parameter_msg_fixture_path():
-    unit_dir = os.path.dirname(os.path.dirname(__file__))
-    return os.path.join(unit_dir, "fixtures", "parametermsgfixture.dll")
+    # TODO Document how the test dll is created
+    return pathlib.Path(__file__).parent.parent / "fixtures" / "parametermsgfixture.dll"
 
 
 @pytest.mark.windows_platform
@@ -329,31 +330,24 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
         )
         win32api.RegSetValueEx(
             hkey,
-            "ParameterMessageFile",  # value name \
-            0,  # reserved \
-            win32con.REG_EXPAND_SZ,  # value type \
+            "ParameterMessageFile",  # value name
+            0,  # reserved
+            win32con.REG_EXPAND_SZ,  # value type
             msgDLL,
         )
         win32api.RegCloseKey(hkey)
 
-        # Ensure any mocks on `_DLL.dllpath` were cleaned up
-        self.assertFalse(
-            isinstance(
-                scalyr_agent.builtin_monitors.windows_event_log_monitor._DLL.dllpath,
-                mock.Mock,
+        try:
+            value = scalyr_agent.builtin_monitors.windows_event_log_monitor._DLL.dllpath(
+                channel, provider
             )
-        )
-        value = scalyr_agent.builtin_monitors.windows_event_log_monitor._DLL.dllpath(
-            channel, provider
-        )
-        self.assertEqual(value, msgDLL)
-
-        # Cleanup
-        win32api.RegDeleteKey(
-            win32con.HKEY_LOCAL_MACHINE,
-            "SYSTEM\\CurrentControlSet\\Services\\EventLog\\%s\\%s"
-            % (channel, provider),
-        )
+            self.assertEqual(value, msgDLL)
+        finally:
+            win32api.RegDeleteKey(
+                win32con.HKEY_LOCAL_MACHINE,
+                "SYSTEM\\CurrentControlSet\\Services\\EventLog\\%s\\%s"
+                % (channel, provider),
+            )
 
 
 @pytest.mark.windows_platform
