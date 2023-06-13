@@ -702,15 +702,15 @@ class TestKubernetesApi(ScalyrTestCase):
 
     def test_query_object_fallback_urls_feature_flag_off(self):
         # Feature flag is off so 404 should not be retried
-        kapi = KubernetesApi(log_api_responses=True)
+        kapi = KubernetesApi(log_api_responses=True, enable_fallback_urls=False)
         kapi.query_api_with_retries = mock.Mock()
 
         # 1. Success on first attempt
-        kapi.query_api_with_retries.side_effect = K8sApiTemporaryError("error 1")
+        kapi.query_api_with_retries.side_effect = K8sApiNotFoundException("/foo0", 404)
 
         self.assertRaisesRegex(
-            K8sApiTemporaryError,
-            "error 1",
+            K8sApiNotFoundException,
+            "The resource at location `/foo0` was not found",
             kapi.query_object,
             kind="CronJob",
             namespace="default",
@@ -771,14 +771,14 @@ class TestKubernetesApi(ScalyrTestCase):
 
     def test_query_objects_fallback_urls_feature_flag_off(self):
         # Feature flag is off so 404 should not be retried
-        kapi = KubernetesApi(log_api_responses=True)
+        kapi = KubernetesApi(log_api_responses=True, enable_fallback_urls=False)
         kapi.query_api_with_retries = mock.Mock()
 
-        kapi.query_api_with_retries.side_effect = K8sApiTemporaryError("error 1")
+        kapi.query_api_with_retries.side_effect = K8sApiNotFoundException("/foo1", 404)
 
         self.assertRaisesRegex(
-            K8sApiTemporaryError,
-            "error 1",
+            K8sApiNotFoundException,
+            "The resource at location `/foo1` was not found",
             kapi.query_objects,
             kind="CronJob",
             namespace="default",
