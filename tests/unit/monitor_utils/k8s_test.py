@@ -662,7 +662,7 @@ class TestKubernetesApi(ScalyrTestCase):
         kapi.query_api_with_retries.reset_mock()
         kapi.query_api_with_retries.side_effect = K8sApiTemporaryError("error 1")
 
-        self.assertRaisesRegex(
+        self.assertRaisesRegexp(
             K8sApiTemporaryError,
             "error 1",
             kapi.query_object,
@@ -690,7 +690,7 @@ class TestKubernetesApi(ScalyrTestCase):
             K8sApiTemporaryError("error 2"),
         ]
 
-        self.assertRaisesRegex(
+        self.assertRaisesRegexp(
             K8sApiTemporaryError,
             "error 2",
             kapi.query_object,
@@ -708,7 +708,7 @@ class TestKubernetesApi(ScalyrTestCase):
         # 1. Success on first attempt
         kapi.query_api_with_retries.side_effect = K8sApiNotFoundException("/foo0", 404)
 
-        self.assertRaisesRegex(
+        self.assertRaisesRegexp(
             K8sApiNotFoundException,
             "The resource at location `/foo0` was not found",
             kapi.query_object,
@@ -733,7 +733,7 @@ class TestKubernetesApi(ScalyrTestCase):
         kapi.query_api_with_retries.reset_mock()
         kapi.query_api_with_retries.side_effect = K8sApiTemporaryError("error 1")
 
-        self.assertRaisesRegex(
+        self.assertRaisesRegexp(
             K8sApiTemporaryError,
             "error 1",
             kapi.query_objects,
@@ -760,7 +760,7 @@ class TestKubernetesApi(ScalyrTestCase):
             K8sApiTemporaryError("error 2"),
         ]
 
-        self.assertRaisesRegex(
+        self.assertRaisesRegexp(
             K8sApiTemporaryError,
             "error 2",
             kapi.query_objects,
@@ -776,7 +776,7 @@ class TestKubernetesApi(ScalyrTestCase):
 
         kapi.query_api_with_retries.side_effect = K8sApiNotFoundException("/foo1", 404)
 
-        self.assertRaisesRegex(
+        self.assertRaisesRegexp(
             K8sApiNotFoundException,
             "The resource at location `/foo1` was not found",
             kapi.query_objects,
