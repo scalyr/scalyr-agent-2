@@ -2399,7 +2399,7 @@ class KubernetesApi(object):
                 limit_once_per_x_secs=3600,
                 limit_key="k8s_list_objects_fallback_url_disabled",
             )
-            object_endpoints = object_endpoints[:1]
+            objects_endpoints = objects_endpoints[:1]
 
         objects_endpoints_count = len(objects_endpoints)
 
