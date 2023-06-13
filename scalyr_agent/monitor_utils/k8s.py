@@ -2383,7 +2383,7 @@ class KubernetesApi(object):
         # code and just assume the value is always template and we can call .substitute() on it.
         # Keep in mind that substitute() won't throw in case the input template string doesn't
         # actually have any template placeholders.
-        if not isinstance(objects_endpoint, Template):
+        if not isinstance(objects_endpoints, Template):
             objects_endpoints = Template(_OBJECT_ENDPOINTS[kind]["list-all"])
 
         if namespace:
@@ -2401,13 +2401,13 @@ class KubernetesApi(object):
             )
             object_endpoints = object_endpoints[:1]
 
-        objects_endpoints_count = len(object_endpoints)
+        objects_endpoints_count = len(objects_endpoints)
 
         for index, object_endpoint in enumerate(objects_endpoints):
             query = None
 
             try:
-                query = objects_endpoint.substitute(name=name, namespace=namespace)
+                query = object_endpoint.substitute(namespace=namespace)
             except Exception as e:
                 global_log.warn(
                     "k8s API - failed to build query list string (%s) - %s"
