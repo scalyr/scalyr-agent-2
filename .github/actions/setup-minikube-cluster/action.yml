@@ -79,6 +79,10 @@ runs:
         echo "kubectl get pods -A"
         echo ""
         kubectl get pods -A
+        echo ""
+        echo "kubectl api-versions"
+        echo ""
+        kubectl api-versions | grep batch
 
         export NODE_NAME=$(kubectl get nodes -o jsonpath="{.items[0].metadata.name}")
         echo ""
