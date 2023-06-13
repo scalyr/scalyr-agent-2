@@ -92,15 +92,17 @@ jobs:
       fail-fast: false
       matrix:
         k8s_version:
-          - { "version": "v1.17.17", "driver": "", "runtime": "docker" }
-          - { "version": "v1.20.15", "driver": "", "runtime": "docker" }
-          - { "version": "v1.21.10", "driver": "", "runtime": "docker" }
-          - { "version": "v1.22.7", "driver": "", "runtime": "docker" }
+          # NOTE: We don't test under very old versions where CronJob was part of v2alpha1 since in
+          # those versions CronJobs are not enabled by default and need to be installed extra
+          - { "version": "v1.17.17", "driver": "", "runtime": "docker", "run_cronjob_checks": false }
+          - { "version": "v1.20.15", "driver": "", "runtime": "docker", "run_cronjob_checks": false }
+          - { "version": "v1.21.10", "driver": "", "runtime": "docker", "run_cronjob_checks": true }
+          - { "version": "v1.22.7", "driver": "", "runtime": "docker", "run_cronjob_checks": true }
           # NOTE: Using containerd runtime in minikube on GHA only works with docker driver
-          - { "version": "v1.23.4", "driver": "docker", "runtime": "containerd" }
-          - { "version": "v1.24.0", "driver": "docker", "runtime": "containerd" }
-          - { "version": "v1.25.10", "driver": "docker", "runtime": "containerd" }
-          - { "version": "v1.26.5", "driver": "docker", "runtime": "containerd" }
+          - { "version": "v1.23.4", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true }
+          - { "version": "v1.24.0", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true }
+          - { "version": "v1.25.10", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true }
+          - { "version": "v1.26.5", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true }
 
     steps:
       - name: Checkout Repository
@@ -169,10 +171,8 @@ jobs:
 
       # We create mock CronJob so we can assert that Kubernetes Events monitor correctly handles 
       # CronJob and Job Events.
-      # NOTE: We don't test under very old versions where CronJob was part of v2alpha1 since in
-      # those versions CronJobs are not enabled by default and need to be installed extra
       - name: Create mock CronJob (v1)
-        if: ${{ contains('["v1.21.10", "v1.22.7", "v1.23.4", "v1.24.0", "v1.25.10", "v1.26.5"]', matrix.k8s_version.version) }}
+        if: ${{ matrix.k8s_version.run_cronjob_checks }}
         run: |
           # We need to use a different file for different K8s versions due to promotion (removal of
           # old v1beta alias) from v1beta to v1 in v1.25.0. v1 has been available since v1.21.0
@@ -247,7 +247,8 @@ jobs:
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/kubernetes_events.log" $parser="k8sEvents" "\"kind\":\"Event\""'
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/kubernetes_events.log" $parser="k8sEvents" "\"kind\":\"Pod\""'
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/kubernetes_events.log" $parser="k8sEvents" "involvedObject"'
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/kubernetes_events.log" $parser="k8sEvents" "NodeReady"'
+          # This event is not always available under Kubernetes >= 1.25
+          #./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/kubernetes_events.log" $parser="k8sEvents" "NodeReady"'
 
           agent_status=$(kubectl --namespace=scalyr exec -i ${SCALYR_AGENT_POD_NAME} --container scalyr-agent -- scalyr-agent-2 status -v)
           k8s_event_log_files_number=$(echo "$agent_status" | grep -c 'Path /var/log/scalyr-agent-2/kubernetes_events.log: copied')
@@ -260,8 +261,8 @@ jobs:
       # We only assert this under newer Kubernetes versions since in the old ones CronJobs were not
       # available out of the box
       - name: Verify Job and CronJob events are ingested
-        if: ${{ contains('["v1.21.10", "v1.22.7", "v1.23.4", "v1.24.0", "v1.25.10", "v1.26.5"]', matrix.k8s_version.version) }}
-        timeout-minutes: 14
+        if: ${{ matrix.k8s_version.run_cronjob_checks }}
+        timeout-minutes: 5
         env:
           # Needed for scalyr-tool
           scalyr_readlog_token: "${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}"
