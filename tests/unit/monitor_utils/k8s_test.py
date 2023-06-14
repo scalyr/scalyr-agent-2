@@ -657,6 +657,12 @@ class TestKubernetesApi(ScalyrTestCase):
         result = kapi.query_object(kind="CronJob", namespace="default", name="test-job")
         self.assertEqual(result, {"a": 1})
         self.assertEqual(kapi.query_api_with_retries.call_count, 1)
+        kapi.query_api_with_retries.assert_called_with(
+            "/apis/batch/v1beta1/namespaces/default/cronjobs/test-job",
+            query_options=None,
+            retry_error_context="CronJob, default, test-job",
+            retry_error_limit_key="query_object-CronJob",
+        )
 
         # 2. First attemp throws 500 (should not be retried)
         kapi.query_api_with_retries.reset_mock()
@@ -671,6 +677,12 @@ class TestKubernetesApi(ScalyrTestCase):
             name="test-job",
         )
         self.assertEqual(kapi.query_api_with_retries.call_count, 1)
+        kapi.query_api_with_retries.assert_called_with(
+            "/apis/batch/v1beta1/namespaces/default/cronjobs/test-job",
+            query_options=None,
+            retry_error_context="CronJob, default, test-job",
+            retry_error_limit_key="query_object-CronJob",
+        )
 
         # 2. First attemp throws 404, second one 200
         kapi.query_api_with_retries.reset_mock()
@@ -682,6 +694,18 @@ class TestKubernetesApi(ScalyrTestCase):
         result = kapi.query_object(kind="CronJob", namespace="default", name="test-job")
         self.assertEqual(result, {"a": 2})
         self.assertEqual(kapi.query_api_with_retries.call_count, 2)
+        kapi.query_api_with_retries.assert_any_call(
+            "/apis/batch/v1beta1/namespaces/default/cronjobs/test-job",
+            query_options=None,
+            retry_error_context="CronJob, default, test-job",
+            retry_error_limit_key="query_object-CronJob",
+        )
+        kapi.query_api_with_retries.assert_called_with(
+            "/apis/batch/v1/namespaces/default/cronjobs/test-job",
+            query_options=None,
+            retry_error_context="CronJob, default, test-job",
+            retry_error_limit_key="query_object-CronJob",
+        )
 
         # 2. First attemp throws 404, second one 500
         kapi.query_api_with_retries.reset_mock()
@@ -746,6 +770,11 @@ class TestKubernetesApi(ScalyrTestCase):
             namespace="default",
         )
         self.assertEqual(kapi.query_api_with_retries.call_count, 1)
+        kapi.query_api_with_retries.assert_called_with(
+            "/apis/batch/v1beta1/namespaces/default/cronjobs",
+            retry_error_context="CronJob, default",
+            retry_error_limit_key="query_objects-CronJob",
+        )
 
         # 2. First attempt throws 404, second one 200
         kapi.query_api_with_retries.reset_mock()
@@ -757,6 +786,16 @@ class TestKubernetesApi(ScalyrTestCase):
         result = kapi.query_objects(kind="CronJob", namespace="default")
         self.assertEqual(result, [{"a": 2, "b": 2}])
         self.assertEqual(kapi.query_api_with_retries.call_count, 2)
+        kapi.query_api_with_retries.assert_any_call(
+            "/apis/batch/v1beta1/namespaces/default/cronjobs",
+            retry_error_context="CronJob, default",
+            retry_error_limit_key="query_objects-CronJob",
+        )
+        kapi.query_api_with_retries.assert_any_call(
+            "/apis/batch/v1/namespaces/default/cronjobs",
+            retry_error_context="CronJob, default",
+            retry_error_limit_key="query_objects-CronJob",
+        )
 
         # 2. First attempt throws 404, second one 500
         kapi.query_api_with_retries.reset_mock()
