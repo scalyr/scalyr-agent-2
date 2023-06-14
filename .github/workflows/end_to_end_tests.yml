@@ -99,8 +99,8 @@ jobs:
           - { "version": "v1.21.10", "driver": "", "runtime": "docker", "run_cronjob_checks": true }
           - { "version": "v1.22.7", "driver": "", "runtime": "docker", "run_cronjob_checks": true }
           # NOTE: Using containerd runtime in minikube on GHA only works with docker driver
-          - { "version": "v1.23.4", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true }
-          - { "version": "v1.24.0", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true }
+          - { "version": "v1.23.17", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true }
+          - { "version": "v1.24.14", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true }
           - { "version": "v1.25.10", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true }
           - { "version": "v1.26.5", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true }
 
@@ -307,10 +307,10 @@ jobs:
           - { "version": "v1.21.10", "driver": "", "runtime": "docker" }
           - { "version": "v1.22.7", "driver": "", "runtime": "docker" }
           # NOTE: Using containerd runtime in minikube on  GHA only works with docker driver
-          - { "version": "v1.23.4", "driver": "docker", "runtime": "containerd" }
-          - { "version": "v1.24.0", "driver": "docker", "runtime": "containerd" }
-          - { "version": "v1.25.10", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true }
-          - { "version": "v1.26.5", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true }
+          - { "version": "v1.23.17", "driver": "docker", "runtime": "containerd" }
+          - { "version": "v1.24.14", "driver": "docker", "runtime": "containerd" }
+          - { "version": "v1.25.10", "driver": "docker", "runtime": "containerd" }
+          - { "version": "v1.26.5", "driver": "docker", "runtime": "containerd" }
 
     steps:
       - name: Checkout Repository
