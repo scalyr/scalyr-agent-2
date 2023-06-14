@@ -309,6 +309,8 @@ jobs:
           # NOTE: Using containerd runtime in minikube on  GHA only works with docker driver
           - { "version": "v1.23.4", "driver": "docker", "runtime": "containerd" }
           - { "version": "v1.24.0", "driver": "docker", "runtime": "containerd" }
+          - { "version": "v1.25.10", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true }
+          - { "version": "v1.26.5", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true }
 
     steps:
       - name: Checkout Repository
