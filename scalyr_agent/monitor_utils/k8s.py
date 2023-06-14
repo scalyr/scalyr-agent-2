@@ -2379,13 +2379,6 @@ class KubernetesApi(object):
 
         objects_endpoints = _OBJECT_ENDPOINTS[kind]["list-all"]
 
-        # We ensure the value is always a Template so in the for loop below we can simplify the
-        # code and just assume the value is always template and we can call .substitute() on it.
-        # Keep in mind that substitute() won't throw in case the input template string doesn't
-        # actually have any template placeholders.
-        if not isinstance(objects_endpoints, Template):
-            objects_endpoints = Template(_OBJECT_ENDPOINTS[kind]["list-all"])
-
         if namespace:
             objects_endpoints = _OBJECT_ENDPOINTS[kind]["list"]
 
@@ -2403,15 +2396,22 @@ class KubernetesApi(object):
 
         objects_endpoints_count = len(objects_endpoints)
 
-        for index, object_endpoint in enumerate(objects_endpoints):
+        for index, objects_endpoint in enumerate(objects_endpoints):
+            # We ensure the value is always a Template so in the for loop below we can simplify the
+            # code and just assume the value is always template and we can call .substitute() on it.
+            # Keep in mind that substitute() won't throw in case the input template string doesn't
+            # actually have any template placeholders.
+            if not isinstance(objects_endpoint, Template):
+                objects_endpoint = Template(objects_endpoint)
+
             query = None
 
             try:
-                query = object_endpoint.substitute(namespace=namespace)
+                query = objects_endpoint.substitute(namespace=namespace)
             except Exception as e:
                 global_log.warn(
                     "k8s API - failed to build query list string (%s) - %s"
-                    % (object_endpoint.template, six.text_type(e)),
+                    % (objects_endpoint.template, six.text_type(e)),
                     limit_once_per_x_secs=300,
                     limit_key="k8s_api_build_list_query-%s" % kind,
                 )
@@ -2441,7 +2441,7 @@ class KubernetesApi(object):
                     "k8s API - failed to list query for %s using URL %s, trying next URL (%s) in the list:  %s"
                     % (
                         kind,
-                        object_endpoint.template,
+                        objects_endpoint.template,
                         getattr(
                             next_objects_endpoint, "template", next_objects_endpoint
                         ),
