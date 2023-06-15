@@ -732,13 +732,15 @@ def _prepare_environment(
     if package_type == "deb":
         # In some distributions apt update may be a pretty flaky due to connection and cache issues,
         # so we add some retries.
+        retry_counter = 0
         while True:
             try:
+                print("Attempt: %s" % (retry_counter + 1))
                 # Workaround for some weird failures we started seeing around June 13th, 2023
                 # https://github.com/scalyr/scalyr-agent-2/actions/runs/5276746619/jobs/9543984472?pr=1143
-                if "debian" in target_distro.name:
+                if "debian" in target_distro.name and False:
                     print("Running add key workaround on debian")
-                    _run_shell("apt-get install -y gnupg")
+                    _run_shell("apt-get install -y gnupg2")
                     #_run_shell("apt-get update && apt-get install -y gnupg")
                     _run_shell(
                         "apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 6ED0E7B82643E131"
@@ -752,6 +754,8 @@ def _prepare_environment(
                 break
             except subprocess.CalledProcessError:
                 timeout_tracker.sleep(1, "Can not update apt.")
+            finally:
+                retry_counter += 1
 
     if target_distro.name == "centos6":
         # for centos 6, we remove repo file for disabled repo, so it could use vault repo.
