@@ -732,13 +732,17 @@ def _prepare_environment(
     if package_type == "deb":
         # In some distributions apt update may be a pretty flaky due to connection and cache issues,
         # so we add some retries.
+        retry_counter = 0
         while True:
             try:
+                print("Attempt: %s" % (retry_counter + 1))
                 _run_shell("apt-get clean")
                 _run_shell("apt update")
                 break
             except subprocess.CalledProcessError:
                 timeout_tracker.sleep(1, "Can not update apt.")
+            finally:
+                retry_counter += 1
 
     if target_distro.name == "centos6":
         # for centos 6, we remove repo file for disabled repo, so it could use vault repo.

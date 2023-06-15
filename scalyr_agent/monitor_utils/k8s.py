@@ -56,14 +56,31 @@ _CID_RE = re.compile("^(.+)://(.+)$")
 # `list-all` is for querying all objects of a given type in the entire cluster
 #
 # the `single` and `list` endpoints are Templates that require the caller to substitute
-# in the appropriate values for ${namespace} and ${name}
+# in the appropriate values for ${namespace} and ${name}.
+#
+# For each key we also allow values to be a list. This way multiple URLs can be specific. We will
+# first try with the first URL with the list and then continue with the next one in case it returns
+# 404.
+# The use case here is to support URL paths which have changed, e.g. API endpoint which has been
+# promoted from /v1beta to /v1 and similar. Keep in mind that this is not a full blown robust
+# solution and not a replacement for proper API version management which is a larger and a longer
+# term project. It's a short term workaround / compromise to handle some of those scenarios where
+# an API endpoint has been promoted from beta to stable.
 _OBJECT_ENDPOINTS = {
     "CronJob": {
-        "single": Template(
-            "/apis/batch/v1beta1/namespaces/${namespace}/cronjobs/${name}"
-        ),
-        "list": Template("/apis/batch/v1beta1/namespaces/${namespace}/cronjobs"),
-        "list-all": "/apis/batch/v1beta1/cronjobs",
+        "single": [
+            Template("/apis/batch/v1beta1/namespaces/${namespace}/cronjobs/${name}"),
+            # In Kubernetes v1.25.0 this API endpoint has been promoted from v1beta to v1
+            Template("/apis/batch/v1/namespaces/${namespace}/cronjobs/${name}"),
+        ],
+        "list": [
+            Template("/apis/batch/v1beta1/namespaces/${namespace}/cronjobs"),
+            Template("/apis/batch/v1/namespaces/${namespace}/cronjobs"),
+        ],
+        "list-all": [
+            "/apis/batch/v1beta1/cronjobs",
+            "/apis/batch/v1/cronjobs",
+        ],
     },
     "DaemonSet": {
         "single": Template("/apis/apps/v1/namespaces/${namespace}/daemonsets/${name}"),
@@ -1765,6 +1782,9 @@ class KubernetesApi(object):
                     "token_file": global_config.k8s_service_account_token,
                     "namespace_file": global_config.k8s_service_account_namespace,
                     "token_re_read_interval": global_config.k8s_token_re_read_interval,
+                    "enable_fallback_urls": not (
+                        global_config.k8s_fallback_urls_disable
+                    ),
                 }
             )
         return KubernetesApi(**kwargs)
@@ -1785,6 +1805,7 @@ class KubernetesApi(object):
         token_file="/var/run/secrets/kubernetes.io/serviceaccount/token",
         namespace_file="/var/run/secrets/kubernetes.io/serviceaccount/namespace",
         token_re_read_interval=300,
+        enable_fallback_urls=True,
     ):
         """Init the kubernetes object"""
         self.log_api_responses = log_api_responses
@@ -1804,6 +1825,7 @@ class KubernetesApi(object):
         self._ca_file = ca_file
         self._token_file = token_file
         self._token_re_read_interval = int(token_re_read_interval)
+        self._enable_fallback_urls = enable_fallback_urls
 
         # We create a few headers ahead of time so that we don't have to recreate them each time we need them.
         self._standard_headers = {
@@ -2277,25 +2299,68 @@ class KubernetesApi(object):
             # return a dummy object with valid kind, namespace and name members
             return {"kind": kind, "metadata": {"namespace": namespace, "name": name}}
 
-        query = None
-        try:
-            query = _OBJECT_ENDPOINTS[kind]["single"].substitute(
-                name=name, namespace=namespace
-            )
-        except Exception as e:
-            global_log.warn(
-                "k8s API - failed to build query string - %s" % (six.text_type(e)),
-                limit_once_per_x_secs=300,
-                limit_key="k8s_api_build_query-%s" % kind,
-            )
-            return {}
+        # This is a workaround until a proper multi version support is implemented. We allow
+        # querying multiple URLs in case some API path has changed, or it has been prometed
+        # from v1beta to v1 or similar.
+        # This approach is of course not the most robust, but a full blown solution would be much
+        # more involved.
+        # NOTE: We could also keep a local in process cache of valid URLs, but that would
+        # complicate the solution and for now, I want to keep it simple.
+        object_endpoints = _OBJECT_ENDPOINTS[kind]["single"]
 
-        return self.query_api_with_retries(
-            query,
-            query_options=query_options,
-            retry_error_context="%s, %s, %s" % (kind, namespace, name),
-            retry_error_limit_key="query_object-%s" % kind,
-        )
+        if not isinstance(object_endpoints, list):
+            object_endpoints = [object_endpoints]
+
+        if not self._enable_fallback_urls:
+            global_log.info(
+                "k8s_fallback_urls_disable option is set to true. Won't fall back to "
+                "the next URL in the list if API returns 404 response",
+                limit_once_per_x_secs=3600,
+                limit_key="k8s_get_object_fallback_url_disabled",
+            )
+            object_endpoints = object_endpoints[:1]
+
+        object_endpoints_count = len(object_endpoints)
+
+        for index, object_endpoint in enumerate(object_endpoints):
+            query = None
+            try:
+                query = object_endpoint.substitute(name=name, namespace=namespace)
+            except Exception as e:
+                global_log.warn(
+                    "k8s API - failed to build query string (%s) - %s"
+                    % (object_endpoint.template, six.text_type(e)),
+                    limit_once_per_x_secs=300,
+                    limit_key="k8s_api_build_query-%s" % kind,
+                )
+                return {}
+
+            try:
+                # If we get 404 back, we retry with a different object endpoint url - in case the
+                # API path has changed or similar
+                return self.query_api_with_retries(
+                    query,
+                    query_options=query_options,
+                    retry_error_context="%s, %s, %s" % (kind, namespace, name),
+                    retry_error_limit_key="query_object-%s" % kind,
+                )
+            except K8sApiNotFoundException as e:
+                if index == object_endpoints_count - 1:
+                    # No more URLs to try, bail out and propagate the error
+                    raise e
+
+                next_object_endpoint = object_endpoints[index + 1]
+                global_log.warn(
+                    "k8s API - failed to query for %s using URL %s, trying next URL (%s) in the list:  %s"
+                    % (
+                        kind,
+                        object_endpoint.template,
+                        next_object_endpoint.template,
+                        six.text_type(e),
+                    ),
+                    limit_once_per_x_secs=300,
+                    limit_key="k8s_api_query-%s_next_url" % kind,
+                )
 
     def query_objects(self, kind, namespace=None, filter=None):
         """Queries a list of objects from the k8s api based on an object kind, optionally limited by
@@ -2312,29 +2377,79 @@ class KubernetesApi(object):
             )
             return {"items": []}
 
-        query = _OBJECT_ENDPOINTS[kind]["list-all"]
+        objects_endpoints = _OBJECT_ENDPOINTS[kind]["list-all"]
+
         if namespace:
+            objects_endpoints = _OBJECT_ENDPOINTS[kind]["list"]
+
+        if not isinstance(objects_endpoints, list):
+            objects_endpoints = [objects_endpoints]
+
+        if not self._enable_fallback_urls:
+            global_log.info(
+                "k8s_fallback_urls_disable option is set to true. Won't fall back to "
+                "the next URL in the list if API returns 404 response",
+                limit_once_per_x_secs=3600,
+                limit_key="k8s_list_objects_fallback_url_disabled",
+            )
+            objects_endpoints = objects_endpoints[:1]
+
+        objects_endpoints_count = len(objects_endpoints)
+
+        for index, objects_endpoint in enumerate(objects_endpoints):
+            # We ensure the value is always a Template so in the for loop below we can simplify the
+            # code and just assume the value is always template and we can call .substitute() on it.
+            # Keep in mind that substitute() won't throw in case the input template string doesn't
+            # actually have any template placeholders.
+            if not isinstance(objects_endpoint, Template):
+                objects_endpoint = Template(objects_endpoint)
+
+            query = None
+
             try:
-                query = _OBJECT_ENDPOINTS[kind]["list"].substitute(namespace=namespace)
+                query = objects_endpoint.substitute(namespace=namespace)
             except Exception as e:
                 global_log.warn(
-                    "k8s API - failed to build namespaced query list string - %s"
-                    % (six.text_type(e)),
+                    "k8s API - failed to build query list string (%s) - %s"
+                    % (objects_endpoint.template, six.text_type(e)),
                     limit_once_per_x_secs=300,
                     limit_key="k8s_api_build_list_query-%s" % kind,
                 )
+                return {}
 
-        if filter:
-            query = "%s?fieldSelector=%s" % (
-                query,
-                six.moves.urllib.parse.quote(filter),
-            )
+            if filter:
+                query = "%s?fieldSelector=%s" % (
+                    query,
+                    six.moves.urllib.parse.quote(filter),
+                )
 
-        return self.query_api_with_retries(
-            query,
-            retry_error_context="%s, %s" % (kind, namespace),
-            retry_error_limit_key="query_objects-%s" % kind,
-        )
+            try:
+                # If we get 404 back, we retry with a different object endpoint url - in case the
+                # API path has changed or similar
+                return self.query_api_with_retries(
+                    query,
+                    retry_error_context="%s, %s" % (kind, namespace),
+                    retry_error_limit_key="query_objects-%s" % kind,
+                )
+            except K8sApiNotFoundException as e:
+                if index == objects_endpoints_count - 1:
+                    # No more URLs to try, bail out and propagate the error
+                    raise e
+
+                next_objects_endpoint = objects_endpoints[index + 1]
+                global_log.info(
+                    "k8s API - failed to list query for %s using URL %s, trying next URL (%s) in the list:  %s"
+                    % (
+                        kind,
+                        objects_endpoint.template,
+                        getattr(
+                            next_objects_endpoint, "template", next_objects_endpoint
+                        ),
+                        six.text_type(e),
+                    ),
+                    limit_once_per_x_secs=300,
+                    limit_key="k8s_api_query_list-%s_next_url" % kind,
+                )
 
     def query_pod(self, namespace, name):
         """Convenience method for query a single pod"""

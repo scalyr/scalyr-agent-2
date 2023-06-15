@@ -123,6 +123,7 @@ class TestConfigurationK8s(TestConfigurationBase):
                 "agent.config.scalyr.com/events_leader_candidate=true",
                 six.text_type,
             ),
+            "skip_leader_election": (STANDARD_PREFIX, False, bool),
         }
 
         # Fake the environment variables

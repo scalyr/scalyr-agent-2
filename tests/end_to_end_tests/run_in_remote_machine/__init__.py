@@ -43,6 +43,7 @@ class TargetDistro:
 
 
 # Collection of remote machine distro specifications for end to end remote tests.
+# NOTE: We use us-east-1 region so all AMIs should be from that region
 DISTROS = {
     distro.name: distro
     for distro in [
@@ -134,7 +135,7 @@ DISTROS = {
             name="debian10",
             ec2_images={
                 Architecture.X86_64: EC2DistroImage(
-                    image_id="ami-0b9a611a02047d3b1",
+                    image_id="ami-074f8bbb689b1c1a0",
                     image_name="Debian 10 Buster",
                     short_name="debian10",
                     size_id="t2.small",
@@ -142,7 +143,7 @@ DISTROS = {
                 )
             },
             docker_image="debian:10",
-            expected_openssl_version_number=0x1010104F,
+            expected_openssl_version_number=0x101010EF,
         ),
         TargetDistro(
             name="centos8",
