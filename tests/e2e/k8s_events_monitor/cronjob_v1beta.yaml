@@ -1,5 +1,4 @@
 apiVersion: batch/v1beta
-#apiVersion: batch/v2alpha1
 kind: CronJob
 metadata:
   name: hello
