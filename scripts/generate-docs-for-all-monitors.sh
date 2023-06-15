@@ -24,13 +24,14 @@
 if [[ "$(uname)" == "Darwin" ]]; then
     echo "Detected Darwin, adding \"/usr/local/opt/coreutils/libexec/gnubin\"to \$PATH"
 
-    if [ ! -d "/usr/local/opt/coreutils/libexec/gnubin" ]; then
+    if [ ! -d "/usr/local/opt/coreutils/libexec/gnubin" ] && [ ! -d "/opt/homebrew/opt/coreutils/libexec/gnubin" ]; then
         echo "Could not find coreutils directory which means script won't work on OS X."
         echo "Please install coreutils package using brew - brew install coreutils"
         exit 2
     fi
 
-    export PATH="/usr/local/opt/coreutils/libexec/gnubin:${PATH}"
+    # NOTE: The path on old intel and new m1/m2 laptops is different
+    export PATH="/usr/local/opt/coreutils/libexec/gnubin:/opt/homebrew/opt/coreutils/libexec/gnubin:${PATH}"
 fi
 
 set -e
