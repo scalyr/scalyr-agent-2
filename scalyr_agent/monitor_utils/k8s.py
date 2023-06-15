@@ -2369,7 +2369,7 @@ class KubernetesApi(object):
         an appropriate query string
         """
         if kind not in _OBJECT_ENDPOINTS:
-            global_log.info(
+            global_log.warn(
                 "k8s API - tried to list invalid object type: %s, %s"
                 % (kind, namespace),
                 limit_once_per_x_secs=300,
