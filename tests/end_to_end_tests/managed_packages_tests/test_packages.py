@@ -734,6 +734,19 @@ def _prepare_environment(
         # so we add some retries.
         while True:
             try:
+                # Workaround for some weird failures we started seeing around June 13th, 2023
+                # https://github.com/scalyr/scalyr-agent-2/actions/runs/5276746619/jobs/9543984472?pr=1143
+                if "debian" in target_distro.name:
+                    print("Running add key workaround on debian")
+                    _run_shell("apt-get install -y gnupg")
+                    #_run_shell("apt-get update && apt-get install -y gnupg")
+                    _run_shell(
+                        "apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 6ED0E7B82643E131"
+                    )
+                    _run_shell(
+                        "apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 0E98404D386FA1D9"
+                    )
+
                 _run_shell("apt-get clean")
                 _run_shell("apt update")
                 break
