@@ -7,7 +7,8 @@ Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Jun 26, 2023 00:00 -0800
 --->
 
 Kubernetes:
-* Fix a bug with Kubernetes Events monitor not emitting events for ``CronJob`` objects when using Kubernetes >= 1.25.0. The bug was related to the API endpoint being promoted from `v1beta` to `stable`. The code has been updated to support both locations - old one (beta) and the new one (stable).
+* Fix a bug with Kubernetes Events monitor not emitting events for `CronJob` objects when using Kubernetes >= 1.25.0. The bug was related to the API endpoint being promoted from `v1beta` to `stable`. The code has been updated to support both locations - old one (beta) and the new one (stable).
+* Update Kubernetes monitor to also log the value of `SCALYR_COMPRESSION_LEVEL` environment variable on start up. Contributed by @MichalKoziorowski-TomTom #1104.
 
 ## 2.2.2 "Pollux" - Apr 26, 2023
 <!---
