@@ -1,6 +1,14 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.2.3 "TBD" - Jun 26, 2023
+<!---
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Jun 26, 2023 00:00 -0800
+--->
+
+Kubernetes:
+* Fix a bug with Kubernetes Events monitor not emitting events for ``CronJob`` objects when using Kubernetes >= 1.25.0. The bug was related to the API endpoint being promoted from `v1beta` to `stable`. The code has been updated to support both locations - old one (beta) and the new one (stable).
+
 ## 2.2.2 "Pollux" - Apr 26, 2023
 <!---
 Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Apr 26, 2023 00:00 -0800
@@ -11,14 +19,6 @@ Improvements:
 
 Kubernetes:
 * Kubernetes ClusterRole resource definition now includes Argo Rollouts. The agent won't receive permission errors anymore when it interrogates Argo Rollout resources.
-
-## 2.2.3 "TBD" - Jun 26, 2023
-<!---
-Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Jun 26, 2023 00:00 -0800
---->
-
-Kubernetes:
-* Fix a bug with Kubernetes Events monitor not emitting events for ``CronJob`` objects when using Kubernetes >= 1.25.0. The bug was related to the API endpoint being promoted from `v1beta` to `stable`. The code has been updated to support both locations - old one (beta) and the new one (stable).
 
 ## 2.2.1 "Frosty" - Mar 29, 2023
 <!---
