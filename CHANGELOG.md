@@ -72,7 +72,7 @@ Packaged by Joseph Makar <joseph.makar@sentinelone.com> on Oct 17, 2022 12:31 -0
 --->
 
 Kubernetes:
-* Fix a bug / edge case in the Kubernetes caching PodProcessor code which could cause an agent to get stuck in an infinite loop when processing controllers which have a custom Kind which is not supported by the agent defined. Contributed by #xdvpser #998 #999.
+* Fix a bug / edge case in the Kubernetes caching PodProcessor code which could cause an agent to get stuck in an infinite loop when processing controllers which have a custom Kind which is not supported by the agent defined. Contributed by @xdvpser #998 #999.
 * Allows user to configure Docker client library connection timeout and maximum connection pool size when using Docker container enumerator via new `k8s_docker_client_timeout` and `k8s_docker_client_max_pool_size` config option.
 
 Docker Images:
