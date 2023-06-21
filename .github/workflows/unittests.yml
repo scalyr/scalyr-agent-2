@@ -142,61 +142,6 @@ jobs:
           steps: ${{ toJson(steps) }}
           channel: '#eng-dataset-cloud-tech'
 
-  # NOTE: Github removed 2.7 support from their runners so we need to use container workaround
-  # See https://github.com/actions/setup-python/issues/672#issuecomment-1589120020 for details
-  unittests-27:
-    name: Unittests - Python 2.7
-    runs-on: ubuntu-latest
-
-    container:
-      image: python:2.7.18-buster
-
-    needs: pre_job
-    # NOTE: We always want to run job on master branch
-    if: (success() || failure()) && (${{ needs.pre_job.outputs.should_skip != 'true' || github.ref_name == 'master' }})
-
-    timeout-minutes: 10
-    defaults:
-      run:
-        shell: bash
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
-
-      - name: Install tox
-        env:
-          TOX_VERSION: 3.20.1
-          TOX_GH_ACTIONS_VERSION: 2.9.1
-        run: |
-          python -m pip install --upgrade pip
-          pip install "tox==$TOX_VERSION" "tox-gh-actions==$TOX_GH_ACTIONS_VERSION"
-
-      - name: Run Unit Tests
-        run: tox
-        env:
-          PLATFORM: ${{ matrix.platform }}
-          KIND: unittests
-
-      - name: Upload pytest test results
-        uses: actions/upload-artifact@v3
-        with:
-          name: pytest-results-2.7-ubuntu
-          path: |
-            test-results/junit*.xml
-            .coverage
-        if: ${{ success() || failure() }}
-
-      - name: Notify Slack on Failure
-        if: ${{ failure() && github.ref_name == 'master' }}
-        uses: act10ns/slack@ed1309ab9862e57e9e583e51c7889486b9a00b0f # v2.0.0
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        with:
-          status: ${{ job.status }}
-          steps: ${{ toJson(steps) }}
-          channel: '#eng-dataset-cloud-tech'
-
   standalone-smoketests:
     name: Standalone Smoketests - Python ${{ matrix.python-version }} - ${{ matrix.variant }}
     runs-on: ubuntu-20.04
@@ -255,64 +200,6 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: pytest-results-${{ matrix.python-version }}-${{ matrix.variant }}
-          path: |
-            test-results/junit*.xml
-        if: ${{ success() || failure() }}
-
-      - name: Notify Slack on Failure
-        if: ${{ failure() && github.ref_name == 'master' }}
-        uses: act10ns/slack@ed1309ab9862e57e9e583e51c7889486b9a00b0f # v2.0.0
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        with:
-          status: ${{ job.status }}
-          steps: ${{ toJson(steps) }}
-          channel: '#eng-dataset-cloud-tech'
-
-  # NOTE: Github removed 2.7 support from their runners so we need to use container workaround
-  # See https://github.com/actions/setup-python/issues/672#issuecomment-1589120020 for details
-  standalone-smoketests-27:
-    name: Standalone Smoketests - Python 2.7 - std
-    runs-on: ubuntu-latest
-
-    container:
-      image: python:2.7.18-buster
-
-    needs: pre_job
-    # NOTE: We always want to run job on master branch
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref_name == 'master' }}
-
-    timeout-minutes: 15
-    defaults:
-      run:
-        shell: bash
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
-
-      - name: Install tox
-        env:
-          TOX_VERSION: 3.20.1
-          TOX_GH_ACTIONS_VERSION: 2.9.1
-        run: |
-          python -m pip install --upgrade pip
-          pip install "tox==$TOX_VERSION" "tox-gh-actions==$TOX_GH_ACTIONS_VERSION"
-
-      - name: Run Standalone Smoketests
-        run: tox
-        env:
-          VARIANT: ${{ matrix.variant }}
-          KIND: smoketests
-          SCALYR_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
-          READ_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
-          SCALYR_SERVER: https://agent.scalyr.com
-          AGENT_HOST_NAME: agent-smoke-standalone-2.7-${{ github.run_number }}
-
-      - name: Upload pytest test results
-        uses: actions/upload-artifact@v3
-        with:
-          name: pytest-results-2.7-std
           path: |
             test-results/junit*.xml
         if: ${{ success() || failure() }}
