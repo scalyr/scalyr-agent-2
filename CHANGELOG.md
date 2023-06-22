@@ -1,9 +1,9 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.2.3 "TBD" - Jun 26, 2023
+## 2.2.3 "Elloria" - Jun 22, 2023
 <!---
-Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Jun 26, 2023 00:00 -0800
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Jun 22, 2023 00:00 -0800
 --->
 
 Kubernetes:
