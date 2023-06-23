@@ -19,7 +19,7 @@ RUN mv Python-"${PYTHON_VERSION}" /tmp/source/python
 
 
 
-FROM base as build_base
+FROM prepare_build_base as build_base
 ENV COMMON_DEPENDENCIES_INSTALL_PREFIX="/usr/local"
 
 FROM download-base as download_xz
@@ -192,6 +192,53 @@ RUN make -j "$(nproc)"
 RUN make DESTDIR=/tmp/root install
 
 
+FROM download-base as download_openssl_3
+ADD public_keys/openssl_public_key.asc openssl_public_key.asc
+RUN gpg2 --import openssl_public_key.asc
+ARG OPENSSL_3_VERSION
+RUN curl -L "https://www.openssl.org/source/openssl-${OPENSSL_3_VERSION}.tar.gz" > openssl.tar.gz
+RUN curl -L "https://www.openssl.org/source/openssl-${OPENSSL_3_VERSION}.tar.gz.asc" > openssl.tar.gz.asc
+RUN gpg2 --verify openssl.tar.gz.asc openssl.tar.gz
+RUN tar -xf "openssl.tar.gz"
+RUN mv openssl-${OPENSSL_3_VERSION} /tmp/source/openssl
+
+FROM download-base as download_openssl_1
+ADD public_keys/openssl_public_key.asc openssl_public_key.asc
+RUN gpg2 --import openssl_public_key.asc
+ARG OPENSSL_1_VERSION
+RUN curl -L "https://www.openssl.org/source/openssl-${OPENSSL_1_VERSION}.tar.gz" > openssl.tar.gz
+RUN curl -L "https://www.openssl.org/source/openssl-${OPENSSL_1_VERSION}.tar.gz.asc" > openssl.tar.gz.asc
+RUN gpg2 --verify openssl.tar.gz.asc openssl.tar.gz
+RUN tar -xf "openssl.tar.gz"
+RUN mv openssl-${OPENSSL_1_VERSION} /tmp/source/openssl
+
+FROM build_base as build_openssl_base
+
+FROM build_openssl_base as build_openssl_3
+COPY --from=download_openssl_3 /tmp/source /tmp/source
+WORKDIR /tmp/source/openssl/build
+ADD configure_openssl.sh configure_openssl.sh
+ARG OPENSSL_INSTALL_PREFIX
+ARG ARCH
+ARG LIBC
+RUN ARCH="${ARCH}" LIBC="${LIBC}" bash configure_openssl.sh "3" --prefix=${OPENSSL_INSTALL_PREFIX}
+RUN make -j "$(nproc)"
+RUN make DESTDIR=/tmp/root install_sw
+
+
+
+FROM build_openssl_base as build_openssl_1
+COPY --from=download_openssl_1 /tmp/source /tmp/source
+WORKDIR /tmp/source/openssl/build
+ADD configure_openssl.sh configure_openssl.sh
+ARG OPENSSL_INSTALL_PREFIX
+ARG ARCH
+ARG LIBC
+RUN ARCH="${ARCH}" LIBC="${LIBC}" bash configure_openssl.sh "1" --prefix=${OPENSSL_INSTALL_PREFIX}
+RUN make -j "$(nproc)"
+RUN make DESTDIR=/tmp/root install_sw
+
+
 FROM build_base as base_build_python
 COPY --from=build_xz /tmp/root/. /
 COPY --from=build_sqlite /tmp/root/. /
@@ -209,13 +256,88 @@ ARG OPENSSL_INSTALL_PREFIX
 ENV PYTHON_INSTALL_PREFIX="${PYTHON_INSTALL_PREFIX}"
 ENV OPENSSL_INSTALL_PREFIX="${OPENSSL_INSTALL_PREFIX}"
 ENV LD_LIBRARY_PATH="${COMMON_DEPENDENCIES_INSTALL_PREFIX}/lib:${LD_LIBRARY_PATH}"
+ENV LD_LIBRARY_PATH="${OPENSSL_INSTALL_PREFIX}/lib:${LD_LIBRARY_PATH}"
 
 COPY --from=download_python /tmp/source /tmp/source
 WORKDIR /tmp/source/python/build
+
 ADD configure_python.sh configure_python.sh
+
+FROM base_build_python as build_python_with_openssl_3
+COPY --from=build_openssl_3 /tmp/root/. /
 RUN bash configure_python.sh
+RUN make -j "$(nproc)"
+RUN make DESTDIR=/tmp/root install
+
+FROM base_build_python as build_python_with_openssl_1
+COPY --from=build_openssl_1 /tmp/root/. /
+RUN bash configure_python.sh
+RUN make -j "$(nproc)"
+RUN make DESTDIR=/tmp/root install
+
+FROM ubuntu:22.04 as wrapped_python
+
+SHELL ["/bin/bash", "-c"]
+ARG RESULT_DIR=/tmp/root
+COPY --from=build_openssl_1 /tmp/root /tmp/openssl_1
+COPY --from=build_openssl_3 /tmp/root /tmp/openssl_3
+COPY --from=build_python_with_openssl_1 /tmp/root /tmp/python_with_openssl_1
+COPY --from=build_python_with_openssl_3 /tmp/root /tmp/python_with_openssl_3
+COPY --from=build_python_with_openssl_3 /tmp/root ${RESULT_DIR}
+
+ARG PYTHON_INSTALL_PREFIX
+ARG PYTHON_X_Y_VERSION=3.11
+
+# Create result version of the openssl directory
+ARG OPENSSL_INSTALL_PREFIX
+
+ARG PYTHON_LIB_DIR="${RESULT_DIR}${PYTHON_INSTALL_PREFIX}/lib"
+RUN mkdir -p "${PYTHON_LIB_DIR}"
+RUN cp "/tmp/openssl_3${OPENSSL_INSTALL_PREFIX}/lib"/*.so* "${PYTHON_LIB_DIR}"
 
 
-RUN make -j "$(nproc)" && false
+ENV PYTHON_OPENSSL_LIBDIR="${PYTHON_LIB_DIR}/openssl"
+RUN mkdir -p "${PYTHON_OPENSSL_LIBDIR}"
+
+ENV LIB_DYNLOAD_DIR_PATH="${PYTHON_INSTALL_PREFIX}/lib/python${PYTHON_X_Y_VERSION}/lib-dynload"
+
+ENV PYTHON_OPENSSL_1_BINDINGS="${PYTHON_OPENSSL_LIBDIR}/1/bindings"
+RUN mkdir -p "${PYTHON_OPENSSL_1_BINDINGS}"
+
+RUN cp "/tmp/python_with_openssl_1${LIB_DYNLOAD_DIR_PATH}/"_{ssl,hashlib}.cpython-*-*-*-*.so "${PYTHON_OPENSSL_1_BINDINGS}"
+
+ENV PYTHON_OPENSSL_3_BINDINGS="${PYTHON_OPENSSL_LIBDIR}/3/bindings"
+RUN mkdir -p "${PYTHON_OPENSSL_3_BINDINGS}"
+RUN cp "/tmp/python_with_openssl_3${LIB_DYNLOAD_DIR_PATH}"/_{ssl,hashlib}.cpython-*-*-*-*.so "${PYTHON_OPENSSL_3_BINDINGS}"
+
+ENV PYTHON_OPENSSL_EMBEDDED_DIR="${PYTHON_OPENSSL_LIBDIR}/embedded"
+RUN mkdir -p "${PYTHON_OPENSSL_EMBEDDED_DIR}"
+RUN ln -s "../3/bindings" "${PYTHON_OPENSSL_EMBEDDED_DIR}/bindings"
+RUN ln -s "../../../../openssl/lib" "${PYTHON_OPENSSL_EMBEDDED_DIR}/libs"
+
+ADD files/python3 "${RESULT_DIR}/${PYTHON_INSTALL_PREFIX}/bin/python3"
+
+ARG PYTHON_VENV_LIB_DIR="${PYTHON_LIB_DIR}/python${PYTHON_X_Y_VERSION}/venv"
+RUN mv "${PYTHON_VENV_LIB_DIR}/__main__.py" "${PYTHON_VENV_LIB_DIR}/__main_original__.py"
+ADD files/venv/__main_wrapper__.py "${PYTHON_VENV_LIB_DIR}/__main__.py"
+
+FROM build_base as python_with_pip
+COPY --from=wrapped_python /tmp/root/. /
+
+ARG PYTHON_INSTALL_PREFIX
+RUN ${PYTHON_INSTALL_PREFIX}/bin/python3 -m ensurepip
+
+COPY --from=wrapped_python /tmp/root /tmp/root
+RUN ${PYTHON_INSTALL_PREFIX}/bin/python3 -m pip install --upgrade pip --root /tmp/root
+
+
+FROM build_base as python_with_pip
+COPY --from=wrapped_python /tmp/root/. /
+
+ARG PYTHON_INSTALL_PREFIX
+RUN ${PYTHON_INSTALL_PREFIX}/bin/python3 -m ensurepip
+
+COPY --from=wrapped_python /tmp/root /tmp/root
+RUN ${PYTHON_INSTALL_PREFIX}/bin/python3 -m pip install --upgrade pip --root /tmp/root
 
 
