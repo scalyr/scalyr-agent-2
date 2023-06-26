@@ -106,10 +106,10 @@ For example:
 
 ### Continuous Integration
 
-We run all the tox checks described above (+ more) continuously as part of our Circle CI based
+We run all the tox checks described above (+ more) continuously as part of our Github Actions based
 build system.
 
-Each push to a branch / pull request will trigger a build and a subset of the Circle CI jobs.
+Each push to a branch / pull request will trigger a build and a subset of the GHA jobs.
 
 Additional jobs will run once the PR has been merged into master. The reason we do that is to
 speed the PR builds and increase the developer feedback loop (some of the tests and checks we
@@ -121,24 +121,6 @@ request has been approved and it's in sync / up to date with latest master.
 When all the checks have passed, you should see something like this:
 
 <a href="https://user-images.githubusercontent.com/125088/79736603-59e77f80-82fa-11ea-9e33-b5279a030e8b.png"><img src="https://user-images.githubusercontent.com/125088/79736603-59e77f80-82fa-11ea-9e33-b5279a030e8b.png" width="450px" /></a>
-
-In addition to that, you should trigger a full build (basically all the jobs which run on merge to
-master minus the agent process level benchmarks), by adding ``/run build`` comment to the PR (to
-avoid abuse, right now the builds can only be triggered by direct collaborators to this
-repository).
-
-This will kick off our StackStorm based build automation and ensure that the whole build passes.
-
-If the build passes, you should see a comment similar to the one below and you are free to merge
-your pull request.
-
-<a href="https://user-images.githubusercontent.com/125088/79735434-93b78680-82f8-11ea-804a-43fbe7c543eb.png"><img src="https://user-images.githubusercontent.com/125088/79735434-93b78680-82f8-11ea-804a-43fbe7c543eb.png" width="400px" /></a>
-
-To avoid wasting the build cycles, please make sure you only trigger the whole build once other
-checks which run on every PR commit have passed, PR has been approved and it's in sync with master.
-
-If the build has failed, you can re-trigger it by adding the same comment again after you made any
-changes / fixes (if necessary).
 
 After the PR has been merged, you should wait for the ``benchmarks`` workflow to complete and then
 check our [CodeSpeed instance](https://scalyr-agent-codespeed.herokuapp.com/) to ensure there are
