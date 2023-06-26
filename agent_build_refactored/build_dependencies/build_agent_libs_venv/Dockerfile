@@ -22,11 +22,11 @@ FROM build_base as install_rust_from_package_manager_musl
 RUN apk add rust
 
 FROM ${INSTALL_RUST_STAGE_NAME} as install_rust_from_package_manager
-COPY --from=build_python /tmp/root/. /
-ARG PYTHON_INSTALL_PREFIX
 
+ARG PYTHON_INSTALL_PREFIX
+COPY --from=build_python ${PYTHON_INSTALL_PREFIX} "${PYTHON_INSTALL_PREFIX}"
 ENV PATH="${PYTHON_INSTALL_PREFIX}/bin:${PATH}"
 RUN python3 -m venv /var/opt/scalyr-agent-2/venv
 ARG REQUIREMENTS
 RUN echo "${REQUIREMENTS}" > /tmp/requirements.txt
-RUN /var/opt/scalyr-agent-2/venv/bin/python3 -m pip wheel -r /tmp/requirements.txt --root /tmp/root
+RUN /var/opt/scalyr-agent-2/venv/bin/python3 -m pip install -r /tmp/requirements.txt --root /tmp/root
