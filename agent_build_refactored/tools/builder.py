@@ -472,8 +472,6 @@ class RemoteBuildxBuilderWrapper(BuildxBuilderWrapper):
                 *cmd_args,
                 "docker",
                 "inspect",
-                "--format",
-                "json",
                 container_name
             ],
             check=True,
