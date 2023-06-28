@@ -142,7 +142,6 @@ class BuilderPythonStep(BuilderStep):
                 "LIBC": libc,
             },
             platform=architecture,
-            cache=False
         )
 
     def _init_max_compatibility_dependencies_(

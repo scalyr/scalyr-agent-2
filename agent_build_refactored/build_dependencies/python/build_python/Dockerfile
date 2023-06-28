@@ -96,8 +96,8 @@ COPY --from=post_build /tmp/root /tmp/root
 RUN ${INSTALL_PREFIX}/bin/python3 -m pip install --upgrade pip --root /tmp/root
 
 
-FROM scratch
-COPY --from=python_with_pip /tmp/root/. /
+FROM prepare_build_base
+COPY --from=python_with_pip /tmp/root /tmp/root
 
 
 ##FROM build_base as build_python_with_openssl_3

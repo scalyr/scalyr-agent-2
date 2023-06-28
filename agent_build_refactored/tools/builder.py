@@ -449,33 +449,6 @@ class RemoteBuildxBuilderWrapper(BuildxBuilderWrapper):
     def get_host_port(container_name: str, cmd_args: List[str] = None):
         cmd_args = cmd_args or []
 
-        subprocess.run(
-            "docker ps -a",
-            shell=True,
-            check=True
-        )
-
-        subprocess.run(
-            [
-                *cmd_args,
-                "docker",
-                "inspect",
-                container_name,
-                "--help"
-            ],
-            check=True,
-        )
-
-        subprocess.run(
-            [
-                *cmd_args,
-                "docker",
-                "inspect",
-                container_name
-            ],
-            check=True,
-        )
-
         inspect_result = subprocess.run(
             [
                 *cmd_args,
@@ -487,10 +460,6 @@ class RemoteBuildxBuilderWrapper(BuildxBuilderWrapper):
             capture_output=True,
         )
 
-        print("!!!!")
-        print(inspect_result.stdout.decode())
-        print(inspect_result.stderr.decode())
-        print("2222")
         inspect_infos = json.loads(
             inspect_result.stdout.decode()
         )

@@ -1,8 +1,8 @@
 FROM prepare_build_base as modify_python_files
 ARG RESULT_DIR=/tmp/root
 COPY --from=build_openssl_3 / /tmp/openssl_3
-COPY --from=build_python_with_openssl_3 / /tmp/python_with_openssl_3
-COPY --from=build_python_with_openssl_3 / ${RESULT_DIR}
+COPY --from=build_python_with_openssl_3 /tmp/root/. /tmp/python_with_openssl_3
+COPY --from=build_python_with_openssl_3 /tmp/root/. ${RESULT_DIR}
 ARG PYTHON_INSTALL_PREFIX
 #ADD files/bin/python3 "${RESULT_DIR}/${PYTHON_INSTALL_PREFIX}/bin"
 RUN mkdir -p "${RESULT_DIR}/${PYTHON_INSTALL_PREFIX}/etc"
@@ -21,7 +21,7 @@ ARG LIB_DYNLOAD_DIR_PATH="${PYTHON_INSTALL_PREFIX}/lib/python${PYTHON_X_Y_VERSIO
 # Remove this code block, when OpenSSL 1 reaches EOL.
 # REMOVE OPENSSL 1
 COPY --from=build_openssl_1 / /tmp/openssl_1
-COPY --from=build_python_with_openssl_1 / /tmp/python_with_openssl_1
+COPY --from=build_python_with_openssl_1 /tmp/root/. /tmp/python_with_openssl_1
 ARG PYTHON_OPENSSL_1_BINDINGS="${PYTHON_OPENSSL_LIBDIR}/1/bindings"
 RUN mkdir -p "${PYTHON_OPENSSL_1_BINDINGS}"
 RUN cp "/tmp/python_with_openssl_1${LIB_DYNLOAD_DIR_PATH}/"_{ssl,hashlib}.cpython-*-*-*-*.so "${PYTHON_OPENSSL_1_BINDINGS}"
