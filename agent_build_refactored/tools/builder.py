@@ -419,8 +419,8 @@ class RemoteBuildxBuilderWrapper(BuildxBuilderWrapper):
                 *self.docker_common_cmd_args,
                 "docker",
                 "run",
-                #"-d",
-                "-i",
+                "-d",
+                #"-i",
                 "--rm",
                 f"--name={self.container_name}",
                 "--privileged",
@@ -463,6 +463,7 @@ class RemoteBuildxBuilderWrapper(BuildxBuilderWrapper):
 
         print("!!!!")
         print(inspect_result.stdout.decode())
+        print("2222")
         inspect_infos = json.loads(
             inspect_result.stdout.decode()
         )
