@@ -79,11 +79,11 @@ jobs:
         python3 -m pip install -r dev-requirements-new.txt
 
 
-    - name: RUN
-      env:
-        USE_GHA_CACHE: "1"
-      run: |
-        python3 agent_build_refactored/build_dependencies/build.py
+#    - name: RUN
+#      env:
+#        USE_GHA_CACHE: "1"
+#      run: |
+#        python3 agent_build_refactored/build_dependencies/build.py
 
 #  build-linux-packages:
 #    name: "Build Linux packages"
