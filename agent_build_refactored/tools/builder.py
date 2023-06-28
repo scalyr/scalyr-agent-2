@@ -460,8 +460,17 @@ class RemoteBuildxBuilderWrapper(BuildxBuilderWrapper):
                 *cmd_args,
                 "docker",
                 "inspect",
-                "--format",
-                "json",
+                container_name,
+                "--help"
+            ],
+            check=True,
+        )
+
+        subprocess.run(
+            [
+                *cmd_args,
+                "docker",
+                "inspect",
                 container_name
             ],
             check=True,
