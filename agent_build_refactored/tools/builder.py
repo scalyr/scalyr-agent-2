@@ -455,6 +455,18 @@ class RemoteBuildxBuilderWrapper(BuildxBuilderWrapper):
             check=True
         )
 
+        subprocess.run(
+            [
+                *cmd_args,
+                "docker",
+                "inspect",
+                "--format",
+                "json",
+                container_name
+            ],
+            check=True,
+        )
+
         inspect_result = subprocess.run(
             [
                 *cmd_args,
