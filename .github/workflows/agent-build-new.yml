@@ -77,6 +77,10 @@ jobs:
     - name: install requirements
       run: |
         python3 -m pip install -r dev-requirements-new.txt
+    
+
+    - name: Expose GitHub Runtime
+      uses: crazy-max/ghaction-github-runtime@056b8ec6661ce03a987ab8643a0edc346ae63fe3
 
 
     - name: RUN
