@@ -1,6 +1,11 @@
 import dataclasses
 import enum
+import pathlib
 import re
+import sys
+
+if __name__ == '__main__':
+    sys.path.append(str(pathlib.Path(__file__).parent.parent.parent))
 
 from agent_build_refactored.tools.builder import BuilderStep
 from agent_build_refactored.tools.constants import SOURCE_ROOT, CpuArch, REQUIREMENTS_COMMON, REQUIREMENTS_COMMON_PLATFORM_DEPENDENT
@@ -74,7 +79,10 @@ build_python_with_switchable_openssl = BuildPythonWithSwitchableOpenSSL(
 
 #build_agent_libs_venv.run_and_output_in_loacl_directory()
 
-build_python_with_switchable_openssl.run_and_output_in_loacl_directory()
+
+if __name__ == '__main__':
+    sys.path.append(str(pathlib.Path(__file__).parent.parent.parent))
+    build_python_with_switchable_openssl.run_and_output_in_loacl_directory()
 
 
 a=10
