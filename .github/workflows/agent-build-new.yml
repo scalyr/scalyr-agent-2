@@ -62,6 +62,8 @@ jobs:
 
 
         - name: RUN
+          env:
+            USE_GHA_CACHE: "1"
           run: |
             python3 agent_build_refactored/build_dependencies/build.py
 
