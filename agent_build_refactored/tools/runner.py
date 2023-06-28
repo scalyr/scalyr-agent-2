@@ -1172,15 +1172,15 @@ class Runner:
 
 
 # Collection of EC2 AMI images that are used for creating instances with remote docker engine.
-DOCKER_EC2_BUILDERS = {
-    Architecture.ARM64: EC2DistroImage(
-        image_id="ami-0e2b332e63c56bcb5",
-        image_name="Ubuntu Server 22.04 LTS (HVM), SSD Volume Type",
-        short_name="ubuntu2204_ARM",
-        size_id="c7g.medium",
-        ssh_username="ubuntu",
-    )
-}
+# DOCKER_EC2_BUILDERS = {
+#     Architecture.ARM64: EC2DistroImage(
+#         image_id="ami-0e2b332e63c56bcb5",
+#         image_name="Ubuntu Server 22.04 LTS (HVM), SSD Volume Type",
+#         short_name="ubuntu2204_ARM",
+#         size_id="c7g.medium",
+#         ssh_username="ubuntu",
+#     )
+# }
 
 
 def run_docker_command(

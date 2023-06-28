@@ -8,6 +8,9 @@ from agent_build_refactored.managed_packages.build_dependencies_versions import 
 
 from agent_build_refactored.build_dependencies.python.build_python import BuilderPythonStep
 from agent_build_refactored.build_dependencies.python.prepare_build_base_with_python import PrepareBuildBaseWithPythonStep
+from agent_build_refactored.build_dependencies.build_dev_requirements import BuildDevRequirementsStep
+from agent_build_refactored.build_dependencies.build_agent_libs_venv import BuildAgentLibsVenvStep
+from agent_build_refactored.build_dependencies.python.build_python_with_switchable_openssl import BuildPythonWithSwitchableOpenSSL
 
 BUILD_PYTHON_DIR = SOURCE_ROOT / "agent_build_refactored/build_dependencies/build_python"
 
@@ -27,23 +30,51 @@ def _target_arch_to_docker_platform(arch: str):
     raise Exception(f"Unknown target arch: {arch}")
 
 
-build_python_step = BuilderPythonStep(
+# build_python_step = BuilderPythonStep(
+#     python_version="3.11.2",
+#     #openssl_type="switchable",
+#     openssl_version="3.0.7",
+#     #architecture=CpuArch.ARMV7,
+#     architecture=CpuArch.x86_64,
+#     libc="musl",
+# )
+
+
+# build_dev_requirements_step = BuildDevRequirementsStep(
+#     build_python_step=build_python_step,
+# )
+#
+# prepare_build_base_with_python_step = PrepareBuildBaseWithPythonStep(
+#     build_dev_requirements_step=build_dev_requirements_step
+# )
+#
+# build_agent_libs_venv = BuildAgentLibsVenvStep(
+#     prepare_build_base_with_python_step=prepare_build_base_with_python_step
+# )
+
+build_python_with_switchable_openssl = BuildPythonWithSwitchableOpenSSL(
     python_version="3.11.2",
-    openssl_type="switchable",
-    #architecture=CpuArch.ARMV7,
+    openssl_1_version="1.1.1s",
+    openssl_3_version="3.0.7",
     architecture=CpuArch.x86_64,
-    libc="gnu",
+    libc="musl",
 )
 
-prepare_build_base_with_python_step = PrepareBuildBaseWithPythonStep(
-    build_python_step=build_python_step
-)
 
-build_python_step.run_and_output_in_loacl_directory()
+#build_python_step.run_and_output_in_loacl_directory()
+
+#build_dev_requirements_step.run_and_output_in_loacl_directory()
 
 #prepare_build_base_with_python_step.run_and_output_in_oci_tarball()
 #prepare_build_base_with_python_step.run_and_output_in_docker()
 
+
+#prepare_build_base_with_python_step.run_and_output_in_docker()
+
+
+#build_agent_libs_venv.run_and_output_in_loacl_directory()
+
+build_python_with_switchable_openssl.run_and_output_in_loacl_directory()
 
 
 a=10

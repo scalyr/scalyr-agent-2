@@ -29,10 +29,11 @@ docker==6.0.0; python_version >= '3.7'
 udatetime==0.0.17; platform_system != 'Windows'
 psutil==5.7.0
 
+# <COMPONENT:ORJSON>
+orjson==3.8.0; platform_system != 'Darwin'
 
 # Agent's common requirements, but only for platform-dependent types of agent.
 # <COMPONENT:COMMON_PLATFORM_DEPENDENT>
-orjson==3.8.0; platform_system != 'Darwin'
 zstandard==0.19.0
 lz4==4.0.2
 
@@ -40,12 +41,12 @@ lz4==4.0.2
 # Agent build requirements.
 # <COMPONENT:BUILD>
 PyInstaller==5.6.2
-paramiko==2.12.0
-boto3==1.26.17
 
 # Dev and testing requirements.
 # <COMPONENT:DEV>
 # Testing tools and libraries
+paramiko==2.12.0
+boto3==1.26.17
 mock==3.0.5
 pytest==7.1.2
 pytest-coverage

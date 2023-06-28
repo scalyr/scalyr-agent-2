@@ -11,15 +11,18 @@ class BuildPythonLibeditStep(BasePythonDependencyBuildStep):
     def __init__(
             self,
             version_commit: str,
+            install_prefix: pl.Path,
             architecture: CpuArch,
             libc: str,
             build_ncurses_step: BuildPythonNcursesStep
     ):
         super(BuildPythonLibeditStep, self).__init__(
             name="build_libedit",
-            version=version_commit,
+            install_prefix=install_prefix,
             architecture=architecture,
             libc=libc,
-            build_contexts=[build_ncurses_step]
-
+            build_contexts=[build_ncurses_step],
+            build_args={
+                "VERSION_COMMIT": version_commit
+            }
         )

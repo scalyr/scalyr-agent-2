@@ -10,19 +10,19 @@ class BuildPythonOpenSSLStep(BasePythonDependencyBuildStep):
     def __init__(
         self,
         version: str,
+        major_version: str,
+        install_prefix: pl.Path,
         architecture: CpuArch,
         libc: str,
-        install_prefix: pl.Path
     ):
 
-        major_version = version.split(".")[0]
         super(BuildPythonOpenSSLStep, self).__init__(
             name=f"build_openssl_{major_version}",
-            version=version,
+            install_prefix=install_prefix,
             architecture=architecture,
             libc=libc,
             build_args={
                 "MAJOR_VERSION": major_version,
+                "VERSION": version,
             },
-            install_prefix=install_prefix,
         )

@@ -1,4 +1,4 @@
-from .buildx_xz import BuildPythonXZStep
+from .buildx_xz import BuildXZStep
 from .build_sqlite import BuildPythonSqliteStep
 from .build_zlib import BuildPythonZlibStep
 from .build_bzip import BuildPythonBzipStep

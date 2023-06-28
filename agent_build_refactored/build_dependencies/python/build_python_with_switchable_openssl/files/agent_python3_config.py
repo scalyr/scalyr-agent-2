@@ -1,0 +1,168 @@
+# Copyright 2014-2023 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+This script provide some configuration options for the Agent's Python3 interpreter.
+"""
+
+import argparse
+import pathlib as pl
+import subprocess
+import sys
+from typing import Tuple
+
+OPENSSL_1_1_1_VERSION = "1_1_1"
+OPENSSL_3_VERSION = "3"
+
+DEFAULT_FALLBACK_OPENSSL_VERSION = OPENSSL_1_1_1_VERSION
+
+PYTHON_BIN_DIR = pl.Path(sys.executable).parent.absolute()
+PYTHON_DIR = PYTHON_BIN_DIR.parent
+PYTHON_OPENSSL_LIB_DIR = PYTHON_DIR / "lib/openssl"
+#PACKAGE_OPT_DIR = pl.Path(sys.executable)
+#OPENSSL_LIBS_PATH = PACKAGE_OPT_DIR / "lib/openssl"
+#PYTHON_DIR = PACKAGE_OPT_DIR / "python3"
+
+
+PYTHON_SHORT_VERSION = ".".join([str(n) for n in sys.version_info[:2]])
+
+PYTHON_LIB_DYNLOAD_PATH = PYTHON_DIR / f"lib/python{PYTHON_SHORT_VERSION}/lib-dynload"
+
+
+PREFERRED_OPENSSL_FILE_PATH = PYTHON_DIR / "etc/preferred_openssl"
+
+# Bin directory of the package.
+PYTHON_BIN_DIR = PYTHON_DIR / "bin"
+
+# This directory is basically a symlink for to another directory with OpenSSL shared objects.
+# This script's work is to decide what OpenSLL shared objects to use and link directory with its shared object
+# with this directory.
+CURRENT_OPENSSL_LIBS_PATH = PYTHON_OPENSSL_LIB_DIR / "current"
+
+
+def initialize():
+    """
+    Initialize package. For example, look for a system OpenSSl to use. If not found, then
+    embedded OpenSSL library is used.
+    :return:
+    """
+    preferred_openssl = None
+
+    if PREFERRED_OPENSSL_FILE_PATH.exists():
+        preferred_openssl = PREFERRED_OPENSSL_FILE_PATH.read_text().strip()
+
+    if not preferred_openssl:
+        preferred_openssl = "auto"
+
+    if preferred_openssl == "auto":
+        try:
+            print("Looking for system OpenSSL >= 3: ", file=sys.stderr, end='')
+            CURRENT_OPENSSL_LIBS_PATH.unlink()
+            CURRENT_OPENSSL_LIBS_PATH.symlink_to(f"./{OPENSSL_3_VERSION}")
+
+            is_found, version_or_error = get_current_openssl_version()
+            if is_found:
+                print(f"found {version_or_error}", file=sys.stderr)
+                return
+
+            print(version_or_error, file=sys.stderr)
+
+            print("Looking for system OpenSSL >= 1.1.1: ", file=sys.stderr, end='')
+            CURRENT_OPENSSL_LIBS_PATH.unlink()
+            CURRENT_OPENSSL_LIBS_PATH.symlink_to(f"./{OPENSSL_1_1_1_VERSION}")
+
+            is_found, version_or_error = get_current_openssl_version()
+            if is_found:
+                print(f"found {version_or_error}", file=sys.stderr)
+                return
+
+            print(version_or_error, file=sys.stderr)
+        except Exception as e:
+            print(
+                f"Warning: Could not determine system OpenSSL version due to error: {str(e)}",
+                file=sys.stderr
+            )
+
+    print("Using embedded OpenSSL == ", file=sys.stderr, end='')
+    if CURRENT_OPENSSL_LIBS_PATH.is_symlink():
+        CURRENT_OPENSSL_LIBS_PATH.unlink()
+    CURRENT_OPENSSL_LIBS_PATH.symlink_to(f"./embedded")
+    is_found, version_or_error = get_current_openssl_version()
+    if not is_found:
+        # Something very wrong happened and this is not expected.
+        print(
+            f"Unexpected error during initialization of the embedded OpenSSL: {version_or_error}",
+            file=sys.stderr
+        )
+        exit(1)
+
+    print(version_or_error, file=sys.stderr)
+
+
+def get_current_openssl_version() -> Tuple[bool, str]:
+    """
+    Determine current system OpenSSL version, if presented.
+    :return: Tuple where:
+        First element - boolean flag that indicated whether appropriate version of OpenSSL is
+            found or not.
+        Second element - if  First flag is true - version of OpenSLL, if False - an error message.
+    """
+
+    result = subprocess.run(
+        [
+            str(PYTHON_BIN_DIR / "python3"),
+            "-c",
+            "import ssl; print(ssl.OPENSSL_VERSION);"
+        ],
+        capture_output=True,
+        env={"LD_LIBRARY_PATH": ""}
+    )
+
+    if result.returncode != 0:
+        return False, "Not found"
+
+    return True, result.stdout.decode()
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    initialize_parser = subparsers.add_parser("initialize")
+
+    set_option_parser = subparsers.add_parser("set")
+    set_option_subparsers = set_option_parser.add_subparsers(dest="option_name", required=True)
+    preferred_openssl_parser = set_option_subparsers.add_parser(
+        "preferred_openssl",
+        help="Specify how agent's Python interpreter has to resolve which OpenSSL"
+             " to use. "
+             "'auto'- first look for system OpenSSL and only then fallback to embedded OpenSSL."
+             "'embedded' - use embedded OpenSSL library without trying to find it in system."
+    )
+    preferred_openssl_parser.add_argument(
+        "value",
+        choices=["auto", "embedded"]
+    )
+
+    args = parser.parse_args()
+
+    if args.command == "initialize":
+        initialize()
+        exit(0)
+    elif args.command == "set":
+        if args.option_name == "preferred_openssl":
+            PREFERRED_OPENSSL_FILE_PATH.write_text(args.value)
+            print(f"The 'preferred_openssl' option is set to '{args.value}'")
+            initialize()
+            exit(0)

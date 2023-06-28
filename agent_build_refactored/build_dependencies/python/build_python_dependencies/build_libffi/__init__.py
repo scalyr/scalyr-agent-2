@@ -7,10 +7,19 @@ from agent_build_refactored.build_dependencies.python.build_python_dependencies.
 class BuildPythonLibffiStep(BasePythonDependencyBuildStep):
     BUILD_CONTEXT_PATH = pl.Path(__file__).parent
 
-    def __init__(self, version: str, architecture: CpuArch, libc: str):
+    def __init__(
+        self,
+        version: str,
+        install_prefix: pl.Path,
+        architecture: CpuArch,
+        libc: str
+    ):
         super(BuildPythonLibffiStep, self).__init__(
             name="build_libffi",
-            version=version,
+            install_prefix=install_prefix,
             architecture=architecture,
-            libc=libc
+            libc=libc,
+            build_args={
+                "VERSION": version
+            },
         )

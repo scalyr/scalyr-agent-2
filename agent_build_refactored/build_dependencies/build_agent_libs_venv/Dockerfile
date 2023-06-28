@@ -12,15 +12,23 @@ RUN "${PYTHON_INSTALL_PREFIX}/bin/python3" -m venv "${VENV_DIR}"
 #  --cache-dir /tmp/pip_cache \
 #  "pip==${PIP_VERSION}"
 
+COPY --from=build_dev_requirements / /tmp/wheels
+
 # Install requirements to venv.
-"${VENV_DIR}/bin/python3" -m pip install -v \
+#ENV LD_LIBRARY_PATH="${PYTHON_INSTALL_PREFIX}/lib/openssl/embedded/libs:${LD_LIBRARY_PATH}"
+ENV LD_LIBRARY_PATH="${PYTHON_INSTALL_PREFIX}/lib:${LD_LIBRARY_PATH}"
+
+RUN "${VENV_DIR}/bin/python3" -m pip install  --force-reinstall --no-index --find-links /tmp/wheels -v \
   -r /tmp/requirements.txt
 
+#RUN ls -al "${VENV_DIR}/lib/python3.11/site-packages" && false
+
 # Remove cache files.
-find "${VENV_DIR}" -name "__pycache__" -type d -prune -exec rm -r {} \;
+RUN find "${VENV_DIR}" -name "__pycache__" -type d -prune -exec rm -r {} \;
 
 # Copy result venv to result output.
-cp -a "${VENV_DIR}" /tmp/venv${VENV_DIR}
+RUN mkdir -p /tmp/venv${VENV_DIR}
+RUN cp -a "${VENV_DIR}/." /tmp/venv${VENV_DIR}
 
 FROM scratch
 COPY --from=build /tmp/venv /

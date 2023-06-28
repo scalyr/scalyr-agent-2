@@ -164,6 +164,22 @@ _ARCHITECTURE_TO_DOCKER_PLATFORM = {
 }
 
 
+class CpuArch(enum.Enum):
+    x86_64 = "x86_64"
+    AARCH64 = "aarch64"
+    ARMV7 = "armv7"
+
+    def as_docker_platform(self):
+        if self.value == "x86_64":
+            return "linux/amd64"
+
+        if self.value == "aarch64":
+            return "linux/arm/64"
+
+        if self.value == "armv7":
+            return "linux/arm/v7"
+
+
 class PackageType(enum.Enum):
     DEB = "deb"
     RPM = "rpm"
@@ -217,3 +233,27 @@ REQUIREMENTS_COMMON = _REQUIREMENT_FILE_COMPONENTS["COMMON"]
 REQUIREMENTS_COMMON_PLATFORM_DEPENDENT = _REQUIREMENT_FILE_COMPONENTS[
     "COMMON_PLATFORM_DEPENDENT"
 ]
+REQUIREMENTS_ORJSON = _REQUIREMENT_FILE_COMPONENTS[
+    "ORJSON"
+]
+
+REQUIREMENTS_BUILD = _REQUIREMENT_FILE_COMPONENTS["BUILD"]
+REQUIREMENTS_DEV = _REQUIREMENT_FILE_COMPONENTS["DEV"]
+
+
+NON_RUST_BASED_REQUIREMENTS = f"{REQUIREMENTS_COMMON}\n" \
+                              f"{REQUIREMENTS_COMMON_PLATFORM_DEPENDENT}\n" \
+                              f"{REQUIREMENTS_BUILD}\n"
+                              #f"{REQUIREMENTS_DEV}\n"
+
+RUST_BASED_REQUIREMENTS = f"{REQUIREMENTS_ORJSON}"
+
+
+ALL_AGENT_REQUIREMENTS = f"{REQUIREMENTS_COMMON}\n" \
+                         f"{REQUIREMENTS_COMMON_PLATFORM_DEPENDENT}\n" \
+                         f"{REQUIREMENTS_ORJSON}\n"
+
+
+ALL_REQUIREMENTS = f"{ALL_AGENT_REQUIREMENTS}\n" \
+                   f"{REQUIREMENTS_BUILD}\n"
+                   #f"{REQUIREMENTS_DEV}"

@@ -1,20 +1,28 @@
 FROM download_base as download_tcl
-RUN git clone "https://github.com/tcltk/tcl.git"
+#RUN git clone "https://github.com/tcltk/tcl.git"
+#ARG TCL_VERSION_COMMIT
+#WORKDIR tcl
+#RUN git checkout "${TCL_VERSION_COMMIT}"
+#RUN rm -r .git
+#WORKDIR ..
+#RUN mv tcl /tmp/source
 ARG TCL_VERSION_COMMIT
-WORKDIR tcl
-RUN git checkout "${TCL_VERSION_COMMIT}"
-RUN rm -r .git
-WORKDIR ..
-RUN mv tcl /tmp/source
+RUN curl -L "https://github.com/tcltk/tcl/archive/${TCL_VERSION_COMMIT}.tar.gz" > tcl.tar.gz
+RUN tar xzf tcl.tar.gz
+RUN mv "tcl-${TCL_VERSION_COMMIT}" /tmp/source
 
 FROM download_base as download_sqlite
-RUN git clone "https://github.com/sqlite/sqlite.git"
+#RUN git clone "https://github.com/sqlite/sqlite.git"
+
 WORKDIR sqlite
-ARG VERSION
-RUN git checkout "${VERSION}"
-RUN rm -r .git
-WORKDIR ..
-RUN mv sqlite /tmp/source
+ARG VERSION_COMMIT
+RUN curl -L "https://github.com/sqlite/sqlite/archive/${VERSION_COMMIT}.tar.gz" > sqlite.tar.gz
+RUN tar xzf sqlite.tar.gz
+RUN mv "sqlite-${VERSION_COMMIT}" /tmp/source
+#RUN git checkout "${VERSION}"
+#RUN rm -r .git
+#WORKDIR ..
+#RUN mv sqlite /tmp/source
 
 FROM prepare_build_base as build_tcl
 COPY --from=download_tcl /tmp/source /tmp/source

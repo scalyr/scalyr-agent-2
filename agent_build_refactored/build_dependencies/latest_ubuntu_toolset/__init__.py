@@ -6,13 +6,12 @@ from agent_build_refactored.tools.builder import BuilderStep
 PARENT_DIR = pl.Path(__file__).parent
 
 
-class DownloadSourcesBaseStep(BuilderStep):
-
+class LatestUbuntuToolsetStep(BuilderStep):
     def __init__(
         self
     ):
-        super(DownloadSourcesBaseStep, self).__init__(
-            name="download_base",
+        super(LatestUbuntuToolsetStep, self).__init__(
+            name="latest_ubuntu_toolset",
             context=PARENT_DIR,
             dockerfile_path=PARENT_DIR / "Dockerfile",
             platform=CpuArch.x86_64,

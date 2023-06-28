@@ -43,7 +43,7 @@ case "$LIBC" in
     ;;
   musl)
     case "${ARCH}" in
-      86_64)
+      x86_64)
         OPENSSL_TARGET="linux-x86_64"
         OPENSSL_3_ARGS="${ALPINE_OPENSSL_3_COMMON_ARGS} enable-ec_nistp_64_gcc_128"
         OPENSSL_1_ARGS="${ALPINE_OPENSSL_1_COMMON_ARGS}"

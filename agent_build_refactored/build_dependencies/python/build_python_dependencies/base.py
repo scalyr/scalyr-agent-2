@@ -17,12 +17,11 @@ class BasePythonDependencyBuildStep(BuilderStep):
     def __init__(
         self,
         name: str,
-        version: str,
+        install_prefix: pl.Path,
         architecture: CpuArch,
         libc: str,
         build_args: Dict[str, str] = None,
-        build_contexts: List[BuilderStep] = None,
-        install_prefix=COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX,
+        build_contexts: List[BuilderStep] = None
     ):
         self.download_base_step = DownloadSourcesBaseStep()
         self.prepare_build_base_step = PrepareBuildBaseStep(
@@ -33,8 +32,7 @@ class BasePythonDependencyBuildStep(BuilderStep):
         build_args = build_args or {}
         build_args.update(
             {
-                "VERSION": version,
-                "INSTALL_PREFIX": install_prefix,
+                "INSTALL_PREFIX": str(install_prefix),
                 "ARCH": architecture.value,
                 "LIBC": libc,
             },
