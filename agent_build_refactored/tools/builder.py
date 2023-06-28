@@ -448,6 +448,13 @@ class RemoteBuildxBuilderWrapper(BuildxBuilderWrapper):
     @staticmethod
     def get_host_port(container_name: str, cmd_args: List[str] = None):
         cmd_args = cmd_args or []
+
+        subprocess.run(
+            "docker ps -a",
+            shell=True,
+            check=True
+        )
+
         inspect_result = subprocess.run(
             [
                 *cmd_args,
