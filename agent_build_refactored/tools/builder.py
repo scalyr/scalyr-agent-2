@@ -387,21 +387,21 @@ class RemoteBuildxBuilderWrapper(BuildxBuilderWrapper):
             check=True
         )
 
-        subprocess.run(
-            [
-                *self.docker_common_cmd_args,
-                "docker",
-                "create",
-                "--rm",
-                f"--name={self.container_name}",
-                "--privileged",
-                "-p",
-                f"0:{_BUILDX_BUILDER_PORT}/tcp",
-                f"moby/buildkit:{BUILDKIT_VERSION}",
-                "--addr", f"tcp://0.0.0.0:{_BUILDX_BUILDER_PORT}",
-            ],
-            check=True
-        )
+        # subprocess.run(
+        #     [
+        #         *self.docker_common_cmd_args,
+        #         "docker",
+        #         "create",
+        #         "--rm",
+        #         f"--name={self.container_name}",
+        #         "--privileged",
+        #         "-p",
+        #         f"0:{_BUILDX_BUILDER_PORT}/tcp",
+        #         f"moby/buildkit:{BUILDKIT_VERSION}",
+        #         "--addr", f"tcp://0.0.0.0:{_BUILDX_BUILDER_PORT}",
+        #     ],
+        #     check=True
+        # )
 
 
         # subprocess.run(
@@ -414,32 +414,33 @@ class RemoteBuildxBuilderWrapper(BuildxBuilderWrapper):
         #     check=True
         # )
 
-        # subprocess.run(
-        #     [
-        #         *self.docker_common_cmd_args,
-        #         "docker",
-        #         "run",
-        #         "-d",
-        #         "--rm",
-        #         f"--name={self.container_name}",
-        #         "--privileged",
-        #         "-p",
-        #         f"0:{_BUILDX_BUILDER_PORT}/tcp",
-        #         f"moby/buildkit:{BUILDKIT_VERSION}",
-        #         "--addr", f"tcp://0.0.0.0:{_BUILDX_BUILDER_PORT}",
-        #     ],
-        #     check=True
-        # )
-
         subprocess.run(
             [
                 *self.docker_common_cmd_args,
                 "docker",
-                "start",
-                self.container_name
+                "run",
+                #"-d",
+                "-i",
+                "--rm",
+                f"--name={self.container_name}",
+                "--privileged",
+                "-p",
+                f"0:{_BUILDX_BUILDER_PORT}/tcp",
+                f"moby/buildkit:{BUILDKIT_VERSION}",
+                "--addr", f"tcp://0.0.0.0:{_BUILDX_BUILDER_PORT}",
             ],
             check=True
         )
+
+        # subprocess.run(
+        #     [
+        #         *self.docker_common_cmd_args,
+        #         "docker",
+        #         "start",
+        #         self.container_name
+        #     ],
+        #     check=True
+        # )
 
         host_port = self.get_host_port(container_name=self.container_name, cmd_args=self.docker_common_cmd_args)
         return host_port
