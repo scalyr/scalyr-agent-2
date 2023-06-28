@@ -460,6 +460,8 @@ class RemoteBuildxBuilderWrapper(BuildxBuilderWrapper):
             capture_output=True,
         )
 
+        print("!!!!")
+        print(inspect_result.stdout.decode())
         inspect_infos = json.loads(
             inspect_result.stdout.decode()
         )
