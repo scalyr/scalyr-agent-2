@@ -23,7 +23,7 @@ import subprocess
 import argparse
 import pathlib as pl
 import re
-from typing import List, Tuple, Optional, Dict, Type
+from typing import List, Tuple, Optional, Dict, Type, Union
 
 from agent_build_refactored.managed_packages.build_dependencies_versions import (
     EMBEDDED_PYTHON_VERSION,
@@ -32,6 +32,7 @@ from agent_build_refactored.managed_packages.build_dependencies_versions import 
     RUST_VERSION,
     EMBEDDED_PYTHON_PIP_VERSION,
 )
+from agent_build_refactored.tools.builder import BuilderStep
 from agent_build_refactored.tools.runner import (
     Runner,
     RunnerStep,
@@ -42,6 +43,9 @@ from agent_build_refactored.tools.runner import (
     GitHubActionsSettings,
     IN_DOCKER,
 )
+from agent_build_refactored.tools.constants import CpuArch, LibC
+from agent_build_refactored.tools.builder import Builder
+
 from agent_build_refactored.tools.constants import (
     SOURCE_ROOT,
     DockerPlatform,
@@ -49,6 +53,17 @@ from agent_build_refactored.tools.constants import (
     REQUIREMENTS_COMMON,
     REQUIREMENTS_COMMON_PLATFORM_DEPENDENT,
 )
+from agent_build_refactored.build_dependencies.python.prepare_build_base_with_python import PrepareBuildBaseWithPythonStep
+from agent_build_refactored.build_dependencies import (
+    BUILD_PYTHON_WITH_OPENSSL_1_STEPS,
+    BUILD_PYTHON_WITH_OPENSSL_3_STEPS,
+    PREPARE_PYTHON_ENVIRONMENT_STEPS,
+)
+
+from agent_build_refactored.build_dependencies.ubuntu_toolset import LatestUbuntuToolsetStep
+
+from agent_build_refactored.build_dependencies.build_agent_libs_venv import BuildAgentLibsVenvStep
+from agent_build_refactored.build_dependencies.python.build_python import BuilderPythonStep
 from agent_build_refactored.tools import check_call_with_log
 from agent_build_refactored.prepare_agent_filesystem import (
     build_linux_fhs_agent_files,
@@ -174,25 +189,25 @@ SUPPORTED_ARCHITECTURES = [
 ]
 
 
-class LinuxPackageBuilder(Runner, abc.ABC):
+def cpu_arch_as_fpm_arch(arch: CpuArch):
+    if arch == CpuArch.x86_64:
+        return "amd64"
+
+    if arch == CpuArch.AARCH64:
+        return "arm64"
+
+    raise Exception(f"Unknown cpu architecture: {arch.value}")
+
+
+class LinuxPackageBuilder(Builder, abc.ABC):
+    ENTRYPOINT_SCRIPT = pl.Path(__file__)
     """
     This is a base class that is responsible for the building of the Linux agent deb and rpm packages that are managed
         by package managers such as apt and yum.
     """
     # type of the package, aka 'deb' or 'rpm'
     PACKAGE_TYPE: str
-
-    @classmethod
-    def get_base_environment(cls) -> EnvironmentRunnerStep:
-        """Packages should be built inside our "toolset" image."""
-        return PREPARE_TOOLSET_STEPS[Architecture.X86_64]
-
-    @property
-    def packages_output_path(self) -> pl.Path:
-        """
-        Directory path with result packages.
-        """
-        return self.output_path / "packages"
+    NAME: str
 
     @property
     def common_agent_package_build_args(self) -> List[str]:
@@ -226,10 +241,6 @@ class LinuxPackageBuilder(Runner, abc.ABC):
                 # fmt: on
             ]
 
-    @abc.abstractmethod
-    def build_agent_package(self):
-        pass
-
     @staticmethod
     def _build_packages_common_files(package_root_path: pl.Path):
         """
@@ -257,53 +268,23 @@ class LinuxPackageBuilder(Runner, abc.ABC):
         # Add config file
         add_config(SOURCE_ROOT / "config", package_root_path / "etc/scalyr-agent-2")
 
-    @classmethod
-    def add_command_line_arguments(cls, parser: argparse.ArgumentParser):
-        super(LinuxPackageBuilder, cls).add_command_line_arguments(
-            parser=parser
-        )
-
-        subparsers = parser.add_subparsers(dest="command")
-
-        subparsers.add_parser(
-            "build", help="Build needed packages."
-        )
-
-    @classmethod
-    def handle_command_line_arguments(
-        cls,
-        args,
-    ):
-        super(LinuxPackageBuilder, cls).handle_command_line_arguments(
-            args=args
-        )
-
-        work_dir = pl.Path(args.work_dir)
-
-        builder = cls(work_dir=work_dir)
-
-        if args.command == "build":
-            builder.build_agent_package()
-            if not IN_DOCKER:
-                output_path = SOURCE_ROOT / "build"
-                if output_path.exists():
-                    shutil.rmtree(output_path)
-                shutil.copytree(
-                    builder.packages_output_path,
-                    output_path,
-                    dirs_exist_ok=True,
-                )
-
-        else:
-            logging.error(f"Unknown command {args.command}.")
-            exit(1)
-
 
 class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
     """
     This class builds non-aio (all in one) version of the package, meaning that this package has some system dependencies,
     such as Python and OpenSSL.
     """
+
+    def __init__(
+        self,
+    ):
+        self.toolset = LatestUbuntuToolsetStep()
+
+        super(LinuxPackageBuilder, self).__init__(
+            name=name,
+            base=self.toolset,
+        )
+
     @staticmethod
     def _create_non_aio_package_scriptlets(output_dir: pl.Path):
         """Copy three scriptlets required by the RPM and Debian non-aio packages.
@@ -353,16 +334,9 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
         replace_code(pre_install_scriptlet)
         replace_code(post_install_scriptlet)
 
-    def build_agent_package(self):
-        self.run_required()
+    def build(self):
 
-        # Run inside the docker if needed.
-        if self.runs_in_docker:
-            command_args = ["build"]
-            self.run_in_docker(command_args=command_args)
-            return
-
-        agent_package_root = self.output_path / "agent_package_root"
+        agent_package_root = self.work_dir / "agent_package_root"
 
         self._build_packages_common_files(package_root_path=agent_package_root)
 
@@ -397,7 +371,7 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
         os.chmod(agent_main_py3_path, main_permissions)
 
         # Create package installation scriptlets
-        scriptlets_path = self.output_path / "scriptlets"
+        scriptlets_path = self.work_dir / "scriptlets"
         scriptlets_path.mkdir()
         self._create_non_aio_package_scriptlets(output_dir=scriptlets_path)
 
@@ -407,11 +381,11 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
         )
 
         # prepare packages changelogs
-        changelogs_path = self.output_path / "changelogs"
+        changelogs_path = self.work_dir / "changelogs"
         changelogs_path.mkdir()
         create_change_logs(output_dir=changelogs_path)
 
-        package_output_dir = self.packages_output_path / self.PACKAGE_TYPE
+        package_output_dir = self.output_dir / self.PACKAGE_TYPE
         package_output_dir.mkdir(parents=True, exist_ok=True)
 
         subprocess.check_call(
@@ -444,152 +418,32 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
     """
 
     # package architecture, for example: amd64 for deb.
-    DEPENDENCY_PACKAGES_ARCHITECTURE: Architecture
+    ARCHITECTURE: CpuArch
+    LIBC: LibC
 
-    # Name of a target distribution in the packagecloud.
-    PACKAGECLOUD_DISTRO: str
+    def __init__(self):
 
-    # Version of a target distribution in the packagecloud.
-    PACKAGECLOUD_DISTRO_VERSION: str
+        self.architecture = self.__class__.ARCHITECTURE
+        self.libs = self.__class__.LIBC
 
-    @classmethod
-    def get_all_required_steps(cls) -> List[RunnerStep]:
-        steps = super(LinuxAIOPackagesBuilder, cls).get_all_required_steps()
-
-        steps.extend(
-            [
-                BUILD_OPENSSL_1_1_1_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
-                BUILD_OPENSSL_3_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
-                BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
-                BUILD_PYTHON_WITH_OPENSSL_3_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
-                BUILD_AGENT_LIBS_VENV_STEPS[cls.DEPENDENCY_PACKAGES_ARCHITECTURE],
-            ]
-        )
-        return steps
-
-    @property
-    def dependency_packages_arch(self) -> str:
-        if self.PACKAGE_TYPE == "deb":
-            return self.DEPENDENCY_PACKAGES_ARCHITECTURE.as_deb_package_arch
-        elif self.PACKAGE_TYPE == "rpm":
-            return self.DEPENDENCY_PACKAGES_ARCHITECTURE.as_rpm_package_arch
-        else:
-            raise ValueError(f"Unknown package type: {self.PACKAGE_TYPE}")
-
-    @property
-    def agent_package_arch(self) -> str:
-        if self.PACKAGE_TYPE == "deb":
-            return Architecture.UNKNOWN.as_deb_package_arch
-        elif self.PACKAGE_TYPE == "rpm":
-            return Architecture.UNKNOWN.as_rpm_package_arch
-        else:
-            raise ValueError(f"Unknown package type: {self.PACKAGE_TYPE}")
-
-    @property
-    def managed_packages_output_path(self) -> pl.Path:
-        return self.packages_output_path / self.PACKAGE_TYPE / "managed"
-
-    @staticmethod
-    def _parse_package_version_parts(version: str) -> Tuple[int, str]:
-        """
-        Deconstructs package version string and return tuple with version's iteration and checksum parts.
-        """
-        iteration, checksum = version.split("+")
-        return int(iteration), checksum
-
-    def _parser_package_file_parts(self, package_file_name: str):
-        if self.PACKAGE_TYPE == "deb":
-            # split filename to name and extension
-            filename, ext = package_file_name.split(".")
-            # then split name to name prefix, version and architecture.
-            package_name, version, arch = filename.split("_")
-        else:
-            # split filename to name, arch, and extension
-            filename, arch, ext = package_file_name.split(".")
-            # split with release
-            prefix, release = filename.rsplit("-", 1)
-            # split with version
-            package_name, version = prefix.rsplit("-", 1)
-
-        return package_name, version, arch, ext
-
-    def _parse_version_from_package_file_name(self, package_file_name: str):
-        """
-        Parse version of the package from its filename.
-        """
-        _, version, _, _ = self._parser_package_file_parts(
-            package_file_name=package_file_name
-        )
-        return version
-
-    @classmethod
-    def get_python_package_build_cmd_args(cls) -> List[str]:
-        """
-        Returns list of arguments for the command that builds python package.
-        """
-
-        description = (
-            "Dependency package which provides Python interpreter which is used by the agent from the "
-            "'scalyr-agent-2 package'"
+        self.ubuntu_toolset = LatestUbuntuToolsetStep()
+        prepare_build_base_with_python = PREPARE_PYTHON_ENVIRONMENT_STEPS[self.libs][self.architecture]
+        self.build_python_step = prepare_build_base_with_python.build_python_step
+        self.build_python_step_with_openssl_1 = BUILD_PYTHON_WITH_OPENSSL_1_STEPS[self.libs][self.architecture]
+        self.build_agent_libs_venv_step = BuildAgentLibsVenvStep(
+            prepare_build_base_with_python_step=prepare_build_base_with_python,
         )
 
-        package_arch = cls.DEPENDENCY_PACKAGES_ARCHITECTURE.get_package_arch(
-            package_type=cls.PACKAGE_TYPE
+        super(LinuxPackageBuilder, self).__init__(
+            name="linux_package_builder",
+            base=self.ubuntu_toolset,
+            dependencies=[
+                self.build_agent_libs_venv_step,
+                self.build_python_step,
+                self.build_python_step.build_openssl_step,
+                self.build_python_step_with_openssl_1,
+            ],
         )
-        return [
-            # fmt: off
-            "fpm",
-            "-s", "dir",
-            "-a", package_arch,
-            "-t", cls.PACKAGE_TYPE,
-            "-n", PYTHON_PACKAGE_NAME,
-            "--license", '"Apache 2.0"',
-            "--vendor", "Scalyr",
-            "--provides", "scalyr-agent-dependencies",
-            "--description", description,
-            "--depends", "bash >= 3.2",
-            "--url", "https://www.scalyr.com",
-            "--deb-user", "root",
-            "--deb-group", "root",
-            "--rpm-user", "root",
-            "--rpm-group", "root",
-            # fmt: on
-        ]
-
-    @classmethod
-    def get_agent_libs_build_command_args(cls) -> List[str]:
-        """
-        Returns list of arguments for command that build agent-libs package.
-        """
-
-        description = (
-            "Dependency package which provides Python requirement libraries which are used by the agent "
-            "from the 'scalyr-agent-2 package'"
-        )
-
-        package_arch = cls.DEPENDENCY_PACKAGES_ARCHITECTURE.get_package_arch(
-            package_type=cls.PACKAGE_TYPE
-        )
-
-        return [
-            # fmt: off
-            "fpm",
-            "-s", "dir",
-            "-a", package_arch,
-            "-t", cls.PACKAGE_TYPE,
-            "-n", AGENT_LIBS_PACKAGE_NAME,
-            "--license", '"Apache 2.0"',
-            "--vendor", "Scalyr",
-            "--provides", "scalyr-agent-2-dependencies",
-            "--description", description,
-            "--depends", "bash >= 3.2",
-            "--url", "https://www.scalyr.com",
-            "--deb-user", "root",
-            "--deb-group", "root",
-            "--rpm-user", "root",
-            "--rpm-group", "root",
-            # fmt: on
-        ]
 
     def _prepare_package_python_and_libraries_files(self, package_root: pl.Path):
         """
@@ -597,14 +451,9 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         :param package_root: Path to the package root.
         """
 
-        step_arch = self.DEPENDENCY_PACKAGES_ARCHITECTURE
-
-        build_python_with_openssl_1_1_1_step = BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[step_arch]
-        build_python_with_openssl_3_step = BUILD_PYTHON_WITH_OPENSSL_3_STEPS[step_arch]
-
         # Copy Python interpreter to package.
         shutil.copytree(
-            build_python_with_openssl_1_1_1_step.get_output_directory(work_dir=self.work_dir),
+            self.build_python_step.output_dir,
             package_root,
             dirs_exist_ok=True,
             symlinks=True
@@ -618,21 +467,18 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         python_hashlib_bindings_glob = "_hashlib.cpython-*-*-*-*.so"
 
         def copy_openssl_files(
-                build_python_step: ArtifactRunnerStep,
-                openssl_variant_name: str,
+                python_dir: pl.Path,
+                openssl_major_version: str,
         ):
             """# This function copies Python's ssl module related files."""
 
-            # Copy _ssl and _hashlib modules.
-            build_python_step_dir = build_python_step.get_output_directory(
-                work_dir=self.work_dir
-            )
-            python_step_bindings_dir = build_python_step_dir / relative_python_install_prefix / f"lib/python{EMBEDDED_PYTHON_SHORT_VERSION}/lib-dynload"
+
+            python_step_bindings_dir = python_dir / relative_python_install_prefix / f"lib/python{EMBEDDED_PYTHON_SHORT_VERSION}/lib-dynload"
 
             ssl_binding_path = list(python_step_bindings_dir.glob(python_ssl_bindings_glob))[0]
             hashlib_binding_path = list(python_step_bindings_dir.glob(python_hashlib_bindings_glob))[0]
 
-            bindings_dir = package_openssl_dir / openssl_variant_name / "bindings"
+            bindings_dir = package_openssl_dir / openssl_major_version / "bindings"
             bindings_dir.mkdir(parents=True)
 
             shutil.copy(ssl_binding_path, bindings_dir)
@@ -640,38 +486,38 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
 
         # Copy ssl modules which are compiled for OpenSSL 1.1.1
         copy_openssl_files(
-            build_python_step=build_python_with_openssl_1_1_1_step,
-            openssl_variant_name="1_1_1"
+            python_dir=self.build_python_step_with_openssl_1.output_dir,
+            openssl_major_version="1"
         )
 
         # Copy ssl modules which are compiled for OpenSSL 3
         copy_openssl_files(
-            build_python_step=build_python_with_openssl_3_step,
-            openssl_variant_name="3"
+            python_dir=self.build_python_step.output_dir,
+            openssl_major_version="3"
         )
 
         # Create directory for the embedded OpenSSL files.
         embedded_openssl_dir = package_openssl_dir / "embedded"
         embedded_openssl_dir.mkdir()
-        # Since we use OpenSSL 1.1.1 for embedded, we link to the previously created C bindings of the OpenSSL 1.1.1.
+        # Since we use OpenSSL 3 for embedded, we link to the previously created C bindings of the OpenSSL 3.
         embedded_openssl_bindings = embedded_openssl_dir / "bindings"
-        embedded_openssl_bindings.symlink_to("../1_1_1/bindings")
-        # Copy shared libraries of the embedded OpenSSL 1.1.1 from the step that builds it.
+        embedded_openssl_bindings.symlink_to("../3/bindings")
+        # Copy shared libraries of the embedded OpenSSL 1 from the step that builds it.
         embedded_openssl_libs_dir = embedded_openssl_dir / "libs"
         embedded_openssl_libs_dir.mkdir(parents=True)
 
-        build_openssl_1_1_1_step = BUILD_OPENSSL_1_1_1_STEPS[step_arch]
-        build_openssl_step_dir = build_openssl_1_1_1_step.get_output_directory(
-            work_dir=self.work_dir
-        )
-        build_env_info = _SUPPORTED_ARCHITECTURES_TO_BUILD_ENVIRONMENTS[step_arch]
+        # build_openssl_1_1_1_step = BUILD_OPENSSL_1_1_1_STEPS[step_arch]
+        # build_openssl_step_dir = build_openssl_1_1_1_step.get_output_directory(
+        #     work_dir=self.work_dir
+        # )
+        # build_env_info = _SUPPORTED_ARCHITECTURES_TO_BUILD_ENVIRONMENTS[step_arch]
+        #
+        # if "centos:6" in build_env_info.image:
+        #     libssl_dir = "usr/local/lib64"
+        # else:
+        #     libssl_dir = "usr/local/lib"
 
-        if "centos:6" in build_env_info.image:
-            libssl_dir = "usr/local/lib64"
-        else:
-            libssl_dir = "usr/local/lib"
-
-        build_openssl_libs_dir = build_openssl_step_dir / libssl_dir
+        build_openssl_libs_dir = self.build_python_step.build_openssl_step.output_dir / "usr/local/lib"
         for path in build_openssl_libs_dir.glob("*.so.*"):
             shutil.copy(path, embedded_openssl_libs_dir)
 
@@ -708,6 +554,8 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         package_opt_etc_dir.mkdir()
         preferred_openssl_file = package_opt_etc_dir / "preferred_openssl"
         preferred_openssl_file.write_text("auto")
+
+        package_python_bin_dir = package_python_dir / "bin"
 
         # Remove other executables
         for _glob in ["pip*", "2to3*", "pydoc*", "idle*"]:
@@ -756,9 +604,8 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         # Copy agent libraries venv
         package_venv_dir = package_opt_dir / "venv"
         package_venv_dir.mkdir()
-        build_agent_libs_venv_step = BUILD_AGENT_LIBS_VENV_STEPS[step_arch]
         shutil.copytree(
-            build_agent_libs_venv_step.get_output_directory(work_dir=self.work_dir) / "venv",
+            self.build_agent_libs_venv_step.output_dir,
             package_venv_dir,
             dirs_exist_ok=True,
             symlinks=True
@@ -803,16 +650,9 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         var_opt_dir = package_root / f"var/opt/{AGENT_SUBDIR_NAME}"
         var_opt_dir.mkdir(parents=True)
 
-    def build_agent_package(self):
-        self.run_required()
+    def build(self):
 
-        # Run inside the docker if needed.
-        if self.runs_in_docker:
-            command_args = ["build"]
-            self.run_in_docker(command_args=command_args)
-            return
-
-        agent_package_root = self.output_path / "agent_package_root"
+        agent_package_root = self.work_dir / "agent_package_root"
 
         self._prepare_package_python_and_libraries_files(
             package_root=agent_package_root
@@ -867,16 +707,12 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
             'dependencies that are required by the package bundled with it.'
         )
 
-        package_arch = self.DEPENDENCY_PACKAGES_ARCHITECTURE.get_package_arch(
-            package_type=self.PACKAGE_TYPE
-        )
-
         # prepare packages changelogs
-        changelogs_path = self.output_path / "changelogs"
+        changelogs_path = self.work_dir / "changelogs"
         changelogs_path.mkdir()
         create_change_logs(output_dir=changelogs_path)
 
-        package_output_dir = self.packages_output_path / self.PACKAGE_TYPE
+        package_output_dir = self.output_dir / self.PACKAGE_TYPE
         package_output_dir.mkdir(parents=True, exist_ok=True)
 
         subprocess.check_call(
@@ -884,7 +720,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
                 # fmt: off
                 *self.common_agent_package_build_args,
                 "-s", "dir",
-                "-a", package_arch,
+                "-a", cpu_arch_as_fpm_arch(arch=self.architecture),
                 "-t", self.PACKAGE_TYPE,
                 "-C", str(agent_package_root),
                 "-n", AGENT_AIO_PACKAGE_NAME,
@@ -904,1158 +740,49 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
             cwd=str(package_output_dir),
         )
 
-    @classmethod
-    def _get_build_package_root_step(cls, package_name: str) -> ArtifactRunnerStep:
-        """
-        Return runner step that builds root for a given package.
-        :param package_name: name of the package.
-        """
-        package_to_steps = {
-            PYTHON_PACKAGE_NAME: BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS,
-            AGENT_LIBS_PACKAGE_NAME: BUILD_AGENT_LIBS_PACKAGE_ROOT_STEPS,
-        }
-        steps = package_to_steps[package_name]
 
-        return steps[cls.DEPENDENCY_PACKAGES_ARCHITECTURE]
+_BUILDERS: Dict[str, Union[Type[LinuxAIOPackagesBuilder], Type[LinuxNonAIOPackageBuilder]]] = {}
 
-    @classmethod
-    def get_package_checksum(
-        cls,
-        package_name: str,
-    ):
-        """
-        Get checksum of the package. We try to take into account every possible variable
-            that may affect the result package.
+for package_type in ["deb", "rpm"]:
 
-        For now, those are:
-            - checksum of the step that produces files for package.
-            - command line arguments that are used to build the package.
+    name = f"{package_type}-non-aio"
 
-        :param package_name:
-        :return:
-        """
+    class _LinuxNonAIOPackagesBuilder(LinuxNonAIOPackageBuilder):
+        NAME = name
+        PACKAGE_TYPE = package_type
 
-        build_root_step = cls._get_build_package_root_step(package_name=package_name)
+    _BUILDERS[name] = _LinuxNonAIOPackagesBuilder
 
-        if package_name == PYTHON_PACKAGE_NAME:
-            build_command_args = cls.get_python_package_build_cmd_args()
-        else:
-            build_command_args = cls.get_agent_libs_build_command_args()
+    for package_libc in [LibC.GNU]:
+        for package_arch in [CpuArch.x86_64, CpuArch.AARCH64]:
+            name = f"{package_type}-aio-{package_arch.value}"
 
-        # Add checksum of the step that builds package files.
-        sha256 = hashlib.sha256()
-        sha256.update(build_root_step.checksum.encode())
+            class _LinuxAIOPackagesBuilder(LinuxAIOPackagesBuilder):
+                NAME = name
+                PACKAGE_TYPE = package_type
+                ARCHITECTURE = package_arch
+                LIBC = package_libc
 
-        # Add arguments that are used to build package.
-        for arg in build_command_args:
-            sha256.update(arg.encode())
+            _BUILDERS[name] = _LinuxAIOPackagesBuilder
 
-        return sha256.hexdigest()
 
-    def build(self, stable_versions_file: str = None):
-        """
-        Build agent package and its dependency packages.
-        # TODO this param for now is always None, this should be chaged after the first stable release.
-        :param stable_versions_file: Path to JSON file with stable versions to reuse.
-        """
+def get_package_builder_by_name(name: str):
+    return _BUILDERS[name]
 
-        self.run_required()
 
-        # Run inside the docker if needed.
-        if self.runs_in_docker:
-            command_args = ["build"]
-            self.run_in_docker(command_args=command_args)
-            return
+def main(args=None):
+    base_parser = argparse.ArgumentParser()
+    base_parser.add_argument("builder_name", choices=_BUILDERS.keys())
+    base_args, other_args = base_parser.parse_known_args(args=args)
+    builder_cls = get_package_builder_by_name(name=base_args.builder_name)
 
-        self.managed_packages_output_path.mkdir(parents=True)
+    builder = builder_cls()
+    parser = builder.create_parser()
+    args = parser.parse_args(args=other_args)
 
-        # Build agent libs package
-        (
-            agent_libs_version,
-            should_build_agent_libs,
-        ) = _get_dependency_package_version_to_use(
-            checksum=_ALL_AGENT_LIBS_PACKAGES_CHECKSUM,
-            package_name=AGENT_LIBS_PACKAGE_NAME,
-            stable_versions_file_path=stable_versions_file,
-        )
+    run_builder = builder.run_builder_from_command_line(args=args)
+    run_builder()
 
-        if should_build_agent_libs:
-            # build python package, if needed
-            (
-                python_version,
-                should_build_python,
-            ) = _get_dependency_package_version_to_use(
-                checksum=_ALL_PYTHON_PACKAGES_CHECKSUM,
-                package_name=PYTHON_PACKAGE_NAME,
-                stable_versions_file_path=stable_versions_file,
-            )
-            if should_build_python:
-                build_python_package_root_step = self._get_build_package_root_step(
-                    package_name=PYTHON_PACKAGE_NAME
-                )
-                build_python_step_output = (
-                    build_python_package_root_step.get_output_directory(
-                        work_dir=self.work_dir
-                    )
-                )
 
-                scriptlets_dir = build_python_step_output / "scriptlets"
-                check_call_with_log(
-                    [
-                        *self.get_python_package_build_cmd_args(),
-                        "-v",
-                        python_version,
-                        "-C",
-                        str(build_python_step_output / "root"),
-                        "--config-files",
-                        f"/opt/{AGENT_SUBDIR_NAME}/etc/preferred_openssl",
-                        "--after-install",
-                        str(scriptlets_dir / "postinstall.sh"),
-                        "--before-remove",
-                        str(scriptlets_dir / "preuninstall.sh"),
-                        "--verbose",
-                    ],
-                    cwd=str(self.managed_packages_output_path),
-                )
-
-            build_agent_libs_package_root_step = self._get_build_package_root_step(
-                package_name=AGENT_LIBS_PACKAGE_NAME
-            )
-            build_agent_libs_step_output = (
-                build_agent_libs_package_root_step.get_output_directory(
-                    work_dir=self.work_dir
-                )
-            )
-
-            scriptlets_dir = build_agent_libs_step_output / "scriptlets"
-
-            check_call_with_log(
-                [
-                    *self.get_agent_libs_build_command_args(),
-                    "--depends",
-                    f"{PYTHON_PACKAGE_NAME} = {python_version}",
-                    "--config-files",
-                    f"/opt/{AGENT_SUBDIR_NAME}/etc/additional-requirements.txt",
-                    "--after-install",
-                    str(scriptlets_dir / "postinstall.sh"),
-                    "-v",
-                    agent_libs_version,
-                    "-C",
-                    str(build_agent_libs_step_output / "root"),
-                    "--verbose",
-                ],
-                cwd=str(self.managed_packages_output_path),
-            )
-
-        self.build_agent_package(
-            agent_libs_package_version=agent_libs_version,
-        )
-
-    def _get_final_package_path_and_version(
-        self,
-        package_name: str,
-        last_repo_package_file_path: pl.Path = None,
-    ) -> Tuple[Optional[pl.Path], str]:
-        """
-        Get path and version of the final package to build.
-        :param package_name: name of the package.
-        :param last_repo_package_file_path: Path to a last package from the repo. If specified and there are no changes
-            between current package and package from repo, then package from repo is used instead of building a new one.
-        :return: Tuple with:
-            - Path to the final package. None if package is not found in repo.
-            - Version of the final package.
-        """
-        final_package_path = None
-
-        current_package_checksum = self.get_package_checksum(package_name=package_name)
-
-        if last_repo_package_file_path is None:
-            # If there is no any recent version of the package in repo then build new version for the first package.
-            final_package_version = f"1+{current_package_checksum}"
-        else:
-            # If there is a recent version of the package in the repo, then parse its checksum and compare it
-            # with the checksum of the current package. If checksums are identical, then we can reuse
-            # package version from the repo.
-            last_repo_package_version = self._parse_version_from_package_file_name(
-                package_file_name=last_repo_package_file_path.name
-            )
-            (
-                last_repo_package_iteration,
-                last_repo_package_checksum,
-            ) = self._parse_package_version_parts(version=last_repo_package_version)
-            if current_package_checksum == last_repo_package_checksum:
-                final_package_version = last_repo_package_version
-                final_package_path = last_repo_package_file_path
-            else:
-                # checksums are not identical, create new version of the package.
-                final_package_version = (
-                    f"{last_repo_package_iteration + 1}+{current_package_checksum}"
-                )
-
-        return final_package_path, final_package_version
-
-    def build_packages(
-        self,
-        last_repo_python_package_file: str = None,
-        last_repo_agent_libs_package_file: str = None,
-    ):
-        """
-        Build needed packages.
-
-        :param last_repo_python_package_file: Path to the python package file. If specified, then the python
-            dependency package from this path will be reused instead of building a new one.
-        :param last_repo_agent_libs_package_file: Path to the agent libs package file. If specified, then the agent-libs
-            dependency package from this path will be reused instead of building a new one.
-        """
-
-        self.run_required()
-
-        # Run inside the docker if needed.
-        if self.runs_in_docker:
-            command_args = ["build"]
-            if last_repo_python_package_file:
-                command_args.extend(
-                    [
-                        "--last-repo-python-package-file",
-                        RunnerMappedPath(last_repo_python_package_file),
-                    ]
-                )
-
-            if last_repo_agent_libs_package_file:
-                command_args.extend(
-                    [
-                        "--last-repo-agent-libs-package-file",
-                        RunnerMappedPath(last_repo_agent_libs_package_file),
-                    ]
-                )
-
-            self.run_in_docker(command_args=command_args)
-            return
-
-        packages_to_publish = []
-
-        last_repo_python_package_path = None
-        last_repo_agent_libs_package_path = None
-
-        # Check if there are packages to reuse provided.
-        if last_repo_python_package_file:
-            last_repo_python_package_path = pl.Path(last_repo_python_package_file)
-
-        if last_repo_agent_libs_package_file:
-            last_repo_agent_libs_package_path = pl.Path(
-                last_repo_agent_libs_package_file
-            )
-
-        self.packages_output_path.mkdir(parents=True)
-
-        # Get reused package from repo, in case current package is unchanged and it is already in repo.
-        (
-            final_python_package_path,
-            final_python_version,
-        ) = self._get_final_package_path_and_version(
-            package_name=PYTHON_PACKAGE_NAME,
-            last_repo_package_file_path=last_repo_python_package_path,
-        )
-
-        # Python package is not found in repo, build it.
-        if final_python_package_path is None:
-            package_root = (
-                self.PYTHON_BUILD_STEP.get_output_directory(work_dir=self.work_dir)
-                / "python"
-            )
-
-            check_call_with_log(
-                [
-                    *self.get_python_package_build_cmd_args,
-                    "-v",
-                    final_python_version,
-                    "-C",
-                    str(package_root),
-                    "--verbose",
-                ],
-                cwd=str(self.packages_output_path),
-            )
-            if self.PACKAGE_TYPE == "deb":
-                found = list(
-                    self.packages_output_path.glob(
-                        f"{PYTHON_PACKAGE_NAME}_{final_python_version}_{self.dependency_packages_arch}.{self.PACKAGE_TYPE}"
-                    )
-                )
-            elif self.PACKAGE_TYPE == "rpm":
-                found = list(
-                    self.packages_output_path.glob(
-                        f"{PYTHON_PACKAGE_NAME}-{final_python_version}-1.{self.dependency_packages_arch}.{self.PACKAGE_TYPE}"
-                    )
-                )
-            else:
-                raise Exception(f"Unknown package type {self.PACKAGE_TYPE}")
-
-            assert (
-                len(found) == 1
-            ), f"Number of result Python packages has to be 1, got {len(found)}"
-            packages_to_publish.append(found[0].name)
-            logger.info(f"Package {found[0]} is built.")
-        else:
-            # Current python package is not changed, and it already exists in repo, reuse it.
-            shutil.copy(final_python_package_path, self.packages_output_path)
-            logger.info(
-                f"Package {final_python_package_path.name} is reused from repo."
-            )
-
-        # Do the same and build the 'agent-libs' package.
-        (
-            final_agent_libs_package_path,
-            final_agent_libs_version,
-        ) = self._get_final_package_path_and_version(
-            package_name=AGENT_LIBS_PACKAGE_NAME,
-            last_repo_package_file_path=last_repo_agent_libs_package_path,
-        )
-
-        # The agent-libs package is not found in repo, build it.
-        if final_agent_libs_package_path is None:
-            package_root = (
-                self.AGENT_LIBS_BUILD_STEP.get_output_directory(work_dir=self.work_dir)
-                / "agent_libs"
-            )
-
-            check_call_with_log(
-                [
-                    *self.get_agent_libs_build_command_args,
-                    "-v",
-                    final_agent_libs_version,
-                    "-C",
-                    str(package_root),
-                    "--depends",
-                    f"scalyr-agent-python3 = {final_python_version}",
-                    "--verbose",
-                ],
-                cwd=str(self.packages_output_path),
-            )
-            if self.PACKAGE_TYPE == "deb":
-                found = list(
-                    self.packages_output_path.glob(
-                        f"{AGENT_LIBS_PACKAGE_NAME}_{final_agent_libs_version}_{self.dependency_packages_arch}.{self.PACKAGE_TYPE}"
-                    )
-                )
-            elif self.PACKAGE_TYPE == "rpm":
-                found = list(
-                    self.packages_output_path.glob(
-                        f"{AGENT_LIBS_PACKAGE_NAME}-{final_agent_libs_version}-1.{self.dependency_packages_arch}.{self.PACKAGE_TYPE}"
-                    )
-                )
-            else:
-                raise Exception(f"Unknown package type {self.PACKAGE_TYPE}")
-
-            assert (
-                len(found) == 1
-            ), f"Number of result agent_libs packages has to be 1, got {len(found)}"
-            packages_to_publish.append(found[0].name)
-            logger.info(f"Package {found[0].name} is built.")
-        else:
-            # Current agent-libs package is not changed, and it already exists in repo, reuse it.
-            shutil.copy(final_agent_libs_package_path, self.packages_output_path)
-            logger.info(
-                f"Package {final_agent_libs_package_path.name} is reused from repo."
-            )
-
-        # Build agent_package
-        agent_package_path = self._build_agent_package(
-            agent_libs_package_version=final_agent_libs_version
-        )
-        packages_to_publish.append(str(agent_package_path))
-
-        # Also write special json file which contain information about packages that have to be published.
-        # We have to use it in order to skip the publishing of the packages that are reused and already in the repo.
-        packages_to_publish_file = (
-            self.packages_output_path / "packages_to_publish.json"
-        )
-        packages_to_publish_file.write_text(json.dumps(packages_to_publish, indent=4))
-
-    def publish_packages_to_packagecloud(
-        self,
-        packages_dir_path: pl.Path,
-        token: str,
-        repo_name: str,
-        user_name: str,
-    ):
-        """
-        Publish packages that are built by the 'build_packages' method.
-        :param packages_dir_path: Path to a directory with target packages.
-        :param token: Auth token to Packagecloud.
-        :param repo_name: Target Packagecloud repo.
-        :param user_name: Target Packagecloud user.
-        """
-
-        # Run in docker if needed.
-        if self.runs_in_docker:
-            self.run_in_docker(
-                command_args=[
-                    "publish",
-                    "--packages-dir",
-                    RunnerMappedPath(packages_dir_path),
-                    "--token",
-                    token,
-                    "--repo-name",
-                    repo_name,
-                    "--user-name",
-                    user_name,
-                ]
-            )
-            return
-
-        # Set packagecloud's credentials file.
-        config = {"url": "https://packagecloud.io", "token": token}
-
-        config_file_path = pl.Path.home() / ".packagecloud"
-        config_file_path.write_text(json.dumps(config))
-
-        packages_to_publish_file = packages_dir_path / "packages_to_publish.json"
-        packages_to_publish = set(json.loads(packages_to_publish_file.read_text()))
-
-        for package_path in packages_dir_path.glob(f"*.{self.PACKAGE_TYPE}"):
-            if package_path.name not in packages_to_publish:
-                logger.info(
-                    f"Package {package_path.name} has been skipped since it's already in repo."
-                )
-                continue
-
-            repo_paths = {
-                "deb": f"{user_name}/{repo_name}/any/any",
-                "rpm": f"{user_name}/{repo_name}/rpm_any/rpm_any",
-            }
-
-            check_call_with_log(
-                [
-                    "package_cloud",
-                    "push",
-                    repo_paths[self.PACKAGE_TYPE],
-                    str(package_path),
-                ]
-            )
-
-            logging.info(f"Package {package_path.name} is published.")
-
-    def find_last_repo_package(
-        self,
-        package_name: str,
-        token: str,
-        user_name: str,
-        repo_name: str,
-    ) -> Optional[str]:
-        """
-        Find the most recent version of the given package in the repo.
-        :param package_name: Name of the package.
-        :param token: Packagecloud token
-        :param repo_name: Target Packagecloud repo.
-        :param user_name: Target Packagecloud user.
-        :return: filename of the package if found, or None.
-        """
-
-        import requests
-        from requests.auth import HTTPBasicAuth
-        from requests.utils import parse_header_links
-
-        auth = HTTPBasicAuth(token, "")
-
-        param_filters = {"deb": "debs", "rpm": "rpms"}
-
-        packages = []
-
-        # First get the first page to get pagination links from response headers.
-        with requests.Session() as s:
-            resp = s.get(
-                url=f"https://packagecloud.io/api/v1/repos/{user_name}/{repo_name}/search.json",
-                params={
-                    "q": package_name,
-                    "filter": param_filters[self.PACKAGE_TYPE],
-                    "per_page": "250",
-                },
-                auth=auth,
-            )
-            resp.raise_for_status()
-
-            packages.extend(resp.json())
-
-            # Iterate through other pages.
-            while True:
-                links = resp.headers.get("Link")
-
-                if links is None:
-                    break
-                # Get link to the next page.
-
-                links_dict = {
-                    link["rel"]: link["url"] for link in parse_header_links(links)
-                }
-
-                next_page_url = links_dict.get("next")
-                if next_page_url is None:
-                    break
-
-                resp = s.get(url=next_page_url, auth=auth)
-                resp.raise_for_status()
-                packages.extend(resp.json())
-
-        filtered_packages = []
-        distro_version = (
-            f"{self.PACKAGECLOUD_DISTRO}/{self.PACKAGECLOUD_DISTRO_VERSION}"
-        )
-
-        for p in packages:
-            # filter by package type
-            if p["type"] != self.PACKAGE_TYPE:
-                continue
-
-            # filter by distro version.
-            if distro_version != p["distro_version"]:
-                continue
-
-            # filter only packages with appropriate architecture
-            _, _, arch, _ = self._parser_package_file_parts(
-                package_file_name=p["filename"]
-            )
-            if arch != self.dependency_packages_arch:
-                continue
-
-            filtered_packages.append(p)
-
-        if len(filtered_packages) == 0:
-            logger.info(f"Could not find any package with name {package_name}")
-            return None
-
-        # sort packages by version and get the last one.
-        sorted_packages = sorted(filtered_packages, key=operator.itemgetter("version"))
-
-        last_package = sorted_packages[-1]
-
-        return last_package["filename"]
-
-    @staticmethod
-    def download_package_from_repo(
-        package_filename: str,
-        output_dir: str,
-        token: str,
-        user_name: str,
-        repo_name: str,
-    ):
-        """
-        Download package file by the given filename.
-        :param package_filename: Filename of the package.
-        :param output_dir: Directory path to store the downloaded package.
-        :param token: Packagecloud token
-        :param repo_name: Target Packagecloud repo.
-        :param user_name: Target Packagecloud user.
-        :return: Path of the downloaded package.
-        """
-
-        # Query needed package info.
-        import requests
-        from requests.auth import HTTPBasicAuth
-
-        auth = HTTPBasicAuth(token, "")
-
-        # There's no need to use pagination, since we provide file name of an exact package and there has to be only
-        # one occurrence.
-        with requests.Session() as s:
-            resp = s.get(
-                url=f"https://packagecloud.io/api/v1/repos/{user_name}/{repo_name}/search.json",
-                params={
-                    "q": f"{package_filename}",
-                },
-                auth=auth,
-            )
-            resp.raise_for_status()
-
-            found_packages = resp.json()
-
-        assert (
-            len(found_packages) == 1
-        ), f"Expected number of found packages is 1, got {len(found_packages)}."
-        last_package = found_packages[0]
-
-        # Download found package file.
-        auth = HTTPBasicAuth(token, "")
-        with requests.Session() as s:
-            resp = s.get(url=last_package["download_url"], auth=auth)
-            resp.raise_for_status()
-
-            output_dir_path = pl.Path(output_dir)
-            output_dir_path.mkdir(parents=True, exist_ok=True)
-            package_path = pl.Path(output_dir) / package_filename
-            with package_path.open("wb") as f:
-                for chunk in resp.iter_content(chunk_size=8192):
-                    f.write(chunk)
-
-        return package_path
-
-
-# Version of the  Python build dependencies.
-_PYTHON_BUILD_DEPENDENCIES_VERSIONS = {
-    "XZ_VERSION": "5.2.6",
-    "OPENSSL_1_1_1_VERSION": PYTHON_PACKAGE_SSL_VERSIONS[OPENSSL_VERSION_TYPE_1_1_1],
-    "OPENSSL_3_VERSION": PYTHON_PACKAGE_SSL_VERSIONS[OPENSSL_VERSION_TYPE_3],
-    "LIBFFI_VERSION": "3.4.2",
-    "UTIL_LINUX_VERSION": "2.38",
-    "NCURSES_VERSION": "6.3",
-    "LIBEDIT_VERSION_COMMIT": "0cdd83b3ebd069c1dee21d81d6bf716cae7bf5da",  # tag - "upstream/3.1-20221030"
-    "GDBM_VERSION": "1.23",
-    "ZLIB_VERSION": "1.2.13",
-    "BZIP_VERSION": "1.0.8",
-}
-
-# Step that downloads all Python dependencies.
-DOWNLOAD_PYTHON_DEPENDENCIES = ArtifactRunnerStep(
-    name="download_build_dependencies",
-    script_path="agent_build_refactored/managed_packages/steps/download_build_dependencies/download_build_dependencies.sh",
-    tracked_files_globs=[
-        "agent_build_refactored/managed_packages/steps/download_build_dependencies/gnu-keyring.gpg",
-        "agent_build_refactored/managed_packages/steps/download_build_dependencies/gpgkey-5C1D1AA44BE649DE760A.gpg",
-    ],
-    base=DockerImageSpec(name="ubuntu:22.04", platform=DockerPlatform.AMD64.value),
-    environment_variables={
-        **_PYTHON_BUILD_DEPENDENCIES_VERSIONS,
-        "PYTHON_VERSION": EMBEDDED_PYTHON_VERSION,
-    },
-)
-
-
-def create_build_openssl_steps(
-    openssl_version_type: str,
-) -> Dict[Architecture, ArtifactRunnerStep]:
-    """
-    Create steps that build openssl library with given version.
-    :param openssl_version_type: type of the OpenSSL, eg. 1_1_1, or 3
-    :return:
-    """
-    steps = {}
-
-    if openssl_version_type == OPENSSL_VERSION_TYPE_3:
-        script_name = "build_openssl_3.sh"
-    else:
-        script_name = "build_openssl_1_1_1.sh"
-
-    for architecture in SUPPORTED_ARCHITECTURES:
-        run_in_remote_docker = architecture != Architecture.X86_64
-
-        step = ArtifactRunnerStep(
-            name=f"build_openssl_{openssl_version_type}_{architecture.value}",
-            script_path=f"agent_build_refactored/managed_packages/steps/build_openssl/{script_name}",
-            base=INSTALL_BUILD_ENVIRONMENT_STEPS[architecture],
-            required_steps={
-                "DOWNLOAD_BUILD_DEPENDENCIES": DOWNLOAD_PYTHON_DEPENDENCIES,
-            },
-            environment_variables={
-                "OPENSSL_VERSION": PYTHON_PACKAGE_SSL_VERSIONS[openssl_version_type],
-            },
-            github_actions_settings=GitHubActionsSettings(
-                run_in_remote_docker=run_in_remote_docker, cacheable=True
-            ),
-        )
-        steps[architecture] = step
-
-    return steps
-
-
-def create_install_build_environment_steps() -> Dict[
-    Architecture, EnvironmentRunnerStep
-]:
-    """
-    Create steps that create build environment with gcc and other tools for python compilation.
-    """
-    steps = {}
-    for architecture in SUPPORTED_ARCHITECTURES:
-        run_in_remote_docker = architecture != Architecture.X86_64
-
-        build_env_info = _SUPPORTED_ARCHITECTURES_TO_BUILD_ENVIRONMENTS[architecture]
-
-        step = EnvironmentRunnerStep(
-            name=f"install_build_environment_{architecture.value}",
-            script_path=f"agent_build_refactored/managed_packages/steps/install_build_environment/{build_env_info.script_name}",
-            base=DockerImageSpec(
-                name=build_env_info.image,
-                platform=architecture.as_docker_platform.value,
-            ),
-            github_actions_settings=GitHubActionsSettings(
-                run_in_remote_docker=run_in_remote_docker,
-                cacheable=True,
-            ),
-        )
-        steps[architecture] = step
-
-    return steps
-
-
-def create_build_python_dependencies_steps() -> Dict[Architecture, ArtifactRunnerStep]:
-    """
-    This function creates step that builds Python dependencies.
-    """
-
-    steps = {}
-    for architecture in SUPPORTED_ARCHITECTURES:
-        run_in_remote_docker = architecture != Architecture.X86_64
-
-        step = ArtifactRunnerStep(
-            name=f"build_python_dependencies_{architecture.value}",
-            script_path="agent_build_refactored/managed_packages/steps/build_python_dependencies.sh",
-            base=INSTALL_BUILD_ENVIRONMENT_STEPS[architecture],
-            required_steps={
-                "DOWNLOAD_BUILD_DEPENDENCIES": DOWNLOAD_PYTHON_DEPENDENCIES
-            },
-            environment_variables={
-                **_PYTHON_BUILD_DEPENDENCIES_VERSIONS,
-            },
-            github_actions_settings=GitHubActionsSettings(
-                run_in_remote_docker=run_in_remote_docker, cacheable=True
-            ),
-        )
-        steps[architecture] = step
-
-    return steps
-
-
-def create_build_python_steps(
-    build_openssl_steps: Dict[Architecture, ArtifactRunnerStep],
-    name_suffix: str,
-
-) -> Dict[Architecture, ArtifactRunnerStep]:
-    """
-    Function that creates step instances that build Python interpreter.
-    :return: Result steps mapped to architectures..
-    """
-
-    steps = {}
-
-    for architecture in SUPPORTED_ARCHITECTURES:
-        run_in_remote_docker = architecture != Architecture.X86_64
-
-        additional_options = ""
-
-        # TODO: find out why enabling LTO optimization of ARM ends with error.
-        # Disable it for now.
-        if architecture == Architecture.X86_64:
-            additional_options += "--with-lto"
-
-        build_python = ArtifactRunnerStep(
-            name=f"build_python_{name_suffix}_{architecture.value}",
-            script_path="agent_build_refactored/managed_packages/steps/build_python.sh",
-            base=INSTALL_BUILD_ENVIRONMENT_STEPS[architecture],
-            required_steps={
-                "DOWNLOAD_BUILD_DEPENDENCIES": DOWNLOAD_PYTHON_DEPENDENCIES,
-                "BUILD_PYTHON_DEPENDENCIES": BUILD_PYTHON_DEPENDENCIES_STEPS[architecture],
-                "BUILD_OPENSSL": build_openssl_steps[architecture]
-            },
-            environment_variables={
-                "PYTHON_VERSION": EMBEDDED_PYTHON_VERSION,
-                "PYTHON_SHORT_VERSION": EMBEDDED_PYTHON_SHORT_VERSION,
-                "ADDITIONAL_OPTIONS": additional_options,
-                "INSTALL_PREFIX": PYTHON_INSTALL_PREFIX,
-                "PIP_VERSION": EMBEDDED_PYTHON_PIP_VERSION,
-            },
-            github_actions_settings=GitHubActionsSettings(
-                run_in_remote_docker=run_in_remote_docker, cacheable=True
-            ),
-        )
-
-        steps[architecture] = build_python
-
-    return steps
-
-
-# Simple dataclass to store information about base environment step.
-@dataclasses.dataclass
-class BuildEnvInfo:
-    # Script to run.
-    script_name: str
-    # Docker image to use.
-    image: str
-
-
-BUILD_ENV_CENTOS_6 = BuildEnvInfo(
-    script_name="install_gcc_centos_6.sh", image="centos:6"
-)
-BUILD_ENV_CENTOS_7 = BuildEnvInfo(
-    script_name="install_gcc_centos_7.sh", image="centos:7"
-)
-
-
-_SUPPORTED_ARCHITECTURES_TO_BUILD_ENVIRONMENTS = {
-    Architecture.X86_64: BUILD_ENV_CENTOS_6,
-    Architecture.ARM64: BUILD_ENV_CENTOS_7,
-}
-
-
-def create_build_python_package_root_steps() -> Dict[Architecture, ArtifactRunnerStep]:
-    """
-    Function that creates step instances that build Python interpreter.
-    :return: Result steps dict mapped to architectures.
-    """
-    steps = {}
-
-    for architecture in SUPPORTED_ARCHITECTURES:
-        build_env_info = _SUPPORTED_ARCHITECTURES_TO_BUILD_ENVIRONMENTS[architecture]
-        if "centos:6" in build_env_info.image:
-            libssl_dir = "/usr/local/lib64"
-        else:
-            libssl_dir = "/usr/local/lib"
-
-        step = ArtifactRunnerStep(
-            name="build_python_package_root",
-            script_path="agent_build_refactored/managed_packages/steps/build_python_package_root.sh",
-            tracked_files_globs=[
-                "agent_build_refactored/managed_packages/scalyr_agent_python3/internal/agent-python3-config.py",
-                "agent_build_refactored/managed_packages/scalyr_agent_python3/agent-python3-config",
-                "agent_build_refactored/managed_packages/scalyr_agent_python3/python3",
-                "agent_build_refactored/managed_packages/scalyr_agent_python3/install-scriptlets/postinstall.sh",
-                "agent_build_refactored/managed_packages/scalyr_agent_python3/install-scriptlets/preuninstall.sh",
-            ],
-            base=PREPARE_TOOLSET_STEPS[Architecture.X86_64],
-            required_steps={
-                "BUILD_OPENSSL_1_1_1": BUILD_OPENSSL_1_1_1_STEPS[architecture],
-                "BUILD_OPENSSL_3": BUILD_OPENSSL_3_STEPS[architecture],
-                "BUILD_PYTHON_WITH_OPENSSL_1_1_1": BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[architecture],
-                "BUILD_PYTHON_WITH_OPENSSL_3": BUILD_PYTHON_WITH_OPENSSL_3_STEPS[architecture],
-            },
-            environment_variables={
-                "PYTHON_SHORT_VERSION": EMBEDDED_PYTHON_SHORT_VERSION,
-                "INSTALL_PREFIX": "/opt/scalyr-agent-2-dependencies",
-                "LIBSSL_DIR": libssl_dir,
-            },
-            github_actions_settings=GitHubActionsSettings(cacheable=True),
-        )
-
-        steps[architecture] = step
-
-    return steps
-
-
-def create_build_dev_requirements_steps() -> Dict[Architecture, ArtifactRunnerStep]:
-    """
-    Create steps that build all agent project requirements.
-    """
-    steps = {}
-    for architecture in SUPPORTED_ARCHITECTURES:
-        run_in_remote_docker = architecture != Architecture.X86_64
-
-        if architecture == Architecture.X86_64:
-            rust_target_platform = "x86_64-unknown-linux-gnu"
-        elif architecture == Architecture.ARM64:
-            rust_target_platform = "aarch64-unknown-linux-gnu"
-        else:
-            raise Exception(f"Unknown architecture '{architecture.value}'")
-
-        build_dev_requirements_step = ArtifactRunnerStep(
-            name=f"build_dev_requirements_{architecture.value}",
-            script_path="agent_build_refactored/managed_packages/steps/build_dev_requirements.sh",
-            tracked_files_globs=[
-                "dev-requirements-new.txt",
-            ],
-            base=INSTALL_BUILD_ENVIRONMENT_STEPS[architecture],
-            required_steps={
-                "BUILD_PYTHON_DEPENDENCIES": BUILD_PYTHON_DEPENDENCIES_STEPS[architecture],
-                "BUILD_OPENSSL": BUILD_OPENSSL_1_1_1_STEPS[architecture],
-                "BUILD_PYTHON": BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[architecture],
-            },
-            environment_variables={
-                "RUST_VERSION": RUST_VERSION,
-                "RUST_PLATFORM": rust_target_platform,
-                "PYTHON_INSTALL_PREFIX": PYTHON_INSTALL_PREFIX,
-            },
-            github_actions_settings=GitHubActionsSettings(
-                cacheable=True, run_in_remote_docker=run_in_remote_docker
-            ),
-        )
-        steps[architecture] = build_dev_requirements_step
-
-    return steps
-
-
-def create_build_agent_libs_venv_steps() -> Dict[Architecture, ArtifactRunnerStep]:
-    """
-    Function that creates steps that install agent requirement libraries.
-    :return: Result steps dict mapped to architectures..
-    """
-
-    steps = {}
-    for architecture in SUPPORTED_ARCHITECTURES:
-
-        run_in_remote_docker = architecture != Architecture.X86_64
-
-        build_agent_libs_step = ArtifactRunnerStep(
-            name=f"build_agent_libs_venv_{architecture.value}",
-            script_path="agent_build_refactored/managed_packages/steps/build_agent_libs_venv.sh",
-            tracked_files_globs=[
-                "dev-requirements-new.txt",
-            ],
-            base=INSTALL_BUILD_ENVIRONMENT_STEPS[architecture],
-            required_steps={
-                "BUILD_OPENSSL": BUILD_OPENSSL_1_1_1_STEPS[architecture],
-                "BUILD_PYTHON": BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[architecture],
-                "BUILD_DEV_REQUIREMENTS": BUILD_DEV_REQUIREMENTS_STEPS[architecture],
-            },
-            environment_variables={
-                "PYTHON_INSTALL_PREFIX": PYTHON_INSTALL_PREFIX,
-                "SUBDIR_NAME": AGENT_SUBDIR_NAME,
-                "REQUIREMENTS": AGENT_LIBS_REQUIREMENTS_CONTENT,
-                "PIP_VERSION": EMBEDDED_PYTHON_PIP_VERSION,
-            },
-            github_actions_settings=GitHubActionsSettings(
-                cacheable=True, run_in_remote_docker=run_in_remote_docker
-            ),
-        )
-        steps[architecture] = build_agent_libs_step
-
-    return steps
-
-
-def create_build_agent_libs_package_root_steps() -> Dict[
-    Architecture, ArtifactRunnerStep
-]:
-    """
-    Function that creates steps that builds agent requirement libraries package roots.
-    :return: Result steps dict mapped to architectures.
-    """
-
-    steps = {}
-    for architecture in SUPPORTED_ARCHITECTURES:
-
-        step = ArtifactRunnerStep(
-            name="build_agent_libs_package_root",
-            script_path="agent_build_refactored/managed_packages/steps/build_agent_libs_package_root.sh",
-            tracked_files_globs=[
-                "agent_build_refactored/managed_packages/scalyr_agent_libs/additional-requirements.txt",
-                "agent_build_refactored/managed_packages/scalyr_agent_libs/agent-libs-config",
-                "agent_build_refactored/managed_packages/scalyr_agent_libs/python3",
-                "agent_build_refactored/managed_packages/scalyr_agent_libs/install-scriptlets/postinstall.sh",
-            ],
-            base=PREPARE_TOOLSET_STEPS[Architecture.X86_64],
-            required_steps={
-                "BUILD_AGENT_LIBS": BUILD_AGENT_LIBS_VENV_STEPS[architecture],
-            },
-            environment_variables={
-                "PYTHON_SHORT_VERSION": EMBEDDED_PYTHON_SHORT_VERSION,
-                "REQUIREMENTS": AGENT_LIBS_REQUIREMENTS_CONTENT,
-            },
-            github_actions_settings=GitHubActionsSettings(
-                cacheable=True,
-            ),
-        )
-        steps[architecture] = step
-
-    return steps
-
-
-# Steps that prepares build environment.
-INSTALL_BUILD_ENVIRONMENT_STEPS = create_install_build_environment_steps()
-
-# Steps that build Python dependencies.
-BUILD_PYTHON_DEPENDENCIES_STEPS = create_build_python_dependencies_steps()
-
-# Steps that build OpenSSL Python dependency, 1.1.1 and 3 versions.
-BUILD_OPENSSL_1_1_1_STEPS = create_build_openssl_steps(
-        openssl_version_type=OPENSSL_VERSION_TYPE_1_1_1
-)
-BUILD_OPENSSL_3_STEPS = create_build_openssl_steps(
-        openssl_version_type=OPENSSL_VERSION_TYPE_3
-)
-
-# Create steps that build Python interpreter with OpenSSl 1.1.1 and 3
-BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS = create_build_python_steps(
-    build_openssl_steps=BUILD_OPENSSL_1_1_1_STEPS,
-    name_suffix="1_1_1"
-)
-BUILD_PYTHON_WITH_OPENSSL_3_STEPS = create_build_python_steps(
-    build_openssl_steps=BUILD_OPENSSL_3_STEPS,
-    name_suffix="3"
-)
-
-# Create steps that build and install all agent dev requirements.
-BUILD_DEV_REQUIREMENTS_STEPS = create_build_dev_requirements_steps()
-
-# Create steps that build agent requirement libs inside venv.
-BUILD_AGENT_LIBS_VENV_STEPS = create_build_agent_libs_venv_steps()
-
-
-def create_prepare_toolset_steps() -> Dict[Architecture, EnvironmentRunnerStep]:
-    """
-    Create steps that prepare environment with all needed tools.
-    """
-    steps = {}
-    for architecture in SUPPORTED_ARCHITECTURES:
-        base_image = DockerImageSpec(
-            name="ubuntu:22.04", platform=architecture.as_docker_platform.value
-        )
-
-        prepare_toolset_step = EnvironmentRunnerStep(
-            name=f"prepare_toolset_{architecture.value}",
-            script_path="agent_build_refactored/managed_packages/steps/prepare_toolset.sh",
-            base=base_image,
-            required_steps={
-                "BUILD_OPENSSL_1_1_1": BUILD_OPENSSL_1_1_1_STEPS[architecture],
-                "BUILD_PYTHON_1_1_1": BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[architecture],
-                "BUILD_OPENSSL_3": BUILD_OPENSSL_3_STEPS[architecture],
-                "BUILD_PYTHON_3": BUILD_PYTHON_WITH_OPENSSL_3_STEPS[architecture],
-                "BUILD_DEV_REQUIREMENTS": BUILD_DEV_REQUIREMENTS_STEPS[architecture],
-            },
-            environment_variables={
-                "PYTHON_INSTALL_PREFIX": PYTHON_INSTALL_PREFIX,
-                "FPM_VERSION": "1.14.2",
-                "PACKAGECLOUD_VERSION": "0.3.11",
-            },
-            github_actions_settings=GitHubActionsSettings(
-                cacheable=True,
-                pre_build_in_separate_job=True,
-            ),
-        )
-
-        steps[architecture] = prepare_toolset_step
-
-    return steps
-
-
-def create_prepare_python_environment_steps() -> Dict[Architecture, EnvironmentRunnerStep]:
-    """
-    Create steps that prepare environment with all needed tools.
-    """
-    steps = {}
-    for architecture in SUPPORTED_ARCHITECTURES:
-
-        prepare_toolset_step = EnvironmentRunnerStep(
-            name=f"prepare_python_environment_{architecture.value}",
-            script_path="agent_build_refactored/managed_packages/steps/prepare_python_environment.sh",
-            base=DockerImageSpec(
-                name=_SUPPORTED_ARCHITECTURES_TO_BUILD_ENVIRONMENTS[architecture].image,
-                platform=architecture.as_docker_platform.value
-            ),
-            required_steps={
-                "BUILD_OPENSSL_1_1_1": BUILD_OPENSSL_1_1_1_STEPS[architecture],
-                "BUILD_PYTHON_1_1_1": BUILD_PYTHON_WITH_OPENSSL_1_1_1_STEPS[architecture],
-                "BUILD_OPENSSL_3": BUILD_OPENSSL_3_STEPS[architecture],
-                "BUILD_PYTHON_3": BUILD_PYTHON_WITH_OPENSSL_3_STEPS[architecture],
-                "BUILD_DEV_REQUIREMENTS": BUILD_DEV_REQUIREMENTS_STEPS[architecture],
-            },
-            environment_variables={
-                "PYTHON_INSTALL_PREFIX": PYTHON_INSTALL_PREFIX,
-            },
-            github_actions_settings=GitHubActionsSettings(
-                cacheable=True,
-                pre_build_in_separate_job=True,
-            ),
-        )
-
-        steps[architecture] = prepare_toolset_step
-
-    return steps
-
-
-PREPARE_TOOLSET_STEPS = create_prepare_toolset_steps()
-PREPARE_PYTHON_ENVIRONMENT_STEPS = create_prepare_python_environment_steps()
-
-# Create steps that build root of the dependency Package which provides Python interpreter for the Agent.
-BUILD_PYTHON_PACKAGE_ROOT_STEPS = create_build_python_package_root_steps()
-
-# Create steps that build root of the dependency Package which provides requirement Python libraries for the Agent.
-BUILD_AGENT_LIBS_PACKAGE_ROOT_STEPS = create_build_agent_libs_package_root_steps()
-
-
-ALL_AIO_PACKAGE_BUILDERS: Dict[str, Type[LinuxAIOPackagesBuilder]] = {}
-
-# Iterate through all supported architectures and create package builders classes for each.
-for arch in SUPPORTED_ARCHITECTURES:
-
-    class DebLinuxAIOPackagesBuilder(LinuxAIOPackagesBuilder):
-        PACKAGE_TYPE = "deb"
-        PACKAGECLOUD_DISTRO = "any"
-        PACKAGECLOUD_DISTRO_VERSION = "any"
-        DEPENDENCY_PACKAGES_ARCHITECTURE = arch
-
-    class RpmLinuxAIOPackagesBuilder(LinuxAIOPackagesBuilder):
-        PACKAGE_TYPE = "rpm"
-        PACKAGECLOUD_DISTRO = "rpm_any"
-        PACKAGECLOUD_DISTRO_VERSION = "rpm_any"
-        DEPENDENCY_PACKAGES_ARCHITECTURE = arch
-
-    # Since we create builders "dynamically" we should assign name to each of them, so
-    # they can be accessible later.
-    for cls in [DebLinuxAIOPackagesBuilder, RpmLinuxAIOPackagesBuilder]:
-        cls.assign_fully_qualified_name(
-            class_name=cls.__name__, module_name=__name__, class_name_suffix=arch.value
-        )
-        name = f"{cls.PACKAGE_TYPE}-aio-{arch.value}"
-        ALL_AIO_PACKAGE_BUILDERS[name] = cls
-
-
-def _calculate_all_packages_checksum(package_name: str):
-    """
-    Calculate checksum for ALL packages with given name.
-    """
-    sha256 = hashlib.sha256()
-    for builder_name in sorted(ALL_AIO_PACKAGE_BUILDERS.keys()):
-        builder_cls = ALL_AIO_PACKAGE_BUILDERS[builder_name]
-        checksum = builder_cls.get_package_checksum(package_name=package_name)
-        sha256.update(checksum.encode())
-
-    return sha256.hexdigest()
-
-
-# We calculate checksum of packages for all architectures, so they can have common version.
-_ALL_PYTHON_PACKAGES_CHECKSUM = _calculate_all_packages_checksum(
-    package_name=PYTHON_PACKAGE_NAME
-)
-
-# The same with agent libs package.
-_ALL_AGENT_LIBS_PACKAGES_CHECKSUM = _calculate_all_packages_checksum(
-    package_name=AGENT_LIBS_PACKAGE_NAME
-)
-
-
-def _get_dependency_package_version_to_use(
-    checksum: str, package_name: str, stable_versions_file_path: str = None
-) -> Tuple[str, bool]:
-    """
-    This function determines if package with given name has been changed or not.
-    :param checksum: checksum of package's all architectures.
-    :param package_name: name of package to check.
-    :param stable_versions_file_path: If None path to JSON file with stable package version that may be reused.
-    :return Tuple where first element is a version, and second boolean flag that indicates whether package should be
-        rebuilt or not.
-    """
-    stable_version = None
-    if stable_versions_file_path:
-        versions = json.loads(pl.Path(stable_versions_file_path).read_text())
-        stable_version = versions[package_name]
-
-    if not stable_version:
-        stable_version = "0+0"
-
-    stable_iteration, stable_checksum = _parse_package_version_parts(
-        version=stable_version
-    )
-
-    if checksum == stable_checksum:
-        return stable_version, False
-    else:
-        new_iteration = stable_iteration + 1
-        return f"{new_iteration}+{checksum}", True
-
-
-def _parse_package_version_parts(version: str) -> Tuple[int, str]:
-    """
-    Deconstructs package version string and return tuple with version's iteration and checksum parts.
-    """
-    iteration, checksum = version.split("+")
-    return int(iteration), checksum
-
-
-ALL_MANAGED_PACKAGE_BUILDERS: Dict[str, Type[LinuxPackageBuilder]] = ALL_AIO_PACKAGE_BUILDERS.copy()
-
-
-class DebLinuxNonAIOPackagesBuilder(LinuxNonAIOPackageBuilder):
-    PACKAGE_TYPE = "deb"
-
-
-class RpmLinuxNonAIOPackagesBuilder(LinuxNonAIOPackageBuilder):
-    PACKAGE_TYPE = "rpm"
-
-
-ALL_MANAGED_PACKAGE_BUILDERS["deb-non-aio"] = DebLinuxNonAIOPackagesBuilder
-ALL_MANAGED_PACKAGE_BUILDERS["rpm-non-aio"] = RpmLinuxNonAIOPackagesBuilder
+if __name__ == '__main__':
+    main()

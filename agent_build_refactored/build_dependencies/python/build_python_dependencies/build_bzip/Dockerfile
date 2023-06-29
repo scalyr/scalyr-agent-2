@@ -1,4 +1,4 @@
-FROM download_base as download
+FROM download_source_base as download
 RUN gpg2 --import /tmp/public_keys/bzip_keyring.gpg
 ARG VERSION
 RUN curl -L "https://sourceware.org/pub/bzip2/bzip2-${VERSION}.tar.gz" > bzip2.tar.gz

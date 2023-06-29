@@ -2,39 +2,46 @@ import pathlib as pl
 
 from agent_build_refactored.tools.constants import CpuArch, LibC, ALL_REQUIREMENTS, SOURCE_ROOT
 from agent_build_refactored.tools.builder import BuilderStep
-from agent_build_refactored.build_dependencies.python.build_python_for_packages import BuildPythonForPackagesStep
 from agent_build_refactored.build_dependencies.python.build_python import BuilderPythonStep
-from agent_build_refactored.build_dependencies.python.build_dev_requirements import BuildDevRequirementsStep
 
 
 _PARENT_DIR = pl.Path(__file__).parent
 
 
-class PrepareBuildBaseWithPythonStep(BuilderStep):
+class BuildDevRequirementsStep(BuilderStep):
     def __init__(
         self,
         build_python_step: BuilderPythonStep,
     ):
 
         self.build_python_step = build_python_step
-        self.build_dev_requirements_step = BuildDevRequirementsStep(
-            build_python_step=build_python_step,
-        )
         self.architecture = self.build_python_step.architecture
         self.libc = self.build_python_step.libc
 
-        super(PrepareBuildBaseWithPythonStep, self).__init__(
+        if self.architecture != CpuArch.ARMV7:
+            abi_part = ""
+        else:
+            abi_part = "eabihf"
+
+        rust_platform = f"{self.architecture.value}-unknown-linux-{self.libc.value}{abi_part}"
+
+        super(BuildDevRequirementsStep, self).__init__(
             name=_PARENT_DIR.name,
             context=SOURCE_ROOT,
             dockerfile=_PARENT_DIR / "Dockerfile",
             build_contexts=[
                 self.build_python_step.prepare_build_base_step,
+                self.build_python_step.build_zlib_step,
+                self.build_python_step.build_libffi_step,
+                self.build_python_step.download_source_base_step,
                 self.build_python_step,
-                self.build_python_step.build_openssl_step,
-                self.build_dev_requirements_step,
+                self.build_python_step.build_openssl_step
             ],
             build_args={
                 "INSTALL_PREFIX": str(self.build_python_step.install_prefix),
                 "COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX": str(self.build_python_step.dependencies_install_prefix),
+                "ALL_REQUIREMENTS": ALL_REQUIREMENTS,
+                "RUST_VERSION": "1.63.0",
+                "RUST_PLATFORM": rust_platform,
             },
         )

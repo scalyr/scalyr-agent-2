@@ -164,6 +164,11 @@ _ARCHITECTURE_TO_DOCKER_PLATFORM = {
 }
 
 
+class LibC(enum.Enum):
+    GNU = "gnu"
+    MUSL = "musl"
+
+
 class CpuArch(enum.Enum):
     x86_64 = "x86_64"
     AARCH64 = "aarch64"

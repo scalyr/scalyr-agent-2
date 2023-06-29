@@ -1,6 +1,6 @@
 import pathlib as pl
 
-from agent_build_refactored.tools.constants import CpuArch
+from agent_build_refactored.tools.constants import CpuArch, LibC
 from agent_build_refactored.build_dependencies.python.build_python_dependencies.base import BasePythonDependencyBuildStep
 from ..build_ncurses import BuildPythonNcursesStep
 
@@ -13,11 +13,10 @@ class BuildPythonLibeditStep(BasePythonDependencyBuildStep):
             version_commit: str,
             install_prefix: pl.Path,
             architecture: CpuArch,
-            libc: str,
+            libc: LibC,
             build_ncurses_step: BuildPythonNcursesStep
     ):
         super(BuildPythonLibeditStep, self).__init__(
-            name="build_libedit",
             install_prefix=install_prefix,
             architecture=architecture,
             libc=libc,

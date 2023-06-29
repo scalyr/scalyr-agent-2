@@ -1,4 +1,4 @@
-FROM download_base as download
+FROM download_source_base as download
 #ADD public_keys/zlib_public_key.gpg zlib_public_key.gpg
 RUN gpg2 --import /tmp/public_keys/zlib_public_key.gpg
 ARG VERSION

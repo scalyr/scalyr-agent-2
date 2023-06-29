@@ -1,6 +1,7 @@
 import abc
 import collections
 import dataclasses
+import functools
 import json
 import pathlib as pl
 import argparse
@@ -15,8 +16,10 @@ import time
 import os
 import enum
 import signal
-from typing import Dict, List, Any
+import inspect
+from typing import Dict, List, Any, Union
 
+import psutil
 
 from agent_build_refactored.tools.constants import SOURCE_ROOT, CpuArch
 from agent_build_refactored.tools.run_in_ec2.remote_docker_buildx_builder.buildx_builder_ami import get_buildx_builder_ami_image
@@ -173,13 +176,26 @@ class BuildxBuilderWrapper:
         return is_missed_cache
 
 
-def docker_build_or_stop_on_cache_miss(cmd_args: List[str]):
+def docker_build_or_stop_on_cache_miss(
+        cmd_args: List[str],
+        input: bytes,
+):
+
+    if input:
+        stdin = subprocess.PIPE
+    else:
+        stdin = None
+
     process = subprocess.Popen(
         [
             *cmd_args,
         ],
         stderr=subprocess.PIPE,
+        stdin=stdin
     )
+
+    if input:
+        process.stdin.write(input)
 
     all_lines = []
 
@@ -236,9 +252,9 @@ def docker_build_or_stop_on_cache_miss(cmd_args: List[str]):
     def _print_rest_of_the_process_oupput():
         while True:
             line = _real_line(decode_errors="replace")
-            if not line:
+            if line is None:
                 break
-        print(line.strip(), file=sys.stderr)
+            print(line.strip(), file=sys.stderr)
 
     def _raise_process_error():
         output = "\n".join(all_lines)
@@ -247,12 +263,11 @@ def docker_build_or_stop_on_cache_miss(cmd_args: List[str]):
     if process.poll() is not None:
         if process.returncode == 0:
             _print_rest_of_the_process_oupput()
-            return
+            return False
         else:
             _raise_process_error()
 
     if is_missed_cache:
-        import psutil
 
         pr = psutil.Process(process.pid)
 
@@ -594,166 +609,146 @@ class EC2BackedRemoteBuildxBuilderWrapper(RemoteBuildxBuilderWrapper):
 _existing_builders: Dict[CpuArch, RemoteBuildxBuilderWrapper] = {}
 
 
-class BuilderStep:
+class BuilderCacheMissError(Exception):
+    pass
+
+
+ALL_BUILDER_STEPS: Dict[str, 'BuilderStep'] = {}
+
+def u(cls):
+    def wrapper(*args, **kwargs):
+        new_instance = cls(*args, **kwargs)
+
+        instance = ALL_BUILDER_STEPS.get(new_instance.id)
+
+        if instance is None:
+            ALL_BUILDER_STEPS[new_instance.id] = new_instance
+            instance = new_instance
+
+        return instance
+
+    return wrapper
+
+
+_BUILD_STEPS_OUTPUT_OCI_DIR = AGENT_BUILD_OUTPUT_PATH / "oci"
+_BUILD_STEPS_OUTPUT_OUTPUT_DIR = AGENT_BUILD_OUTPUT_PATH / "output"
+
+
+class BuilderStep():
     def __init__(
         self,
         name: str,
         context: pl.Path,
-        dockerfile_path: pl.Path,
+        dockerfile: Union[str, pl.Path],
         build_contexts: List['BuilderStep'] = None,
         build_args: Dict[str, str] = None,
         platform: CpuArch = CpuArch.x86_64,
         cache: bool = True,
+        unique_name_suffix: str = None,
     ):
 
+        unique_name_suffix = unique_name_suffix or ""
         self.name = name
+        self.unique_name = f"{name}{unique_name_suffix}"
+        self.id = f"{self.unique_name}_{platform.value}"
         self.platform = platform
         self.build_context = context
-        self.dockerfile_path = dockerfile_path
+        self.dockerfile = dockerfile
         self.build_contexts = build_contexts or []
         self.build_args = build_args or {}
         self.cache = cache
 
-    @property
-    def as_bake_target(self):
+    @classmethod
+    def create(cls, *args, **kwargs):
+        global ALL_BUILDER_STEPS
 
-        cache_path = AGENT_BUILD_OUTPUT_PATH / "cache" / self.name
-        cache_path = AGENT_BUILD_OUTPUT_PATH / "cache"
+        new_instance = cls(*args, **kwargs)
 
-        mode = "min"
+        instance = ALL_BUILDER_STEPS.get(new_instance.id)
 
-        #cache_sources = [f"type=local,mode=min,tag={self.name},src={cache_path}"]
-        cache_sources = [f"type=local,mode={mode},src={cache_path}"]
-        contexts = {}
+        if instance is None:
+            ALL_BUILDER_STEPS[new_instance.id] = new_instance
+            instance = new_instance
 
-        for step in self.build_contexts:
-            contexts[step.name] = f"target:{step.name}"
+        return instance
 
-            src = str(AGENT_BUILD_OUTPUT_PATH / "cache" / step.name)
-            #cache_sources.append(f"type=local,mode=min,tag={step.name},src={src}")
-            #cache_sources.append(f"type=local,mode={mode},src={src}")
-
-        target = {
-            "context": str(self.build_context),
-            "dockerfile": str(self.dockerfile_path),
-            "args": {
-                "BUILDKIT_INLINE_CACHE":"1",
-                **self.build_args,
-            },
-            "cache-from": cache_sources,
-            # ignore-error=true
-            #"cache-to": [f"type=local,mode=min,tag={self.name},dest={cache_path}"],
-            "cache-to": [f"type=local,mode={mode},dest={cache_path}"],
-            #"output": [f"type=local,dest={AGENT_BUILD_OUTPUT_PATH / 'output' / self.name}"]
-        }
-
-        if self.platform:
-            target["platforms"] = [self.platform.as_docker_platform()]
-
-        if contexts:
-            target["contexts"] = contexts
-        return target
-
-    def get_all_dependency_steps(self) -> List['BuilderStep']:
-        result = [self]
-
-        for step in self.build_contexts:
-            result.extend(step.get_all_dependency_steps())
-
-        return result
-
-    # def run(
-    #     self,
-    # ):
-    #     result = {}
-    #     all_targets = {}
-    #     default_group_targets = []
-    #
-    #     for step in self.get_all_dependency_steps():
-    #         all_targets[step.name] = step.as_bake_target
-    #         default_group_targets.append(step.name)
-    #
-    #     AGENT_BUILD_OUTPUT_PATH.mkdir(exist_ok=True, parents=True)
-    #
-    #     for path in AGENT_BUILD_OUTPUT_PATH.glob("bake_*.json"):
-    #         path.unlink()
-    #
-    #     bake_file_path = AGENT_BUILD_OUTPUT_PATH / f"bake_{self.name}_{str(int(time.time()))}.json"
-    #
-    #     result["target"] = all_targets
-    #
-    #     #result["target"]["default"] = result["target"].pop("build_xz")
-    #
-    #     a=10
-    #
-    #     result["group"] = {
-    #         "default": {
-    #             "targets": default_group_targets,
-    #             #"targets": [self.name]
-    #         }
-    #     }
-    #
-    #     bake_file_json = json.dumps(
-    #         result,
-    #         sort_keys=True,
-    #         indent=4
-    #     )
-    #     bake_file_path.write_text(bake_file_json)
-    #
-    #     machine_name = platform.machine()
-    #     if machine_name in ["x86_64"]:
-    #         current_machine_arch = CpuArch.x86_64
-    #     elif machine_name in ["aarch64"]:
-    #         current_machine_arch = CpuArch.AARCH64
-    #     elif machine_name in ["armv7l"]:
-    #         current_machine_arch = CpuArch.ARMV7
-    #     else:
-    #         raise Exception(f"Unknown uname machine {machine_name}")
-    #
-    #     local_builder_info = self.prepare_buildx_builders(local=True)
-    #
-    #     if self.platform == current_machine_arch:
-    #         return
-    #
-    #     repeat_in_remote = local_builder_info.bake_or_stop_on_cache_miss(bake_file_path=bake_file_path)
-    #
-    #     if repeat_in_remote:
-    #         remote_builder_info = self.prepare_buildx_builders(local=False)
-    #         remote_builder_info.bake(bake_file_path=bake_file_path)
-    #
-    #
-    #
-    #
-    #     a=10
 
     @property
     def oci_layout(self):
-        return AGENT_BUILD_OUTPUT_PATH / "oci" / self.name
-
-    @property
-    def output_dir(self):
-        return AGENT_BUILD_OUTPUT_PATH / "output" / self.name
+        return _BUILD_STEPS_OUTPUT_OCI_DIR / self.id
 
     @property
     def oci_layout_tarball(self):
         return self.oci_layout.parent / f"{self.oci_layout.name}.tar"
 
-    def _cleanup(self):
-        if self.oci_layout.parent.exists():
-            shutil.rmtree(self.oci_layout.parent)
-        self.oci_layout.parent.mkdir(parents=True)
+    @property
+    def output_dir(self):
+        return _BUILD_STEPS_OUTPUT_OUTPUT_DIR / self.id
 
-        if self.output_dir.parent.exists():
-            shutil.rmtree(self.output_dir.parent)
-        self.output_dir.parent.mkdir(parents=True)
+    def get_build_command_args(self):
+        cmd_args = [
+            "docker",
+            "buildx",
+            "build",
+            "--platform",
+            self.platform.as_docker_platform(),
+            "-f"
+        ]
+
+        if isinstance(self.dockerfile, pl.Path):
+            cmd_args.append(str(self.dockerfile))
+        else:
+            cmd_args.append("-")
+
+        if self.cache:
+            if USE_GHA_CACHE:
+                cmd_args.extend([
+                    "--cache-from",
+                    f"type=gha,scope={self.name}",
+                    "--cache-to",
+                    f"type=gha,scope={self.name}",
+                ])
+            else:
+                cache_type = "local"
+                cache_path = AGENT_BUILD_OUTPUT_PATH / "cache" / self.name
+                # cache_path = AGENT_BUILD_OUTPUT_PATH / "cache"
+                cmd_args.extend([
+                    "--cache-from",
+                    f"type={cache_type},src={cache_path}",
+                    "--cache-to",
+                    f"type={cache_type},dest={cache_path}",
+                ])
+
+        for name, value in self.build_args.items():
+            cmd_args.extend([
+                "--build-arg",
+                f"{name}={value}",
+            ])
+
+        for step in self.build_contexts:
+            for context_name in [step.name, step.unique_name, step.id]:
+                cmd_args.extend([
+                    "--build-context",
+                    f"{context_name}=oci-layout://{step.oci_layout}"
+                ])
+
+        cmd_args.append(
+            str(self.build_context)
+        )
+
+        return cmd_args
 
     def run(self,
             output: str = None,
             tags: List[str] = None,
+            fail_on_cache_miss: bool = False,
         ):
 
         for step in self.build_contexts:
-            step.run_and_output_in_oci_tarball(initial=False)
+            step.run_and_output_in_oci_tarball(
+                fail_on_cache_miss=fail_on_cache_miss,
+                no_cleanup=True
+            )
 
         machine_name = platform.machine()
         if machine_name in ["x86_64"]:
@@ -766,46 +761,17 @@ class BuilderStep:
             raise Exception(f"Unknown uname machine {machine_name}")
 
         local = False
-       #local_builder_info = self.prepare_buildx_builders(local=True)
 
-        if self.platform != current_machine_arch:
-            return
+        # if self.platform != current_machine_arch:
+        #     return
 
-        cache_path = AGENT_BUILD_OUTPUT_PATH / "cache" / self.name
-        #cache_path = AGENT_BUILD_OUTPUT_PATH / "cache"
-
-        cmd_args = [
-            "docker",
-            "buildx",
-            "build",
-            "-f",
-            str(self.dockerfile_path),
-        ]
-
-        if self.cache:
-
-            if USE_GHA_CACHE:
-                cmd_args.extend([
-                    "--cache-from",
-                    f"type=gha,scope={self.name}",
-                    "--cache-to",
-                    f"type=gha,scope={self.name}",
-                ])
-            else:
-                cache_type = "local"
-                cmd_args.extend([
-                    "--cache-from",
-                    f"type={cache_type},src={cache_path}",
-                    "--cache-to",
-                    f"type={cache_type},dest={cache_path}",
-                ])
+        cmd_args = self.get_build_command_args()
 
         if output:
             cmd_args.extend([
                 "--output",
                 output,
             ])
-
 
         if tags:
             for tag in tags:
@@ -814,48 +780,66 @@ class BuilderStep:
                     tag
                 ])
 
-        for name, value in self.build_args.items():
-            cmd_args.extend([
-                "--build-arg",
-                f"{name}={value}",
-            ])
-
-        for step in self.build_contexts:
-            cmd_args.extend([
-                "--build-context",
-                f"{step.name}=oci-layout://{step.oci_layout}"
-            ])
-
-        cmd_args.append(
-            str(self.build_context)
-        )
+        if isinstance(self.dockerfile, str):
+            build_dockerfile_input = self.dockerfile.encode()
+        else:
+            build_dockerfile_input = None
 
         if local:
             subprocess.run(
                 cmd_args,
-                check=True
+                check=True,
+                input=build_dockerfile_input,
             )
 
         else:
-            remote_builder_info = self.prepare_remote_buildx_builders()
-            cmd_args.extend([
-                "--builder",
-                remote_builder_info.name,
-            ])
+
+            docker_remote_builder_info = self.prepare_remote_buildx_builders(in_ec2=False)
+
+            is_cache_miss = docker_build_or_stop_on_cache_miss(
+                cmd_args=[
+                    *cmd_args,
+                    "--builder",
+                    docker_remote_builder_info.name,
+                ],
+                input=build_dockerfile_input
+            )
+
+            if not is_cache_miss:
+                return
+
+            if fail_on_cache_miss:
+                raise BuilderCacheMissError()
+
+            ec2_remote_builder_info = self.prepare_remote_buildx_builders(in_ec2=False)
+
             subprocess.run(
-                cmd_args,
-                check=True
+                [
+                    *cmd_args,
+                    "--builder",
+                    ec2_remote_builder_info.name,
+                ],
+                check=True,
+                input=build_dockerfile_input
             )
 
 
         a=10
 
-    def run_and_output_in_oci_tarball(self, initial: bool = True, tarball_path: pl.Path = None):
-        if initial:
-            self._cleanup()
+    def run_and_output_in_oci_tarball(
+            self,
+            tarball_path: pl.Path = None,
+            fail_on_cache_miss: bool = False,
+            no_cleanup: bool = False,
+    ):
+        if not no_cleanup:
+            _cleanup_output_dirs()
 
         if not self.oci_layout.exists():
-            self.run(output=f"type=oci,dest={self.oci_layout_tarball}")
+            self.run(
+                output=f"type=oci,dest={self.oci_layout_tarball}",
+                fail_on_cache_miss=fail_on_cache_miss,
+            )
 
             with tarfile.open(self.oci_layout_tarball) as tar:
                     tar.extractall(path=self.oci_layout)
@@ -863,82 +847,80 @@ class BuilderStep:
         if tarball_path:
             shutil.copy(self.oci_layout_tarball, tarball_path)
 
-    def run_and_output_in_loacl_directory(self, initial: bool = True, output_dir: pl.Path = None):
-        if initial:
-            self._cleanup()
-        output_dir = output_dir or self.output_dir
-        self.run(output=f"type=local,dest={output_dir}")
+    def run_and_output_in_local_directory(
+            self,
+            output_dir: pl.Path = None,
+            fail_on_cache_miss:bool = False,
+            no_cleanup: bool = False,
 
-    def run_and_output_in_docker(self, initial: bool = True, tags: List[str] = None):
-        if initial:
-            self._cleanup()
+    ):
+        if not no_cleanup:
+            _cleanup_output_dirs()
+
+        if not self.output_dir.exists():
+            self.run(
+                output=f"type=local,dest={self.output_dir}",
+                fail_on_cache_miss=fail_on_cache_miss,
+            )
+
+        if output_dir:
+            output_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(
+                self.output_dir,
+                output_dir,
+                dirs_exist_ok=True,
+            )
+
+    def run_and_output_in_docker(
+            self,
+            tags: List[str] = None,
+            fail_on_cache_miss: bool = False,
+            no_cleanup: bool = False,
+    ):
+        if not no_cleanup:
+            _cleanup_output_dirs()
 
         if tags is None:
             tags = [self.name]
 
-        self.run(output=f"type=docker", tags=tags)
+        self.run(
+            output=f"type=docker", tags=tags,
+            fail_on_cache_miss=fail_on_cache_miss,
+        )
 
     def prepare_remote_buildx_builders(
-        self
+        self,
+        in_ec2: bool = False
     ):
 
         global _existing_builders
 
-        builder_name = f"{BUILDER_NAME}_{self.platform.value}"
+        if in_ec2:
+            suffix = "ec2"
+        else:
+            suffix = "docker"
 
-        info = _existing_builders.get(self.platform)
+        builder_name = f"{BUILDER_NAME}_{self.platform.value}_{suffix}"
+
+        info = _existing_builders.get(builder_name)
 
         if info:
             return info
 
-        info = DockerBackedBuildxBuilderWrapper(
-            name=builder_name,
-            architecture=self.platform
-        )
-
-        info.create_builder()
-
-        _existing_builders[self.platform] = info
-
-        return info
-
-
-        # try:
-        #     subprocess.run(
-        #         ["docker", "buildx", "rm", "-f", builder_name],
-        #         check=True,
-        #         capture_output=True,
-        #         timeout=60,
-        #     )
-        # except subprocess.SubprocessError as e:
-        #     stderr = e.stderr.decode()
-        #     if stderr != f'ERROR: no builder "{builder_name}" found\n':
-        #         raise Exception(f"Can not inspect builder. Stderr: {stderr}")
-
-        if local:
-            info = LocalBuildxBuilderWrapper(
+        if in_ec2:
+            info = EC2BackedRemoteBuildxBuilderWrapper(
                 name=builder_name,
                 architecture=self.platform
             )
-            # info = DockerBackedBuildxBuilderWrapper(
-            #     name=builder_name,
-            #     architecture=self.platform
-            # )
-
-            # info = EC2BackedRemoteBuildxBuilderWrapper(
-            #     name=builder_name,
-            #     architecture=self.platform,
-            # )
         else:
-
-            info = EC2BackedRemoteBuildxBuilderWrapper(
+            info = DockerBackedBuildxBuilderWrapper(
                 name=builder_name,
-                architecture=self.platform,
+                architecture=self.platform
             )
 
         info.create_builder()
 
-        _existing_builders[self.platform][locality] = info
+        _existing_builders[builder_name] = info
 
         return info
 
@@ -956,142 +938,183 @@ _ARM_IMAGE = EC2DistroImage(
 
 DOCKER_EC2_BUILDERS = {
     CpuArch.x86_64: _ARM_IMAGE,
+    CpuArch.AARCH64: _ARM_IMAGE,
     CpuArch.ARMV7: _ARM_IMAGE
 }
 
 _BUILDX_BUILDER_PORT = "1234"
 
+_IN_DOCKER_SOURCE_ROOT = pl.Path("/tmp/source")
 
-# def create_node_in_ec2(architecture: CpuArch):
-#     base_ec2_image = DOCKER_EC2_BUILDERS[architecture]
-#     aws_settings = AWSSettings.create_from_env()
-#     boto3_session = aws_settings.create_boto3_session()
-#     image = get_buildx_builder_ami_image(
-#         architecture=architecture,
-#         base_ec2_image=base_ec2_image,
-#         boto3_session=boto3_session,
-#         aws_settings=aws_settings,
-#
-#     )
-#
-#     ec2_image = EC2DistroImage(
-#         image_id=image.id,
-#         image_name=image.name,
-#         short_name=base_ec2_image.short_name,
-#         size_id=base_ec2_image.size_id,
-#         ssh_username=base_ec2_image.ssh_username,
-#     )
-#
-#     instance = create_and_deploy_ec2_instance(
-#         boto3_session=boto3_session,
-#         ec2_image=ec2_image,
-#         name_prefix="remote_docker",
-#         aws_settings=aws_settings,
-#         root_volume_size=32,
-#     )
-#
-#     try:
-#         ssh_host = f"{ec2_image.ssh_username}@{instance.public_ip_address}"
-#         container_name = "ssh"
-#
-#         subprocess.run(
-#             ["docker", "rm", "-f", container_name],
-#             check=True
-#         )
-#
-#         mapped_private_key_path = pl.Path("/tmp/private.pem")
-#         subprocess.run(
-#             [
-#                 "docker",
-#                 "run",
-#                 "-d",
-#                 "--rm",
-#                 "--name",
-#                 container_name,
-#                 "-p",
-#                 "1234:1234",
-#                 "-v",
-#                 f"{aws_settings.private_key_path}:${mapped_private_key_path}",
-#                 "kroniak/ssh-client",
-#                 "ssh", "-i", "/tmp/private.pem", "-o", "StrictHostKeyChecking=no", "-N", "-L",
-#                 "0.0.0.0:1234:localhost:1234", ssh_host
-#             ],
-#             check=True
-#         )
-#
-#         builder_info = EC2BackedBuilderInfo(
-#             architecture=architecture,
-#             container_name=container_name
-#             # ec2_instance=instance,
-#             # ssh_container_name=container_name,
-#             # ssh_host=ssh_host,
-#             # ssh_container_mapped_private_key_path=mapped_private_key_path,
-#         )
-#
-#         return builder_info
-#
-#     except Exception:
-#         instance.terminate()
-#         raise
+_DOCKERFILE_CONTENT_TEMPLATE = f"""
+FROM {{base_image}} as main
+{{copy_dependencies}}
+ADD . {_IN_DOCKER_SOURCE_ROOT}
+
+ENV PYTHONPATH="{_IN_DOCKER_SOURCE_ROOT}"
+WORKDIR {_IN_DOCKER_SOURCE_ROOT}
+RUN python3 /tmp/source/{{entrypoint_script}} {{builder_name}} --locally --no-cleanup
+
+FROM scratch
+COPY --from=main {{work_dir}}/. /work_dir
+COPY --from=main {{output_dir}}/. /output_dir
+"""
+
+_BUILDERS_OUTPUT_DIR = AGENT_BUILD_OUTPUT_PATH / "builder_output"
+_BUILDERS_WORK_DIR = AGENT_BUILD_OUTPUT_PATH / "builder_work_dir"
+
+class Builder:
+    ENTRYPOINT_SCRIPT: pl.Path = None
+    NAME: str
+
+    def __init__(
+            self,
+            name: str,
+            base: BuilderStep,
+            dependencies: List[BuilderStep] = None,
+    ):
+        self.name = name
+        self.base = base
+        self.dependencies = dependencies or []
+        copy_dependencies_str = ""
+
+        for dep in self.dependencies:
+            dep_rel_output_dir = dep.output_dir.relative_to(SOURCE_ROOT)
+            in_docker_dep_output_dir = _IN_DOCKER_SOURCE_ROOT / dep_rel_output_dir
+            copy_dependencies_str = f"{copy_dependencies_str}\n" \
+                                    f"COPY --from={dep.name} / {in_docker_dep_output_dir}\n"
+
+        rel_output_dir = self.output_dir.relative_to(SOURCE_ROOT)
+        rel_work_dir = self.work_dir.relative_to(SOURCE_ROOT)
+
+        entrypoint_script_rel_path = self.__class__.ENTRYPOINT_SCRIPT.relative_to(SOURCE_ROOT)
+
+        dockerfile_content = _DOCKERFILE_CONTENT_TEMPLATE.format(
+            base_image=self.base.name,
+            copy_dependencies=copy_dependencies_str,
+            entrypoint_script=str(entrypoint_script_rel_path),
+            builder_name=self.__class__.NAME,
+            work_dir=str(_IN_DOCKER_SOURCE_ROOT / rel_work_dir),
+            output_dir=str(_IN_DOCKER_SOURCE_ROOT / rel_output_dir)
+        )
+
+        self.docker_step = BuilderStep(
+            name=f"builder_{self.name}_docker_step",
+            context=SOURCE_ROOT,
+            dockerfile=dockerfile_content,
+            build_contexts=[
+                self.base,
+                *self.dependencies,
+            ],
+            platform=self.base.platform,
+            cache=False
+        )
+
+    @property
+    def output_dir(self) -> pl.Path:
+        return _BUILDERS_OUTPUT_DIR / self.name
+
+    @property
+    def work_dir(self):
+        return _BUILDERS_WORK_DIR / self.name
+
+    @abc.abstractmethod
+    def build(self):
+        pass
+
+    def run_builder(
+        self,
+        output_dir: pl.Path = None,
+        locally: bool = False,
+        no_cleanup: bool = False
+    ):
+        if not no_cleanup:
+            _cleanup_output_dirs()
+
+        if not locally:
+            self.docker_step.run_and_output_in_local_directory(
+                no_cleanup=no_cleanup,
+            )
+            shutil.copytree(
+                self.docker_step.output_dir / "work_dir",
+                self.work_dir,
+                dirs_exist_ok=True,
+                symlinks=True,
+            )
+            shutil.copytree(
+                self.docker_step.output_dir / "output_dir",
+                self.output_dir,
+                dirs_exist_ok=True,
+                symlinks=True,
+            )
+            return
+
+        for step in self.dependencies:
+            step.run_and_output_in_local_directory(no_cleanup=True)
+
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.work_dir.mkdir(parents=True, exist_ok=True)
+
+        self.build()
+
+        if output_dir:
+            output_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(
+                self.output_dir,
+                output_dir,
+                dirs_exist_ok=True,
+            )
 
 
 
 
 
 
+    # def run_builder(self):
+    #     if self.run_in_docker:
+    #         self.run_builder_in_docker()
+    #     else:
+    #         self.run_builder_locally()
 
-# class Builder:
-#     def __init__(
-#         self,
-#         base_environment: BuilderStep,
-#         required_steps: List[BuilderStep],
-#     ):
-#         self._required_steps = required_steps
-#
-#     def _generate_bake_dict(self):
-#         result = {}
-#
-#         all_targets = {}
-#         default_group_targets = []
-#         for step in self._required_steps:
-#             for dep_step in step.get_all_dependency_steps():
-#                 all_targets[dep_step.name] = dep_step.as_bake_target
-#                 default_group_targets.append(dep_step.name)
-#
-#
-#         combine_outputs_target = {
-#
-#         }
-#
-#         result["target"] = all_targets
-#
-#         result["group"] = {
-#             "default": {
-#                 "targets": default_group_targets,
-#             }
-#         }
-#
-#         return result
-#
-#     def run(self):
-#
-#         bake_dict = self._generate_bake_dict()
-#
-#         bake_file_path = AGENT_BUILD_OUTPUT_PATH / "bake.json"
-#
-#         bake_json = json.dumps(bake_dict, sort_keys=True, indent=4)
-#         bake_file_path.write_text(bake_json)
-#         subprocess.run(
-#             [
-#                 "docker",
-#                 "buildx",
-#                 "bake",
-#                 "-f",
-#                 str(bake_file_path),
-#             ],
-#             check=True
-#         )
-#
-#     def main(self, args: List[str] = None):
-#         pass
+
+    @staticmethod
+    def create_parser():
+        parser = argparse.ArgumentParser()
+
+        parser.add_argument(
+            "--locally",
+            action="store_true"
+        )
+
+        parser.add_argument(
+            "--no-cleanup",
+            action="store_true"
+        )
+
+        return parser
+
+    def run_builder_from_command_line(self, args):
+        return functools.partial(
+            self.run_builder,
+            locally=args.locally,
+            no_cleanup=args.no_cleanup,
+        )
+
+
+def _cleanup_output_dirs():
+    if _BUILD_STEPS_OUTPUT_OCI_DIR.exists():
+        shutil.rmtree(_BUILD_STEPS_OUTPUT_OCI_DIR)
+    _BUILD_STEPS_OUTPUT_OCI_DIR.mkdir(parents=True)
+
+    if _BUILD_STEPS_OUTPUT_OUTPUT_DIR.exists():
+        shutil.rmtree(_BUILD_STEPS_OUTPUT_OUTPUT_DIR)
+    _BUILD_STEPS_OUTPUT_OUTPUT_DIR.mkdir(parents=True)
+
+    if _BUILDERS_OUTPUT_DIR.exists():
+        shutil.rmtree(_BUILDERS_OUTPUT_DIR)
+    _BUILDERS_OUTPUT_DIR.mkdir(parents=True)
+
+    if _BUILDERS_WORK_DIR.exists():
+        shutil.rmtree(_BUILDERS_WORK_DIR)
+    _BUILDERS_WORK_DIR.mkdir(parents=True)
 

@@ -1,4 +1,4 @@
-FROM download_base as download
+FROM download_source_base as download
 #ADD public_keys/util_linux_public_key.gpg util_linux_public_key.gpg
 RUN gpg2 --import /tmp/public_keys/util_linux_public_key.gpg
 ARG VERSION

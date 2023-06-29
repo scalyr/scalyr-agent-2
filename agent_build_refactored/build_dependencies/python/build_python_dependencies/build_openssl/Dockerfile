@@ -1,4 +1,4 @@
-FROM download_base as download
+FROM download_source_base as download
 #ADD public_keys/openssl_public_key.asc openssl_public_key.asc
 RUN gpg2 --import /tmp/public_keys/openssl_public_key.asc
 ARG VERSION

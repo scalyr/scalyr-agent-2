@@ -1,4 +1,4 @@
-FROM download_base as download_tcl
+FROM download_source_base as download_tcl
 #RUN git clone "https://github.com/tcltk/tcl.git"
 #ARG TCL_VERSION_COMMIT
 #WORKDIR tcl
@@ -11,7 +11,7 @@ RUN curl -L "https://github.com/tcltk/tcl/archive/${TCL_VERSION_COMMIT}.tar.gz" 
 RUN tar xzf tcl.tar.gz
 RUN mv "tcl-${TCL_VERSION_COMMIT}" /tmp/source
 
-FROM download_base as download_sqlite
+FROM download_source_base as download_sqlite
 #RUN git clone "https://github.com/sqlite/sqlite.git"
 
 WORKDIR sqlite

@@ -1,9 +1,9 @@
 import pathlib as pl
 
-from agent_build_refactored.tools.constants import CpuArch
+from agent_build_refactored.tools.constants import CpuArch, SOURCE_ROOT
 from agent_build_refactored.tools.builder import BuilderStep
 
-PARENT_DIR = pl.Path(__file__).parent
+_PARENT_DIR = pl.Path(__file__).parent
 
 
 class LatestUbuntuToolsetStep(BuilderStep):
@@ -11,8 +11,8 @@ class LatestUbuntuToolsetStep(BuilderStep):
         self
     ):
         super(LatestUbuntuToolsetStep, self).__init__(
-            name="latest_ubuntu_toolset",
-            context=PARENT_DIR,
-            dockerfile_path=PARENT_DIR / "Dockerfile",
+            name=_PARENT_DIR.name,
+            context=SOURCE_ROOT,
+            dockerfile=_PARENT_DIR / "Dockerfile",
             platform=CpuArch.x86_64,
         )

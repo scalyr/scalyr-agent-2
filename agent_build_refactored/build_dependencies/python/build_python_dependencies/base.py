@@ -1,9 +1,9 @@
 import pathlib as pl
 from typing import Dict, List
 
-from agent_build_refactored.tools.constants import CpuArch
+from agent_build_refactored.tools.constants import CpuArch, LibC
 from agent_build_refactored.tools.builder import BuilderStep
-from .download_sources_base import DownloadSourcesBaseStep
+from agent_build_refactored.build_dependencies.python.download_source_base import DownloadSourcesBaseStep
 from ..prepare_build_base import PrepareBuildBaseStep
 
 PARENT_DIR = pl.Path(__file__).parent
@@ -16,14 +16,14 @@ class BasePythonDependencyBuildStep(BuilderStep):
 
     def __init__(
         self,
-        name: str,
         install_prefix: pl.Path,
         architecture: CpuArch,
-        libc: str,
+        libc: LibC,
         build_args: Dict[str, str] = None,
-        build_contexts: List[BuilderStep] = None
+        build_contexts: List[BuilderStep] = None,
+        unique_name_suffix: str = None,
     ):
-        self.download_base_step = DownloadSourcesBaseStep()
+        self.download_source_base_step = DownloadSourcesBaseStep()
         self.prepare_build_base_step = PrepareBuildBaseStep(
             architecture=architecture,
             libc=libc
@@ -34,21 +34,22 @@ class BasePythonDependencyBuildStep(BuilderStep):
             {
                 "INSTALL_PREFIX": str(install_prefix),
                 "ARCH": architecture.value,
-                "LIBC": libc,
+                "LIBC": libc.value,
             },
         )
 
         build_contexts = build_contexts or []
         build_contexts.extend([
-            self.download_base_step,
+            self.download_source_base_step,
             self.prepare_build_base_step,
         ])
 
         super(BasePythonDependencyBuildStep, self).__init__(
-            name=name,
+            name=self.__class__.BUILD_CONTEXT_PATH.name,
             context=self.__class__.BUILD_CONTEXT_PATH,
             build_contexts=build_contexts,
-            dockerfile_path=self.__class__.BUILD_CONTEXT_PATH / "Dockerfile",
+            dockerfile=self.__class__.BUILD_CONTEXT_PATH / "Dockerfile",
             build_args=build_args,
-            platform=CpuArch.x86_64,
+            platform=architecture,
+            unique_name_suffix=unique_name_suffix,
         )

@@ -15,7 +15,7 @@ from agent_build_refactored.build_dependencies.python.build_python import Builde
 from agent_build_refactored.build_dependencies.python.prepare_build_base_with_python import PrepareBuildBaseWithPythonStep
 from agent_build_refactored.build_dependencies.build_dev_requirements import BuildDevRequirementsStep
 from agent_build_refactored.build_dependencies.build_agent_libs_venv import BuildAgentLibsVenvStep
-from agent_build_refactored.build_dependencies.python.build_python_with_switchable_openssl import BuildPythonWithSwitchableOpenSSL
+from agent_build_refactored.build_dependencies.python.build_python_for_packages import BuildPythonForPackagesStep
 
 BUILD_PYTHON_DIR = SOURCE_ROOT / "agent_build_refactored/build_dependencies/build_python"
 
@@ -57,7 +57,7 @@ def _target_arch_to_docker_platform(arch: str):
 #     prepare_build_base_with_python_step=prepare_build_base_with_python_step
 # )
 
-build_python_with_switchable_openssl = BuildPythonWithSwitchableOpenSSL(
+build_python_with_switchable_openssl = BuildPythonForPackagesStep(
     python_version="3.11.2",
     openssl_1_version="1.1.1s",
     openssl_3_version="3.0.7",
@@ -82,7 +82,7 @@ build_python_with_switchable_openssl = BuildPythonWithSwitchableOpenSSL(
 
 if __name__ == '__main__':
     sys.path.append(str(pathlib.Path(__file__).parent.parent.parent))
-    build_python_with_switchable_openssl.run_and_output_in_loacl_directory()
+    build_python_with_switchable_openssl.run_and_output_in_local_directory(fail_on_cache_miss=False)
 
 
 a=10

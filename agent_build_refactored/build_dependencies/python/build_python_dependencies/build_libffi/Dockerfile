@@ -1,4 +1,4 @@
-FROM download_base as download
+FROM download_source_base as download
 ARG VERSION
 RUN curl -L "https://github.com/libffi/libffi/releases/download/v${VERSION}/libffi-${VERSION}.tar.gz" > libffi.tar.gz
 # libffi does not provide any normal way of verifying its source, so every time when we update its

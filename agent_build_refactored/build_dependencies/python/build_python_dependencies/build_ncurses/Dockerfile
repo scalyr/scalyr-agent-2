@@ -1,4 +1,4 @@
-FROM download_base as download
+FROM download_source_base as download
 RUN gpg2 --import /tmp/public_keys/gnu-keyring.gpg
 ARG VERSION
 RUN curl -L "https://ftp.gnu.org/pub/gnu/ncurses/ncurses-${VERSION}.tar.gz" > ncurses.tar.gz

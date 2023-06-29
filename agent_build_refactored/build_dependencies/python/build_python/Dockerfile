@@ -1,8 +1,7 @@
-ARG PYTHON_BUILD_TYPE
 ARG OPENSSL_MAJOR_VERSION
 ARG LIBC
 
-FROM download_base as download
+FROM download_source_base as download
 RUN gpg2 --import /tmp/public_keys/python_pub_key.gpg
 ARG PYTHON_VERSION
 RUN curl -L "https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz" > python.tgz
@@ -30,7 +29,7 @@ FROM build_openssl_${OPENSSL_MAJOR_VERSION} as build_openssl
 #WORKDIR /tmp/source/build
 #ADD configure_python.sh configure_python.sh
 
-FROM prepare_build_base as install_python_dependencies_max_compatibility
+FROM prepare_build_base as build_python
 COPY --from=build_xz / /
 COPY --from=build_sqlite / /
 COPY --from=build_zlib / /
@@ -41,63 +40,47 @@ COPY --from=build_libedit / /
 COPY --from=build_libffi / /
 COPY --from=build_openssl / /
 
-FROM prepare_build_base as install_python_dependencies_latest_gnu
-
-FROM prepare_build_base as install_python_dependencies_latest_musl
-
-FROM install_python_dependencies_latest_${LIBC} as install_python_dependencies_latest
-
-
-FROM install_python_dependencies_${PYTHON_BUILD_TYPE} as build_python
 ARG INSTALL_PREFIX
 ARG COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX
 ENV LD_LIBRARY_PATH="${COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX}/lib:${LD_LIBRARY_PATH}"
+
 COPY --from=download /tmp/source /tmp/source
 WORKDIR /tmp/source/build
-ADD configure_python.sh configure_python.sh
-RUN INSTALL_PREFIX="${INSTALL_PREFIX}" \
-    COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX="${COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX}" \
-    bash configure_python.sh
+#ADD configure_python.sh configure_python.sh
+#RUN INSTALL_PREFIX="${INSTALL_PREFIX}" \
+#    COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX="${COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX}" \
+#    bash configure_python.sh
+
+RUN ../configure \
+  CFLAGS="-I${COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX}/include -I${COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX}/include/ncurses" \
+  LDFLAGS="${LDFLAGS} -L${COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX}/lib" \
+	--enable-shared=yes \
+    --with-openssl="${COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX}" \
+	--with-readline=edit \
+	--prefix="${INSTALL_PREFIX}" \
+	--with-ensurepip=no
+
 RUN make -j "$(nproc)"
 RUN make DESTDIR=/tmp/root install
 
-#FROM prepare_build_base as python_with_sqlite
-#COPY --from=build_sqlite / /tmp/sqlite
-#COPY --from=python_with_openssl /tmp/root /tmp/root
-#ARG INSTALL_PREFIX
-#ARG COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX
-
-
-FROM build_python as post_build_max_compatibility
+# Copy sqlite shared library because it's dfficult to make it compiled statically.
+# TODO: But it would be good to create static.
 COPY --from=build_sqlite / /tmp/sqlite
-ARG INSTALL_PREFIX
-ARG COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX
 RUN cp /tmp/sqlite${COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX}/lib/*.so* /tmp/root${INSTALL_PREFIX}/lib
 
-FROM build_python as post_build_latest
-
-FROM post_build_${PYTHON_BUILD_TYPE} as post_build
-ARG INSTALL_PREFIX
-ADD files/bin/python3 "/tmp/root${INSTALL_PREFIX}/bin"
+# Remove cache files.
 RUN find "/tmp/root${INSTALL_PREFIX}" -name "__pycache__" -type d -prune -exec rm -r {} \;
 
-FROM build_openssl_${OPENSSL_MAJOR_VERSION} as build_openssl
+# install built python to the current system
+RUN cp -a /tmp/root/. /
 
-FROM prepare_build_base as python_with_pip
-COPY --from=build_openssl / /
-COPY --from=post_build /tmp/root/. /
-
-ARG INSTALL_PREFIX
-ARG COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX
-ENV LD_LIBRARY_PATH="${COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX}/lib:${LD_LIBRARY_PATH}"
 RUN ${INSTALL_PREFIX}/bin/python3 -m ensurepip
-
-COPY --from=post_build /tmp/root /tmp/root
+# Install upgraded pip version in the final python root.
 RUN ${INSTALL_PREFIX}/bin/python3 -m pip install --upgrade pip --root /tmp/root
 
 
-FROM prepare_build_base
-COPY --from=python_with_pip /tmp/root /tmp/root
+FROM scratch
+COPY --from=build_python /tmp/root/. /
 
 
 ##FROM build_base as build_python_with_openssl_3

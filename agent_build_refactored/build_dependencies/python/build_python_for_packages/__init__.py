@@ -4,7 +4,6 @@ from agent_build_refactored.tools.constants import CpuArch
 from agent_build_refactored.tools.builder import BuilderStep
 from agent_build_refactored.build_dependencies.python.build_python import (
     BuilderPythonStep,
-    BUILD_TYPE_MAX_COMPATIBILITY
 )
 
 _PARENT_DIR = pl.Path(__file__).parent
@@ -14,7 +13,7 @@ def _get_python_x_y_version(version: str):
     return ".".join(version.split(".")[:2])
 
 
-class BuildPythonWithSwitchableOpenSSL(BuilderStep):
+class BuildPythonForPackagesStep(BuilderStep):
     def __init__(
         self,
         python_version: str,
@@ -24,6 +23,8 @@ class BuildPythonWithSwitchableOpenSSL(BuilderStep):
         libc: str
     ):
 
+        self.architecture = architecture
+        self.libc = libc
         python_install_prefix = pl.Path("/opt/scalyr-agent-2/python3")
         python_dependencies_install_prefix = pl.Path("/usr/local")
 
@@ -50,10 +51,10 @@ class BuildPythonWithSwitchableOpenSSL(BuilderStep):
 
         python_x_y_version = _get_python_x_y_version(version=python_version)
 
-        super(BuildPythonWithSwitchableOpenSSL, self).__init__(
+        super(BuildPythonForPackagesStep, self).__init__(
             name="build_python_with_switchable_openssl",
             context=_PARENT_DIR,
-            dockerfile_path=_PARENT_DIR / "Dockerfile",
+            dockerfile=_PARENT_DIR / "Dockerfile",
             build_contexts=[
                 self.build_python_with_openssl_3_step.prepare_build_base_step,
                 self.build_python_with_openssl_1_step.build_openssl_step,

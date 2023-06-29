@@ -41,6 +41,5 @@ RUN cp "/tmp/openssl_3${COMMON_PYTHON_DEPENDENCY_PYTHON_INSTALL_PREFIX}/lib"/*.s
 ARG PYTHON_LIB_PYTHON_X_Y_DIR="${RESULT_DIR}${PYTHON_INSTALL_PREFIX}/lib/python${PYTHON_X_Y_VERSION}"
 ADD files/agent_python3_config.py "${PYTHON_LIB_PYTHON_X_Y_DIR}"
 
-
 FROM scratch
 COPY --from=modify_python_files /tmp/root/. /

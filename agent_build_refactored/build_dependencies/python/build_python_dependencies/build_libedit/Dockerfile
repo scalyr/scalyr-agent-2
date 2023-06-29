@@ -1,4 +1,4 @@
-FROM download_base as download
+FROM download_source_base as download
 #ARG VERSION
 #RUN git clone "https://salsa.debian.org/debian/libedit.git"
 #WORKDIR libedit
