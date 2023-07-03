@@ -1434,7 +1434,16 @@ class Builder(metaclass=BuilderMeta):
             )
         except BuilderCacheMissError:
             logging.exception(f"Builder {cls.NAME} failed")
-            exit(400)
+
+            if args.fail_on_cache_miss:
+                print("0")
+                exit(0)
+            raise
+
+        if args.fail_on_cache_miss:
+            print("1")
+            exit(0)
+
 
 
 def _cleanup_output_dirs():

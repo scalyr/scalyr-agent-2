@@ -304,34 +304,40 @@ jobs:
       - name: Build managed package with builder '${{ matrix.name }}'
         id: build_with_cache
         run: |
-          set +e
           
-          python3 agent_build_refactored/scripts/builder_helper.py \
-            agent_build_refactored.managed_packages.managed_packages_builders.deb-non-aio \
-            --fail-on-cache-miss
+          CACHE_FOUND=$(
+            python3 agent_build_refactored/scripts/builder_helper.py \
+              agent_build_refactored.managed_packages.managed_packages_builders.deb-non-aio \
+              --fail-on-cache-miss
+          )
           
-          EXIT_CODE="$?"
+          if [ "${CACHE_FOUND} = "1" ]; then
+            echo "cache_found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "cache_found=false" >> "$GITHUB_OUTPUT"
+          fi
           
-          set -e
-          
-          echo "EEEEE ${EXIT_CODE}"
-          case $EXIT_CODE in
-            0)
-              echo "cache_found=false" >> "$GITHUB_OUTPUT"
-              ;;
-          
-            400)
-              echo "cache_found=true" >> "$GITHUB_OUTPUT"
-              exit 400
-              ;;
-            *)
-              exit 1
-              ;;
-          esac
+#          set -e
+#
+#          echo "EEEEE ${EXIT_CODE}"
+#          case $EXIT_CODE in
+#            0)
+#              echo "cache_found=false" >> "$GITHUB_OUTPUT"
+#              ;;
+#
+#            400)
+#              echo "cache_found=true" >> "$GITHUB_OUTPUT"
+#              exit 400
+#              ;;
+#            *)
+#              exit 1
+#              ;;
+#          esac
 
 #          if [ "${EXIT_CODE}" = "400"]; then
 #            echo "CACHE_IS_MISSING=true" >> "$GITHUB_OUTPUT"
 #          fi
+
       - name: Save packages as artifact
         if: steps.build_with_cache.outputs.cache_found == 'true'
         uses: actions/upload-artifact@v3
