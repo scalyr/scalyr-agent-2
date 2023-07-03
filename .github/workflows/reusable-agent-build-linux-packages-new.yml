@@ -306,11 +306,11 @@ jobs:
         run: |
           set +e
           
-          EXIT_CODE=(
-            python3 agent_build_refactored/scripts/builder_helper.py \
-              agent_build_refactored.managed_packages.managed_packages_builders.deb-non-aio \
-              --fail-on-cache-miss
-          )
+          python3 agent_build_refactored/scripts/builder_helper.py \
+            agent_build_refactored.managed_packages.managed_packages_builders.deb-non-aio \
+            --fail-on-cache-miss
+          
+          EXIT_CODE="$?"
           
           set -e
           
