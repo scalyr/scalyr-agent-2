@@ -321,6 +321,7 @@ jobs:
           
             400)
               echo "cache_found=true" >> "$GITHUB_OUTPUT"
+              exit 400
               ;;
             *)
               exit 1
