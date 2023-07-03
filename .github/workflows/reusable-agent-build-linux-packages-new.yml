@@ -23,95 +23,95 @@ env:
 # Since we can do a "master" run (on push and PR to a master branch) and "non-master" run, it generates matrices with different
 #  size according to that information.
 jobs:
-  pre_job:
-    runs-on: ubuntu-20.04
-    outputs:
-      is_master_run: ${{ steps.init-matrices.outputs.is_master_run }}
-      to_publish: ${{ steps.init-matrices.outputs.to_publish }}
-      is_production: ${{ steps.init-matrices.outputs.is_production }}
-      version: ${{ steps.init-matrices.outputs.version }}
-      aws_private_key_name: ${{ steps.init_common_options.outputs.aws_private_key_name }}
-      aws_security_group: ${{ steps.init_common_options.outputs.aws_security_group }}
-      aws_prefix_list_id: ${{ steps.init_common_options.outputs.aws_prefix_list_id }}
-      aws_region: ${{ steps.init_common_options.outputs.aws_region }}
-      aws_objects_name_prefix: ${{ steps.init_common_options.outputs.aws_objects_name_prefix }}
-      # The following outputs will be used by the other jobs below as their strategy matrices.
-      pre_build_steps_matrix_json: ${{ steps.init-matrices.outputs.pre_build_steps_matrix_json }}
-      agent_image_build_matrix_json: ${{ steps.init-matrices.outputs.agent_image_build_matrix_json }}
-      managed_packages_build_matrix_json: ${{ steps.init-matrices.outputs.managed_packages_build_matrix_json }}
-      managed_packages_test_matrix_json: ${{ steps.init-matrices.outputs.managed_packages_test_matrix_json }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Install python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.8.13"
-
-      - name: Init common options
-        id: init_common_options
-        shell: bash
-        run: |
-          echo "aws_private_key_name=CT_SCALYR_AGENT_GHA" >> $GITHUB_OUTPUT
-          echo "aws_security_group=github-actions-remote-access" >> $GITHUB_OUTPUT
-          echo "aws_prefix_list_id=pl-04a16228a97704d23" >> $GITHUB_OUTPUT
-          echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
-          echo "aws_objects_name_prefix=${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}" >> $GITHUB_OUTPUT
-
-      - name: Init job matrices
-        uses: ./.github/actions/init-job-matrices
-        id: init-matrices
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-
-          # In this action we define all our job matrices. It filters out jobs that must not be executed if
-          # workflow run is not from the 'master' branch or from PR to the 'master' branch.
-          # Jobs that has to be in a non-master workflow run has to have a '"master_run_only": false' field.
-          # In the 'non-master' runs we only build debian-based images.
-          images-to-build: |
-            [
-              { "name": "docker-json-debian", "master_run_only": false },
-              { "name": "docker-syslog-debian", "master_run_only": false },
-              { "name": "docker-api-debian", "master_run_only": false },
-              { "name": "k8s-debian", "master_run_only": false },
-              { "name": "docker-json-alpine", "master_run_only": true },
-              { "name": "docker-syslog-alpine", "master_run_only": true },
-              { "name": "docker-api-alpine", "master_run_only": true },
-              { "name": "k8s-alpine", "master_run_only": true }
-            ]
-
-          managed-packages-to-build: |
-            [
-              { "name": "deb-aio-x86_64", "master_run_only": false },
-              { "name": "rpm-aio-x86_64", "master_run_only": false },
-              { "name": "deb-aio-arm64", "master_run_only": false },
-              { "name": "rpm-aio-arm64", "master_run_only": false },
-              { "name": "deb-non-aio", "master_run_only": false },
-              { "name": "rpm-non-aio", "master_run_only": false }
-            ]
-
-          managed-packages-to-test: |
-            [
-              { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "ubuntu2204",    "remote-machine-type": "ec2",    "master_run_only": false },
-              { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "ubuntu2004",    "remote-machine-type": "ec2",    "master_run_only": false },
-              { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "ubuntu1804",    "remote-machine-type": "ec2",    "master_run_only": false },
-              { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "ubuntu1604",    "remote-machine-type": "ec2",    "master_run_only": false },
-              { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "ubuntu1404",    "remote-machine-type": "docker", "master_run_only": false },
-              { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "debian10",      "remote-machine-type": "ec2",    "master_run_only": false },
-              { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "debian11",      "remote-machine-type": "docker", "master_run_only": false },
-              { "name": "rpm-aio-x86_64", "arch": "x86_64", "distro-name": "centos8",       "remote-machine-type": "docker", "master_run_only": false },
-              { "name": "rpm-aio-x86_64", "arch": "x86_64", "distro-name": "centos7",       "remote-machine-type": "ec2",    "master_run_only": false },
-              { "name": "rpm-aio-x86_64", "arch": "x86_64", "distro-name": "centos6",       "remote-machine-type": "docker", "master_run_only": false },
-              { "name": "rpm-aio-x86_64", "arch": "x86_64", "distro-name": "amazonlinux2",  "remote-machine-type": "ec2",    "master_run_only": false },
-              { "name": "deb-aio-arm64",  "arch": "arm64",  "distro-name": "ubuntu1404",    "remote-machine-type": "docker", "master_run_only": false },
-              { "name": "rpm-aio-arm64",  "arch": "arm64",  "distro-name": "centos7",       "remote-machine-type": "docker", "master_run_only": false },
-              { "name": "deb-non-aio",    "arch": "x86_64", "distro-name": "ubuntu1404",    "remote-machine-type": "docker", "master_run_only": false },
-              { "name": "deb-non-aio",    "arch": "x86_64", "distro-name": "ubuntu2204",    "remote-machine-type": "docker", "master_run_only": false },
-              { "name": "rpm-non-aio",    "arch": "x86_64", "distro-name": "centos7",       "remote-machine-type": "docker", "master_run_only": false },
-              { "name": "rpm-non-aio",    "arch": "x86_64", "distro-name": "amazonlinux2",  "remote-machine-type": "docker", "master_run_only": false }
-            ]
+#  pre_job:
+#    runs-on: ubuntu-20.04
+#    outputs:
+#      is_master_run: ${{ steps.init-matrices.outputs.is_master_run }}
+#      to_publish: ${{ steps.init-matrices.outputs.to_publish }}
+#      is_production: ${{ steps.init-matrices.outputs.is_production }}
+#      version: ${{ steps.init-matrices.outputs.version }}
+#      aws_private_key_name: ${{ steps.init_common_options.outputs.aws_private_key_name }}
+#      aws_security_group: ${{ steps.init_common_options.outputs.aws_security_group }}
+#      aws_prefix_list_id: ${{ steps.init_common_options.outputs.aws_prefix_list_id }}
+#      aws_region: ${{ steps.init_common_options.outputs.aws_region }}
+#      aws_objects_name_prefix: ${{ steps.init_common_options.outputs.aws_objects_name_prefix }}
+#      # The following outputs will be used by the other jobs below as their strategy matrices.
+#      pre_build_steps_matrix_json: ${{ steps.init-matrices.outputs.pre_build_steps_matrix_json }}
+#      agent_image_build_matrix_json: ${{ steps.init-matrices.outputs.agent_image_build_matrix_json }}
+#      managed_packages_build_matrix_json: ${{ steps.init-matrices.outputs.managed_packages_build_matrix_json }}
+#      managed_packages_test_matrix_json: ${{ steps.init-matrices.outputs.managed_packages_test_matrix_json }}
+#
+#    steps:
+#      - name: Checkout repository
+#        uses: actions/checkout@v3
+#
+#      - name: Install python
+#        uses: actions/setup-python@v4
+#        with:
+#          python-version: "3.8.13"
+#
+#      - name: Init common options
+#        id: init_common_options
+#        shell: bash
+#        run: |
+#          echo "aws_private_key_name=CT_SCALYR_AGENT_GHA" >> $GITHUB_OUTPUT
+#          echo "aws_security_group=github-actions-remote-access" >> $GITHUB_OUTPUT
+#          echo "aws_prefix_list_id=pl-04a16228a97704d23" >> $GITHUB_OUTPUT
+#          echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
+#          echo "aws_objects_name_prefix=${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}" >> $GITHUB_OUTPUT
+#
+#      - name: Init job matrices
+#        uses: ./.github/actions/init-job-matrices
+#        id: init-matrices
+#        with:
+#          github_token: ${{ secrets.GITHUB_TOKEN }}
+#
+#          # In this action we define all our job matrices. It filters out jobs that must not be executed if
+#          # workflow run is not from the 'master' branch or from PR to the 'master' branch.
+#          # Jobs that has to be in a non-master workflow run has to have a '"master_run_only": false' field.
+#          # In the 'non-master' runs we only build debian-based images.
+#          images-to-build: |
+#            [
+#              { "name": "docker-json-debian", "master_run_only": false },
+#              { "name": "docker-syslog-debian", "master_run_only": false },
+#              { "name": "docker-api-debian", "master_run_only": false },
+#              { "name": "k8s-debian", "master_run_only": false },
+#              { "name": "docker-json-alpine", "master_run_only": true },
+#              { "name": "docker-syslog-alpine", "master_run_only": true },
+#              { "name": "docker-api-alpine", "master_run_only": true },
+#              { "name": "k8s-alpine", "master_run_only": true }
+#            ]
+#
+#          managed-packages-to-build: |
+#            [
+#              { "name": "deb-aio-x86_64", "master_run_only": false },
+#              { "name": "rpm-aio-x86_64", "master_run_only": false },
+#              { "name": "deb-aio-arm64", "master_run_only": false },
+#              { "name": "rpm-aio-arm64", "master_run_only": false },
+#              { "name": "deb-non-aio", "master_run_only": false },
+#              { "name": "rpm-non-aio", "master_run_only": false }
+#            ]
+#
+#          managed-packages-to-test: |
+#            [
+#              { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "ubuntu2204",    "remote-machine-type": "ec2",    "master_run_only": false },
+#              { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "ubuntu2004",    "remote-machine-type": "ec2",    "master_run_only": false },
+#              { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "ubuntu1804",    "remote-machine-type": "ec2",    "master_run_only": false },
+#              { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "ubuntu1604",    "remote-machine-type": "ec2",    "master_run_only": false },
+#              { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "ubuntu1404",    "remote-machine-type": "docker", "master_run_only": false },
+#              { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "debian10",      "remote-machine-type": "ec2",    "master_run_only": false },
+#              { "name": "deb-aio-x86_64", "arch": "x86_64", "distro-name": "debian11",      "remote-machine-type": "docker", "master_run_only": false },
+#              { "name": "rpm-aio-x86_64", "arch": "x86_64", "distro-name": "centos8",       "remote-machine-type": "docker", "master_run_only": false },
+#              { "name": "rpm-aio-x86_64", "arch": "x86_64", "distro-name": "centos7",       "remote-machine-type": "ec2",    "master_run_only": false },
+#              { "name": "rpm-aio-x86_64", "arch": "x86_64", "distro-name": "centos6",       "remote-machine-type": "docker", "master_run_only": false },
+#              { "name": "rpm-aio-x86_64", "arch": "x86_64", "distro-name": "amazonlinux2",  "remote-machine-type": "ec2",    "master_run_only": false },
+#              { "name": "deb-aio-arm64",  "arch": "arm64",  "distro-name": "ubuntu1404",    "remote-machine-type": "docker", "master_run_only": false },
+#              { "name": "rpm-aio-arm64",  "arch": "arm64",  "distro-name": "centos7",       "remote-machine-type": "docker", "master_run_only": false },
+#              { "name": "deb-non-aio",    "arch": "x86_64", "distro-name": "ubuntu1404",    "remote-machine-type": "docker", "master_run_only": false },
+#              { "name": "deb-non-aio",    "arch": "x86_64", "distro-name": "ubuntu2204",    "remote-machine-type": "docker", "master_run_only": false },
+#              { "name": "rpm-non-aio",    "arch": "x86_64", "distro-name": "centos7",       "remote-machine-type": "docker", "master_run_only": false },
+#              { "name": "rpm-non-aio",    "arch": "x86_64", "distro-name": "amazonlinux2",  "remote-machine-type": "docker", "master_run_only": false }
+#            ]
 
 #  # This job pre-executes and caches Runner steps that has to be executed in a separate job.
 #  # For example, we build platform-specific base docker images in a separate jobs to reduce overall build time, because
@@ -248,8 +248,6 @@ jobs:
 
   build-managed-packages:
     name: Build managed package ${{ matrix.name }}
-    needs:
-      - pre_job
     runs-on: ubuntu-22.04
 
     strategy:
