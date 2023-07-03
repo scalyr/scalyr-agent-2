@@ -311,7 +311,7 @@ jobs:
               --fail-on-cache-miss
           )
           
-          if [ "${CACHE_FOUND} = "1" ]; then
+          if [ "${CACHE_FOUND}" = "1" ]; then
             echo "cache_found=true" >> "$GITHUB_OUTPUT"
           else
             echo "cache_found=false" >> "$GITHUB_OUTPUT"
