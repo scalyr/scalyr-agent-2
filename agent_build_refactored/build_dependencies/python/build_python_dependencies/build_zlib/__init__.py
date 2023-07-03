@@ -2,6 +2,7 @@ import pathlib as pl
 
 from agent_build_refactored.tools.constants import CpuArch, LibC
 from agent_build_refactored.build_dependencies.python.build_python_dependencies.base import BasePythonDependencyBuildStep
+from agent_build_refactored.build_dependencies.python.download_sources import DownloadSourcesStep
 
 
 class BuildPythonZlibStep(BasePythonDependencyBuildStep):
@@ -9,7 +10,7 @@ class BuildPythonZlibStep(BasePythonDependencyBuildStep):
 
     def __init__(
         self,
-        version: str,
+        download_source_step: DownloadSourcesStep,
         install_prefix: pl.Path,
         architecture: CpuArch,
         libc: LibC
@@ -18,7 +19,10 @@ class BuildPythonZlibStep(BasePythonDependencyBuildStep):
             install_prefix=install_prefix,
             architecture=architecture,
             libc=libc,
+            build_contexts=[
+                download_source_step,
+            ],
             build_args={
-                "VERSION": version
+                "VERSION": download_source_step.zlib_version,
             },
         )

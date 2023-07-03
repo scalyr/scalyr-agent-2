@@ -20,3 +20,6 @@ ADD dev-requirements-new.txt /tmp/dev-requirements-new.txt
 RUN python3 -m pip install -r /tmp/dev-requirements-new.txt
 
 RUN gem install "fpm:1.15.1"
+
+# Generate keypair to sign and verify test repos for packages.
+RUN gpg2 --batch --passphrase '' --quick-gen-key test default default

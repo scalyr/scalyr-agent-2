@@ -1,16 +1,19 @@
 ARG OPENSSL_MAJOR_VERSION
 ARG LIBC
 
-FROM download_source_base as download
-RUN gpg2 --import /tmp/public_keys/python_pub_key.gpg
-ARG PYTHON_VERSION
-RUN curl -L "https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz" > python.tgz
-RUN curl -L "https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz.asc" > python.tgz.asc
-RUN gpg --verify python.tgz.asc python.tgz
-RUN tar -xf python.tgz
-RUN mv Python-"${PYTHON_VERSION}" /tmp/source
+#FROM download_source_base as download
+#RUN gpg2 --import /tmp/public_keys/python_pub_key.gpg
+#ARG PYTHON_VERSION
+#RUN curl -L "https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz" > python.tgz
+#RUN curl -L "https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz.asc" > python.tgz.asc
+#RUN gpg --verify python.tgz.asc python.tgz
+#RUN tar -xf python.tgz
+#RUN mv Python-"${PYTHON_VERSION}" /tmp/source
 
-FROM build_openssl_${OPENSSL_MAJOR_VERSION} as build_openssl
+FROM scratch as build_openssl
+COPY --from=build_python_dependencies /openssl_${OPENSSL_MAJOR_VERSION}/. /
+
+#FROM build_openssl_${OPENSSL_MAJOR_VERSION} as build_openssl
 
 #FROM prepare_build_base as build_base
 #COPY --from=download /tmp/source /tmp/source
@@ -30,21 +33,32 @@ FROM build_openssl_${OPENSSL_MAJOR_VERSION} as build_openssl
 #ADD configure_python.sh configure_python.sh
 
 FROM prepare_build_base as build_python
-COPY --from=build_xz / /
-COPY --from=build_sqlite / /
-COPY --from=build_zlib / /
-COPY --from=build_bzip / /
-COPY --from=build_util_linux / /
-COPY --from=build_ncurses / /
-COPY --from=build_libedit / /
-COPY --from=build_libffi / /
-COPY --from=build_openssl / /
+#COPY --from=build_xz / /
+#COPY --from=build_sqlite / /
+#COPY --from=build_zlib / /
+#COPY --from=build_bzip / /
+#COPY --from=build_util_linux / /
+#COPY --from=build_ncurses / /
+#COPY --from=build_libedit / /
+#COPY --from=build_libffi / /
+#COPY --from=build_openssl / /
+ARG OPENSSL_MAJOR_VERSION
+COPY --from=build_python_dependencies /bzip/. /
+COPY --from=build_python_dependencies /libedit/. /
+COPY --from=build_python_dependencies /libffi/. /
+COPY --from=build_python_dependencies /ncurses/. /
+COPY --from=build_python_dependencies /openssl_${OPENSSL_MAJOR_VERSION}/. /
+COPY --from=build_python_dependencies /sqlite/. /
+COPY --from=build_python_dependencies /util_linux/. /
+COPY --from=build_python_dependencies /xz/. /
+COPY --from=build_python_dependencies /zlib/. /
+
 
 ARG INSTALL_PREFIX
 ARG COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX
 ENV LD_LIBRARY_PATH="${COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX}/lib:${LD_LIBRARY_PATH}"
 
-COPY --from=download /tmp/source /tmp/source
+COPY --from=download_sources /python /tmp/source
 WORKDIR /tmp/source/build
 #ADD configure_python.sh configure_python.sh
 #RUN INSTALL_PREFIX="${INSTALL_PREFIX}" \
@@ -63,9 +77,11 @@ RUN ../configure \
 RUN make -j "$(nproc)"
 RUN make DESTDIR=/tmp/root install
 
+#RUN readelf -d /tmp/root/opt/scalyr-agent-2/python3/lib/python3.11/lib-dynload/_ssl.cpython-311-x86_64-linux-gnu.so && false
+
 # Copy sqlite shared library because it's dfficult to make it compiled statically.
 # TODO: But it would be good to create static.
-COPY --from=build_sqlite / /tmp/sqlite
+COPY --from=build_python_dependencies /sqlite /tmp/sqlite
 RUN cp /tmp/sqlite${COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX}/lib/*.so* /tmp/root${INSTALL_PREFIX}/lib
 
 # Remove cache files.

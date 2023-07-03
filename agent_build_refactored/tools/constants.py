@@ -179,7 +179,7 @@ class CpuArch(enum.Enum):
             return "linux/amd64"
 
         if self.value == "aarch64":
-            return "linux/arm/64"
+            return "linux/arm64"
 
         if self.value == "armv7":
             return "linux/arm/v7"

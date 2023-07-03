@@ -25,13 +25,13 @@ import pathlib as pl
 import re
 from typing import List, Tuple, Optional, Dict, Type, Union
 
-from agent_build_refactored.managed_packages.build_dependencies_versions import (
-    EMBEDDED_PYTHON_VERSION,
-    PYTHON_PACKAGE_SSL_1_1_1_VERSION,
-    PYTHON_PACKAGE_SSL_3_VERSION,
-    RUST_VERSION,
-    EMBEDDED_PYTHON_PIP_VERSION,
-)
+# from agent_build_refactored.managed_packages.build_dependencies_versions import (
+#     #EMBEDDED_PYTHON_VERSION,
+#     PYTHON_PACKAGE_SSL_1_1_1_VERSION,
+#     PYTHON_PACKAGE_SSL_3_VERSION,
+#     RUST_VERSION,
+#     EMBEDDED_PYTHON_PIP_VERSION,
+# )
 from agent_build_refactored.tools.builder import BuilderStep
 from agent_build_refactored.tools.runner import (
     Runner,
@@ -58,7 +58,9 @@ from agent_build_refactored.build_dependencies import (
     BUILD_PYTHON_WITH_OPENSSL_1_STEPS,
     BUILD_PYTHON_WITH_OPENSSL_3_STEPS,
     PREPARE_PYTHON_ENVIRONMENT_STEPS,
+    UBUNTU_TOOLSET_STEP,
 )
+from agent_build_refactored.build_dependencies.versions import PYTHON_VERSION
 
 from agent_build_refactored.build_dependencies.ubuntu_toolset import LatestUbuntuToolsetStep
 
@@ -160,23 +162,21 @@ AGENT_OPT_DIR = pl.Path("/opt") / AGENT_SUBDIR_NAME
 
 PYTHON_INSTALL_PREFIX = f"{AGENT_OPT_DIR}/python3"
 
-EMBEDDED_PYTHON_SHORT_VERSION = ".".join(EMBEDDED_PYTHON_VERSION.split(".")[:2])
+PYTHON_X_Y = ".".join(PYTHON_VERSION.split(".")[:2])
 
-OPENSSL_VERSION_TYPE_1_1_1 = "1_1_1"
-OPENSSL_VERSION_TYPE_3 = "3"
+EMBEDDED_OPENSSL_VERSION = BUILD_PYTHON_WITH_OPENSSL_3_STEPS[LibC.GNU][CpuArch.x86_64].openssl_version
 
 
-PYTHON_PACKAGE_SSL_VERSIONS = {
-    OPENSSL_VERSION_TYPE_1_1_1: PYTHON_PACKAGE_SSL_1_1_1_VERSION,
-    OPENSSL_VERSION_TYPE_3: PYTHON_PACKAGE_SSL_3_VERSION,
-}
+def _get_openssl_version_number(version: str):
+    version_parts = version.split(".")
+    major = version_parts[0]
+    minor = version_parts[1]
+    patch = version_parts[2]
+    hex_str = f"0x{major}{minor.zfill(2)}00{patch.zfill(2)}0"
+    return int(hex_str, 16)
 
-DEFAULT_OPENSSL_VERSION_TYPE = OPENSSL_VERSION_TYPE_1_1_1
 
-DEFAULT_PYTHON_PACKAGE_OPENSSL_VERSION = PYTHON_PACKAGE_SSL_VERSIONS[
-    DEFAULT_OPENSSL_VERSION_TYPE
-]
-
+EMBEDDED_OPENSSL_VERSION_NUMBER = _get_openssl_version_number(version=EMBEDDED_OPENSSL_VERSION)
 
 AGENT_LIBS_REQUIREMENTS_CONTENT = (
     f"{REQUIREMENTS_COMMON}\n" f"{REQUIREMENTS_COMMON_PLATFORM_DEPENDENT}"
@@ -199,15 +199,22 @@ def cpu_arch_as_fpm_arch(arch: CpuArch):
     raise Exception(f"Unknown cpu architecture: {arch.value}")
 
 
-class LinuxPackageBuilder(Builder, abc.ABC):
-    ENTRYPOINT_SCRIPT = pl.Path(__file__)
+class LinuxPackageBuilder(Builder):
     """
     This is a base class that is responsible for the building of the Linux agent deb and rpm packages that are managed
         by package managers such as apt and yum.
     """
     # type of the package, aka 'deb' or 'rpm'
     PACKAGE_TYPE: str
-    NAME: str
+
+    def __init__(self):
+        super(LinuxPackageBuilder, self).__init__(
+            base=UBUNTU_TOOLSET_STEP,
+            dependencies=self.get_dependencies(),
+        )
+
+    def get_dependencies(self) -> List[BuilderStep]:
+        return []
 
     @property
     def common_agent_package_build_args(self) -> List[str]:
@@ -268,22 +275,15 @@ class LinuxPackageBuilder(Builder, abc.ABC):
         # Add config file
         add_config(SOURCE_ROOT / "config", package_root_path / "etc/scalyr-agent-2")
 
+    @property
+    def package_output_dir(self):
+        return self.output_dir / self.PACKAGE_TYPE
 
 class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
     """
     This class builds non-aio (all in one) version of the package, meaning that this package has some system dependencies,
     such as Python and OpenSSL.
     """
-
-    def __init__(
-        self,
-    ):
-        self.toolset = LatestUbuntuToolsetStep()
-
-        super(LinuxPackageBuilder, self).__init__(
-            name=name,
-            base=self.toolset,
-        )
 
     @staticmethod
     def _create_non_aio_package_scriptlets(output_dir: pl.Path):
@@ -385,8 +385,7 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
         changelogs_path.mkdir()
         create_change_logs(output_dir=changelogs_path)
 
-        package_output_dir = self.output_dir / self.PACKAGE_TYPE
-        package_output_dir.mkdir(parents=True, exist_ok=True)
+        self.package_output_dir.mkdir(parents=True, exist_ok=True)
 
         subprocess.check_call(
             [
@@ -407,7 +406,7 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
                 "--conflicts", AGENT_AIO_PACKAGE_NAME
                 # fmt: on
             ],
-            cwd=str(package_output_dir),
+            cwd=str(self.package_output_dir),
         )
 
 
@@ -429,21 +428,21 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         self.ubuntu_toolset = LatestUbuntuToolsetStep()
         prepare_build_base_with_python = PREPARE_PYTHON_ENVIRONMENT_STEPS[self.libs][self.architecture]
         self.build_python_step = prepare_build_base_with_python.build_python_step
+        self.build_python_dependencies_step = self.build_python_step.build_python_dependencies
         self.build_python_step_with_openssl_1 = BUILD_PYTHON_WITH_OPENSSL_1_STEPS[self.libs][self.architecture]
         self.build_agent_libs_venv_step = BuildAgentLibsVenvStep(
             prepare_build_base_with_python_step=prepare_build_base_with_python,
         )
+        
+        super(LinuxAIOPackagesBuilder, self).__init__()
 
-        super(LinuxPackageBuilder, self).__init__(
-            name="linux_package_builder",
-            base=self.ubuntu_toolset,
-            dependencies=[
-                self.build_agent_libs_venv_step,
-                self.build_python_step,
-                self.build_python_step.build_openssl_step,
-                self.build_python_step_with_openssl_1,
-            ],
-        )
+    def get_dependencies(self) -> List[BuilderStep]:
+        return [
+            self.build_agent_libs_venv_step,
+            self.build_python_step.build_python_dependencies,
+            self.build_python_step,
+            self.build_python_step_with_openssl_1,
+        ]
 
     def _prepare_package_python_and_libraries_files(self, package_root: pl.Path):
         """
@@ -473,7 +472,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
             """# This function copies Python's ssl module related files."""
 
 
-            python_step_bindings_dir = python_dir / relative_python_install_prefix / f"lib/python{EMBEDDED_PYTHON_SHORT_VERSION}/lib-dynload"
+            python_step_bindings_dir = python_dir / relative_python_install_prefix / f"lib/python{PYTHON_X_Y}/lib-dynload"
 
             ssl_binding_path = list(python_step_bindings_dir.glob(python_ssl_bindings_glob))[0]
             hashlib_binding_path = list(python_step_bindings_dir.glob(python_hashlib_bindings_glob))[0]
@@ -506,18 +505,11 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         embedded_openssl_libs_dir = embedded_openssl_dir / "libs"
         embedded_openssl_libs_dir.mkdir(parents=True)
 
-        # build_openssl_1_1_1_step = BUILD_OPENSSL_1_1_1_STEPS[step_arch]
-        # build_openssl_step_dir = build_openssl_1_1_1_step.get_output_directory(
-        #     work_dir=self.work_dir
-        # )
-        # build_env_info = _SUPPORTED_ARCHITECTURES_TO_BUILD_ENVIRONMENTS[step_arch]
-        #
-        # if "centos:6" in build_env_info.image:
-        #     libssl_dir = "usr/local/lib64"
-        # else:
-        #     libssl_dir = "usr/local/lib"
-
-        build_openssl_libs_dir = self.build_python_step.build_openssl_step.output_dir / "usr/local/lib"
+        openssl_3_dir = self.build_python_dependencies_step.output_dir / f"openssl_3"
+        rel_dependencies_install_prefix = self.build_python_dependencies_step.install_prefix.relative_to(
+            "/"
+        )
+        build_openssl_libs_dir = openssl_3_dir / rel_dependencies_install_prefix / "lib"
         for path in build_openssl_libs_dir.glob("*.so.*"):
             shutil.copy(path, embedded_openssl_libs_dir)
 
@@ -527,7 +519,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
 
         # Remove original bindings from Python interpreter and replace them with symlinks.
         package_python_dir = package_root / relative_python_install_prefix
-        package_python_lib_dir = package_python_dir / f"lib/python{EMBEDDED_PYTHON_SHORT_VERSION}"
+        package_python_lib_dir = package_python_dir / f"lib/python{PYTHON_X_Y}"
         package_python_bindings_dir = package_python_lib_dir / "lib-dynload"
         ssl_binding_path = list(package_python_bindings_dir.glob(python_ssl_bindings_glob))[0]
         hashlib_binding_path = list(package_python_bindings_dir.glob(python_hashlib_bindings_glob))[0]
@@ -539,7 +531,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         # Rename main Python executable to be 'python3-original' and copy our wrapper script instead of it
         source_bin_dir = SOURCE_ROOT / "agent_build_refactored/managed_packages/files/bin"
         package_python_bin_dir = package_python_dir / "bin"
-        package_python_bin_executable_full_name = package_python_bin_dir / f"python{EMBEDDED_PYTHON_SHORT_VERSION}"
+        package_python_bin_executable_full_name = package_python_bin_dir / f"python{PYTHON_X_Y}"
         package_python_bin_original_executable = package_python_bin_dir / "python3-original"
         package_python_bin_executable_full_name.rename(package_python_bin_original_executable)
         shutil.copy(source_bin_dir / "python3", package_python_bin_executable_full_name)
@@ -573,7 +565,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         # We do not wait for it and remove them now in order to reduce overall size.
         # When deprecated libs are removed, this code can be removed as well.
 
-        if EMBEDDED_PYTHON_VERSION < "3.12":
+        if PYTHON_VERSION < "3.12":
             os.remove(package_python_lib_dir / "asynchat.py")
             os.remove(package_python_lib_dir / "smtpd.py")
 
@@ -581,7 +573,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
             #  We have to update the pysnmp library before the asyncore is removed from Python.
             # os.remove(package_python_lib_dir / "asyncore.py")
 
-        if EMBEDDED_PYTHON_VERSION < "3.13":
+        if PYTHON_VERSION < "3.13":
             os.remove(package_python_lib_dir / "aifc.py")
             list(package_python_bindings_dir.glob("audioop.*.so"))[0].unlink()
             os.remove(package_python_lib_dir / "cgi.py")
@@ -627,7 +619,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         package_venv_bin_python_executable = package_venv_bin_dir / "python"
         package_venv_bin_python_executable.symlink_to("python3")
 
-        package_venv_bin_python_full_executable = package_venv_bin_dir / f"python{EMBEDDED_PYTHON_SHORT_VERSION}"
+        package_venv_bin_python_full_executable = package_venv_bin_dir / f"python{PYTHON_X_Y}"
         package_venv_bin_python_full_executable.symlink_to("python3")
 
         # Create core requirements file.
@@ -712,8 +704,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         changelogs_path.mkdir()
         create_change_logs(output_dir=changelogs_path)
 
-        package_output_dir = self.output_dir / self.PACKAGE_TYPE
-        package_output_dir.mkdir(parents=True, exist_ok=True)
+        self.package_output_dir.mkdir(parents=True, exist_ok=True)
 
         subprocess.check_call(
             [
@@ -737,11 +728,11 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
                 "--conflicts", AGENT_NON_AIO_AIO_PACKAGE_NAME
                 # fmt: on
             ],
-            cwd=str(package_output_dir),
+            cwd=str(self.package_output_dir),
         )
 
 
-_BUILDERS: Dict[str, Union[Type[LinuxAIOPackagesBuilder], Type[LinuxNonAIOPackageBuilder]]] = {}
+ALL_PACKAGE_BUILDERS: Dict[str, Union[Type[LinuxAIOPackagesBuilder], Type[LinuxNonAIOPackageBuilder]]] = {}
 
 for package_type in ["deb", "rpm"]:
 
@@ -751,7 +742,7 @@ for package_type in ["deb", "rpm"]:
         NAME = name
         PACKAGE_TYPE = package_type
 
-    _BUILDERS[name] = _LinuxNonAIOPackagesBuilder
+    ALL_PACKAGE_BUILDERS[name] = _LinuxNonAIOPackagesBuilder
 
     for package_libc in [LibC.GNU]:
         for package_arch in [CpuArch.x86_64, CpuArch.AARCH64]:
@@ -763,26 +754,26 @@ for package_type in ["deb", "rpm"]:
                 ARCHITECTURE = package_arch
                 LIBC = package_libc
 
-            _BUILDERS[name] = _LinuxAIOPackagesBuilder
+            ALL_PACKAGE_BUILDERS[name] = _LinuxAIOPackagesBuilder
 
 
 def get_package_builder_by_name(name: str):
-    return _BUILDERS[name]
+    return ALL_PACKAGE_BUILDERS[name]
 
 
-def main(args=None):
-    base_parser = argparse.ArgumentParser()
-    base_parser.add_argument("builder_name", choices=_BUILDERS.keys())
-    base_args, other_args = base_parser.parse_known_args(args=args)
-    builder_cls = get_package_builder_by_name(name=base_args.builder_name)
-
-    builder = builder_cls()
-    parser = builder.create_parser()
-    args = parser.parse_args(args=other_args)
-
-    run_builder = builder.run_builder_from_command_line(args=args)
-    run_builder()
-
-
-if __name__ == '__main__':
-    main()
+# def main(args=None):
+#     base_parser = argparse.ArgumentParser()
+#     base_parser.add_argument("builder_name", choices=_BUILDERS.keys())
+#     base_args, other_args = base_parser.parse_known_args(args=args)
+#     builder_cls = get_package_builder_by_name(name=base_args.builder_name)
+#
+#     builder = builder_cls()
+#     parser = builder.create_parser()
+#     args = parser.parse_args(args=other_args)
+#
+#     run_builder = builder.run_builder_from_command_line(args=args)
+#     run_builder()
+#
+#
+# if __name__ == '__main__':
+#     main()

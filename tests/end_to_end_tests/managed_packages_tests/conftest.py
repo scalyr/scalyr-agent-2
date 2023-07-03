@@ -1,46 +1,52 @@
-import json
 import pathlib as pl
-import shutil
 import subprocess
-import argparse
 import http.server
 import socketserver
-import tarfile
 import threading
 import time
 
 import pytest
-import requests
 
 from agent_build_refactored.tools.constants import (
     Architecture,
     AGENT_VERSION,
     SOURCE_ROOT,
+    CpuArch,
 )
-from agent_build_refactored.tools.runner import Runner, RunnerMappedPath
 from agent_build_refactored.managed_packages.managed_packages_builders import (
-    ALL_MANAGED_PACKAGE_BUILDERS,
-    PREPARE_TOOLSET_STEPS,
+    ALL_PACKAGE_BUILDERS,
     PYTHON_PACKAGE_NAME,
     AGENT_LIBS_PACKAGE_NAME,
     AGENT_AIO_PACKAGE_NAME,
     AGENT_NON_AIO_AIO_PACKAGE_NAME,
 )
+from tests.end_to_end_tests.managed_packages_tests.tools import (
+    create_server_root,
+    get_packages_stable_version,
+    is_builder_creates_aio_package,
+)
+
 from tests.end_to_end_tests.run_in_remote_machine import DISTROS
 
 
-def pytest_addoption(parser):
-    parser.addoption("--builder-name", dest="builder_name", required=True)
+def add_cmd_args(parser, is_pytest_parser: bool):
 
-    parser.addoption(
+    if is_pytest_parser:
+        add_func = parser.addoption
+    else:
+        add_func = parser.add_argument
+
+    add_func("--builder-name", dest="builder_name", required=True)
+
+    add_func(
         "--packages-source",
         dest="packages_source",
         required=False,
         help="Depending on the '--packages-source-type' option, directory or repo tarball with packages to test. "
-        "If not specified, packages will be built inplace.",
+             "If not specified, packages will be built inplace.",
     )
 
-    parser.addoption(
+    add_func(
         "--packages-source-type",
         dest="packages_source_type",
         choices=["dir", "repo-tarball"],
@@ -48,21 +54,22 @@ def pytest_addoption(parser):
         required=False,
     )
 
-    parser.addoption(
+    add_func(
         "--remote-machine-type",
         required=True,
         choices=["ec2", "docker"],
         help="Type of the remote machine for the test. For 'ec2' - run in AWS ec2 instance,"
-        "'docker' - run in docker container, 'local', run locally.",
+             "'docker' - run in docker container, 'local', run locally.",
     )
 
-    parser.addoption(
-        "--runs-locally",
-        action="store_true",
-        help="If set, then tests run inside local machine, not in remote one.",
+    add_func(
+        "--stable-packages-version",
+        dest="stable_packages_version",
+        required=False,
+        help="Version of the latest stable version of package.",
     )
 
-    parser.addoption(
+    add_func(
         "--distro-name",
         dest="distro_name",
         required=True,
@@ -70,30 +77,8 @@ def pytest_addoption(parser):
         help="Distribution to test.",
     )
 
-
-def pytest_collection_modifyitems(config, items):
-    """
-    This pytest hook modifies test cases according to input config options.
-    """
-    names = [item.name for item in items]
-    index = names.index("test_remotely")
-    test_remotely = items[index]
-
-    # If tests have to be run in remote machine then we remove all test cases
-    # and leave only the 'test_remotely' case, which has to run all tests remotely.
-    if not config.option.runs_locally:
-        del items[:]
-        items.append(test_remotely)
-    # Or remove the 'test_remotely' case if tests have to be run locally.
-    else:
-        items.pop(index)
-
-    # make sure that the 'test_packages' test case runs first to test packages
-    # on the cleanest machine possible.
-    if "test_packages" in items:
-        index = names.index("test_packages")
-        test = items.pop(index)
-        items.insert(0, test)
+def pytest_addoption(parser):
+    add_cmd_args(parser, is_pytest_parser=True)
 
 
 @pytest.fixture(scope="session")
@@ -105,7 +90,7 @@ def package_builder_name(request):
 @pytest.fixture(scope="session")
 def package_builder(package_builder_name):
     """Builder class that builds tested packges."""
-    return ALL_MANAGED_PACKAGE_BUILDERS[package_builder_name]
+    return ALL_PACKAGE_BUILDERS[package_builder_name]
 
 
 @pytest.fixture(scope="session")
@@ -129,7 +114,7 @@ def target_distro(distro_name):
 @pytest.fixture(scope="session")
 def use_aio_package(package_builder_name):
     """Fixture flag that tells that a tested package is AIO"""
-    return "non-aio" not in package_builder_name
+    return is_builder_creates_aio_package(package_builder_name=package_builder_name)
 
 
 @pytest.fixture(scope="session")
@@ -140,227 +125,27 @@ def agent_package_name(use_aio_package):
         return AGENT_NON_AIO_AIO_PACKAGE_NAME
 
 
-class RepoBuilder(Runner):
-    """
-    This runner class is responsible for creating deb/rpm repositories from provided packages.
-    The result repo is used as a mock repository for testing.
-    """
-
-    BASE_ENVIRONMENT = PREPARE_TOOLSET_STEPS[Architecture.X86_64]
-
-    def build(
-        self,
-        package_type: str,
-        packages_dir_path: pl.Path,
-    ):
-
-        self.run_required()
-
-        if self.runs_in_docker:
-            self.run_in_docker(
-                command_args=[
-                    "--package-type",
-                    package_type,
-                    "--packages-dir",
-                    RunnerMappedPath(packages_dir_path),
-                ]
-            )
-            return
-
-        repo_path = self.output_path / "repo"
-        repo_path.mkdir()
-        repo_public_key_file = self.output_path / "repo_public_key.gpg"
-
-        sign_key_id = (
-            subprocess.check_output(
-                "gpg2 --with-colons --fingerprint test | awk -F: '$1 == \"pub\" {{print $5;}}'",
-                shell=True,
-            )
-            .strip()
-            .decode()
-        )
-
-        subprocess.check_call(
-            [
-                "gpg2",
-                "--output",
-                str(repo_public_key_file),
-                "--armor",
-                "--export",
-                sign_key_id,
-            ]
-        )
-
-        if package_type == "deb":
-            # Create deb repository using 'aptly'.
-            workdir = self.output_path / "aptly"
-            workdir.mkdir(parents=True)
-            aptly_root = workdir / "aptly"
-            aptly_config_path = workdir / "aptly.conf"
-
-            aptly_config = {"rootDir": str(aptly_root)}
-
-            aptly_config_path.write_text(json.dumps(aptly_config))
-            subprocess.run(
-                [
-                    "aptly",
-                    "-config",
-                    str(aptly_config_path),
-                    "repo",
-                    "create",
-                    "-distribution=scalyr",
-                    "scalyr",
-                ],
-                check=True,
-            )
-
-            for package_path in packages_dir_path.glob("*.deb"):
-                subprocess.check_call(
-                    [
-                        "aptly",
-                        "-config",
-                        str(aptly_config_path),
-                        "repo",
-                        "add",
-                        "scalyr",
-                        str(package_path),
-                    ]
-                )
-
-            subprocess.run(
-                [
-                    "aptly",
-                    "-config",
-                    str(aptly_config_path),
-                    "publish",
-                    "-architectures=amd64,arm64,all",
-                    "-distribution=scalyr",
-                    "repo",
-                    "scalyr",
-                ],
-                check=True,
-            )
-            shutil.copytree(aptly_root / "public", repo_path, dirs_exist_ok=True)
-
-        elif package_type == "rpm":
-            # Create rpm repository using 'createrepo_c'.
-            for package_path in packages_dir_path.glob("*.rpm"):
-                shutil.copy(package_path, repo_path)
-            subprocess.check_call(["createrepo_c", str(repo_path)])
-
-            # Sign repository's metadata
-            metadata_path = repo_path / "repodata/repomd.xml"
-            subprocess.check_call(
-                [
-                    "gpg2",
-                    "--local-user",
-                    sign_key_id,
-                    "--output",
-                    f"{metadata_path}.asc",
-                    "--detach-sign",
-                    "--armor",
-                    str(metadata_path),
-                ]
-            )
-
-    @classmethod
-    def add_command_line_arguments(cls, parser: argparse.ArgumentParser):
-        super(RepoBuilder, cls).add_command_line_arguments(parser)
-
-        parser.add_argument("--package-type", dest="package_type", required=True)
-        parser.add_argument(
-            "--packages-dir",
-            dest="packages_dir",
-            required=True,
-        )
-
-    @classmethod
-    def handle_command_line_arguments(
-        cls,
-        args,
-    ):
-        super(RepoBuilder, cls).handle_command_line_arguments(args)
-        builder = cls()
-        builder.build(
-            package_type=args.package_type, packages_dir_path=pl.Path(args.packages_dir)
-        )
+@pytest.fixture(scope="session")
+def stable_packages_version(request):
+    return get_packages_stable_version(
+        version=request.config.option.stable_packages_version
+    )
 
 
 @pytest.fixture(scope="session")
-def stable_agent_package_version():
-    # TODO: For now we just hardcode the particular version, when first release is done
-    # it has to be changed to version in the repository.
-    return "2.1.40"
-
-
-@pytest.fixture(scope="session")
-def stable_version_packages(
-    package_builder, tmp_path_factory, stable_agent_package_version
-):
-    """
-    Fixture directory with packages of the current stable version of the agent.
-    Stable packages are needed to perform upgrade test and to verify that release stable
-    packages can be upgraded by current packages.
-    """
-
-    stable_repo_url = "https://scalyr-repo.s3.amazonaws.com/stable"
-    if package_builder.PACKAGE_TYPE == "deb":
-        file_name = f"scalyr-agent-2_{stable_agent_package_version}_all.deb"
-        package_url = f"{stable_repo_url}/apt/pool/main/s/scalyr-agent-2/{file_name}"
-    elif package_builder.PACKAGE_TYPE == "rpm":
-        file_name = f"scalyr-agent-2-{stable_agent_package_version}-1.noarch.rpm"
-        package_url = f"{stable_repo_url}/yum/binaries/noarch/{file_name}"
-    else:
-        raise Exception(f"Unknown package type: {package_builder.PACKAGE_TYPE}")
-
-    packages_path = tmp_path_factory.mktemp("packages")
-    agent_package_path = packages_path / file_name
-    with requests.Session() as s:
-        resp = s.get(url=package_url)
-        resp.raise_for_status()
-
-        agent_package_path.write_bytes(resp.content)
-
-    return packages_path
-
-
-@pytest.fixture(scope="session")
-def server_root(request, tmp_path_factory, package_builder, stable_version_packages):
+def server_root(request, tmp_path_factory, package_builder, stable_packages_version):
     """
     Root directory which is served by the mock web server.
     The mock repo is located in ./repo folder, the public key is located in ./repo_public_key.gpg
     :return:
     """
-    package_source_type = request.config.option.packages_source_type
 
-    server_root = tmp_path_factory.mktemp("server_root")
-    if package_source_type == "repo-tarball":
-        # Extract repo directory from tarball.
-        with tarfile.open(request.config.option.packages_source) as tf:
-            tf.extractall(server_root)
-
-    elif package_source_type == "dir":
-        if request.config.option.packages_source is None:
-            # Build packages now.
-            builder = package_builder()
-            builder.build_agent_package()
-            builder_output = builder.packages_output_path
-        else:
-            builder_output = pl.Path(request.config.option.packages_source)
-
-        packages_dir = builder_output / package_builder.PACKAGE_TYPE
-        repo_packages = tmp_path_factory.mktemp("repo_packages")
-        shutil.copytree(packages_dir, repo_packages, dirs_exist_ok=True)
-        shutil.copytree(stable_version_packages, repo_packages, dirs_exist_ok=True)
-
-        # Build mock repo from packages.
-        repo_builder = RepoBuilder()
-        repo_builder.build(
-            package_type=package_builder.PACKAGE_TYPE, packages_dir_path=repo_packages
-        )
-        shutil.copytree(repo_builder.output_path, server_root, dirs_exist_ok=True)
-
-    return server_root
+    return create_server_root(
+        packages_source_type=request.config.option.packages_source_type,
+        packages_source=request.config.option.packages_source,
+        package_builder=package_builder,
+        stable_packages_version=stable_packages_version,
+    )
 
 
 @pytest.fixture(scope="session")
@@ -455,28 +240,22 @@ def _get_package_path_from_repo(
     return found[0]
 
 
-@pytest.fixture(scope="session")
-def python_package_path(repo_root, package_builder):
-    if repo_root is None:
-        return None
+def _arch_to_package_arch(package_type: str, arch: CpuArch = None):
+    if package_type == "deb":
+        mapping = {
+            CpuArch.x86_64: "amd64",
+            CpuArch.AARCH64: "arm64",
+            None: "all",
+        }
+        return mapping[arch]
 
-    return _get_package_path_from_repo(
-        package_filename_glob=f"{PYTHON_PACKAGE_NAME}*.{package_builder.PACKAGE_TYPE}",
-        package_type=package_builder.PACKAGE_TYPE,
-        repo_root=repo_root,
-    )
-
-
-@pytest.fixture(scope="session")
-def agent_libs_package_path(repo_root, package_builder):
-    if repo_root is None:
-        return None
-
-    return _get_package_path_from_repo(
-        package_filename_glob=f"{AGENT_LIBS_PACKAGE_NAME}*.{package_builder.PACKAGE_TYPE}",
-        package_type=package_builder.PACKAGE_TYPE,
-        repo_root=repo_root,
-    )
+    if package_type == "rpm":
+        mapping = {
+            CpuArch.x86_64: "x86_64",
+            CpuArch.AARCH64: "aarch64",
+            None: "noarch",
+        }
+        return mapping[arch]
 
 
 @pytest.fixture(scope="session")
@@ -485,14 +264,14 @@ def agent_package_path(repo_root, package_builder, agent_package_name, use_aio_p
         return None
 
     if use_aio_package:
-        package_arch = (
-            package_builder.DEPENDENCY_PACKAGES_ARCHITECTURE.get_package_arch(
-                package_type=package_builder.PACKAGE_TYPE
-            )
+        package_arch = _arch_to_package_arch(
+            package_type=package_builder.PACKAGE_TYPE,
+            arch=package_builder.ARCHITECTURE,
         )
     else:
-        package_arch = Architecture.UNKNOWN.get_package_arch(
-            package_type=package_builder.PACKAGE_TYPE
+        package_arch = _arch_to_package_arch(
+            package_type=package_builder.PACKAGE_TYPE,
+            arch=None,
         )
 
     if package_builder.PACKAGE_TYPE == "deb":

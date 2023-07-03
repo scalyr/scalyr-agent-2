@@ -22,10 +22,11 @@ import pathlib as pl
 import subprocess
 from typing import List, Dict, Union
 
-from agent_build_refactored.managed_packages.build_dependencies_versions import (
-    EMBEDDED_OPENSSL_VERSION_NUMBER,
-)
-from agent_build_refactored.tools.constants import Architecture
+# from agent_build_refactored.managed_packages.build_dependencies_versions import (
+#     EMBEDDED_OPENSSL_VERSION_NUMBER,
+# )
+from agent_build_refactored.tools.constants import CpuArch
+from agent_build_refactored.managed_packages.managed_packages_builders import EMBEDDED_OPENSSL_VERSION_NUMBER
 from agent_build_refactored.tools.run_in_ec2.constants import EC2DistroImage
 
 logger = logging.getLogger(__name__)
@@ -35,7 +36,7 @@ logger = logging.getLogger(__name__)
 class TargetDistro:
     name: str
     docker_image: str
-    ec2_images: Dict[Architecture, EC2DistroImage]
+    ec2_images: Dict[CpuArch, EC2DistroImage]
     # Expected version (in int representation) of the OpenSSL library that has to be picked by the agent.
     # This is ineger representation of the OpenSSL version. More info https://docs.python.org/3/library/ssl.html#ssl.OPENSSL_VERSION_NUMBER,
     #   https://www.openssl.org/docs/man3.0/man3/OPENSSL_VERSION_NUMBER.html
@@ -49,7 +50,7 @@ DISTROS = {
         TargetDistro(
             name="ubuntu2204",
             ec2_images={
-                Architecture.X86_64: EC2DistroImage(
+                CpuArch.x86_64: EC2DistroImage(
                     image_id="ami-09d56f8956ab235b3",
                     image_name="Ubuntu Server 22.04 (HVM), SSD Volume Type",
                     short_name="ubuntu2204",
@@ -63,7 +64,7 @@ DISTROS = {
         TargetDistro(
             name="ubuntu2004",
             ec2_images={
-                Architecture.X86_64: EC2DistroImage(
+                CpuArch.x86_64: EC2DistroImage(
                     image_id="ami-0149b2da6ceec4bb0",
                     image_name="Ubuntu Server 20.04 LTS (HVM), SSD Volume Type",
                     short_name="ubuntu2004",
@@ -77,7 +78,7 @@ DISTROS = {
         TargetDistro(
             name="ubuntu1804",
             ec2_images={
-                Architecture.X86_64: EC2DistroImage(
+                CpuArch.x86_64: EC2DistroImage(
                     image_id="ami-07ebfd5b3428b6f4d",
                     image_name="Ubuntu Server 18.04 LTS (HVM), SSD Volume Type",
                     short_name="ubuntu1804",
@@ -91,7 +92,7 @@ DISTROS = {
         TargetDistro(
             name="ubuntu1604",
             ec2_images={
-                Architecture.X86_64: EC2DistroImage(
+                CpuArch.x86_64: EC2DistroImage(
                     image_id="ami-08bc77a2c7eb2b1da",
                     image_name="Ubuntu Server 16.04 LTS (HVM), SSD Volume Type",
                     short_name="ubuntu1604",
@@ -105,7 +106,7 @@ DISTROS = {
         TargetDistro(
             name="ubuntu1404",
             ec2_images={
-                Architecture.X86_64: EC2DistroImage(
+                CpuArch.x86_64: EC2DistroImage(
                     image_id="ami-07957d39ebba800d5",
                     image_name="Ubuntu Server 14.04 LTS (HVM)",
                     short_name="ubuntu1404",
@@ -119,7 +120,7 @@ DISTROS = {
         TargetDistro(
             name="debian11",
             ec2_images={
-                Architecture.X86_64: EC2DistroImage(
+                CpuArch.x86_64: EC2DistroImage(
                     image_id="ami-09a41e26df464c548",
                     image_name="Debian 11 (HVM), SSD Volume Type",
                     short_name="debian11",
@@ -133,7 +134,7 @@ DISTROS = {
         TargetDistro(
             name="debian10",
             ec2_images={
-                Architecture.X86_64: EC2DistroImage(
+                CpuArch.x86_64: EC2DistroImage(
                     image_id="ami-0b9a611a02047d3b1",
                     image_name="Debian 10 Buster",
                     short_name="debian10",
@@ -147,7 +148,7 @@ DISTROS = {
         TargetDistro(
             name="centos8",
             ec2_images={
-                Architecture.X86_64: EC2DistroImage(
+                CpuArch.x86_64: EC2DistroImage(
                     image_id="ami-01ca03df4a6012157",
                     image_name="CentOS 8 (x86_64) - with Updates HVM",
                     short_name="centos8",
@@ -162,7 +163,7 @@ DISTROS = {
         TargetDistro(
             name="centos7",
             ec2_images={
-                Architecture.X86_64: EC2DistroImage(
+                CpuArch.x86_64: EC2DistroImage(
                     image_id="ami-0affd4508a5d2481b",
                     image_name="CentOS 7 (x86_64) - with Updates HVM",
                     short_name="centos7",
@@ -176,7 +177,7 @@ DISTROS = {
         TargetDistro(
             name="centos6",
             ec2_images={
-                Architecture.X86_64: EC2DistroImage(
+                CpuArch.x86_64: EC2DistroImage(
                     image_id="ami-03a941394ec9849de",
                     image_name="CentOS 6 (x86_64) - with Updates HVM",
                     short_name="centos7",
@@ -190,7 +191,7 @@ DISTROS = {
         TargetDistro(
             name="amazonlinux2",
             ec2_images={
-                Architecture.X86_64: EC2DistroImage(
+                CpuArch.x86_64: EC2DistroImage(
                     image_id="ami-09d95fab7fff3776c",
                     image_name="Amazon Linux 2 AMI (HVM), SSD Volume Type",
                     short_name="amazonlinux2",
@@ -209,7 +210,7 @@ def run_test_remotely(
     target_distro: TargetDistro,
     remote_machine_type: str,
     command: List[str],
-    architecture: Architecture,
+    architecture: CpuArch,
     pytest_runner_path: pl.Path,
     file_mappings: Dict = None,
 ):
@@ -283,7 +284,7 @@ def run_test_remotely(
                 f"{pytest_runner_path}:/test_runner",
                 *mount_options,
                 "--platform",
-                str(architecture.as_docker_platform.value),
+                architecture.as_docker_platform(),
                 target_distro.docker_image,
                 "/test_runner",
                 "-s",

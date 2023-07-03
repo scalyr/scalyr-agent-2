@@ -22,9 +22,6 @@ PYTHON_VERSION = "3.11.2"
 OPENSSL_1_VERSION = "1.1.1s"
 OPENSSL_3_VERSION = "3.0.7"
 
-# Version of the OpenSSL library, which is bundled with the package
-EMBEDDED_OPENSSL_VERSION = OPENSSL_1_VERSION
-
 # Integer (hex) representation of the OpenSSL version.
 EMBEDDED_OPENSSL_VERSION_NUMBER = 0x1010113F
 

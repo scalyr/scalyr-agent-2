@@ -10,15 +10,14 @@ ENV BASH_ENV="/root/.bash_env"
 
 
 
-FROM centos:7 as base_aarch64_gnu1
+FROM centos:7 as base_aarch64_gnu
 RUN yum install -y centos-release-scl
 RUN yum install -y devtoolset-9 perl-core
 RUN echo -e "source /opt/rh/devtoolset-9/enable" >> /root/.bash_env
 ENV BASH_ENV="/root/.bash_env"
 
-#FROM ubuntu:14.04 as base-armv7-gnu
-#FROM ubuntu:14.04 as base_armv7_gnu
-FROM ubuntu:14.04 as base_aarch64_gnu
+FROM ubuntu:14.04 as base_armv7_gnu
+#FROM ubuntu:14.04 as base_aarch64_gnu
 ENV DEBIAN_FRONTEND="noninteractive"
 RUN apt-get update && apt-get install -y software-properties-common
 RUN add-apt-repository -y ppa:ubuntu-toolchain-r/test

@@ -2,6 +2,7 @@ import pathlib as pl
 
 from agent_build_refactored.tools.constants import CpuArch, LibC
 from agent_build_refactored.build_dependencies.python.build_python_dependencies.base import BasePythonDependencyBuildStep
+from agent_build_refactored.build_dependencies.python.download_sources import DownloadSourcesStep
 
 
 class BuildPythonSqliteStep(BasePythonDependencyBuildStep):
@@ -9,7 +10,7 @@ class BuildPythonSqliteStep(BasePythonDependencyBuildStep):
 
     def __init__(
         self,
-        version_commit: str,
+        download_source_step: DownloadSourcesStep,
         install_prefix: pl.Path,
         architecture: CpuArch,
         libc: LibC
@@ -18,8 +19,11 @@ class BuildPythonSqliteStep(BasePythonDependencyBuildStep):
             install_prefix=install_prefix,
             architecture=architecture,
             libc=libc,
+            build_contexts=[
+                download_source_step,
+            ],
             build_args={
-                "TCL_VERSION_COMMIT": "338c6692672696a76b6cb4073820426406c6f3f9",  # tag - "core-8-6-13"
-                "VERSION_COMMIT": version_commit
+                "TCL_VERSION_COMMIT": download_source_step.tcl_version_commit,
+                "VERSION_COMMIT": download_source_step.sqlite_version_commit,
             },
         )

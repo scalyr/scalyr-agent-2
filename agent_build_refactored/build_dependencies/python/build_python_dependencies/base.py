@@ -23,7 +23,6 @@ class BasePythonDependencyBuildStep(BuilderStep):
         build_contexts: List[BuilderStep] = None,
         unique_name_suffix: str = None,
     ):
-        self.download_source_base_step = DownloadSourcesBaseStep()
         self.prepare_build_base_step = PrepareBuildBaseStep(
             architecture=architecture,
             libc=libc
@@ -40,7 +39,6 @@ class BasePythonDependencyBuildStep(BuilderStep):
 
         build_contexts = build_contexts or []
         build_contexts.extend([
-            self.download_source_base_step,
             self.prepare_build_base_step,
         ])
 

@@ -29,8 +29,8 @@ class PrepareBuildBaseWithPythonStep(BuilderStep):
             dockerfile=_PARENT_DIR / "Dockerfile",
             build_contexts=[
                 self.build_python_step.prepare_build_base_step,
+                self.build_python_step.build_python_dependencies,
                 self.build_python_step,
-                self.build_python_step.build_openssl_step,
                 self.build_dev_requirements_step,
             ],
             build_args={

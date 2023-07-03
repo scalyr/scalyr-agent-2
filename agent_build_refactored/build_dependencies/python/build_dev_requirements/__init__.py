@@ -31,11 +31,8 @@ class BuildDevRequirementsStep(BuilderStep):
             dockerfile=_PARENT_DIR / "Dockerfile",
             build_contexts=[
                 self.build_python_step.prepare_build_base_step,
-                self.build_python_step.build_zlib_step,
-                self.build_python_step.build_libffi_step,
-                self.build_python_step.download_source_base_step,
+                self.build_python_step.build_python_dependencies,
                 self.build_python_step,
-                self.build_python_step.build_openssl_step
             ],
             build_args={
                 "INSTALL_PREFIX": str(self.build_python_step.install_prefix),

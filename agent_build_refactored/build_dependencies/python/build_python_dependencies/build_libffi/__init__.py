@@ -2,14 +2,14 @@ import pathlib as pl
 
 from agent_build_refactored.tools.constants import CpuArch, LibC
 from agent_build_refactored.build_dependencies.python.build_python_dependencies.base import BasePythonDependencyBuildStep
-
+from agent_build_refactored.build_dependencies.python.download_sources import DownloadSourcesStep
 
 class BuildPythonLibffiStep(BasePythonDependencyBuildStep):
     BUILD_CONTEXT_PATH = pl.Path(__file__).parent
 
     def __init__(
         self,
-        version: str,
+        download_source_step: DownloadSourcesStep,
         install_prefix: pl.Path,
         architecture: CpuArch,
         libc: LibC
@@ -18,7 +18,10 @@ class BuildPythonLibffiStep(BasePythonDependencyBuildStep):
             install_prefix=install_prefix,
             architecture=architecture,
             libc=libc,
+            build_contexts=[
+                download_source_step,
+            ],
             build_args={
-                "VERSION": version
+                "VERSION": download_source_step.libffi_version,
             },
         )
