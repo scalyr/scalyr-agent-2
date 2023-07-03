@@ -867,6 +867,7 @@ COPY --from
         else:
             builder_info = self.prepare_remote_buildx_builders(in_ec2=False)
 
+        self.oci_layout.parent.mkdir(parents=True, exist_ok=True)
         try:
             subprocess.run(
                 [
