@@ -314,7 +314,7 @@ jobs:
           
           set -e
           
-          case "$EXIT_CODE in
+          case $EXIT_CODE in
             0)
               echo "cache_found=false" >> "$GITHUB_OUTPUT"
               ;;
