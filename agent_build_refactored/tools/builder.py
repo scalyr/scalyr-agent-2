@@ -863,6 +863,7 @@ COPY --from
             builder_info = LocalBuildxBuilderWrapper(
                 name=name,
             )
+            builder_info.create_builder()
         else:
             builder_info = self.prepare_remote_buildx_builders(in_ec2=False)
 
