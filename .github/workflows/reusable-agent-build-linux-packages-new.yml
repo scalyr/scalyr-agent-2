@@ -262,8 +262,7 @@ jobs:
       #   "os": Runner OS.
       matrix:
         builder_name:
-          - x86-64
-          - aarch64
+          - deb-non-aio
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -307,6 +306,8 @@ jobs:
             python3 agent_build_refactored/scripts/builder_helper.py \
               agent_build_refactored.managed_packages.managed_packages_builders.deb-non-aio \
               --fail-on-cache-miss
+      
+      
 
       - name: Save packages as artifact
         uses: actions/upload-artifact@v3

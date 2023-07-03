@@ -4,6 +4,7 @@ import dataclasses
 import functools
 import importlib
 import json
+import logging
 import pathlib as pl
 import argparse
 import platform
@@ -1427,9 +1428,13 @@ class Builder(metaclass=BuilderMeta):
         #         **run_args
         #     )
 
-        builder.run_builder(
-            **run_args
-        )
+        try:
+            builder.run_builder(
+                **run_args
+            )
+        except BuilderCacheMissError:
+            logging.exception(f"Builder {cls.NAME} failed")
+            exit(400)
 
 
 def _cleanup_output_dirs():
