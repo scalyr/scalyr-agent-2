@@ -314,6 +314,7 @@ jobs:
           
           set -e
           
+          echo "EEEEE ${EXIT_CODE}"
           case $EXIT_CODE in
             0)
               echo "cache_found=false" >> "$GITHUB_OUTPUT"
@@ -342,7 +343,7 @@ jobs:
       - name: GG
         if: steps.build_with_cache.outputs.cache_found == 'false'
         run:
-          echo "gggg"
+          echo "${{ matrix.builder_name }}" /tmp/cache/${{ matrix.builder_name }}.txt
 
 #  test_managed_packages:
 #    name: Test package on ${{ matrix.distro-name }}-${{ matrix.remote-machine-type }}, ${{ matrix.name }}
