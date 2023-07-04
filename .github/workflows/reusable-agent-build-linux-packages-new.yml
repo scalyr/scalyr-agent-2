@@ -373,10 +373,10 @@ jobs:
 
       - name: GG
         run: |
-          echo "${{ needs.build_packages.strategy.github }}"
-          echo "${{ needs.build_packages.strategy.needs }}"
-          echo "${{ needs.build_packages.strategy.vars }}"
-          echo "${{ needs.build_packages.strategy.inputs }}"
+          echo "${{ jobs.build_packages.strategy.github }}"
+          echo "${{ jobs.build_packages.strategy.needs }}"
+          echo "${{ jobs.build_packages.strategy.vars }}"
+          echo "${{ jobs.build_packages.strategy.inputs }}"
 
 #      - name: Download artifacts
 #        uses: actions/download-artifact@v3
