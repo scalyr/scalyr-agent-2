@@ -345,11 +345,27 @@ jobs:
           name: linux-packages-${{ matrix.name }}
           path: build
           retention-days: 1
-      
-      - name: GG
+
+      - name: Get builder dependencies
         if: steps.build_with_cache.outputs.cache_found == 'false'
-        run:
-          echo "${{ matrix.builder_name }}" /tmp/cache/${{ matrix.builder_name }}.txt
+        run: |
+          python3 agent_build_refactored/scripts/builder_helper.py --get-all-dependencies > /tmp/dependencies/${{ matrix.builder_name }}.json
+          #DEPENDENCIES_JSON=$(python3 agent_build_refactored/scripts/builder_helper.py --get-all-dependencies)
+          #echo "builder_dependencies_json=" >> "$GITHUB_OUTPUT" 
+          
+
+      - name: Save builder dependencies json as artifact
+        if: steps.build_with_cache.outputs.cache_found == 'false'
+        uses: actions/upload-artifact@v3
+        with:
+          name: _linux-packages-${{ matrix.name }}-dependencies
+          path: /tmp/dependencies
+          retention-days: 1
+      
+#      - name: GG
+#        if: steps.build_with_cache.outputs.cache_found == 'false'
+#        run:
+#          echo "${{ matrix.builder_name }}" /tmp/cache/${{ matrix.builder_name }}.txt
 
 #  test_managed_packages:
 #    name: Test package on ${{ matrix.distro-name }}-${{ matrix.remote-machine-type }}, ${{ matrix.name }}

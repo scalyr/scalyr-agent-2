@@ -36,7 +36,7 @@ class MaxCompatibilityPythonBuilderToolchain:
 MAX_COMPATIBILITY_TOOLCHAINS: Dict[LibC, Dict[CpuArch, MaxCompatibilityPythonBuilderToolchain]] = collections.defaultdict(dict)
 
 for libc in [LibC.GNU]:
-    download_sources_step = DownloadSourcesStep(
+    download_sources_step = DownloadSourcesStep.create(
         python_version=PYTHON_VERSION,
         bzip_version="1.0.8",
         libedit_version_commit="0cdd83b3ebd069c1dee21d81d6bf716cae7bf5da",  # tag - "upstream/3.1-20221030"
@@ -49,31 +49,35 @@ for libc in [LibC.GNU]:
         util_linux_version="2.38",
         xz_version="5.2.6",
         zlib_version="1.2.13",
+        module=__name__,
     )
 
     for arch in [CpuArch.x86_64, CpuArch.AARCH64]:
-        build_python_with_openssl_1 = BuilderPythonStep(
+        build_python_with_openssl_1 = BuilderPythonStep.create(
             download_sources_step=download_sources_step,
             openssl_version=OPENSSL_1_VERSION,
             install_prefix=PYTHON_INSTALL_PREFIX,
             dependencies_install_prefix=PYTHON_DEPENDENCIES_INSTALL_PREFIX,
             architecture=arch,
             libc=libc,
+            module=__name__,
         )
         BUILD_PYTHON_WITH_OPENSSL_1_STEPS[libc][arch] = build_python_with_openssl_1
 
-        build_python_with_openssl_3 = BuilderPythonStep(
+        build_python_with_openssl_3 = BuilderPythonStep.create(
             download_sources_step=download_sources_step,
             openssl_version=OPENSSL_3_VERSION,
             install_prefix=PYTHON_INSTALL_PREFIX,
             dependencies_install_prefix=PYTHON_DEPENDENCIES_INSTALL_PREFIX,
             architecture=arch,
             libc=libc,
+            module=__name__,
         )
         BUILD_PYTHON_WITH_OPENSSL_3_STEPS[libc][arch] = build_python_with_openssl_3
 
-        prepare_python_environment_step = PrepareBuildBaseWithPythonStep(
+        prepare_python_environment_step = PrepareBuildBaseWithPythonStep.create(
             build_python_step=build_python_with_openssl_3,
+            module=__name__,
         )
         PREPARE_PYTHON_ENVIRONMENT_STEPS[libc][arch] = prepare_python_environment_step
 
@@ -86,4 +90,6 @@ for libc in [LibC.GNU]:
         MAX_COMPATIBILITY_TOOLCHAINS[libc][arch] = toolchain
 
 
-UBUNTU_TOOLSET_STEP = LatestUbuntuToolsetStep()
+UBUNTU_TOOLSET_STEP = LatestUbuntuToolsetStep.create(
+    module=__name__,
+)

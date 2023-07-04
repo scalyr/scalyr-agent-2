@@ -29,7 +29,7 @@ import pathlib as pl
 import argparse
 import sys
 
-from typing import Dict
+from typing import Dict, Type
 
 if sys.version_info < (3, 8, 0):
     raise ValueError("This script requires Python 3.8 or above")
@@ -47,16 +47,23 @@ from agent_build_refactored.docker_image_builders import (
     ALL_IMAGE_BUILDERS,
 )
 from agent_build_refactored.managed_packages.managed_packages_builders import (
-    ALL_MANAGED_PACKAGE_BUILDERS,
+    ALL_PACKAGE_BUILDERS,
 )
+from agent_build_refactored.tools.builder import BUILDER_CLASSES, Builder
+from agent_build_refactored.scripts.builder_helper import builder_main
 
+
+ALL_BUILDERS: Dict[str, Type[Builder]] = {
+    **ALL_IMAGE_BUILDERS,
+    **ALL_PACKAGE_BUILDERS
+}
 
 _AGENT_BUILD_PATH = __SOURCE_ROOT__ / "agent_build"
 
-
-BUILDERS: Dict[str, Runner] = UniqueDict(
-    **ALL_IMAGE_BUILDERS, **ALL_MANAGED_PACKAGE_BUILDERS
-)
+#
+# BUILDERS: Dict[str, Runner] = UniqueDict(
+#     **ALL_IMAGE_BUILDERS, **ALL_MANAGED_PACKAGE_BUILDERS
+# )
 
 if __name__ == "__main__":
 
@@ -65,28 +72,38 @@ if __name__ == "__main__":
     # First, we use base parser just to parse the builder name.
     # When we determine the name, we create another parser which will be used by the builder itself.
     base_parser = argparse.ArgumentParser(add_help=False)
-    base_parser.add_argument("builder_name", choices=BUILDERS.keys())
+    base_parser.add_argument("builder_name", choices=ALL_BUILDERS.keys())
 
-    base_parser.add_argument(
-        "--fqdn",
-        dest="fqdn",
-        action="store_true",
-        help="If this flag specified then just print fully qualified name for the builder. Mainly needed for CI/CD.",
+    # base_parser.add_argument(
+    #     "--fqdn",
+    #     dest="fqdn",
+    #     action="store_true",
+    #     help="If this flag specified then just print fully qualified name for the builder. Mainly needed for CI/CD.",
+    # )
+
+    base_args, other_argv = base_parser.parse_known_args()
+
+    builder_cls = ALL_BUILDERS[base_args.builder_name]
+
+    builder_main(
+        builder_fqdn=builder_cls.FQDN,
+        argv=other_argv,
     )
 
-    base_args, other_args = base_parser.parse_known_args()
+    a=10
 
-    builder_cls = BUILDERS[base_args.builder_name]
-
-    if base_args.fqdn:
-        print(builder_cls.get_fully_qualified_name())
-        exit(0)
-
-    # Create parser for builder commands and parse them.
-    parser = argparse.ArgumentParser()
-
-    builder_cls.add_command_line_arguments(parser=parser)
-
-    args = parser.parse_args(args=other_args)
-
-    builder_cls.handle_command_line_arguments(args=args)
+    #
+    # builder_cls = BUILDER_CLASSES[base_args.builder_name]
+    #
+    # if base_args.fqdn:
+    #     print(builder_cls.get_fully_qualified_name())
+    #     exit(0)
+    #
+    # # Create parser for builder commands and parse them.
+    # parser = argparse.ArgumentParser()
+    #
+    # builder_cls.add_command_line_arguments(parser=parser)
+    #
+    # args = parser.parse_args(args=other_args)
+    #
+    # builder_cls.handle_command_line_arguments(args=args)
