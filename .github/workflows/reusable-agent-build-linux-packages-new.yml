@@ -246,8 +246,8 @@ jobs:
 #          path: /tmp/result
 #          retention-days: 1
 
-  build-managed-packages:
-    name: Build managed package ${{ matrix.name }}
+  build_packages:
+    name: Build package ${{ matrix.name }}
     runs-on: ubuntu-22.04
 
     strategy:
@@ -354,13 +354,41 @@ jobs:
           #echo "builder_dependencies_json=" >> "$GITHUB_OUTPUT" 
           
 
-      - name: Save builder dependencies json as artifact
-        if: steps.build_with_cache.outputs.cache_found == 'false'
-        uses: actions/upload-artifact@v3
-        with:
-          name: _linux-packages-${{ matrix.name }}-dependencies
-          path: /tmp/dependencies
-          retention-days: 1
+#      - name: Save builder dependencies json as artifact
+#        if: steps.build_with_cache.outputs.cache_found == 'false'
+#        uses: actions/upload-artifact@v3
+#        with:
+#          name: _linux-packages-dependencies-${{ matrix.name }}
+#          path: /tmp/dependencies
+#          retention-days: 1
+
+  prepare_dependencies_matrices:
+    name: Prepare dependencies matrices
+    needs:
+      - build_packages
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: GG
+        run: |
+          echo "${{ needs.build_packages.strategy }}"
+
+#      - name: Download artifacts
+#        uses: actions/download-artifact@v3
+#        with:
+#          path: /tmp/all_artifacts
+#
+#
+#      - name: Prepare artifacts
+#        run: |
+#          mkdir -p /tmp/result_artifacts
+#          cp -a /tmp/all_artifacts/linux-packages-*/. /tmp/result_artifacts
+#          cp -a /tmp/all_artifacts/tarball-noarch/. /tmp/result_artifacts
+#          cp -a /tmp/all_artifacts/windows-msi/. /tmp/result_artifacts
+      
+      
       
 #      - name: GG
 #        if: steps.build_with_cache.outputs.cache_found == 'false'
