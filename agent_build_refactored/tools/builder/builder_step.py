@@ -688,7 +688,7 @@ COPY --from
             check=True
         )
 
-        if cache_policy == CachePolicy.USE_ONLY_CACHE:
+        if use_only_cache:
             subprocess.run(
                 [
                     "docker",
@@ -732,7 +732,8 @@ COPY --from
             full_no_cache_error_message = "Can not continue. This build is supposed to be rebuilt from cache"
             build_process_stderr = e.stderr.decode()
             print(build_process_stderr, file=sys.stderr)
-            if cache_policy.USE_ONLY_CACHE and full_no_cache_error_message in build_process_stderr:
+
+            if use_only_cache and full_no_cache_error_message in build_process_stderr:
                 raise BuilderCacheMissError(f"Can not find cache for '{self.name}' with flag 'fail_on_cache_miss' set.")
             raise
 
