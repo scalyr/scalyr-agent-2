@@ -304,6 +304,7 @@ jobs:
         uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
 
       - name: Build managed package with builder '${{ matrix.name }}'
+        shell: bash
         id: build
         env:
             USE_GHA_CACHE: "1"
@@ -311,7 +312,7 @@ jobs:
           
           OUTPUT=$(python3 build_package_new_refactored.py ${{ matrix.builder_name }} --use-only-cache)
           
-
+          echo "${OUTPUT}"
           
           if [ "${OUTPUT}" = "cache_hit" ]; then
             echo "GGGGGGG"
