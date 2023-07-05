@@ -56,7 +56,7 @@ jobs:
           echo "${MATRICES}"
           echo "${MATRICES}" >> "${GITHUB_OUTPUT}"
 
-  build_dependency_group_0:
+  group_0:
     runs-on: ubuntu-latest
     needs: [prepare_before_build]
     strategy:
