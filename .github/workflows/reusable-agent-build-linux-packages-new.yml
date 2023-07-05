@@ -316,8 +316,8 @@ jobs:
           if [ "${OUTPUT}" = "cache_hit" ]; then
             echo "cache_hit=true" >> "$GITHUB_OUTPUT"
           fi
-          
-          echo "$GITHUB_OUTPUT 55555555555"
+          cat "$GITHUB_OUTPUT"
+
 #          set -e
 #
 #          echo "EEEEE ${EXIT_CODE}"
