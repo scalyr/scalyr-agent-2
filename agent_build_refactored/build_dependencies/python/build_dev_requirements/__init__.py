@@ -25,9 +25,12 @@ class BuildDevRequirementsStep(BuilderStep):
 
         rust_platform = f"{self.architecture.value}-unknown-linux-{self.libc.value}{abi_part}"
 
+        requirements_file = SOURCE_ROOT / "dev-requirements-new.txt"
+        self.requirements_file_content = requirements_file.read_text()
+
         super(BuildDevRequirementsStep, self).__init__(
             name=_PARENT_DIR.name,
-            context=SOURCE_ROOT,
+            context=_PARENT_DIR,
             dockerfile=_PARENT_DIR / "Dockerfile",
             platform=self.architecture,
             build_contexts=[
@@ -36,9 +39,9 @@ class BuildDevRequirementsStep(BuilderStep):
                 self.build_python_step,
             ],
             build_args={
-                "INSTALL_PREFIX": str(self.build_python_step.install_prefix),
+                "PYTHON_INSTALL_PREFIX": str(self.build_python_step.install_prefix),
                 "COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX": str(self.build_python_step.dependencies_install_prefix),
-                "ALL_REQUIREMENTS": ALL_REQUIREMENTS,
+                "REQUIREMENTS_CONTENT": self.requirements_file_content,
                 "RUST_VERSION": "1.63.0",
                 "RUST_PLATFORM": rust_platform,
             },

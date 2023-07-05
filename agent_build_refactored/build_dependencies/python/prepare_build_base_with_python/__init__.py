@@ -25,7 +25,7 @@ class PrepareBuildBaseWithPythonStep(BuilderStep):
 
         super(PrepareBuildBaseWithPythonStep, self).__init__(
             name=_PARENT_DIR.name,
-            context=SOURCE_ROOT,
+            context=_PARENT_DIR,
             dockerfile=_PARENT_DIR / "Dockerfile",
             platform=self.architecture,
             build_contexts=[
@@ -37,5 +37,6 @@ class PrepareBuildBaseWithPythonStep(BuilderStep):
             build_args={
                 "INSTALL_PREFIX": str(self.build_python_step.install_prefix),
                 "COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX": str(self.build_python_step.dependencies_install_prefix),
+                "REQUIREMENTS_CONTENT": self.build_dev_requirements_step.requirements_file_content,
             },
         )

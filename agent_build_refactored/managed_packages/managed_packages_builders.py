@@ -62,11 +62,17 @@ from agent_build_refactored.build_dependencies.python.prepare_build_base_with_py
 # )
 from agent_build_refactored.build_dependencies.versions import PYTHON_VERSION
 
-from agent_build_refactored.build_dependencies.ubuntu_toolset import ToolsetStep
+from agent_build_refactored.build_dependencies.ubuntu_toolset import UbuntuToolset
 
 from agent_build_refactored.build_dependencies.build_agent_libs_venv import BuildAgentLibsVenvStep
-from agent_build_refactored.build_dependencies.python.build_python_dependencies import BuildPytonDependenciesStep, DownloadSourcesStep, PrepareBuildBaseStep
+from agent_build_refactored.build_dependencies.python.build_python_dependencies import (
+    BuildPytonDependenciesStep,
+    DownloadSourcesStep,
+    PrepareBuildBaseStep,
+)
+
 from agent_build_refactored.build_dependencies.python.build_python import BuilderPythonStep
+from agent_build_refactored.build_dependencies.python.build_dev_requirements import BuildDevRequirementsStep
 from agent_build_refactored.tools import check_call_with_log
 from agent_build_refactored.prepare_agent_filesystem import (
     build_linux_fhs_agent_files,
@@ -224,11 +230,159 @@ class LinuxPackageBuilder(Builder):
 
     def __init__(self, dependencies: List[BuilderStep] = None):
 
-        self.toolset_step = ToolsetStep.create()
+        # self.download_sources_step = DownloadSourcesStep.create(
+        #     python_version=PYTHON_VERSION,
+        #     bzip_version="1.0.8",
+        #     libedit_version_commit="0cdd83b3ebd069c1dee21d81d6bf716cae7bf5da",  # tag - "upstream/3.1-20221030"
+        #     libffi_version="3.4.2",
+        #     ncurses_version="6.3",
+        #     openssl_1_version=OPENSSL_1_VERSION,
+        #     openssl_3_version=OPENSSL_3_VERSION,
+        #     tcl_version_commit="338c6692672696a76b6cb4073820426406c6f3f9",  # tag - "core-8-6-13"
+        #     sqlite_version_commit="e671c4fbc057f8b1505655126eaf90640149ced6",  # tag - "version-3.41.2"
+        #     util_linux_version="2.38",
+        #     xz_version="5.2.6",
+        #     zlib_version="1.2.13",
+        # )
+        #
+        # self.prepare_build_base_step = PrepareBuildBaseStep.create(
+        #     architecture=self.architecture,
+        #     libc=self.libc
+        # )
+        #
+        # self.build_python_dependencies = BuildPytonDependenciesStep.create(
+        #     download_sources_step=self.download_sources_step,
+        #     prepare_build_base=self.prepare_build_base_step,
+        #     install_prefix=PYTHON_DEPENDENCIES_INSTALL_PREFIX,
+        # )
+        #
+        # self.build_python_step_with_openssl_3 = BuilderPythonStep.create(
+        #     download_sources_step=self.download_sources_step,
+        #     prepare_build_base_step=self.prepare_build_base_step,
+        #     build_python_dependencies=self.build_python_dependencies,
+        #     openssl_version=OPENSSL_3_VERSION,
+        #     install_prefix=PYTHON_INSTALL_PREFIX,
+        #     dependencies_install_prefix=PYTHON_DEPENDENCIES_INSTALL_PREFIX,
+        # )
+
+        # self.build_python_step_with_openssl_1 = BuilderPythonStep.create(
+        #     download_sources_step=self.download_sources_step,
+        #     prepare_build_base_step=self.prepare_build_base_step,
+        #     build_python_dependencies=self.build_python_dependencies,
+        #     openssl_version=OPENSSL_1_VERSION,
+        #     install_prefix=PYTHON_INSTALL_PREFIX,
+        #     dependencies_install_prefix=PYTHON_DEPENDENCIES_INSTALL_PREFIX,
+        # )
+
+        # self.build_python_step_with_openssl_3 = self.create_python_step(
+        #     architecture=CpuArch.x86_64,
+        #     libc=LibC.GNU,
+        # )
+        #
+        # self.prepare_build_base_with_python = PrepareBuildBaseWithPythonStep.create(
+        #     build_python_step=self.build_python_step_with_openssl_3,
+        # )
+        #
+        # self.ubuntu_toolset = UbuntuToolset.create(
+        #     build_python_step=self.build_python_step_with_openssl_3,
+        # )
+
+        self.ubuntu_toolset = self.create_ubuntu_toolset()
 
         super(LinuxPackageBuilder, self).__init__(
-            base=self.toolset_step,
+            base=self.ubuntu_toolset,
             dependencies=dependencies,
+        )
+
+    @staticmethod
+    def create_python_step(
+            architecture: CpuArch,
+            libc: LibC,
+    ):
+        download_sources_step = DownloadSourcesStep.create(
+            python_version=PYTHON_VERSION,
+            bzip_version="1.0.8",
+            libedit_version_commit="0cdd83b3ebd069c1dee21d81d6bf716cae7bf5da",  # tag - "upstream/3.1-20221030"
+            libffi_version="3.4.2",
+            ncurses_version="6.3",
+            openssl_1_version=OPENSSL_1_VERSION,
+            openssl_3_version=OPENSSL_3_VERSION,
+            tcl_version_commit="338c6692672696a76b6cb4073820426406c6f3f9",  # tag - "core-8-6-13"
+            sqlite_version_commit="e671c4fbc057f8b1505655126eaf90640149ced6",  # tag - "version-3.41.2"
+            util_linux_version="2.38",
+            xz_version="5.2.6",
+            zlib_version="1.2.13",
+        )
+
+        prepare_build_base_step = PrepareBuildBaseStep.create(
+            architecture=architecture,
+            libc=libc
+        )
+
+        build_python_dependencies = BuildPytonDependenciesStep.create(
+            download_sources_step=download_sources_step,
+            prepare_build_base=prepare_build_base_step,
+            install_prefix=PYTHON_DEPENDENCIES_INSTALL_PREFIX,
+        )
+
+        build_python_step = BuilderPythonStep.create(
+            download_sources_step=download_sources_step,
+            prepare_build_base_step=prepare_build_base_step,
+            build_python_dependencies=build_python_dependencies,
+            openssl_version=OPENSSL_3_VERSION,
+            install_prefix=PYTHON_INSTALL_PREFIX,
+            dependencies_install_prefix=PYTHON_DEPENDENCIES_INSTALL_PREFIX,
+        )
+
+        return build_python_step
+
+    @staticmethod
+    def build_dev_requirements(
+        architecture: CpuArch,
+        libc: LibC,
+    ):
+        build_python_step= LinuxPackageBuilder.create_python_step(
+            architecture=architecture,
+            libc=libc,
+        )
+
+        return BuildDevRequirementsStep(
+            build_python_step=build_python_step,
+        )
+
+    @staticmethod
+    def create_build_base_with_python(
+        architecture: CpuArch,
+        libc: LibC,
+    ):
+        build_python_step = LinuxPackageBuilder.create_python_step(
+            architecture=architecture,
+            libc=libc,
+        )
+
+        return PrepareBuildBaseWithPythonStep.create(
+            build_python_step=build_python_step,
+        )
+
+    @staticmethod
+    def create_ubuntu_toolset():
+
+        architecture = CpuArch.x86_64
+        libc = LibC.GNU
+
+        build_python_step = LinuxPackageBuilder.create_python_step(
+            architecture=architecture,
+            libc=libc,
+        )
+
+        build_dev_requirement_step = LinuxPackageBuilder.build_dev_requirements(
+            architecture=architecture,
+            libc=libc,
+        )
+
+        return UbuntuToolset(
+            build_python_step=build_python_step,
+            build_dev_requirements_step=build_dev_requirement_step
         )
 
     def get_dependencies(self) -> List[BuilderStep]:
@@ -296,6 +450,7 @@ class LinuxPackageBuilder(Builder):
     @property
     def package_output_dir(self):
         return self.output_dir / self.PACKAGE_TYPE
+
 
 class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
     """
@@ -443,64 +598,61 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         self.architecture = self.__class__.ARCHITECTURE
         self.libc = self.__class__.LIBC
 
-        self.ubuntu_toolset = ToolsetStep.create()
-
-        self.download_sources_step = DownloadSourcesStep.create(
-            python_version=PYTHON_VERSION,
-            bzip_version="1.0.8",
-            libedit_version_commit="0cdd83b3ebd069c1dee21d81d6bf716cae7bf5da",  # tag - "upstream/3.1-20221030"
-            libffi_version="3.4.2",
-            ncurses_version="6.3",
-            openssl_1_version=OPENSSL_1_VERSION,
-            openssl_3_version=OPENSSL_3_VERSION,
-            tcl_version_commit="338c6692672696a76b6cb4073820426406c6f3f9",  # tag - "core-8-6-13"
-            sqlite_version_commit="e671c4fbc057f8b1505655126eaf90640149ced6",  # tag - "version-3.41.2"
-            util_linux_version="2.38",
-            xz_version="5.2.6",
-            zlib_version="1.2.13",
-        )
-
-        self.prepare_build_base_step = PrepareBuildBaseStep.create(
+        # self.download_sources_step = DownloadSourcesStep.create(
+        #     python_version=PYTHON_VERSION,
+        #     bzip_version="1.0.8",
+        #     libedit_version_commit="0cdd83b3ebd069c1dee21d81d6bf716cae7bf5da",  # tag - "upstream/3.1-20221030"
+        #     libffi_version="3.4.2",
+        #     ncurses_version="6.3",
+        #     openssl_1_version=OPENSSL_1_VERSION,
+        #     openssl_3_version=OPENSSL_3_VERSION,
+        #     tcl_version_commit="338c6692672696a76b6cb4073820426406c6f3f9",  # tag - "core-8-6-13"
+        #     sqlite_version_commit="e671c4fbc057f8b1505655126eaf90640149ced6",  # tag - "version-3.41.2"
+        #     util_linux_version="2.38",
+        #     xz_version="5.2.6",
+        #     zlib_version="1.2.13",
+        # )
+        #
+        # self.prepare_build_base_step = PrepareBuildBaseStep.create(
+        #     architecture=self.architecture,
+        #     libc=self.libc
+        # )
+        #
+        # self.build_python_dependencies = BuildPytonDependenciesStep.create(
+        #     download_sources_step=self.download_sources_step,
+        #     prepare_build_base=self.prepare_build_base_step,
+        #     install_prefix=PYTHON_DEPENDENCIES_INSTALL_PREFIX,
+        # )
+        #
+        # self.build_python_step_with_openssl_3 = BuilderPythonStep.create(
+        #     download_sources_step=self.download_sources_step,
+        #     prepare_build_base_step=self.prepare_build_base_step,
+        #     build_python_dependencies = self.build_python_dependencies,
+        #     openssl_version=OPENSSL_3_VERSION,
+        #     install_prefix=PYTHON_INSTALL_PREFIX,
+        #     dependencies_install_prefix=PYTHON_DEPENDENCIES_INSTALL_PREFIX,
+        # )
+        #
+        # self.build_python_step_with_openssl_1 = BuilderPythonStep.create(
+        #     download_sources_step=self.download_sources_step,
+        #     prepare_build_base_step=self.prepare_build_base_step,
+        #     build_python_dependencies=self.build_python_dependencies,
+        #     openssl_version=OPENSSL_1_VERSION,
+        #     install_prefix=PYTHON_INSTALL_PREFIX,
+        #     dependencies_install_prefix=PYTHON_DEPENDENCIES_INSTALL_PREFIX,
+        # )
+        #
+        self.prepare_build_base_with_python = self.create_build_base_with_python(
             architecture=self.architecture,
-            libc=self.libc
+            libc=self.libc,
         )
 
-        self.build_python_dependencies = BuildPytonDependenciesStep.create(
-            download_sources_step=self.download_sources_step,
-            prepare_build_base=self.prepare_build_base_step,
-            install_prefix=PYTHON_DEPENDENCIES_INSTALL_PREFIX,
-        )
-
-        self.build_python_step_with_openssl_3 = BuilderPythonStep.create(
-            download_sources_step=self.download_sources_step,
-            prepare_build_base_step=self.prepare_build_base_step,
-            build_python_dependencies = self.build_python_dependencies,
-            openssl_version=OPENSSL_3_VERSION,
-            install_prefix=PYTHON_INSTALL_PREFIX,
-            dependencies_install_prefix=PYTHON_DEPENDENCIES_INSTALL_PREFIX,
-        )
-
-        self.build_python_step_with_openssl_1 = BuilderPythonStep.create(
-            download_sources_step=self.download_sources_step,
-            prepare_build_base_step=self.prepare_build_base_step,
-            build_python_dependencies=self.build_python_dependencies,
-            openssl_version=OPENSSL_1_VERSION,
-            install_prefix=PYTHON_INSTALL_PREFIX,
-            dependencies_install_prefix=PYTHON_DEPENDENCIES_INSTALL_PREFIX,
-        )
-
-        #prepare_build_base_with_python = PREPARE_PYTHON_ENVIRONMENT_STEPS[self.libs][self.architecture]
-        self.prepare_build_base_with_python = PrepareBuildBaseWithPythonStep.create(
-            build_python_step=self.build_python_step_with_openssl_3,
-        )
         self.build_agent_libs_venv_step = BuildAgentLibsVenvStep.create(
             prepare_build_base_with_python_step=self.prepare_build_base_with_python,
         )
         
         super(LinuxAIOPackagesBuilder, self).__init__(
             dependencies=[
-                self.build_python_step_with_openssl_3,
-                self.build_python_step_with_openssl_1,
                 self.prepare_build_base_with_python,
                 self.build_agent_libs_venv_step,
             ]

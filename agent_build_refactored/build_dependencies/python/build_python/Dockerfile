@@ -92,7 +92,7 @@ RUN cp -a /tmp/root/. /
 
 RUN ${INSTALL_PREFIX}/bin/python3 -m ensurepip
 # Install upgraded pip version in the final python root.
-RUN ${INSTALL_PREFIX}/bin/python3 -m pip install --upgrade pip --root /tmp/root
+RUN ${INSTALL_PREFIX}/bin/python3 -m pip install --upgrade pip setuptools --root /tmp/root
 
 
 FROM scratch

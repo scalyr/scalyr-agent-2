@@ -27,7 +27,6 @@ logging.basicConfig()
 
 if __name__ == '__main__':
     base_parser = argparse.ArgumentParser()
-    base_parser.add_argument("type", choices=["builder", "builder_step"])
     base_parser.add_argument("fqdn")
     base_args, other_argv = base_parser.parse_known_args()
 
@@ -35,14 +34,8 @@ if __name__ == '__main__':
     module_name, builder_name = fqdn.rsplit(".", 1)
     module = importlib.import_module(module_name)
 
-    if base_args.type == "builder_step":
-        builder_step = ALL_BUILDER_STEPS[fqdn]
-        builder_step.run()
-        exit(0)
-
-    elif base_args.type == "builder":
-        builder_main(
-            builder_fqdn=fqdn,
-            argv=other_argv,
-        )
-        exit(0)
+    builder_main(
+        builder_fqdn=fqdn,
+        argv=other_argv,
+    )
+    exit(0)

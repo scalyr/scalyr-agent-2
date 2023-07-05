@@ -11,7 +11,7 @@ from .python.build_python_dependencies.build_openssl import BuildPythonOpenSSLSt
 from agent_build_refactored.build_dependencies.python.download_sources import DownloadSourcesStep
 from .python.build_python import BuilderPythonStep
 from .versions import PYTHON_VERSION, OPENSSL_1_VERSION, OPENSSL_3_VERSION
-from agent_build_refactored.build_dependencies.ubuntu_toolset import ToolsetStep
+from agent_build_refactored.build_dependencies.ubuntu_toolset import UbuntuToolset
 
 #SUPPORTED_ARCHITECTURES: Dict[CpuArch] = []
 
