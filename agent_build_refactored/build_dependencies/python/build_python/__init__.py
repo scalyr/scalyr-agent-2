@@ -30,14 +30,14 @@ class BuilderPythonStep(BuilderStep):
         self,
         download_sources_step: DownloadSourcesStep,
         prepare_build_base_step: PrepareBuildBaseStep,
-        build_python_dependencies: BuildPytonDependenciesStep,
+        build_python_dependencies_step: BuildPytonDependenciesStep,
         openssl_version: str,
         install_prefix: pl.Path,
         dependencies_install_prefix: pl.Path,
     ):
         self.download_sources_step = download_sources_step
         self.prepare_build_base_step = prepare_build_base_step
-        self.build_python_dependencies = build_python_dependencies
+        self.build_python_dependencies_step = build_python_dependencies_step
         self.openssl_version = openssl_version
         self.install_prefix = install_prefix
         self.dependencies_install_prefix = dependencies_install_prefix
@@ -121,7 +121,7 @@ class BuilderPythonStep(BuilderStep):
             build_contexts=[
                 self.prepare_build_base_step,
                 self.download_sources_step,
-                self.build_python_dependencies,
+                self.build_python_dependencies_step,
                 # self.build_xz_step,
                 # self.build_sqlite_step,
                 # self.build_zlib_step,

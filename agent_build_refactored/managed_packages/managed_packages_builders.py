@@ -320,7 +320,7 @@ class LinuxPackageBuilder(Builder):
             libc=libc
         )
 
-        build_python_dependencies = BuildPytonDependenciesStep.create(
+        build_python_dependencies_step = BuildPytonDependenciesStep.create(
             download_sources_step=download_sources_step,
             prepare_build_base=prepare_build_base_step,
             install_prefix=PYTHON_DEPENDENCIES_INSTALL_PREFIX,
@@ -329,7 +329,7 @@ class LinuxPackageBuilder(Builder):
         build_python_step = BuilderPythonStep.create(
             download_sources_step=download_sources_step,
             prepare_build_base_step=prepare_build_base_step,
-            build_python_dependencies=build_python_dependencies,
+            build_python_dependencies_step=build_python_dependencies_step,
             openssl_version=openssl_version,
             install_prefix=PYTHON_INSTALL_PREFIX,
             dependencies_install_prefix=PYTHON_DEPENDENCIES_INSTALL_PREFIX,
@@ -651,6 +651,10 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
             libc=self.libc,
         )
 
+        self.build_python_step = self.prepare_build_base_with_python.build_python_step
+
+        self.build_python_dependencies_step = self.build_python_step.build_python_dependencies_step
+
         self.build_agent_libs_venv_step = BuildAgentLibsVenvStep.create(
             prepare_build_base_with_python_step=self.prepare_build_base_with_python,
         )
@@ -663,6 +667,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         
         super(LinuxAIOPackagesBuilder, self).__init__(
             dependencies=[
+                self.build_python_step,
                 self.prepare_build_base_with_python,
                 self.build_python_step_with_openssl_1,
                 self.build_agent_libs_venv_step,
@@ -672,7 +677,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
     def get_dependencies(self) -> List[BuilderStep]:
         return [
             self.build_python_step_with_openssl_3,
-            self.build_python_step_with_openssl_3.build_python_dependencies,
+            self.build_python_step_with_openssl_3.build_python_dependencies_step,
             self.build_agent_libs_venv_step,
             self.build_python_step_with_openssl_1,
         ]
