@@ -13,11 +13,6 @@ runs:
       with:
         python-version: ${{ inputs.python_version }}
 
-#    - name: Get pip cache dir
-#      id: pip-cache
-#      run: |
-#        echo "::set-output name=dir::$(pip cache dir)"
-#
     - name: Get cached venv
       id: cache_venv
       uses: actions/cache@v2

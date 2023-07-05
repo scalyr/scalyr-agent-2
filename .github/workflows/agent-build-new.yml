@@ -38,7 +38,7 @@ jobs:
       - name: install python and requirements
         uses: ./.github/actions/install_python_and_requirements
         with:
-          python_version: 3.11
+          python_version: 3.8
 
 #  test:
 #    name: test
