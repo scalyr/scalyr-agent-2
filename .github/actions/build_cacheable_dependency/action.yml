@@ -1,0 +1,24 @@
+name: "Build cacheable dependency"
+description: "Run build of one cacheable dependency"
+
+inputs:
+  dependency_id:
+    description: "Id of the dependency to build"
+
+  python_version:
+    description: "Version of Python to use"
+
+runs:
+  using: "composite"
+  steps:
+    - name: install python and requirements
+      uses: ./.github/actions/install_python_and_requirements
+      with:
+        python_version: 3.8
+
+    - name: Build dependency
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        python3 agent_build_refactored/scripts/cicd/run_dependency.py ${{ inputs.dependency_id }}
+      

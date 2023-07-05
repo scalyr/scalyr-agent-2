@@ -2,6 +2,9 @@ name: Build all cacheable dependencies
 
 on:
   workflow_call:
+    inputs:
+      python_version:
+        description: "Version of Python to use."
 #    secrets:
 #      CT_AWS_DEV_EC2_PRIVATE_KEY:
 #        required: true
@@ -22,6 +25,25 @@ jobs:
   prepare_before_build:
     name: Prepare before dependencies build
     runs-on: ubuntu-latest
+    outputs:
+      DEPENDENCY_GROUP_MATRIX_0: steps.get_dependency_matrices.outputs.DEPENDENCY_GROUP_MATRIX_0
+      DEPENDENCY_GROUP_MATRIX_0_SIZE: steps.get_dependency_matrices.outputs.DEPENDENCY_GROUP_MATRIX_0_SIZE
+      DEPENDENCY_GROUP_MATRIX_1: steps.get_dependency_matrices.outputs.DEPENDENCY_GROUP_MATRIX_0
+      DEPENDENCY_GROUP_MATRIX_1_SIZE: steps.get_dependency_matrices.outputs.DEPENDENCY_GROUP_MATRIX_0_SIZE
+      DEPENDENCY_GROUP_MATRIX_2: steps.get_dependency_matrices.outputs.DEPENDENCY_GROUP_MATRIX_0
+      DEPENDENCY_GROUP_MATRIX_2_SIZE: steps.get_dependency_matrices.outputs.DEPENDENCY_GROUP_MATRIX_0_SIZE
+      DEPENDENCY_GROUP_MATRIX_3: steps.get_dependency_matrices.outputs.DEPENDENCY_GROUP_MATRIX_0
+      DEPENDENCY_GROUP_MATRIX_3_SIZE: steps.get_dependency_matrices.outputs.DEPENDENCY_GROUP_MATRIX_0_SIZE
+      DEPENDENCY_GROUP_MATRIX_4: steps.get_dependency_matrices.outputs.DEPENDENCY_GROUP_MATRIX_0
+      DEPENDENCY_GROUP_MATRIX_4_SIZE: steps.get_dependency_matrices.outputs.DEPENDENCY_GROUP_MATRIX_0_SIZE
+      DEPENDENCY_GROUP_MATRIX_5: steps.get_dependency_matrices.outputs.DEPENDENCY_GROUP_MATRIX_0
+      DEPENDENCY_GROUP_MATRIX_6_SIZE: steps.get_dependency_matrices.outputs.DEPENDENCY_GROUP_MATRIX_0_SIZE
+      DEPENDENCY_GROUP_MATRIX_7: steps.get_dependency_matrices.outputs.DEPENDENCY_GROUP_MATRIX_0
+      DEPENDENCY_GROUP_MATRIX_8_SIZE: steps.get_dependency_matrices.outputs.DEPENDENCY_GROUP_MATRIX_0_SIZE
+      DEPENDENCY_GROUP_MATRIX_9: steps.get_dependency_matrices.outputs.DEPENDENCY_GROUP_MATRIX_0
+      DEPENDENCY_GROUP_MATRIX_9_SIZE: steps.get_dependency_matrices.outputs.DEPENDENCY_GROUP_MATRIX_0_SIZE
+      DEPENDENCY_GROUP_MATRIX_10: steps.get_dependency_matrices.outputs.DEPENDENCY_GROUP_MATRIX_0
+      DEPENDENCY_GROUP_MATRIX_10_SIZE: steps.get_dependency_matrices.outputs.DEPENDENCY_GROUP_MATRIX_0_SIZE
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -29,7 +51,7 @@ jobs:
       - name: install python and requirements
         uses: ./.github/actions/install_python_and_requirements
         with:
-          python_version: 3.8
+          python_version: ${{ inputs.python_version }}
 
       - name: Get dependency matrices
         id: get_dependency_matrices
@@ -38,3 +60,35 @@ jobs:
           echo "Matrices:"
           echo "${MATRICES}"
           echo "${MATRICES}" >> "${GITHUB_OUTPUT}"
+
+  build_dependency_group_0:
+    runs-on: ubuntu-latest
+    needs: [prepare_before_build]
+    strategy:
+      matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_0) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: install python and requirements
+        uses: ./.github/actions/build_cacheable_dependency
+        with:
+          dependency_id: ${{ matrix.id }}
+          python_version: ${{ inputs.python_version }}
+
+  build_dependency_group_1:
+    runs-on: ubuntu-latest
+    needs: [prepare_before_build, build_dependency_group_0]
+    strategy:
+      matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_1) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: install python and requirements
+        uses: ./.github/actions/build_cacheable_dependency
+        with:
+          dependency_id: ${{ matrix.id }}
+          python_version: ${{ inputs.python_version }}
+
+
