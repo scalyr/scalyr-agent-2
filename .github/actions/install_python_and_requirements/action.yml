@@ -11,22 +11,23 @@ runs:
     - name: Install python
       uses: actions/setup-python@v4
       with:
-        python-version: ${{ matrix.python-version }}
+        python-version: ${{ inputs.python_version }}
 
 #    - name: Get pip cache dir
 #      id: pip-cache
 #      run: |
 #        echo "::set-output name=dir::$(pip cache dir)"
 #
-#    - name: pip cache
-#      uses: actions/cache@v2
-#      with:
-#        path: ${{ steps.pip-cache.outputs.dir }}
-#        key: ${{ runner.os }}-pip-${{ hashFiles('dev-requirements-new.txt') }}
-#        restore-keys: |
-#          ${{ runner.os }}-pip-
+    - name: Get cached venv
+      id: cache_venv
+      uses: actions/cache@v2
+      working-directory: ${{ github.workspace }}
+      with:
+        path: venv
+        key: ${{ runner.os }}-requirements-venv-${{ hashFiles('dev-requirements-new.txt') }}
 
     - name: Create venv
+      if: steps.cache_venv.outputs.cache-hit != 'true'
       shell: bash
       working-directory: ${{ github.workspace }}
       run: |
