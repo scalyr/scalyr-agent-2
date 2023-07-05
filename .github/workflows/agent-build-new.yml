@@ -43,7 +43,6 @@ jobs:
       - pre_job
     uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
     with:
-      fail_on_cache_miss: true
       python_version: ${{ needs.pre_job.outputs.python_version }}
 
 #  prepare_dependencies_build:

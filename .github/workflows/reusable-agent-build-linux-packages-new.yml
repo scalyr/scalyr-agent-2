@@ -3,10 +3,10 @@ name: Agent Linux Packages Build Refactored
 on:
   workflow_call:
     inputs:
-      fail_on_cache_miss:
-        description: Fail the build of packages if they can not be completely built from cache.
-        type: boolean
-        default: false
+#      fail_on_cache_miss:
+#        description: Fail the build of packages if they can not be completely built from cache.
+#        type: boolean
+#        default: false
 
       python_version:
         description: Version of Python to use
@@ -302,16 +302,16 @@ jobs:
 
       - name: Build managed package with builder '${{ matrix.name }}'
         id: build
+        env:
+            USE_GHA_CACHE: "1"
         run: |
           
-          ADDITIONAL_ARGS=""
-          if [ "${{ inputs.fail_on_cache_miss }}" == 'true' ]; then
-            ADDITIONAL_ARGS="${ADDITIONAL_ARGS} --fail-on-cache-miss"
-          fi 
+#          ADDITIONAL_ARGS=""
+#          if [ "${{ inputs.fail_on_cache_miss }}" == 'true' ]; then
+#            ADDITIONAL_ARGS="${ADDITIONAL_ARGS} --use-only-cache"
+#          fi
           
-          OUTPUT=$(
-            python3 build_package_new_refactored.py ${{ matrix.builder_name }} ${ADDITIONAL_ARGS[@]}
-          )
+          OUTPUT=$(python3 build_package_new_refactored.py ${{ matrix.builder_name }} --use-only-cache)
           
           if [ "${OUTPUT}" = "cache_hit" ]; then
             echo "cache_hit=true" >> "$GITHUB_OUTPUT"

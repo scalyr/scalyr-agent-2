@@ -262,9 +262,9 @@ class Builder(metaclass=BuilderMeta):
     #     cmd_line_name="--run-dependency-step",
     # )
 
-    FAIL_ON_CACHE_MISS_ARG = BuilderArg(
-        name="fail_on_cache_miss",
-        cmd_line_name="--fail-on-cache-miss",
+    USE_ONLY_CACHE = BuilderArg(
+        name="use_only_cache",
+        cmd_line_name="--use-only-cache",
         cmd_line_action="store_true",
         default=False,
     )
@@ -437,7 +437,7 @@ class Builder(metaclass=BuilderMeta):
             self.REUSE_EXISTING_DEPENDENCIES_OUTPUTS
         )
         fail_on_cache_miss = self.get_builder_arg_value(
-            self.FAIL_ON_CACHE_MISS_ARG
+            self.USE_ONLY_CACHE
         )
 
         def _copy_to_output():
@@ -468,7 +468,7 @@ class Builder(metaclass=BuilderMeta):
             )
             docker_step.run_and_output_in_local_directory(
                 #no_cleanup=no_cleanup,
-                fail_on_cache_miss=fail_on_cache_miss,
+                use_only_cache=fail_on_cache_miss,
             )
             shutil.copytree(
                 docker_step.output_dir / "work_dir",
@@ -579,12 +579,12 @@ class Builder(metaclass=BuilderMeta):
         except BuilderCacheMissError:
             logging.exception(f"Builder {cls.NAME} failed")
 
-            if args.fail_on_cache_miss:
+            if args.use_only_cache:
                 print("cache_miss")
                 exit(0)
             raise
 
-        if args.fail_on_cache_miss:
+        if args.use_only_cache:
             print("cache_hit")
             exit(0)
 

@@ -19,6 +19,8 @@ runs:
     - name: Build dependency
       shell: bash
       working-directory: ${{ github.workspace }}
+      env:
+          USE_GHA_CACHE: "1"
       run: |
         python3 agent_build_refactored/scripts/cicd/run_dependency.py ${{ inputs.dependency_id }}
       

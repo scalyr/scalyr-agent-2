@@ -19,7 +19,7 @@ RUN mv bzip2-${BZIP_VERSION} /tmp/source
 FROM base as libedit
 ARG LIBEDIT_VERSION_COMMIT
 RUN curl -L "https://salsa.debian.org/debian/libedit/-/archive/${LIBEDIT_VERSION_COMMIT}/libedit-${LIBEDIT_VERSION_COMMIT}.tar.gz" > libedit.tar.gz
-RUN tar xzf libedit.tar.gz
+RUN tar xf libedit.tar.gz
 RUN mv "libedit-${LIBEDIT_VERSION_COMMIT}" /tmp/source
 
 FROM base as libffi
@@ -38,7 +38,7 @@ ARG NCURSES_VERSION
 RUN curl -L "https://ftp.gnu.org/pub/gnu/ncurses/ncurses-${NCURSES_VERSION}.tar.gz" > ncurses.tar.gz
 RUN curl -L "https://ftp.gnu.org/pub/gnu/ncurses/ncurses-${NCURSES_VERSION}.tar.gz.sig" > ncurses.tar.gz.sig
 RUN gpg2 --verify  ncurses.tar.gz.sig ncurses.tar.gz
-RUN tar -xvf "ncurses.tar.gz"
+RUN tar -xf "ncurses.tar.gz"
 RUN mv ncurses-${NCURSES_VERSION} /tmp/source
 
 FROM base as openssl_1
@@ -63,14 +63,14 @@ RUN mv openssl-${OPENSSL_3_VERSION} /tmp/source
 FROM base as tcl
 ARG TCL_VERSION_COMMIT
 RUN curl -L "https://github.com/tcltk/tcl/archive/${TCL_VERSION_COMMIT}.tar.gz" > tcl.tar.gz
-RUN tar xzf tcl.tar.gz
+RUN tar xf tcl.tar.gz
 RUN mv "tcl-${TCL_VERSION_COMMIT}" /tmp/source
 
 FROM base as sqlite
 WORKDIR sqlite
 ARG SQLITE_VERSION_COMMIT
 RUN curl -L "https://github.com/sqlite/sqlite/archive/${SQLITE_VERSION_COMMIT}.tar.gz" > sqlite.tar.gz
-RUN tar xzf sqlite.tar.gz
+RUN tar xf sqlite.tar.gz
 RUN mv "sqlite-${SQLITE_VERSION_COMMIT}" /tmp/source
 
 FROM base as util_linux
@@ -89,7 +89,7 @@ ARG XZ_VERSION
 RUN curl -L "https://tukaani.org/xz/xz-${XZ_VERSION}.tar.gz" > xz.tar.gz
 RUN curl -L "https://tukaani.org/xz/xz-${XZ_VERSION}.tar.gz.sig" > xz.tar.gz.sig
 RUN gpg2 --verify xz.tar.gz.sig xz.tar.gz
-RUN tar -xvf xz.tar.gz
+RUN tar -xf xz.tar.gz
 RUN mv xz-${XZ_VERSION} /tmp/source
 
 FROM base as zlib

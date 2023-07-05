@@ -81,7 +81,7 @@ build_python_with_switchable_openssl = BuildPythonForPackagesStep(
 
 if __name__ == '__main__':
     sys.path.append(str(pathlib.Path(__file__).parent.parent.parent))
-    build_python_with_switchable_openssl.run_and_output_in_local_directory(fail_on_cache_miss=False)
+    build_python_with_switchable_openssl.run_and_output_in_local_directory(use_only_cache=False)
 
 
 a=10
