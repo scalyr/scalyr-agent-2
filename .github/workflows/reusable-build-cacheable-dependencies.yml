@@ -27,6 +27,10 @@ jobs:
     name: Prepare before dependencies build
     runs-on: ubuntu-latest
     outputs:
+      runs_on: ${{ steps.get_dependency_matrices.outputs.runs_on }}
+      checkout_action_name: ${{ steps.get_dependency_matrices.outputs.checkout_action_name }}
+      build_cacheable_dependency_action_name: ${{ steps.get_dependency_matrices.outputs.build_cacheable_dependency_action_name }}
+
       DEPENDENCY_GROUP_MATRIX_0: ${{ steps.get_dependency_matrices.outputs.DEPENDENCY_GROUP_MATRIX_0 }}
       DEPENDENCY_GROUP_MATRIX_1: ${{ steps.get_dependency_matrices.outputs.DEPENDENCY_GROUP_MATRIX_1 }}
       DEPENDENCY_GROUP_MATRIX_2: ${{ steps.get_dependency_matrices.outputs.DEPENDENCY_GROUP_MATRIX_2 }}
@@ -52,120 +56,141 @@ jobs:
         id: get_dependency_matrices
         run: |
           echo "::notice::Need to build and cache some dependencies first"
+          echo "runs_on=ubuntu-22.04" >> "${GITHUB_OUTPUT}"
+          echo "checkout_action_name=actions/checkout@v3" >> "${GITHUB_OUTPUT}"
+          echo "build_cacheable_dependency_action_name=./.github/actions/build_cacheable_dependency" >> "${GITHUB_OUTPUT}"
+          
           MATRICES=$(python3 agent_build_refactored/scripts/cicd/create_cacheable_steps_matrix.py)
           echo "Matrices:"
           echo "${MATRICES}"
           echo "${MATRICES}" >> "${GITHUB_OUTPUT}"
 
   group_0:
-    name: ${{ matrix.id }}
-    runs-on: ubuntu-latest
+    name: (0)${{ matrix.id }}
+    runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
     needs: [prepare_before_build]
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_0) }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: ${{ needs.prepare_before_build.outputs.checkout_action_name }}
 
       - name: Build dependency
-        uses: ./.github/actions/build_cacheable_dependency
+        uses: ${{ needs.prepare_before_build.outputs.build_cacheable_dependency_action_name }}
         with:
           dependency_id: ${{ matrix.id }}
           python_version: ${{ inputs.python_version }}
 
   group_1:
-    name: ${{ matrix.id }}
-    runs-on: ubuntu-latest
+    name: (1)${{ matrix.id }}
+    runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
     needs: [ prepare_before_build, group_0]
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_1) }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: ${{ needs.prepare_before_build.outputs.checkout_action_name }}
 
       - name: Build dependency
-        uses: ./.github/actions/build_cacheable_dependency
+        uses: ${{ needs.prepare_before_build.outputs.build_cacheable_dependency_action_name }}
         with:
           dependency_id: ${{ matrix.id }}
           python_version: ${{ inputs.python_version }}
 
   group_2:
-    name: ${{ matrix.id }}
-    runs-on: ubuntu-latest
+    name: (2)${{ matrix.id }}
+    runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
     needs: [ prepare_before_build, group_1]
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_2) }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: ${{ needs.prepare_before_build.outputs.checkout_action_name }}
 
       - name: Build dependency
-        uses: ./.github/actions/build_cacheable_dependency
+        uses: ${{ needs.prepare_before_build.outputs.build_cacheable_dependency_action_name }}
         with:
           dependency_id: ${{ matrix.id }}
           python_version: ${{ inputs.python_version }}
 
   group_3:
-    name: ${{ matrix.id }}
-    runs-on: ubuntu-latest
+    name: (3)${{ matrix.id }}
+    runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
     needs: [ prepare_before_build, group_2]
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_3) }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: ${{ needs.prepare_before_build.outputs.checkout_action_name }}
 
       - name: Build dependency
-        uses: ./.github/actions/build_cacheable_dependency
+        uses: ${{ needs.prepare_before_build.outputs.build_cacheable_dependency_action_name }}
         with:
           dependency_id: ${{ matrix.id }}
           python_version: ${{ inputs.python_version }}
 
   group_4:
-    name: ${{ matrix.id }}
-    runs-on: ubuntu-latest
+    name: (4)${{ matrix.id }}
+    runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
     needs: [ prepare_before_build, group_3]
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_4) }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: ${{ needs.prepare_before_build.outputs.checkout_action_name }}
 
       - name: Build dependency
-        uses: ./.github/actions/build_cacheable_dependency
+        uses: ${{ needs.prepare_before_build.outputs.build_cacheable_dependency_action_name }}
         with:
           dependency_id: ${{ matrix.id }}
           python_version: ${{ inputs.python_version }}
 
   group_5:
-    name: ${{ matrix.id }}
-    runs-on: ubuntu-latest
+    name: (5)${{ matrix.id }}
+    runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
     needs: [ prepare_before_build, group_4]
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_5) }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: ${{ needs.prepare_before_build.outputs.checkout_action_name }}
 
       - name: Build dependency
-        uses: ./.github/actions/build_cacheable_dependency
+        uses: ${{ needs.prepare_before_build.outputs.build_cacheable_dependency_action_name }}
         with:
           dependency_id: ${{ matrix.id }}
           python_version: ${{ inputs.python_version }}
 
   group_6:
-    name: ${{ matrix.id }}
-    runs-on: ubuntu-latest
+    name: (6)${{ matrix.id }}
+    runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
     needs: [ prepare_before_build, group_5 ]
     if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_6 != '{}'
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_6) }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: ${{ needs.prepare_before_build.outputs.checkout_action_name }}
 
       - name: Build dependency
-        uses: ./.github/actions/build_cacheable_dependency
+        uses: ${{ needs.prepare_before_build.outputs.build_cacheable_dependency_action_name }}
+        with:
+          dependency_id: ${{ matrix.id }}
+          python_version: ${{ inputs.python_version }}
+
+  group_7:
+    name: (7)${{ matrix.id }}
+    runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
+    needs: [ prepare_before_build, group_6 ]
+    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_7 != '{}'
+    strategy:
+      matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_7) }}
+    steps:
+      - name: Checkout repository
+        uses: ${{ needs.prepare_before_build.outputs.checkout_action_name }}
+
+      - name: Build dependency
+        uses: ${{ needs.prepare_before_build.outputs.build_cacheable_dependency_action_name }}
         with:
           dependency_id: ${{ matrix.id }}
           python_version: ${{ inputs.python_version }}
