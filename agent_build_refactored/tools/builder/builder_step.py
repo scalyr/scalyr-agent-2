@@ -692,7 +692,7 @@ COPY --from
 
         self.oci_layout.parent.mkdir(parents=True, exist_ok=True)
         try:
-            subprocess.run(
+            result = subprocess.run(
                 [
                     *cmd_args,
                     "--build-arg",
@@ -710,8 +710,10 @@ COPY --from
             print(build_process_stderr, file=sys.stderr)
             if fail_on_cache_miss and full_no_cache_error_message in build_process_stderr:
                 raise BuilderCacheMissError(f"Can not find cache for '{self.name}' with flag 'fail_on_cache_miss' set.")
-
             raise
+
+        if not fail_on_cache_miss:
+            print(result.stderr.decode(), file=sys.stderr)
 
 
     def run_and_output_in_oci_tarball(
