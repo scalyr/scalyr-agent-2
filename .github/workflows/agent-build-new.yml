@@ -40,32 +40,31 @@ jobs:
     with:
       fail_on_cache_miss: true
 
-  prepare_dependencies_build:
-    name: Prepare dependencies build
-    needs:
-      - build_linux_packages
-    if: needs.build_linux_packages.outputs.cache_hit != 'true'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: install python and requirements
-        uses: ./.github/actions/install_python_and_requirements
-        with:
-          python_version: 3.8
-
-      - name: Get dependency matrices
-        id: get_dependency_matrices
-        run: |
-          MATRICES=$(python3 agent_build_refactored/scripts/cicd/create_cacheable_steps_matrix.py)
-          echo "Matrices:"
-          echo "${MATRICES}"
-          echo "${MATRICES}" >> "${GITHUB_OUTPUT}"
+#  prepare_dependencies_build:
+#    name: Prepare dependencies build
+#    needs:
+#      - build_linux_packages
+#    if: needs.build_linux_packages.outputs.cache_hit != 'true'
+#    runs-on: ubuntu-latest
+#
+#    steps:
+#      - name: Checkout repository
+#        uses: actions/checkout@v3
+#
+#      - name: install python and requirements
+#        uses: ./.github/actions/install_python_and_requirements
+#        with:
+#          python_version: 3.8
+#
+#      - name: Get dependency matrices
+#        id: get_dependency_matrices
+#        run: |
+#          MATRICES=$(python3 agent_build_refactored/scripts/cicd/create_cacheable_steps_matrix.py)
+#          echo "Matrices:"
+#          echo "${MATRICES}"
+#          echo "${MATRICES}" >> "${GITHUB_OUTPUT}"
 
   build_cacheable_dependencies:
-    name: "Build cacheable dependencies"
     needs:
       - prepare_dependencies_build
     uses: ./.github/workflows/reusable-build-cacheable-dependencies.yml
