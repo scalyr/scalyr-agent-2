@@ -305,11 +305,11 @@ jobs:
             ADDITIONAL_ARGS="${ADDITIONAL_ARGS} --fail-on-cache-miss"
           fi 
           
-          CACHE_FOUND=$(
+          OUTPUT=$(
             python3 build_package_new_refactored.py ${{ matrix.builder_name }} ${ADDITIONAL_ARGS[@]}
           )
           
-          if [ "${CACHE_FOUND}" = "cache_hit" ]; then
+          if [ "${OUTPUT}" = "cache_hit" ]; then
             echo "cache_hit=true" >> "$GITHUB_OUTPUT"
           fi
           

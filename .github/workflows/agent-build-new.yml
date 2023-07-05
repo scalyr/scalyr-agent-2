@@ -40,6 +40,27 @@ jobs:
         with:
           python_version: 3.8
 
+  build_linux_packages:
+    name: "Build Linux packages"
+    needs: pre_job
+    uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
+    with:
+      fail_on_cache_miss: true
+
+  prepare_dependencies_build:
+    name: Prepare dependencies build
+    if: jobs.build_linux_packages.outputs.cache_hit != 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: install python and requirements
+        uses: ./.github/actions/install_python_and_requirements
+        with:
+          python_version: 3.8
+
       - name: Get dependency matrices
         id: get_dependency_matrices
         run: |
@@ -47,12 +68,7 @@ jobs:
           echo "Matrices:"
           echo "${MATRICES}"
           echo "${MATRICES}" >> "${GITHUB_OUTPUT}"
-
-  build-linux-packages:
-    name: "Build Linux packages"
-    uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
-    with:
-      fail_on_cache_miss: true
+    
 
 #  test:
 #    name: test
