@@ -713,6 +713,7 @@ COPY --from
             builder_info = self.prepare_remote_buildx_builders(in_ec2=False)
 
         self.oci_layout.parent.mkdir(parents=True, exist_ok=True)
+
         process = subprocess.Popen(
             [
                 *cmd_args,
@@ -727,17 +728,18 @@ COPY --from
         )
 
         process.stdin.write(dockerfile_content.encode())
+        process.stdin.close()
 
         stderr_buffer = io.BytesIO()
         while True:
-            data = process.stderr.read()
-            if not data:
+            line = process.stderr.readline()
+            if not line:
                 break
 
             if use_only_cache:
-                sys.stderr.buffer.write(data)
+                sys.stderr.buffer.write(line)
 
-            stderr_buffer.write(data)
+            stderr_buffer.write(line)
 
         process.wait()
         if process.returncode != 0:
