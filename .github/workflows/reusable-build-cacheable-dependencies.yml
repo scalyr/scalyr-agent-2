@@ -89,7 +89,7 @@ jobs:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_1) }}
     steps:
       - name: Checkout repository
-        uses: ${{ needs.prepare_before_build.outputs.checkout_action_name }}
+        uses: actions/checkout@v3
 
       - name: Build dependency
         uses: ${{ needs.prepare_before_build.outputs.build_cacheable_dependency_action_name }}
@@ -105,7 +105,7 @@ jobs:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_2) }}
     steps:
       - name: Checkout repository
-        uses: ${{ needs.prepare_before_build.outputs.checkout_action_name }}
+        uses: actions/checkout@v3
 
       - name: Build dependency
         uses: ${{ needs.prepare_before_build.outputs.build_cacheable_dependency_action_name }}
@@ -121,7 +121,7 @@ jobs:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_3) }}
     steps:
       - name: Checkout repository
-        uses: ${{ needs.prepare_before_build.outputs.checkout_action_name }}
+        uses: actions/checkout@v3
 
       - name: Build dependency
         uses: ${{ needs.prepare_before_build.outputs.build_cacheable_dependency_action_name }}
@@ -137,7 +137,7 @@ jobs:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_4) }}
     steps:
       - name: Checkout repository
-        uses: ${{ needs.prepare_before_build.outputs.checkout_action_name }}
+        uses: actions/checkout@v3
 
       - name: Build dependency
         uses: ${{ needs.prepare_before_build.outputs.build_cacheable_dependency_action_name }}
@@ -153,7 +153,7 @@ jobs:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_5) }}
     steps:
       - name: Checkout repository
-        uses: ${{ needs.prepare_before_build.outputs.checkout_action_name }}
+        uses: actions/checkout@v3
 
       - name: Build dependency
         uses: ${{ needs.prepare_before_build.outputs.build_cacheable_dependency_action_name }}
@@ -170,7 +170,7 @@ jobs:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_6) }}
     steps:
       - name: Checkout repository
-        uses: ${{ needs.prepare_before_build.outputs.checkout_action_name }}
+        uses: actions/checkout@v3
 
       - name: Build dependency
         uses: ${{ needs.prepare_before_build.outputs.build_cacheable_dependency_action_name }}
@@ -187,7 +187,7 @@ jobs:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_7) }}
     steps:
       - name: Checkout repository
-        uses: ${{ needs.prepare_before_build.outputs.checkout_action_name }}
+        uses: actions/checkout@v3
 
       - name: Build dependency
         uses: ${{ needs.prepare_before_build.outputs.build_cacheable_dependency_action_name }}
