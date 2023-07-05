@@ -7,7 +7,7 @@
 ARG BASE_IMAGE_SUFFIX
 
 # Install dependency packages for debian.
-FROM python:3.8.16-slim-bullseye as scalyr-dependencies-slim-bullseye
+FROM python:3.9-slim-bullseye as scalyr-dependencies-slim-bullseye
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
 # Workaround for weird build failure on Circle CI, see
@@ -89,7 +89,7 @@ MAINTAINER Scalyr Inc <support@scalyr.com>
 RUN apk update && apk add --virtual curl git
 
 # Install tools for debian.
-FROM python:3.8.16-slim-bullseye as ready-base-slim-bullseye
+FROM python:3.9-slim-bullseye as ready-base-slim-bullseye
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
 # Workaround for weird build failure on Circle CI, see
