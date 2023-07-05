@@ -137,4 +137,20 @@ jobs:
           dependency_id: ${{ matrix.id }}
           python_version: ${{ inputs.python_version }}
 
+  group_5:
+    name: ${{ matrix.id }} }}
+    runs-on: ubuntu-latest
+    needs: [ prepare_before_build, group_4]
+    strategy:
+      matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_5) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Build dependency
+        uses: ./.github/actions/build_cacheable_dependency
+        with:
+          dependency_id: ${{ matrix.id }}
+          python_version: ${{ inputs.python_version }}
+
 
