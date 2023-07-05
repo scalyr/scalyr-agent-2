@@ -37,7 +37,7 @@ jobs:
         run: |
           echo "python_version=3.8" >> "${GITHUB_OUTPUT}"
 
-  build_linux_packages_cached:
+  build_cached_linux_packages:
     name: "Build cached Linux packages"
     needs:
       - pre_job
@@ -82,7 +82,7 @@ jobs:
 #          echo "${MATRICES}" >> "${GITHUB_OUTPUT}"
 
   build_cacheable_dependencies:
-    needs: [pre_job, build_linux_packages]
+    needs: [pre_job, build_cached_linux_packages]
     if: needs.build_linux_packages.outputs.cache_hit != 'true'
     uses: ./.github/workflows/reusable-build-cacheable-dependencies.yml
     with:
