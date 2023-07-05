@@ -286,7 +286,7 @@ jobs:
       - name: install python and requirements
         uses: ./.github/actions/install_python_and_requirements
         with:
-          python_version: ${{ inputs:python_version }}
+          python_version: ${{ inputs.python_version }}
 
       - name: Set up QEMU
         id: qemu
