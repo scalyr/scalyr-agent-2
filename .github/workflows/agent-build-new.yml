@@ -67,7 +67,7 @@ jobs:
   build_cacheable_dependencies:
     if: needs.build_linux_packages.outputs.cache_hit != 'true'
     needs:
-      - prepare_dependencies_build
+      - build_linux_packages
     uses: ./.github/workflows/reusable-build-cacheable-dependencies.yml
     
 
