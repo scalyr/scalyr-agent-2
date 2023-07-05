@@ -31,6 +31,8 @@ import sys
 
 from typing import Dict, Type
 
+logging.basicConfig(level=logging.INFO)
+
 if sys.version_info < (3, 8, 0):
     raise ValueError("This script requires Python 3.8 or above")
 
@@ -41,7 +43,6 @@ __SOURCE_ROOT__ = __PARENT_DIR__
 # local packages. All such imports also have to be done after that.
 sys.path.append(str(__SOURCE_ROOT__))
 
-from agent_build_refactored.tools import UniqueDict, init_logging
 from agent_build_refactored.tools.runner import Runner
 from agent_build_refactored.docker_image_builders import (
     ALL_IMAGE_BUILDERS,
@@ -51,9 +52,6 @@ from agent_build_refactored.managed_packages.managed_packages_builders import (
 )
 from agent_build_refactored.tools.builder import BUILDER_CLASSES, Builder
 from agent_build_refactored.scripts.builder_helper import builder_main
-
-
-logging.basicConfig(level=logging.INFO)
 
 
 ALL_BUILDERS: Dict[str, Type[Builder]] = {
@@ -69,8 +67,6 @@ _AGENT_BUILD_PATH = __SOURCE_ROOT__ / "agent_build"
 # )
 
 if __name__ == "__main__":
-
-    init_logging()
 
     # First, we use base parser just to parse the builder name.
     # When we determine the name, we create another parser which will be used by the builder itself.

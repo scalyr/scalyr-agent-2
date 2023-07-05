@@ -26,9 +26,6 @@ from agent_build_refactored.tools.steps_libs.container import (  # NOQA
     DockerContainer,
 )
 
-from agent_build_refactored.tools.steps_libs.build_logging import (  # NOQA
-    init_logging,
-)
 from agent_build_refactored.tools.steps_libs.constants import IN_DOCKER  # NOQA
 
 
