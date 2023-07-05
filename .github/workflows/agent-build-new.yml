@@ -40,6 +40,14 @@ jobs:
         with:
           python_version: 3.8
 
+      - name: Get dependency matrices
+        id: get_dependency_matrices
+        run: |
+          MATRICES=$(python3 agent_build_refactored/scripts/cicd/create_cacheable_steps_matrix.py)
+          echo "Matrices:"
+          echo "${MATRICES}"
+          echo "${MATRICES}" >> "${GITHUB_OUTPUT}"
+
 #  test:
 #    name: test
 #    runs-on: ubuntu-latest
