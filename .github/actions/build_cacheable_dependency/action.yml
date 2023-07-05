@@ -27,7 +27,7 @@ runs:
       working-directory: ${{ github.workspace }}
       env:
           USE_GHA_CACHE: "1"
-          GHA_CACHE_VERSION: ${{ inputs.cache_version }}
+          CACHE_VERSION: ${{ inputs.cache_version }}
       run: |
         python3 agent_build_refactored/scripts/cicd/run_dependency.py ${{ inputs.dependency_id }}
       
