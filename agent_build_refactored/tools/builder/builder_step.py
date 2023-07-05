@@ -658,13 +658,13 @@ COPY --from
             flags=re.MULTILINE
         )
 
+        nginc_container_name = "nginx"
+        subprocess.run(
+            ["docker", "rm", "-f", nginc_container_name],
+            check=True
+        )
 
         if fail_on_cache_miss:
-            nginc_container_name = "nginx"
-            subprocess.run(
-                ["docker", "rm", "-f", nginc_container_name],
-                check=True
-            )
             subprocess.run(
                 [
                     "docker",
