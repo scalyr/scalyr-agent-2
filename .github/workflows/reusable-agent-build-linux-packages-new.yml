@@ -12,6 +12,10 @@ on:
         description: Version of Python to use
         type: string
 
+      cache_version:
+        description: Version suffix for the cache key. May be useful when it is needed to invalidate the cache.
+        type: string
+
     outputs:
       cache_hit:
         description: "Flag that indicates that packages are build build by using cache."
@@ -308,6 +312,7 @@ jobs:
         id: build
         env:
             USE_GHA_CACHE: "1"
+            GHA_CACHE_VERSION: ${{ inputs.cache_version }}
         run: |
           
           OUTPUT="$(python3 build_package_new_refactored.py ${{ matrix.builder_name }} --use-only-cache | tr -d '\n')"

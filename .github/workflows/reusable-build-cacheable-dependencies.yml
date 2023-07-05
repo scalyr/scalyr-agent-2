@@ -6,6 +6,10 @@ on:
       python_version:
         description: "Version of Python to use."
         type: string
+
+      cache_version:
+        description: Version suffix for the cache key. May be useful when it is needed to invalidate the cache.
+        type: string
 #    secrets:
 #      CT_AWS_DEV_EC2_PRIVATE_KEY:
 #        required: true
@@ -20,6 +24,7 @@ on:
 
 env:
   DOCKER_BUILDKIT: 1
+
 
 
 jobs:
@@ -75,6 +80,7 @@ jobs:
         with:
           dependency_id: ${{ matrix.id }}
           python_version: ${{ inputs.python_version }}
+          cache_version: ${{ inputs.cache_version }}
 
   group_1:
     name: (1)${{ matrix.id }}
@@ -92,6 +98,7 @@ jobs:
         with:
           dependency_id: ${{ matrix.id }}
           python_version: ${{ inputs.python_version }}
+          cache_version: ${{ inputs.cache_version }}
 
   group_2:
     name: (2)${{ matrix.id }}
@@ -109,6 +116,7 @@ jobs:
         with:
           dependency_id: ${{ matrix.id }}
           python_version: ${{ inputs.python_version }}
+          cache_version: ${{ inputs.cache_version }}
 
   group_3:
     name: (3)${{ matrix.id }}
@@ -126,6 +134,7 @@ jobs:
         with:
           dependency_id: ${{ matrix.id }}
           python_version: ${{ inputs.python_version }}
+          cache_version: ${{ inputs.cache_version }}
 
   group_4:
     name: (4)${{ matrix.id }}
@@ -143,6 +152,7 @@ jobs:
         with:
           dependency_id: ${{ matrix.id }}
           python_version: ${{ inputs.python_version }}
+          cache_version: ${{ inputs.cache_version }}
 
   group_5:
     name: (5)${{ matrix.id }}
@@ -160,6 +170,7 @@ jobs:
         with:
           dependency_id: ${{ matrix.id }}
           python_version: ${{ inputs.python_version }}
+          cache_version: ${{ inputs.cache_version }}
 
   group_6:
     name: (6)${{ matrix.id }}
@@ -177,6 +188,7 @@ jobs:
         with:
           dependency_id: ${{ matrix.id }}
           python_version: ${{ inputs.python_version }}
+          cache_version: ${{ inputs.cache_version }}
 
   group_7:
     name: (7)${{ matrix.id }}
@@ -194,6 +206,7 @@ jobs:
         with:
           dependency_id: ${{ matrix.id }}
           python_version: ${{ inputs.python_version }}
+          cache_version: ${{ inputs.cache_version }}
 
   group_8:
     name: (8)${{ matrix.id }}
@@ -211,5 +224,6 @@ jobs:
         with:
           dependency_id: ${{ matrix.id }}
           python_version: ${{ inputs.python_version }}
+          cache_version: ${{ inputs.cache_version }}
 
 

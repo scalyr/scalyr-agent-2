@@ -8,6 +8,9 @@ inputs:
   python_version:
     description: "Version of Python to use"
 
+  cache_version:
+    description: Version suffix for the cache key. May be useful when it is needed to invalidate the cache.
+
 runs:
   using: "composite"
   steps:
@@ -24,6 +27,7 @@ runs:
       working-directory: ${{ github.workspace }}
       env:
           USE_GHA_CACHE: "1"
+          GHA_CACHE_VERSION: ${{ inputs.cache_version }}
       run: |
         python3 agent_build_refactored/scripts/cicd/run_dependency.py ${{ inputs.dependency_id }}
       

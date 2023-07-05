@@ -18,6 +18,7 @@ from agent_build_refactored.tools.constants import CpuArch, AGENT_BUILD_OUTPUT_P
 
 logger = logging.getLogger(__name__)
 
+
 @dataclasses.dataclass
 class BuildxBuilderWrapper:
     name: str
@@ -459,6 +460,7 @@ BUILDER_NAME = "agent_cicd"
 _BUILDX_BUILDER_PORT = "1234"
 BUILDKIT_VERSION = "v0.11.6"
 USE_GHA_CACHE = bool(os.environ.get("USE_GHA_CACHE"))
+CACHE_VERSION = os.environ.get("CACHE_VERSION", "")
 
 _BUILD_STEPS_OUTPUT_OCI_DIR = AGENT_BUILD_OUTPUT_PATH / "oci"
 _BUILD_STEPS_OUTPUT_OUTPUT_DIR = AGENT_BUILD_OUTPUT_PATH / "output"
@@ -594,10 +596,18 @@ class BuilderStep():
 
         if self.cache:
             if USE_GHA_CACHE:
-                cache_from_value = f"type=gha,scope={self.id}"
-                cache_to_value = f"type=gha,scope={self.id}"
+                scope = f"{self.id}"
+                if CACHE_VERSION:
+                    scope = f"{scope}_{CACHE_VERSION}"
+
+                cache_from_value = f"type=gha,scope={scope}"
+                cache_to_value = f"type=gha,scope={scope}"
             else:
-                cache_path = AGENT_BUILD_OUTPUT_PATH / "cache" / self.id
+                cache_name = f"{self.id}"
+                if CACHE_VERSION:
+                    cache_name = f"{cache_name}_{CACHE_VERSION}"
+
+                cache_path = AGENT_BUILD_OUTPUT_PATH / "cache" / cache_name
                 cache_from_value = f"type=local,src={cache_path}"
                 cache_to_value = f"type=local,dest={cache_path}"
 

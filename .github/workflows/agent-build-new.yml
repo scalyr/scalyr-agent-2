@@ -36,6 +36,7 @@ jobs:
       - id: define_constants
         run: |
           echo "python_version=3.8" >> "${GITHUB_OUTPUT}"
+          echo "cache_version=1" >> "${GITHUB_OUTPUT}"
 
   build_cached_linux_packages:
     name: "Build cached Linux packages"
@@ -44,6 +45,7 @@ jobs:
     uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
     with:
       python_version: ${{ needs.pre_job.outputs.python_version }}
+      cache_version: ${{ needs.pre_job.outputs.cache_version }}
 
 
   ggg:
@@ -87,6 +89,7 @@ jobs:
     uses: ./.github/workflows/reusable-build-cacheable-dependencies.yml
     with:
       python_version: ${{ needs.pre_job.outputs.python_version }}
+      cache_version: ${{ needs.pre_job.outputs.cache_version }}
 
 
   build_linux_packages:
@@ -97,6 +100,7 @@ jobs:
     uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
     with:
       python_version: ${{ needs.pre_job.outputs.python_version }}
+      cache_version: ${{ needs.pre_job.outputs.cache_version }}
 #
 
 #  test:
