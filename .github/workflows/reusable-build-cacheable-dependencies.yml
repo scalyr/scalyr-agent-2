@@ -73,7 +73,7 @@ jobs:
 
   group_1:
     runs-on: ubuntu-latest
-    needs: [ prepare_before_build group_0]
+    needs: [ prepare_before_build, group_0]
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_1) }}
     steps:
