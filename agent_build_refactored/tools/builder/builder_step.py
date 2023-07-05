@@ -611,7 +611,9 @@ class BuilderStep():
         # if self.platform != current_machine_arch:
         #     return
 
-        cmd_args = self.get_build_command_args()
+        cmd_args = self.get_build_command_args(
+            use_only_cache=use_only_cache
+        )
 
         if output:
             cmd_args.extend([
