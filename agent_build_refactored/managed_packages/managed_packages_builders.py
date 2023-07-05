@@ -310,8 +310,14 @@ class LinuxPackageBuilder(Builder):
             libc=libc,
         )
 
-        return PrepareBuildBaseWithPythonStep.create(
+        build_dev_requirements_step = LinuxPackageBuilder.build_dev_requirements(
+            architecture=architecture,
+            libc=libc
+        )
+
+        return PrepareBuildBaseWithPythonStep(
             build_python_step=build_python_step,
+            build_dev_requirements_step=build_dev_requirements_step,
             run_in_remote_builder_if_possible=True,
         )
 

@@ -12,13 +12,12 @@ class PrepareBuildBaseWithPythonStep(BuilderStep):
     def __init__(
         self,
         build_python_step: BuilderPythonStep,
+        build_dev_requirements_step: BuildDevRequirementsStep,
         run_in_remote_builder_if_possible: bool = False,
     ):
 
         self.build_python_step = build_python_step
-        self.build_dev_requirements_step = BuildDevRequirementsStep(
-            build_python_step=build_python_step,
-        )
+        self.build_dev_requirements_step = build_dev_requirements_step
         self.architecture = self.build_python_step.architecture
         self.libc = self.build_python_step.libc
 
