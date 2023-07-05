@@ -71,7 +71,7 @@ jobs:
       - build_linux_packages
     uses: ./.github/workflows/reusable-build-cacheable-dependencies.yml
     with:
-      python_version: ${{ inputs:python_version }}
+      python_version: ${{ inputs.python_version }}
     
 
 #  test:
