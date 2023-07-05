@@ -55,7 +55,7 @@ jobs:
       - name: Get dependency matrices
         id: get_dependency_matrices
         run: |
-          echo "::notice::Need to build and cache some dependencies first"
+          echo "::notice::Need to build and cache some dependencies first (May take longer than fully cached build)"
           echo "runs_on=ubuntu-22.04" >> "${GITHUB_OUTPUT}"
           echo "checkout_action_name=actions/checkout@v3" >> "${GITHUB_OUTPUT}"
           echo "build_cacheable_dependency_action_name=./.github/actions/build_cacheable_dependency" >> "${GITHUB_OUTPUT}"
@@ -67,8 +67,9 @@ jobs:
 
   group_0:
     name: (0)${{ matrix.id }}
-    runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
     needs: [prepare_before_build]
+    runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
+    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_0 != '{}'
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_0) }}
     steps:
@@ -83,8 +84,9 @@ jobs:
 
   group_1:
     name: (1)${{ matrix.id }}
-    runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
     needs: [ prepare_before_build, group_0]
+    runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
+    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_1 != '{}'
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_1) }}
     steps:
@@ -99,8 +101,9 @@ jobs:
 
   group_2:
     name: (2)${{ matrix.id }}
+    needs: [ prepare_before_build, group_1 ]
     runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
-    needs: [ prepare_before_build, group_1]
+    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_2 != '{}'
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_2) }}
     steps:
@@ -115,8 +118,9 @@ jobs:
 
   group_3:
     name: (3)${{ matrix.id }}
+    needs: [ prepare_before_build, group_2 ]
     runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
-    needs: [ prepare_before_build, group_2]
+    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_3 != '{}'
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_3) }}
     steps:
@@ -131,8 +135,9 @@ jobs:
 
   group_4:
     name: (4)${{ matrix.id }}
+    needs: [ prepare_before_build, group_3 ]
     runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
-    needs: [ prepare_before_build, group_3]
+    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_4 != '{}'
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_4) }}
     steps:
@@ -147,8 +152,9 @@ jobs:
 
   group_5:
     name: (5)${{ matrix.id }}
+    needs: [ prepare_before_build, group_4 ]
     runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
-    needs: [ prepare_before_build, group_4]
+    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_5 != '{}'
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_5) }}
     steps:
@@ -163,8 +169,8 @@ jobs:
 
   group_6:
     name: (6)${{ matrix.id }}
-    runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
     needs: [ prepare_before_build, group_5 ]
+    runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
     if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_6 != '{}'
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_6) }}
@@ -180,11 +186,28 @@ jobs:
 
   group_7:
     name: (7)${{ matrix.id }}
-    runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
     needs: [ prepare_before_build, group_6 ]
+    runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
     if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_7 != '{}'
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_7) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Build dependency
+        uses: ./.github/actions/build_cacheable_dependency
+        with:
+          dependency_id: ${{ matrix.id }}
+          python_version: ${{ inputs.python_version }}
+
+  group_8:
+    name: (8)${{ matrix.id }}
+    needs: [ prepare_before_build, group_7 ]
+    runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
+    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_8 != '{}'
+    strategy:
+      matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_8) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
