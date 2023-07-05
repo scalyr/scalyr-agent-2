@@ -306,11 +306,6 @@ jobs:
             USE_GHA_CACHE: "1"
         run: |
           
-#          ADDITIONAL_ARGS=""
-#          if [ "${{ inputs.fail_on_cache_miss }}" == 'true' ]; then
-#            ADDITIONAL_ARGS="${ADDITIONAL_ARGS} --use-only-cache"
-#          fi
-          
           OUTPUT=$(python3 build_package_new_refactored.py ${{ matrix.builder_name }} --use-only-cache)
           
           if [ "${OUTPUT}" = "cache_hit" ]; then
