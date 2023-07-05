@@ -745,10 +745,10 @@ COPY --from
         if process.returncode != 0:
             full_no_cache_error_message = b"Can not continue. This build is supposed to be rebuilt from cache"
             if use_only_cache and full_no_cache_error_message in stderr_buffer.getvalue():
-                logger.error(
-                    "This build has failed due to a cache miss, when it is expected to be fully reused from cache."
-                )
-                raise BuilderCacheMissError(f"Can not find cache for '{self.name}' with flag 'fail_on_cache_miss' set.")
+                # logger.error(
+                #     "This build has failed due to a cache miss, when it is expected to be fully reused from cache."
+                # )
+                raise BuilderCacheMissError(full_no_cache_error_message.decode())
 
             raise subprocess.CalledProcessError(
                 returncode=process.returncode,
