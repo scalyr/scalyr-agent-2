@@ -1,26 +1,26 @@
-name: Build all cacheable dependencies
-
-on:
-  workflow_call:
-    secrets:
-      CT_AWS_DEV_EC2_PRIVATE_KEY:
-        required: true
-      CT_AWS_DEV_EC2_ACCESS_KEY:
-        required: true
-      CT_AWS_DEV_EC2_SECRET_KEY:
-        required: true
-      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE:
-        required: true
-      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ:
-        required: true
-
-env:
-  DOCKER_BUILDKIT: 1
-
-
-jobs:
-  pre_job:
-    - name: Get All Job Matrices
-      id: get_all_gob_matrices
-      run: |
-        python3
+#name: Build all cacheable dependencies
+#
+#on:
+#  workflow_call:
+#    secrets:
+#      CT_AWS_DEV_EC2_PRIVATE_KEY:
+#        required: true
+#      CT_AWS_DEV_EC2_ACCESS_KEY:
+#        required: true
+#      CT_AWS_DEV_EC2_SECRET_KEY:
+#        required: true
+#      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE:
+#        required: true
+#      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ:
+#        required: true
+#
+#env:
+#  DOCKER_BUILDKIT: 1
+#
+#
+#jobs:
+#  pre_job:
+#    name: Get All Job Matrices
+#      id: get_all_gob_matrices
+#      run: |
+#        python3
