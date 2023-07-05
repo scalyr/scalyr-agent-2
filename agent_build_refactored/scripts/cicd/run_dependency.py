@@ -3,7 +3,7 @@ import sys
 import logging
 import pathlib as pl
 
-logging.basicConfig()
+logging.basicConfig(level=logging.INFO)
 
 
 # Add source root to the PYTHONPATH in order to be able to import
