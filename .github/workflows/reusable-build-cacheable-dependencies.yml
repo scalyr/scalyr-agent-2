@@ -5,6 +5,7 @@ on:
     inputs:
       python_version:
         description: "Version of Python to use."
+        type: string
 #    secrets:
 #      CT_AWS_DEV_EC2_PRIVATE_KEY:
 #        required: true
@@ -70,7 +71,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: install python and requirements
+      - name: Build dependency
         uses: ./.github/actions/build_cacheable_dependency
         with:
           dependency_id: ${{ matrix.id }}
@@ -85,7 +86,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: install python and requirements
+      - name: Build dependency
         uses: ./.github/actions/build_cacheable_dependency
         with:
           dependency_id: ${{ matrix.id }}
