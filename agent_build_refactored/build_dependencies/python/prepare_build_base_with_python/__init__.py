@@ -1,8 +1,6 @@
 import pathlib as pl
 
-from agent_build_refactored.tools.constants import CpuArch, LibC, ALL_REQUIREMENTS, SOURCE_ROOT
 from agent_build_refactored.tools.builder import BuilderStep
-from agent_build_refactored.build_dependencies.python.build_python_for_packages import BuildPythonForPackagesStep
 from agent_build_refactored.build_dependencies.python.build_python import BuilderPythonStep
 from agent_build_refactored.build_dependencies.python.build_dev_requirements import BuildDevRequirementsStep
 
@@ -36,7 +34,7 @@ class PrepareBuildBaseWithPythonStep(BuilderStep):
             ],
             build_args={
                 "INSTALL_PREFIX": str(self.build_python_step.install_prefix),
-                "COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX": str(self.build_python_step.dependencies_install_prefix),
+                "PYTHON_DEPENDENCIES_INSTALL_PREFIX": str(self.build_python_step.dependencies_install_prefix),
                 "REQUIREMENTS_CONTENT": self.build_dev_requirements_step.requirements_file_content,
             },
         )

@@ -40,7 +40,7 @@ class BuildDevRequirementsStep(BuilderStep):
             ],
             build_args={
                 "PYTHON_INSTALL_PREFIX": str(self.build_python_step.install_prefix),
-                "COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX": str(self.build_python_step.dependencies_install_prefix),
+                "PYTHON_DEPENDENCIES_INSTALL_PREFIX": str(self.build_python_step.dependencies_install_prefix),
                 "REQUIREMENTS_CONTENT": self.requirements_file_content,
                 "RUST_VERSION": "1.63.0",
                 "RUST_PLATFORM": rust_platform,

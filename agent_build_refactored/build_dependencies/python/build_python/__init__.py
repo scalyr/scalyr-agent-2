@@ -3,21 +3,6 @@ import pathlib as pl
 from agent_build_refactored.tools.constants import CpuArch, LibC
 from agent_build_refactored.tools.builder import BuilderStep
 from agent_build_refactored.build_dependencies.python.prepare_build_base import PrepareBuildBaseStep
-from agent_build_refactored.build_dependencies.python.download_source_base import DownloadSourcesBaseStep
-from agent_build_refactored.build_dependencies.python.build_python_dependencies import (
-    BuildXZStep,
-    BuildPythonOpenSSLStep,
-    BuildPythonSqliteStep,
-    BuildPythonZlibStep,
-    BuildPythonBzipStep,
-    BuildPythonUtilLinuxStep,
-    BuildPythonNcursesStep,
-    BuildPythonLibeditStep,
-    BuildPythonLibffiStep,
-)
-from agent_build_refactored.build_dependencies.python.build_python_dependencies.base import (
-    COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX,
-)
 from agent_build_refactored.build_dependencies.python.download_sources import DownloadSourcesStep
 from agent_build_refactored.build_dependencies.python.build_python_dependencies import BuildPytonDependenciesStep
 
@@ -122,20 +107,11 @@ class BuilderPythonStep(BuilderStep):
                 self.prepare_build_base_step,
                 self.download_sources_step,
                 self.build_python_dependencies_step,
-                # self.build_xz_step,
-                # self.build_sqlite_step,
-                # self.build_zlib_step,
-                # self.build_bzip_step,
-                # self.build_util_linux_step,
-                # self.build_ncurses_step,
-                # self.build_libedit_step,
-                # self.build_libffi_step,
-                # self.build_openssl_step,
             ],
             build_args={
                 "INSTALL_PREFIX": str(self.install_prefix),
                 "OPENSSL_MAJOR_VERSION": openssl_major_version,
-                "COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX": COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX,
+                "PYTHON_DEPENDENCIES_INSTALL_PREFIX": self.build_python_dependencies_step.install_prefix,
                 "ARCH": self.architecture.value,
                 "LIBC": self.libc,
             },

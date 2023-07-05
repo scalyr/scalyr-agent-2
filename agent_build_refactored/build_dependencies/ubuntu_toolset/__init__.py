@@ -32,7 +32,7 @@ class UbuntuToolset(BuilderStep):
             ],
             build_args={
                 "PYTHON_INSTALL_PREFIX": str(self.build_python_step.install_prefix),
-                "COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX": str(self.build_python_step.dependencies_install_prefix),
+                "PYTHON_DEPENDENCIES_INSTALL_PREFIX": str(self.build_python_step.dependencies_install_prefix),
                 "REQUIREMENTS_CONTENT": self.build_dev_requirements_step.requirements_file_content,
             }
         )

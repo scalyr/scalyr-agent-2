@@ -27,8 +27,8 @@ COPY --from=build_python_dependencies /openssl_${OPENSSL_MAJOR_VERSION}/. /
 #COPY --from=build_libffi / /
 #COPY --from=build_openssl / /
 #ARG INSTALL_PREFIX
-#ARG COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX
-#ENV LD_LIBRARY_PATH="${COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX}/lib:${LD_LIBRARY_PATH}"
+#ARG PYTHON_DEPENDENCIES_INSTALL_PREFIX
+#ENV LD_LIBRARY_PATH="${PYTHON_DEPENDENCIES_INSTALL_PREFIX}/lib:${LD_LIBRARY_PATH}"
 #WORKDIR /tmp/source/build
 #ADD configure_python.sh configure_python.sh
 
@@ -55,21 +55,21 @@ COPY --from=build_python_dependencies /zlib/. /
 
 
 ARG INSTALL_PREFIX
-ARG COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX
-ENV LD_LIBRARY_PATH="${COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX}/lib:${LD_LIBRARY_PATH}"
+ARG PYTHON_DEPENDENCIES_INSTALL_PREFIX
+ENV LD_LIBRARY_PATH="${PYTHON_DEPENDENCIES_INSTALL_PREFIX}/lib:${LD_LIBRARY_PATH}"
 
 COPY --from=download_sources /python /tmp/source
 WORKDIR /tmp/source/build
 #ADD configure_python.sh configure_python.sh
 #RUN INSTALL_PREFIX="${INSTALL_PREFIX}" \
-#    COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX="${COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX}" \
+#    PYTHON_DEPENDENCIES_INSTALL_PREFIX="${PYTHON_DEPENDENCIES_INSTALL_PREFIX}" \
 #    bash configure_python.sh
 
 RUN ../configure \
-  CFLAGS="-I${COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX}/include -I${COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX}/include/ncurses" \
-  LDFLAGS="${LDFLAGS} -L${COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX}/lib" \
+  CFLAGS="-I${PYTHON_DEPENDENCIES_INSTALL_PREFIX}/include -I${PYTHON_DEPENDENCIES_INSTALL_PREFIX}/include/ncurses" \
+  LDFLAGS="${LDFLAGS} -L${PYTHON_DEPENDENCIES_INSTALL_PREFIX}/lib" \
 	--enable-shared=yes \
-    --with-openssl="${COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX}" \
+    --with-openssl="${PYTHON_DEPENDENCIES_INSTALL_PREFIX}" \
 	--with-readline=edit \
 	--prefix="${INSTALL_PREFIX}" \
 	--with-ensurepip=no
@@ -82,7 +82,7 @@ RUN make DESTDIR=/tmp/root install
 # Copy sqlite shared library because it's dfficult to make it compiled statically.
 # TODO: But it would be good to create static.
 COPY --from=build_python_dependencies /sqlite /tmp/sqlite
-RUN cp /tmp/sqlite${COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX}/lib/*.so* /tmp/root${INSTALL_PREFIX}/lib
+RUN cp /tmp/sqlite${PYTHON_DEPENDENCIES_INSTALL_PREFIX}/lib/*.so* /tmp/root${INSTALL_PREFIX}/lib
 
 # Remove cache files.
 RUN find "/tmp/root${INSTALL_PREFIX}" -name "__pycache__" -type d -prune -exec rm -r {} \;
@@ -133,7 +133,7 @@ COPY --from=build_python /tmp/root/. /
 #
 #ARG INSTALL_PREFIX
 #ARG PYTHON_X_Y_VERSION
-#ARG COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX
+#ARG PYTHON_DEPENDENCIES_INSTALL_PREFIX
 #
 #ARG PYTHON_LIB_DIR="${RESULT_DIR}${INSTALL_PREFIX}/lib"
 #RUN mkdir -p "${PYTHON_LIB_DIR}"
@@ -162,7 +162,7 @@ COPY --from=build_python /tmp/root/. /
 #RUN ln -s "../3/bindings" "${PYTHON_OPENSSL_EMBEDDED_DIR}/bindings"
 ##RUN ln -s "../../../../openssl/lib" "${PYTHON_OPENSSL_EMBEDDED_DIR}/libs"
 #RUN mkdir -p "${PYTHON_OPENSSL_EMBEDDED_DIR}/libs"
-#RUN cp "/tmp/openssl_3${COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX}/lib"/*.so* "${PYTHON_OPENSSL_EMBEDDED_DIR}/libs"
+#RUN cp "/tmp/openssl_3${PYTHON_DEPENDENCIES_INSTALL_PREFIX}/lib"/*.so* "${PYTHON_OPENSSL_EMBEDDED_DIR}/libs"
 #
 #ARG PYTHON_LIB_PYTHON_X_Y_DIR="${RESULT_DIR}${INSTALL_PREFIX}/lib/python${PYTHON_X_Y_VERSION}"
 #ADD files/agent_python3_config.py "${PYTHON_LIB_PYTHON_X_Y_DIR}"
@@ -174,8 +174,8 @@ COPY --from=build_python /tmp/root/. /
 #COPY --from=build_sqlite / /tmp/sqlite
 #COPY --from=python_with_openssl /tmp/root /tmp/root
 #ARG INSTALL_PREFIX
-#ARG COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX
-#RUN cp /tmp/sqlite${COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX}/lib/*.so* /tmp/root${INSTALL_PREFIX}/lib
+#ARG PYTHON_DEPENDENCIES_INSTALL_PREFIX
+#RUN cp /tmp/sqlite${PYTHON_DEPENDENCIES_INSTALL_PREFIX}/lib/*.so* /tmp/root${INSTALL_PREFIX}/lib
 #
 #
 #FROM prepare_build_base as python_with_pip
@@ -183,8 +183,8 @@ COPY --from=build_python /tmp/root/. /
 #COPY --from=python_with_sqlite /tmp/root/. /
 #
 #ARG INSTALL_PREFIX
-#ARG COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX
-#ENV LD_LIBRARY_PATH="${COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX}/lib:${LD_LIBRARY_PATH}"
+#ARG PYTHON_DEPENDENCIES_INSTALL_PREFIX
+#ENV LD_LIBRARY_PATH="${PYTHON_DEPENDENCIES_INSTALL_PREFIX}/lib:${LD_LIBRARY_PATH}"
 #RUN ${INSTALL_PREFIX}/bin/python3 -m ensurepip
 #
 #COPY --from=python_with_sqlite /tmp/root/. /tmp/root

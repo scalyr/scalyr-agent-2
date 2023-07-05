@@ -8,7 +8,7 @@ from ..prepare_build_base import PrepareBuildBaseStep
 
 PARENT_DIR = pl.Path(__file__).parent
 
-COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX = "/usr/local"
+PYTHON_DEPENDENCIES_INSTALL_PREFIX = "/usr/local"
 
 
 class BasePythonDependencyBuildStep(BuilderStep):

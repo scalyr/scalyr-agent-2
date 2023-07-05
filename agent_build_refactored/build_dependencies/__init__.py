@@ -7,7 +7,6 @@ from agent_build_refactored.tools.constants import CpuArch, LibC
 
 from agent_build_refactored.tools.builder import BuilderStep
 from .python.prepare_build_base_with_python import PrepareBuildBaseWithPythonStep
-from .python.build_python_dependencies.build_openssl import BuildPythonOpenSSLStep
 from agent_build_refactored.build_dependencies.python.download_sources import DownloadSourcesStep
 from .python.build_python import BuilderPythonStep
 from .versions import PYTHON_VERSION, OPENSSL_1_VERSION, OPENSSL_3_VERSION
