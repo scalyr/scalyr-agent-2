@@ -519,6 +519,7 @@ class BuilderStep():
         cache: bool = True,
         unique_name_suffix: str = None,
         local_dir_contexts: Dict[str, pl.Path] = None,
+        needs_essential_dependencies: bool = True,
     ):
 
         unique_name_suffix = unique_name_suffix or ""
@@ -534,6 +535,14 @@ class BuilderStep():
             self.dockerfile_content = dockerfile
 
         #self.dockerfile = dockerfile
+
+        build_contexts = build_contexts or []
+
+        if needs_essential_dependencies:
+            build_contexts.extend([
+                CacheMissChecker.create(),
+            ])
+
         self.build_contexts = build_contexts or []
         self.build_args = build_args or {}
         self.cache = cache
@@ -932,6 +941,7 @@ class BuilderStep():
 
         return instance
 
+
 CACHE_MISS_CHECKER_DOCKERFILE = """
 FROM ubuntu:22.04 as cache_check
 RUN apt update && apt install -y curl dnsutils
@@ -945,6 +955,7 @@ class CacheMissChecker(BuilderStep):
             context=SOURCE_ROOT,
             dockerfile=CACHE_MISS_CHECKER_DOCKERFILE,
             platform=CpuArch.x86_64,
-            cache=True
+            cache=True,
+            needs_essential_dependencies=False,
         )
 
