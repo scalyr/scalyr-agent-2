@@ -14,7 +14,7 @@ import tarfile
 import logging
 from typing import List, Any, Union, Dict
 
-from agent_build_refactored.tools.constants import CpuArch, AGENT_BUILD_OUTPUT_PATH
+from agent_build_refactored.tools.constants import CpuArch, AGENT_BUILD_OUTPUT_PATH, SOURCE_ROOT
 
 logger = logging.getLogger(__name__)
 
@@ -921,3 +921,18 @@ COPY --from
             instance = new_instance
 
         return instance
+
+CACHE_MISS_CHECKER_DOCKERFILE = """
+FROM ubuntu:22.04 as cache_check
+RUN apt update && apt install -y curl dnsutils
+"""
+
+
+class CacheMissChecker(BuilderStep):
+    def __init__(self):
+        super(CacheMissChecker, self).__init__(
+            context=SOURCE_ROOT,
+            dockerfile=CACHE_MISS_CHECKER_DOCKERFILE,
+            platform=CpuArch.x86_64
+        )
+
