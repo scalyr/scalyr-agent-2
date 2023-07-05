@@ -46,15 +46,15 @@ jobs:
       python_version: ${{ needs.pre_job.outputs.python_version }}
 
 
-#  ggg:
-#    name: GGGGG
-#    runs-on: ubuntu-latest
-#    needs: [pre_job, build_linux_packages]
-#    steps:
-#
-#      - id: define_constants
-#        run: |
-#          echo "${{ needs.build_linux_packages.outputs.cache_hit }}"
+  ggg:
+    name: GGGGG
+    runs-on: ubuntu-latest
+    needs: [pre_job, build_linux_packages]
+    steps:
+
+      - id: define_constants
+        run: |
+          echo "${{ needs.build_linux_packages.outputs.cache_hit }}"
   
 
   #  prepare_dependencies_build:
