@@ -595,8 +595,6 @@ class BuilderStep():
         ]
 
         if self.cache:
-
-            raise Exception(CACHE_VERSION)
             cache_name = f"{self.id}"
             if CACHE_VERSION:
                 cache_name = f"{cache_name}_{CACHE_VERSION}"
