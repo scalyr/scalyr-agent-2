@@ -823,11 +823,12 @@ COPY --from
 
         return info
 
-    def get_children(self):
-        result = [self]
+    def get_children(self) -> Dict[str, 'BuilderStep']:
+        result = {}
 
         for step in self.build_contexts:
-            result.extend(step.get_children())
+            result[step.id] = step
+            result.update(step.get_children())
 
         return result
 
@@ -846,17 +847,17 @@ COPY --from
     def create(cls, *args, **kwargs):
         global ALL_BUILDER_STEPS
 
-        module = kwargs.pop("module")
+        #module = kwargs.pop("module")
 
         new_instance = cls(*args, **kwargs)
 
-        fqdn = f"{module}.{new_instance.id}"
+        #fqdn = f"{module}.{new_instance.id}"
 
-        instance = ALL_BUILDER_STEPS.get(fqdn)
+        instance = ALL_BUILDER_STEPS.get(new_instance.id)
 
         if instance is None:
-            new_instance.fqdn = fqdn
-            ALL_BUILDER_STEPS[fqdn] = new_instance
+            #new_instance.fqdn = fqdn
+            ALL_BUILDER_STEPS[new_instance.id] = new_instance
             instance = new_instance
 
         return instance

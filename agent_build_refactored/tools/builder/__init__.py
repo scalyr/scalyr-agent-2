@@ -577,6 +577,15 @@ class Builder(metaclass=BuilderMeta):
     def get_constructor_arguments_from_command_line(cls, args):
         return {}
 
+    def get_all_dependencies(self) -> Dict[str, BuilderStep]:
+        builder__dependencies = [self.base, *self.dependencies]
+        all_dependencies = {}
+        for dep in builder__dependencies:
+            all_dependencies[dep.id] = dep
+            all_dependencies.update(dep.get_children())
+
+        return all_dependencies
+
     @classmethod
     def create_and_run_builder_from_command_line(cls, args):
 
@@ -597,15 +606,10 @@ class Builder(metaclass=BuilderMeta):
             exit(0)
 
         if args.get_all_dependencies:
+            all_dependencies = builder.get_all_dependencies()
 
-            builder__dependencies = [builder.base, * builder.dependencies]
-            all_dependencies = []
-            for dep in builder__dependencies:
-                all_dependencies.extend(dep.get_children())
-
-            all_dependencies_ids = {d.fqdn for d in all_dependencies}
-
-            print(json.dumps(list(all_dependencies_ids)))
+            all_dependencies_ids = sorted(list(all_dependencies.keys()))
+            print(json.dumps(all_dependencies_ids))
             exit(0)
 
         try:

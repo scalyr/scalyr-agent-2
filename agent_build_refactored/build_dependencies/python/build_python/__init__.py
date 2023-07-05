@@ -35,7 +35,7 @@ class BuilderPythonStep(BuilderStep):
         architecture: CpuArch,
         libc: LibC,
     ):
-
+        self.download_sources_step = download_sources_step
         self.architecture = architecture
         self.libc = libc
         self.openssl_version = openssl_version
@@ -45,7 +45,6 @@ class BuilderPythonStep(BuilderStep):
             architecture=architecture,
             libc=libc
         )
-        self.download_sources_step = download_sources_step
 
         # self.build_xz_step = BuildXZStep(
         #     download_source_step=self.download_sources_step,
@@ -115,7 +114,7 @@ class BuilderPythonStep(BuilderStep):
         # )
 
         self.build_python_dependencies = BuildPytonDependenciesStep(
-            download_sources_step=download_sources_step,
+            download_sources_step=self.download_sources_step,
             prepare_build_base=self.prepare_build_base_step,
             install_prefix=dependencies_install_prefix,
             architecture=architecture,

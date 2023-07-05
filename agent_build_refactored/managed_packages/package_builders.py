@@ -5,7 +5,7 @@ import shutil
 from agent_build_refactored.tools.constants import CpuArch
 from agent_build_refactored.tools.builder import BuilderStep, Builder
 from agent_build_refactored.build_dependencies.python.build_python_for_packages import BuildPythonForPackagesStep
-from agent_build_refactored.build_dependencies.ubuntu_toolset import LatestUbuntuToolsetStep
+from agent_build_refactored.build_dependencies.ubuntu_toolset import ToolsetStep
 from agent_build_refactored.build_dependencies.python.prepare_build_base_with_python import PrepareBuildBaseWithPythonStep
 
 
