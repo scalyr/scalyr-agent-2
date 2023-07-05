@@ -542,7 +542,7 @@ class BuilderStep():
             "-",
         ]
 
-        if self.cache and False:
+        if self.cache:
             if USE_GHA_CACHE:
                 cache_to_value = f"type=gha,scope={self.id}"
                 cache_from_value = f"type=gha,scope={self.id}"
