@@ -39,6 +39,7 @@ jobs:
     uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
     with:
       fail_on_cache_miss: true
+      python_version: ${{ inputs:python_version }}
 
 #  prepare_dependencies_build:
 #    name: Prepare dependencies build
@@ -69,6 +70,8 @@ jobs:
     needs:
       - build_linux_packages
     uses: ./.github/workflows/reusable-build-cacheable-dependencies.yml
+    with:
+      python_version: ${{ inputs:python_version }}
     
 
 #  test:
