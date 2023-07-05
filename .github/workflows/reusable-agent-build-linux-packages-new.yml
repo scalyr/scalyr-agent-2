@@ -315,6 +315,8 @@ jobs:
             CACHE_VERSION: ${{ inputs.cache_version }}
         run: |
           
+          echo "$$$$$$$$$$$"
+          which python3
           OUTPUT="$(python3 build_package_new_refactored.py ${{ matrix.builder_name }} --use-only-cache | tr -d '\n')"
           
           if [ "${OUTPUT}" = "cache_hit" ]; then
