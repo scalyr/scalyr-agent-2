@@ -24,7 +24,7 @@ to see all available packages to build use:
 Commands line arguments for the particular package builder are defined within the builder itself,
 to see those options use build_package_new.py <name of the package> --help.
 """
-
+import logging
 import pathlib as pl
 import argparse
 import sys
@@ -51,6 +51,9 @@ from agent_build_refactored.managed_packages.managed_packages_builders import (
 )
 from agent_build_refactored.tools.builder import BUILDER_CLASSES, Builder
 from agent_build_refactored.scripts.builder_helper import builder_main
+
+
+logging.basicConfig(level=logging.INFO)
 
 
 ALL_BUILDERS: Dict[str, Type[Builder]] = {

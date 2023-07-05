@@ -774,6 +774,8 @@ class BuilderStep():
             stderr_buffer.write(line)
 
         process.wait()
+
+
         if process.returncode != 0:
             sys.stderr.buffer.write(stderr_buffer.getvalue())
             full_no_cache_error_message = b"Can not continue. This build is supposed to be rebuilt from cache"
