@@ -49,7 +49,9 @@ jobs:
 
   prepare_dependencies_build:
     name: Prepare dependencies build
-    if: jobs.build_linux_packages.outputs.cache_hit != 'true'
+    needs:
+      - build_linux_packages
+    if: needs.build_linux_packages.outputs.cache_hit != 'true'
     runs-on: ubuntu-latest
 
     steps:
