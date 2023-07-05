@@ -16,7 +16,7 @@ RUN python3 -m pip install \
     -r /tmp/requirements.txt \
     --no-index \
     --find-links /tmp/wheels \
-    --root /tmp/root \
+    --root /tmp/root
 
 FROM base
 COPY --from=build /tmp/root/. /

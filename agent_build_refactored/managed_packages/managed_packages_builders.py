@@ -296,6 +296,7 @@ class LinuxPackageBuilder(Builder):
 
     @staticmethod
     def create_python_step(
+            openssl_version: str,
             architecture: CpuArch,
             libc: LibC,
     ):
@@ -329,7 +330,7 @@ class LinuxPackageBuilder(Builder):
             download_sources_step=download_sources_step,
             prepare_build_base_step=prepare_build_base_step,
             build_python_dependencies=build_python_dependencies,
-            openssl_version=OPENSSL_3_VERSION,
+            openssl_version=openssl_version,
             install_prefix=PYTHON_INSTALL_PREFIX,
             dependencies_install_prefix=PYTHON_DEPENDENCIES_INSTALL_PREFIX,
         )
@@ -342,6 +343,7 @@ class LinuxPackageBuilder(Builder):
         libc: LibC,
     ):
         build_python_step= LinuxPackageBuilder.create_python_step(
+            openssl_version=OPENSSL_3_VERSION,
             architecture=architecture,
             libc=libc,
         )
@@ -356,6 +358,7 @@ class LinuxPackageBuilder(Builder):
         libc: LibC,
     ):
         build_python_step = LinuxPackageBuilder.create_python_step(
+            openssl_version=OPENSSL_3_VERSION,
             architecture=architecture,
             libc=libc,
         )
@@ -371,6 +374,7 @@ class LinuxPackageBuilder(Builder):
         libc = LibC.GNU
 
         build_python_step = LinuxPackageBuilder.create_python_step(
+            openssl_version=OPENSSL_3_VERSION,
             architecture=architecture,
             libc=libc,
         )
@@ -650,10 +654,17 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         self.build_agent_libs_venv_step = BuildAgentLibsVenvStep.create(
             prepare_build_base_with_python_step=self.prepare_build_base_with_python,
         )
+
+        self.build_python_step_with_openssl_1 = self.create_python_step(
+            openssl_version=OPENSSL_1_VERSION,
+            architecture=self.architecture,
+            libc=self.libc,
+        )
         
         super(LinuxAIOPackagesBuilder, self).__init__(
             dependencies=[
                 self.prepare_build_base_with_python,
+                self.build_python_step_with_openssl_1,
                 self.build_agent_libs_venv_step,
             ]
         )
