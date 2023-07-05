@@ -528,6 +528,7 @@ class BuilderStep():
         self.id = f"{self.unique_name}_{platform.value}"
         self.platform = platform
         self.build_context = context
+        self.needs_essential_dependencies = needs_essential_dependencies
 
         if isinstance(dockerfile, pl.Path):
             self.dockerfile_content = dockerfile.read_text()
@@ -684,41 +685,42 @@ class BuilderStep():
 
         dockerfile_content = self.dockerfile_content
 
-        dockerfile_content = re.sub(
-            r"(^FROM [^\n]+$)",
-            r"\1\nCOPY --from=cache_check2 / /",
-            dockerfile_content,
-            flags=re.MULTILINE
-        )
+        if self.needs_essential_dependencies:
+            dockerfile_content = re.sub(
+                r"(^FROM [^\n]+$)",
+                r"\1\nCOPY --from=cache_check2 / /",
+                dockerfile_content,
+                flags=re.MULTILINE
+            )
 
-        dockerfile_content = re.sub(
-            r"(^FROM [^\n]+$)",
-            fr"{TEMPLATE}\n\1",
-            dockerfile_content,
-            count=1,
-            flags=re.MULTILINE
-        )
+            dockerfile_content = re.sub(
+                r"(^FROM [^\n]+$)",
+                fr"{TEMPLATE}\n\1",
+                dockerfile_content,
+                count=1,
+                flags=re.MULTILINE
+            )
 
-        nginc_container_name = "nginx"
-        subprocess.run(
-            ["docker", "rm", "-f", nginc_container_name],
-            check=True
-        )
-
-        if use_only_cache:
+            nginc_container_name = "nginx"
             subprocess.run(
-                [
-                    "docker",
-                    "run",
-                    "-d",
-                    "--name",
-                    nginc_container_name,
-                    "-p",
-                    "8080:80",
-                    "nginx"
-                ],
+                ["docker", "rm", "-f", nginc_container_name],
                 check=True
             )
+
+            if use_only_cache:
+                subprocess.run(
+                    [
+                        "docker",
+                        "run",
+                        "-d",
+                        "--name",
+                        nginc_container_name,
+                        "-p",
+                        "8080:80",
+                        "nginx"
+                    ],
+                    check=True
+                )
 
         local = True
 
@@ -762,9 +764,9 @@ class BuilderStep():
 
         process.wait()
         if process.returncode != 0:
+            sys.stderr.buffer.write(stderr_buffer.getvalue())
             full_no_cache_error_message = b"Can not continue. This build is supposed to be rebuilt from cache"
             if use_only_cache and full_no_cache_error_message in stderr_buffer.getvalue():
-                sys.stderr.buffer.write(stderr_buffer.getvalue())
                 raise BuilderCacheMissError(full_no_cache_error_message.decode())
 
             raise subprocess.CalledProcessError(
