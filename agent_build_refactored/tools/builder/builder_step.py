@@ -713,7 +713,7 @@ COPY --from
             raise
 
         if not fail_on_cache_miss:
-            print(result.stderr.decode(), file=sys.stderr)
+            print(result.stderr.decode(errors="replace"), file=sys.stderr)
 
 
     def run_and_output_in_oci_tarball(
