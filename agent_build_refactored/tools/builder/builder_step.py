@@ -495,14 +495,14 @@ class CachePolicy(enum.Enum):
 
 
 TEMPLATE = """
-FROM cache_miss_checker as cache_check
+FROM essential_ubuntu_tools as cache_check
 ARG ERROR_MESSAGE
 RUN echo -n "Can not continue." >> /tmp/error_mgx.txt
 RUN echo " ${ERROR_MESSAGE}" >> /tmp/error_mgx.txt
 RUN if curl -s localhost:8080 > /dev/null; then cat /tmp/error_mgx.txt ; exit 1; fi
 RUN mkdir -p /tmp/empty
 
-FROM scratch as cache_check2
+FROM scratch as cache_check_dummy_files
 COPY --from=cache_check /tmp/empty/. /
 """
 
@@ -541,7 +541,7 @@ class BuilderStep():
 
         if needs_essential_dependencies:
             build_contexts.extend([
-                CacheMissChecker.create(),
+                EssentialTools.create(),
             ])
 
         self.build_contexts = build_contexts or []
@@ -688,7 +688,7 @@ class BuilderStep():
         if self.needs_essential_dependencies:
             dockerfile_content = re.sub(
                 r"(^FROM [^\n]+$)",
-                r"\1\nCOPY --from=cache_check2 / /",
+                r"\1\nCOPY --from=cache_check_dummy_files / /",
                 dockerfile_content,
                 flags=re.MULTILINE
             )
@@ -942,18 +942,14 @@ class BuilderStep():
         return instance
 
 
-CACHE_MISS_CHECKER_DOCKERFILE = """
-FROM ubuntu:22.04 as cache_check
-RUN apt update && apt install -y curl dnsutils
-"""
+class EssentialTools(BuilderStep):
+    CONTEXT_DIR = pl.Path(__file__).parent / "essential_ubuntu_tools"
 
-
-class CacheMissChecker(BuilderStep):
     def __init__(self):
-        super(CacheMissChecker, self).__init__(
-            name="cache_miss_checker",
-            context=SOURCE_ROOT,
-            dockerfile=CACHE_MISS_CHECKER_DOCKERFILE,
+        super(EssentialTools, self).__init__(
+            name=self.__class__.CONTEXT_DIR.name,
+            context=self.__class__.CONTEXT_DIR,
+            dockerfile=self.__class__.CONTEXT_DIR / "Dockerfile",
             platform=CpuArch.x86_64,
             cache=True,
             needs_essential_dependencies=False,

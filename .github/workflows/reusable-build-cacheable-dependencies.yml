@@ -28,8 +28,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       runs_on: ${{ steps.get_dependency_matrices.outputs.runs_on }}
-      checkout_action_name: ${{ steps.get_dependency_matrices.outputs.checkout_action_name }}
-      build_cacheable_dependency_action_name: ${{ steps.get_dependency_matrices.outputs.build_cacheable_dependency_action_name }}
 
       DEPENDENCY_GROUP_MATRIX_0: ${{ steps.get_dependency_matrices.outputs.DEPENDENCY_GROUP_MATRIX_0 }}
       DEPENDENCY_GROUP_MATRIX_1: ${{ steps.get_dependency_matrices.outputs.DEPENDENCY_GROUP_MATRIX_1 }}
@@ -57,8 +55,6 @@ jobs:
         run: |
           echo "::notice::Need to build and cache some dependencies first (May take longer than fully cached build)"
           echo "runs_on=ubuntu-22.04" >> "${GITHUB_OUTPUT}"
-          echo "checkout_action_name=actions/checkout@v3" >> "${GITHUB_OUTPUT}"
-          echo "build_cacheable_dependency_action_name=./.github/actions/build_cacheable_dependency" >> "${GITHUB_OUTPUT}"
           
           MATRICES=$(python3 agent_build_refactored/scripts/cicd/create_cacheable_steps_matrix.py)
           echo "Matrices:"

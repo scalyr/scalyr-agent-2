@@ -1,9 +1,4 @@
-FROM ubuntu:22.04 as base
-RUN apt-get update && apt install -y \
-    gnupg2 \
-    git \
-    tar \
-    curl
+FROM essential_ubuntu_tools as base
 ADD public_keys /tmp/public_keys
 WORKDIR /tmp/download
 
