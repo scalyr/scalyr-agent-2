@@ -73,12 +73,12 @@ jobs:
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_0) }}
     steps:
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
       - run: |
           echo "${{ needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_0 }}"
 
-        uses: ./.github/actions/build_cacheable_dependency
+      - uses: ./.github/actions/build_cacheable_dependency
         with:
           dependency_id: ${{ matrix.id }}
           python_version: ${{ inputs.python_version }}
