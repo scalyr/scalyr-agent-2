@@ -30,6 +30,7 @@ def create_github_actions_cacheable_dependencies_matrix():
         print(f"DEPENDENCY_GROUP_MATRIX_{i}={group_matrix_json}")
         print(f"DEPENDENCY_GROUP_MATRIX_{i}_SIZE={len(group_matrix_include)}")
 
+
 if __name__ == '__main__':
     create_github_actions_cacheable_dependencies_matrix()
 

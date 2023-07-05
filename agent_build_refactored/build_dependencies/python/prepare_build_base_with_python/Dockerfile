@@ -16,6 +16,8 @@ RUN python3 -m pip install \
     -r /tmp/requirements.txt \
     --no-index \
     --find-links /tmp/wheels \
+    --no-warn-script-location \
+    --root-user-action=ignore \
     --root /tmp/root
 
 FROM base

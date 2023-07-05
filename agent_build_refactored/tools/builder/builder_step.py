@@ -201,6 +201,7 @@ class DockerBackedBuildxBuilderWrapper(RemoteBuildxBuilderWrapper):
 
 @dataclasses.dataclass
 class EC2BackedRemoteBuildxBuilderWrapper(RemoteBuildxBuilderWrapper):
+    architecture: CpuArch
     ec2_instance: Any = dataclasses.field(init=False)
     ssh_container_name: str = dataclasses.field(init=False)
     ssh_host: str = dataclasses.field(init=False)
@@ -338,7 +339,8 @@ _BUILDX_BUILDER_PORT = "1234"
 BUILDKIT_VERSION = "v0.11.6"
 USE_GHA_CACHE = bool(os.environ.get("USE_GHA_CACHE"))
 CACHE_VERSION = os.environ.get("CACHE_VERSION", "")
-REMOTE_BUILDX_BUILDER_TYPE = os.environ.get("REMOTE_BUILDX_BUILDER_TYPE", "docker")
+#REMOTE_BUILDX_BUILDER_TYPE = os.environ.get("REMOTE_BUILDX_BUILDER_TYPE", "docker")
+REMOTE_BUILDX_BUILDER_TYPE = os.environ.get("REMOTE_BUILDX_BUILDER_TYPE", "ec2")
 
 _BUILD_STEPS_OUTPUT_OCI_DIR = AGENT_BUILD_OUTPUT_PATH / "oci"
 _BUILD_STEPS_OUTPUT_OUTPUT_DIR = AGENT_BUILD_OUTPUT_PATH / "output"
@@ -372,7 +374,7 @@ TEMPLATE = """
 
 # This is a special stage that has to fail when it is not reused from cache ad has to run from the beginning.
 # By using this stage we can fail the build early when we do not want to build everything from the beginning.
-FROM essential_ubuntu_tools as cache_check
+FROM --platform=linux/amd64 essential_ubuntu_tools as cache_check
 ARG ERROR_MESSAGE
 RUN echo -n "Can not continue." >> /tmp/error_mgx.txt
 RUN echo " ${ERROR_MESSAGE}" >> /tmp/error_mgx.txt
@@ -405,6 +407,7 @@ class BuilderStep():
         cache: bool = True,
         unique_name_suffix: str = None,
         local_dir_contexts: Dict[str, pl.Path] = None,
+        run_in_remote_builder_if_possible: bool = False,
         needs_essential_dependencies: bool = True,
     ):
 
@@ -414,6 +417,7 @@ class BuilderStep():
         self.id = f"{self.unique_name}_{platform.value}"
         self.platform = platform
         self.build_context = context
+        self.run_in_remote_builder_if_possible = run_in_remote_builder_if_possible
         self.needs_essential_dependencies = needs_essential_dependencies
 
         if isinstance(dockerfile, pl.Path):
@@ -544,20 +548,6 @@ class BuilderStep():
 
         use_only_cache = cache_policy == CachePolicy.USE_ONLY_CACHE
 
-
-        machine_name = platform.machine()
-        if machine_name.lower() in ["x86_64"]:
-            current_machine_arch = CpuArch.x86_64
-        elif machine_name.lower() in ["aarch64"]:
-            current_machine_arch = CpuArch.AARCH64
-        elif machine_name.lower() in ["armv7l"]:
-            current_machine_arch = CpuArch.ARMV7
-        else:
-            raise Exception(f"Unknown uname machine {machine_name}")
-
-        # if self.platform != current_machine_arch:
-        #     return
-
         cmd_args = self.get_build_command_args(
             use_only_cache=use_only_cache,
         )
@@ -625,12 +615,25 @@ class BuilderStep():
                     logger.exception(f"Container creation has failed. Stderr: {e.stderr.decode()}")
                     raise
 
-        local = True
+        local = False
 
-        if local:
-            builder_info = self.prepare_buildx_builders(local=True)
+        machine_name = platform.machine()
+        if machine_name.lower() in ["x86_64"]:
+            current_machine_arch = CpuArch.x86_64
+        elif machine_name.lower() in ["aarch64"]:
+            current_machine_arch = CpuArch.AARCH64
+        elif machine_name.lower() in ["armv7l"]:
+            current_machine_arch = CpuArch.ARMV7
         else:
-            builder_info = self.prepare_buildx_builders(local=False)
+            raise Exception(f"Unknown uname machine {machine_name}")
+
+        builder_info = None
+        if self.platform != current_machine_arch:
+            if self.run_in_remote_builder_if_possible:
+                builder_info = self.prepare_buildx_builders(local=False)
+
+        if builder_info is None:
+            builder_info = self.prepare_buildx_builders(local=True)
 
         self.oci_layout.parent.mkdir(parents=True, exist_ok=True)
 
@@ -769,11 +772,6 @@ class BuilderStep():
     ):
         global _existing_builders
 
-        # if in_ec2:
-        #     suffix = "ec2"
-        # else:
-        #     suffix = "docker"
-
         builder_name_suffix = "local" if local else "remote"
         builder_name = f"{BUILDER_NAME}_{self.platform.value}_{builder_name_suffix}"
 
@@ -795,6 +793,7 @@ class BuilderStep():
             else:
                 info = EC2BackedRemoteBuildxBuilderWrapper(
                     name=builder_name,
+                    architecture=self.platform,
                 )
 
         info.create_builder()

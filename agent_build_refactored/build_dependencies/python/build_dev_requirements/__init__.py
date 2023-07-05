@@ -12,6 +12,7 @@ class BuildDevRequirementsStep(BuilderStep):
     def __init__(
         self,
         build_python_step: BuilderPythonStep,
+        run_in_remote_builder_if_possible: bool = False,
     ):
 
         self.build_python_step = build_python_step
@@ -45,4 +46,5 @@ class BuildDevRequirementsStep(BuilderStep):
                 "RUST_VERSION": "1.63.0",
                 "RUST_PLATFORM": rust_platform,
             },
+            run_in_remote_builder_if_possible=run_in_remote_builder_if_possible,
         )

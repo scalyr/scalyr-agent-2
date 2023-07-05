@@ -14,6 +14,7 @@ class BuildPytonDependenciesStep(BuilderStep):
         download_sources_step: DownloadSourcesStep,
         prepare_build_base: PrepareBuildBaseStep,
         install_prefix: pl.Path,
+        run_in_remote_builder_if_possible: bool = False,
     ):
         self.download_sources_step = download_sources_step
         self.prepare_build_base = prepare_build_base
@@ -35,4 +36,5 @@ class BuildPytonDependenciesStep(BuilderStep):
                 "ARCH": self.architecture.value,
                 "LIBC": self.libc.value,
             },
+            run_in_remote_builder_if_possible=run_in_remote_builder_if_possible,
         )

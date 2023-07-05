@@ -19,6 +19,7 @@ class BuilderPythonStep(BuilderStep):
         openssl_version: str,
         install_prefix: pl.Path,
         dependencies_install_prefix: pl.Path,
+        run_in_remote_builder_if_possible: bool = False,
     ):
         self.download_sources_step = download_sources_step
         self.prepare_build_base_step = prepare_build_base_step
@@ -28,73 +29,6 @@ class BuilderPythonStep(BuilderStep):
         self.dependencies_install_prefix = dependencies_install_prefix
         self.architecture = self.prepare_build_base_step.architecture
         self.libc = self.prepare_build_base_step.libc
-
-        # self.build_xz_step = BuildXZStep(
-        #     download_source_step=self.download_sources_step,
-        #     install_prefix=dependencies_install_prefix,
-        #     architecture=self.architecture,
-        #     libc=self.libc,
-        # )
-        #
-        # self.build_sqlite_step = BuildPythonSqliteStep(
-        #     download_source_step=self.download_sources_step,
-        #     install_prefix=dependencies_install_prefix,
-        #     architecture=self.architecture,
-        #     libc=self.libc,
-        # )
-        #
-        # self.build_zlib_step = BuildPythonZlibStep(
-        #     download_source_step=self.download_sources_step,
-        #     install_prefix=dependencies_install_prefix,
-        #     architecture=self.architecture,
-        #     libc=self.libc,
-        # )
-        #
-        # self.build_bzip_step = BuildPythonBzipStep(
-        #     download_source_step=self.download_sources_step,
-        #     install_prefix=dependencies_install_prefix,
-        #     architecture=self.architecture,
-        #     libc=self.libc,
-        # )
-        #
-        # self.build_util_linux_step = BuildPythonUtilLinuxStep(
-        #     download_source_step=self.download_sources_step,
-        #     install_prefix=dependencies_install_prefix,
-        #     architecture=self.architecture,
-        #     libc=self.libc,
-        # )
-        #
-        # self.build_ncurses_step = BuildPythonNcursesStep(
-        #     download_source_step=self.download_sources_step,
-        #     install_prefix=dependencies_install_prefix,
-        #     architecture=self.architecture,
-        #     libc=self.libc,
-        # )
-        #
-        # self.build_libedit_step = BuildPythonLibeditStep(
-        #     download_source_step=self.download_sources_step,
-        #     install_prefix=dependencies_install_prefix,
-        #     architecture=self.architecture,
-        #     libc=self.libc,
-        #     build_ncurses_step=self.build_ncurses_step,
-        # )
-        #
-        # self.build_libffi_step = BuildPythonLibffiStep(
-        #     download_source_step=self.download_sources_step,
-        #     install_prefix=dependencies_install_prefix,
-        #     architecture=self.architecture,
-        #     libc=self.libc,
-        # )
-        #
-        # openssl_major_version = openssl_version.strip(".")[0]
-        #
-        # self.build_openssl_step = BuildPythonOpenSSLStep(
-        #     download_source_step=self.download_sources_step,
-        #     major_version=openssl_major_version,
-        #     install_prefix=dependencies_install_prefix,
-        #     architecture=self.architecture,
-        #     libc=self.libc,
-        # )
 
         openssl_major_version = openssl_version.strip(".")[0]
 
@@ -115,5 +49,6 @@ class BuilderPythonStep(BuilderStep):
                 "ARCH": self.architecture.value,
                 "LIBC": self.libc,
             },
-            unique_name_suffix=f"_with_openssl_{openssl_major_version}"
+            unique_name_suffix=f"_with_openssl_{openssl_major_version}",
+            run_in_remote_builder_if_possible=run_in_remote_builder_if_possible,
         )

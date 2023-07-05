@@ -12,6 +12,7 @@ class PrepareBuildBaseWithPythonStep(BuilderStep):
     def __init__(
         self,
         build_python_step: BuilderPythonStep,
+        run_in_remote_builder_if_possible: bool = False,
     ):
 
         self.build_python_step = build_python_step
@@ -37,4 +38,5 @@ class PrepareBuildBaseWithPythonStep(BuilderStep):
                 "PYTHON_DEPENDENCIES_INSTALL_PREFIX": str(self.build_python_step.dependencies_install_prefix),
                 "REQUIREMENTS_CONTENT": self.build_dev_requirements_step.requirements_file_content,
             },
+            run_in_remote_builder_if_possible=run_in_remote_builder_if_possible,
         )

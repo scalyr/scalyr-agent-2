@@ -14,6 +14,8 @@ COPY --from=build_dev_requirements / /tmp/wheels
 RUN "${VENV_DIR}/bin/python3" -m pip install \
     --no-index \
     --find-links /tmp/wheels \
+    --no-warn-script-location \
+    --root-user-action=ignore \
     -r /tmp/requirements.txt
 
 #RUN ls -al "${VENV_DIR}/lib/python3.11/site-packages" && false

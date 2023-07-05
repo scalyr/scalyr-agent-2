@@ -13,6 +13,7 @@ class PrepareBuildBaseStep(BuilderStep):
         self,
         architecture: CpuArch,
         libc: LibC,
+        run_in_remote_builder_if_possible: bool = False,
     ):
 
         self.architecture = architecture
@@ -25,5 +26,6 @@ class PrepareBuildBaseStep(BuilderStep):
             build_args={
                 "ARCH": self.architecture.value,
                 "LIBC": self.libc.value,
-            }
+            },
+            run_in_remote_builder_if_possible=run_in_remote_builder_if_possible,
         )
