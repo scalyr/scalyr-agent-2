@@ -479,6 +479,34 @@ class CachePolicy(enum.Enum):
     BUILD_ON_CACHE_MISS = "build_cache_miss"
 
 
+# TEMPLATE  = """
+# FROM ubuntu:22.04 as cache_check
+# RUN apt update && apt install -y curl dnsutils
+# ARG d=3
+# ARG ERROR_MESSAGE
+# RUN echo -n "Can not continue." >> /tmp/error_mgx.txt
+# RUN echo " ${ERROR_MESSAGE}" >> /tmp/error_mgx.txt
+# RUN if curl -s localhost:8080 > /dev/null; then cat /tmp/error_mgx.txt ; exit 1; fi
+# RUN mkdir -p /tmp/empty
+#
+# FROM scratch as cache_check2
+# COPY --from=cache_check /tmp/empty/. /
+# """
+
+
+TEMPLATE = """
+FROM cache_miss_checker as cache_check
+ARG ERROR_MESSAGE
+RUN echo -n "Can not continue." >> /tmp/error_mgx.txt
+RUN echo " ${ERROR_MESSAGE}" >> /tmp/error_mgx.txt
+RUN if curl -s localhost:8080 > /dev/null; then cat /tmp/error_mgx.txt ; exit 1; fi
+RUN mkdir -p /tmp/empty
+
+FROM scratch as cache_check2
+COPY --from=cache_check /tmp/empty/. /
+"""
+
+
 class BuilderStep():
     def __init__(
         self,
@@ -644,24 +672,6 @@ class BuilderStep():
                     "-t",
                     tag
                 ])
-
-        TEMPLATE  = """
-FROM ubuntu:22.04 as cache_check
-RUN apt update && apt install -y curl dnsutils
-ARG d=3
-ARG ERROR_MESSAGE
-RUN echo -n "Can not continue." >> /tmp/error_mgx.txt
-RUN echo " ${ERROR_MESSAGE}" >> /tmp/error_mgx.txt
-RUN if curl -s localhost:8080 > /dev/null; then cat /tmp/error_mgx.txt ; exit 1; fi
-RUN mkdir -p /tmp/empty
-
-FROM scratch as cache_check2
-COPY --from=cache_check /tmp/empty/. /
-"""
-
-        COPY_TEMPLATE = """
-COPY --from 
-        """
 
         dockerfile_content = self.dockerfile_content
 
@@ -931,8 +941,10 @@ RUN apt update && apt install -y curl dnsutils
 class CacheMissChecker(BuilderStep):
     def __init__(self):
         super(CacheMissChecker, self).__init__(
+            name="cache_miss_checker",
             context=SOURCE_ROOT,
             dockerfile=CACHE_MISS_CHECKER_DOCKERFILE,
-            platform=CpuArch.x86_64
+            platform=CpuArch.x86_64,
+            cache=True
         )
 

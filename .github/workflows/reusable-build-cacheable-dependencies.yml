@@ -69,7 +69,7 @@ jobs:
     name: (0)${{ matrix.id }}
     needs: [prepare_before_build]
     runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
-    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_0 != '{}'
+    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_0 != ''
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_0) }}
     steps:
@@ -87,7 +87,7 @@ jobs:
     name: (1)${{ matrix.id }}
     needs: [ prepare_before_build, group_0]
     runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
-    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_1 != '{}'
+    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_1 != ''
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_1) }}
     steps:
@@ -104,7 +104,7 @@ jobs:
     name: (2)${{ matrix.id }}
     needs: [ prepare_before_build, group_1 ]
     runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
-    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_2 != '{}'
+    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_2 != ''
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_2) }}
     steps:
@@ -121,7 +121,7 @@ jobs:
     name: (3)${{ matrix.id }}
     needs: [ prepare_before_build, group_2 ]
     runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
-    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_3 != '{}'
+    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_3 != ''
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_3) }}
     steps:
@@ -138,7 +138,7 @@ jobs:
     name: (4)${{ matrix.id }}
     needs: [ prepare_before_build, group_3 ]
     runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
-    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_4 != '{}'
+    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_4 != ''
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_4) }}
     steps:
@@ -155,7 +155,7 @@ jobs:
     name: (5)${{ matrix.id }}
     needs: [ prepare_before_build, group_4 ]
     runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
-    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_5 != '{}'
+    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_5 != ''
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_5) }}
     steps:
@@ -172,7 +172,7 @@ jobs:
     name: (6)${{ matrix.id }}
     needs: [ prepare_before_build, group_5 ]
     runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
-    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_6 != '{}'
+    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_6 != ''
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_6) }}
     steps:
@@ -189,7 +189,7 @@ jobs:
     name: (7)${{ matrix.id }}
     needs: [ prepare_before_build, group_6 ]
     runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
-    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_7 != '{}'
+    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_7 != ''
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_7) }}
     steps:
@@ -206,7 +206,7 @@ jobs:
     name: (8)${{ matrix.id }}
     needs: [ prepare_before_build, group_7 ]
     runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
-    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_8 != '{}'
+    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_8 != ''
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_8) }}
     steps:
