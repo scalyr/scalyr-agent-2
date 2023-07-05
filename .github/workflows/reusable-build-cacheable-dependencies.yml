@@ -157,7 +157,7 @@ jobs:
     name: ${{ matrix.id }}
     runs-on: ubuntu-latest
     needs: [ prepare_before_build, group_5 ]
-    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_6 != "{}"
+    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_6 != '{}'
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_6) }}
     steps:
