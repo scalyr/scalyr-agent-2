@@ -643,8 +643,17 @@ COPY --from
 
         dockerfile_content = self.dockerfile_content
 
-        if fail_on_cache_miss:
+        dockerfile_content = re.sub(
+            r"(^FROM [^\n]+$)",
+            r"\1\nCOPY --from=cache_check2 / /",
+            dockerfile_content,
+            flags=re.MULTILINE
+        )
 
+        dockerfile_content = f"{TEMPLATE}\n" \
+                             f"{dockerfile_content}"
+
+        if fail_on_cache_miss:
             nginc_container_name = "nginx"
             subprocess.run(
                 ["docker", "rm", "-f", nginc_container_name],
@@ -663,16 +672,6 @@ COPY --from
                 ],
                 check=True
             )
-
-            dockerfile_content = re.sub(
-                r"(^FROM [^\n]+$)",
-                r"\1\nCOPY --from=cache_check2 / /",
-                dockerfile_content,
-                flags=re.MULTILINE
-            )
-
-            dockerfile_content = f"{TEMPLATE}\n" \
-                                 f"{dockerfile_content}"
 
         local = True
 

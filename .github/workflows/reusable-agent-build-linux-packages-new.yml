@@ -2,17 +2,27 @@ name: Agent Linux Packages Build Refactored
 
 on:
   workflow_call:
-    secrets:
-      CT_AWS_DEV_EC2_PRIVATE_KEY:
-        required: true
-      CT_AWS_DEV_EC2_ACCESS_KEY:
-        required: true
-      CT_AWS_DEV_EC2_SECRET_KEY:
-        required: true
-      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE:
-        required: true
-      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ:
-        required: true
+    inputs:
+      fail_on_cache_miss:
+        description: Fail the build of packages if they can not be completely built from cache.
+        type: boolean
+        default: false
+
+    outputs:
+      cache_hit:
+        description: "Flag that indicates that packages are build build by using cache."
+        value: ${{ jobs.build_packages.outputs.cache_hit }}
+#    secrets:
+#      CT_AWS_DEV_EC2_PRIVATE_KEY:
+#        required: true
+#      CT_AWS_DEV_EC2_ACCESS_KEY:
+#        required: true
+#      CT_AWS_DEV_EC2_SECRET_KEY:
+#        required: true
+#      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE:
+#        required: true
+#      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ:
+#        required: true
 
 env:
   DOCKER_BUILDKIT: 1
@@ -249,6 +259,8 @@ jobs:
   build_packages:
     name: Build package ${{ matrix.name }}
     runs-on: ubuntu-22.04
+    outputs:
+      cache_hit: ${{ steps.build.outputs.cache_hit }}
 
     strategy:
       # This job receives its matrix from the 'pre_job' job. The matrix itself is created by the .github/actions/init-job-matrices action.
@@ -267,27 +279,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Install python
-        uses: actions/setup-python@v4
+      - name: install python and requirements
+        uses: ./.github/actions/install_python_and_requirements
         with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Get pip cache dir
-        id: pip-cache
-        run: |
-          echo "::set-output name=dir::$(pip cache dir)"
-
-      - name: pip cache
-        uses: actions/cache@v2
-        with:
-          path: ${{ steps.pip-cache.outputs.dir }}
-          key: ${{ runner.os }}-pip-${{ hashFiles('dev-requirements-new.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      - name: install requirements
-        run: |
-          python3 -m pip install -r dev-requirements-new.txt
+          python_version: 3.8
 
       - name: Set up QEMU
         id: qemu
@@ -302,18 +297,20 @@ jobs:
           driver-opts: network=host
 
       - name: Build managed package with builder '${{ matrix.name }}'
-        id: build_with_cache
+        id: build
         run: |
           
+          ADDITIONAL_ARGS=""
+          if [ "${{ inputs.fail_on_cache_miss }}" == 'true' ]; then
+            ADDITIONAL_ARGS="${ADDITIONAL_ARGS} --fail-on-cache-miss"
+          fi 
+          
           CACHE_FOUND=$(
-            python3 build_package_new_refactored.py ${{ matrix.builder_name }} \
-              --fail-on-cache-miss
+            python3 build_package_new_refactored.py ${{ matrix.builder_name }} ${ADDITIONAL_ARGS[@]}
           )
           
-          if [ "${CACHE_FOUND}" = "1" ]; then
-            echo "cache_found=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "cache_found=false" >> "$GITHUB_OUTPUT"
+          if [ "${CACHE_FOUND}" = "cache_hit" ]; then
+            echo "cache_hit=true" >> "$GITHUB_OUTPUT"
           fi
           
 #          set -e
@@ -338,20 +335,20 @@ jobs:
 #          fi
 
       - name: Save packages as artifact
-        if: steps.build_with_cache.outputs.cache_found == 'true'
+        if: steps.build_with_cache.outputs.cache_hit == 'true'
         uses: actions/upload-artifact@v3
         with:
           name: linux-packages-${{ matrix.name }}
           path: build
           retention-days: 1
 
-      - name: Get builder dependencies
-        if: steps.build_with_cache.outputs.cache_found == 'false'
-        run: |
-          mkdir -p /tmp/dependencies
-          python3 build_package_new_refactored.py ${{ matrix.builder_name }} --get-all-dependencies > /tmp/dependencies/${{ matrix.builder_name }}.json
-          #DEPENDENCIES_JSON=$(python3 build_package_new_refactored.py ${{ matrix.builder_name }} --get-all-dependencies)
-          #echo "builder_dependencies_json=" >> "$GITHUB_OUTPUT" 
+#      - name: Get builder dependencies
+#        if: steps.build_with_cache.outputs.cache_found == 'false'
+#        run: |
+#          mkdir -p /tmp/dependencies
+#          python3 build_package_new_refactored.py ${{ matrix.builder_name }} --get-all-dependencies > /tmp/dependencies/${{ matrix.builder_name }}.json
+#          #DEPENDENCIES_JSON=$(python3 build_package_new_refactored.py ${{ matrix.builder_name }} --get-all-dependencies)
+#          #echo "builder_dependencies_json=" >> "$GITHUB_OUTPUT"
           
 
 #      - name: Save builder dependencies json as artifact
@@ -361,42 +358,6 @@ jobs:
 #          name: _linux-packages-dependencies-${{ matrix.name }}
 #          path: /tmp/dependencies
 #          retention-days: 1
-
-  prepare_dependencies_matrices:
-    name: Prepare dependencies matrices
-    needs:
-      - build_packages
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: GG
-        run: |
-          echo "${{ jobs.build_packages.strategy.github }}"
-          echo "${{ jobs.build_packages.strategy.needs }}"
-          echo "${{ jobs.build_packages.strategy.vars }}"
-          echo "${{ jobs.build_packages.strategy.inputs }}"
-
-#      - name: Download artifacts
-#        uses: actions/download-artifact@v3
-#        with:
-#          path: /tmp/all_artifacts
-#
-#
-#      - name: Prepare artifacts
-#        run: |
-#          mkdir -p /tmp/result_artifacts
-#          cp -a /tmp/all_artifacts/linux-packages-*/. /tmp/result_artifacts
-#          cp -a /tmp/all_artifacts/tarball-noarch/. /tmp/result_artifacts
-#          cp -a /tmp/all_artifacts/windows-msi/. /tmp/result_artifacts
-      
-      
-      
-#      - name: GG
-#        if: steps.build_with_cache.outputs.cache_found == 'false'
-#        run:
-#          echo "${{ matrix.builder_name }}" /tmp/cache/${{ matrix.builder_name }}.txt
 
 #  test_managed_packages:
 #    name: Test package on ${{ matrix.distro-name }}-${{ matrix.remote-machine-type }}, ${{ matrix.name }}

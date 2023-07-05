@@ -48,6 +48,12 @@ jobs:
           echo "${MATRICES}"
           echo "${MATRICES}" >> "${GITHUB_OUTPUT}"
 
+  build-linux-packages:
+    name: "Build Linux packages"
+    uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
+    with:
+      fail_on_cache_miss: true
+
 #  test:
 #    name: test
 #    runs-on: ubuntu-latest

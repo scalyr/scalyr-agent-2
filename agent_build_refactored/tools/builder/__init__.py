@@ -493,46 +493,6 @@ class Builder(metaclass=BuilderMeta):
 
         _copy_to_output()
 
-    def run_step(self, path: str):
-
-        path_parts = path.split(".")
-
-        current_step_part = path_parts[0]
-        other_parts = path_parts[1:]
-
-        all_steps = self.dependencies[:]
-        all_steps.append(self.base)
-
-        found_step = None
-        current_steps = all_steps
-
-        current_step_part = path_parts[0]
-        other_parts = path_parts[1:]
-
-        current_parts = path_parts
-        found_step = None
-
-        while True:
-            current_step = None
-            for step in current_steps:
-                child_step = step.find_child_context_by_identifier(
-                    identifier=current_step_part,
-                )
-                if child_step is not None:
-                    current_step = step
-                    break
-
-            if len(current_steps) == 0:
-                if len(current_parts) != 1:
-                    raise Exception("1111")
-                else:
-                    found_step = current_step
-                    break
-
-            current_steps = current_step.build_contexts[:]
-            current_step_part = current_parts[0]
-            current_parts = current_parts[1:]
-
 
 
 
@@ -620,12 +580,12 @@ class Builder(metaclass=BuilderMeta):
             logging.exception(f"Builder {cls.NAME} failed")
 
             if args.fail_on_cache_miss:
-                print("0")
+                print("cache_miss")
                 exit(0)
             raise
 
         if args.fail_on_cache_miss:
-            print("1")
+            print("cache_hit")
             exit(0)
 
 
