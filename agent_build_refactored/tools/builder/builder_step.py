@@ -1,6 +1,7 @@
 import abc
 import dataclasses
 import enum
+import io
 import json
 import os
 import pathlib as pl
@@ -127,32 +128,29 @@ class LocalBuildxBuilderWrapper(BuildxBuilderWrapper):
 
     def create_builder(self):
 
-        try:
-            result = subprocess.run(
-                [
-                    "docker", "buildx", "ls"
-                ],
-                check=True,
-                capture_output=True
-            )
-        except subprocess.SubprocessError as e:
-            print(e.stderr.decode(), file=sys.stderr)
-            raise
+        result = subprocess.run(
+            [
+                "docker", "buildx", "ls"
+            ],
+            check=True,
+            capture_output=True
+        )
+        result_output = result.stdout.decode()
 
-        r = result.stdout.decode()
-        a=10
+        if self.name in result_output:
+            return
 
-        try:
-            subprocess.run(
-                ["docker", "buildx", "rm", "-f", self.name],
-                check=True,
-                capture_output=True,
-                timeout=60,
-            )
-        except subprocess.SubprocessError as e:
-            stderr = e.stderr.decode()
-            if stderr != f'ERROR: no builder "{self.name}" found\n':
-                raise Exception(f"Can not inspect builder. Stderr: {stderr}")
+        # try:
+        #     subprocess.run(
+        #         ["docker", "buildx", "rm", "-f", self.name],
+        #         check=True,
+        #         capture_output=True,
+        #         timeout=60,
+        #     )
+        # except subprocess.SubprocessError as e:
+        #     stderr = e.stderr.decode()
+        #     if stderr != f'ERROR: no builder "{self.name}" found\n':
+        #         raise Exception(f"Can not inspect builder. Stderr: {stderr}")
 
         create_builder_args = [
             "docker",
@@ -715,32 +713,55 @@ COPY --from
             builder_info = self.prepare_remote_buildx_builders(in_ec2=False)
 
         self.oci_layout.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            result = subprocess.run(
-                [
-                    *cmd_args,
-                    "--build-arg",
-                    "ERROR_MESSAGE=This build is supposed to be rebuilt from cache",
-                    "--builder",
-                    builder_info.name,
-                ],
-                check=True,
-                input=dockerfile_content.encode(),
-                capture_output=True,
-            )
-        except subprocess.SubprocessError as e:
-            full_no_cache_error_message = "Can not continue. This build is supposed to be rebuilt from cache"
-            build_process_stderr = e.stderr.decode()
-            print(build_process_stderr, file=sys.stderr)
+        process = subprocess.Popen(
+            [
+                *cmd_args,
+                "--build-arg",
+                "ERROR_MESSAGE=This build is supposed to be rebuilt from cache",
+                "--builder",
+                builder_info.name,
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
 
-            if use_only_cache and full_no_cache_error_message in build_process_stderr:
+        stderr_buffer = io.BytesIO()
+        while True:
+            data = process.stderr.read()
+            if not data:
+                break
+
+            if use_only_cache:
+                sys.stderr.buffer.write(data)
+
+            stderr_buffer.write(data)
+
+        process.wait()
+        if process.returncode != 0:
+            full_no_cache_error_message = b"Can not continue. This build is supposed to be rebuilt from cache"
+            if use_only_cache and full_no_cache_error_message in stderr_buffer.getvalue():
                 raise BuilderCacheMissError(f"Can not find cache for '{self.name}' with flag 'fail_on_cache_miss' set.")
-            raise
+
+            raise subprocess.CalledProcessError(
+                returncode=process.returncode,
+                cmd=cmd_args,
+                output=process.stdout.read(),
+                stderr=stderr_buffer.getvalue(),
+            )
+
+
+        # except subprocess.SubprocessError as e:
+        #     full_no_cache_error_message = "Can not continue. This build is supposed to be rebuilt from cache"
+        #     build_process_stderr = e.stderr.decode()
+        #     print(build_process_stderr, file=sys.stderr)
+        #
+        #     if use_only_cache and full_no_cache_error_message in build_process_stderr:
+        #         raise BuilderCacheMissError(f"Can not find cache for '{self.name}' with flag 'fail_on_cache_miss' set.")
+        #     raise
 
         if use_only_cache:
             logger.info(f"Dependency '{self.id}' is successfully restored from cache.")
         else:
-            print(result.stderr.decode(errors="replace"), file=sys.stderr)
             logger.info(f"Dependency '{self.id}' is successfully built.")
 
 
