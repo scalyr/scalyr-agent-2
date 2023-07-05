@@ -551,12 +551,12 @@ class BuilderStep():
 
         if self.cache:
             if USE_GHA_CACHE:
-                cache_to_value = f"type=gha,scope={self.id}"
                 cache_from_value = f"type=gha,scope={self.id}"
+                cache_to_value = f"type=gha,scope={self.id}"
             else:
                 cache_path = AGENT_BUILD_OUTPUT_PATH / "cache" / self.id
-                cache_to_value = f"type=local,src={cache_path}"
-                cache_from_value = f"type=local,dest={cache_path}"
+                cache_from_value = f"type=local,src={cache_path}"
+                cache_to_value = f"type=local,dest={cache_path}"
 
             cmd_args.extend([
                 "--cache-from",
