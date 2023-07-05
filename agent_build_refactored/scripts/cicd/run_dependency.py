@@ -7,6 +7,7 @@ import pathlib as pl
 # local packages. All such imports also have to be done after that.
 sys.path.append(str(pl.Path(__file__).parent.parent.parent.parent))
 
+from agent_build_refactored.tools.builder.builder_step import CachePolicy
 from agent_build_refactored.scripts.cicd import all_dependencies
 
 if __name__ == '__main__':
@@ -17,4 +18,4 @@ if __name__ == '__main__':
 
     dependency = all_dependencies[args.dependency_id]
 
-    dependency.run()
+    dependency.run(cache_policy=CachePolicy.USE_ONLY_CACHE_FOR_DEPENDENCIES)
