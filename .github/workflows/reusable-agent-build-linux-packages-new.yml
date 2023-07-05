@@ -315,10 +315,9 @@ jobs:
           echo "${OUTPUT}"
           
           if [ "${OUTPUT}" = "cache_hit" ]; then
-            echo "GGGGGGG"
             echo "cache_hit=true" >> "$GITHUB_OUTPUT"
           else
-            echo "FFFFFFFF"
+            echo "Expected output of the build command has to be 'cache_hit' but it is '${OUTPUT}'"
           fi
           cat "$GITHUB_OUTPUT"
 

@@ -140,18 +140,6 @@ class LocalBuildxBuilderWrapper(BuildxBuilderWrapper):
         if self.name in result_output:
             return
 
-        # try:
-        #     subprocess.run(
-        #         ["docker", "buildx", "rm", "-f", self.name],
-        #         check=True,
-        #         capture_output=True,
-        #         timeout=60,
-        #     )
-        # except subprocess.SubprocessError as e:
-        #     stderr = e.stderr.decode()
-        #     if stderr != f'ERROR: no builder "{self.name}" found\n':
-        #         raise Exception(f"Can not inspect builder. Stderr: {stderr}")
-
         create_builder_args = [
             "docker",
             "buildx",
@@ -168,10 +156,16 @@ class LocalBuildxBuilderWrapper(BuildxBuilderWrapper):
 
         ]
 
-        subprocess.run(
-            create_builder_args,
-            check=True
-        )
+        try:
+            subprocess.run(
+                create_builder_args,
+                check=True,
+                capture_output=True,
+            )
+        except subprocess.SubprocessError as e:
+            logger.exception(f"Can not create buildx builder. Stderr: {e.stderr.decode}")
+            raise
+
 
 
 @dataclasses.dataclass
