@@ -314,7 +314,10 @@ jobs:
 
           
           if [ "${OUTPUT}" = "cache_hit" ]; then
+            echo "GGGGGGG"
             echo "cache_hit=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "FFFFFFFF"
           fi
           cat "$GITHUB_OUTPUT"
 
