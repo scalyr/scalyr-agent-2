@@ -326,7 +326,7 @@ jobs:
           cat "${GITHUB_OUTPUT}"
 
       - name: Save packages as artifact
-        if: steps.build_with_cache.outputs.cache_hit == 'true'
+        if: steps.build.outputs.cache_hit == 'true'
         uses: actions/upload-artifact@v3
         with:
           name: linux-packages-${{ matrix.name }}

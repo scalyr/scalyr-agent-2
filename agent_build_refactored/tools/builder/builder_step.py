@@ -18,6 +18,8 @@ from agent_build_refactored.tools.constants import CpuArch, AGENT_BUILD_OUTPUT_P
 
 logger = logging.getLogger(__name__)
 
+_existing_builders: Dict[str, 'RemoteBuildxBuilderWrapper'] = {}
+
 
 @dataclasses.dataclass
 class BuildxBuilderWrapper:
@@ -26,102 +28,6 @@ class BuildxBuilderWrapper:
     @abc.abstractmethod
     def create_builder(self):
         pass
-
-    # def bake_or_stop_on_cache_miss(self, bake_file_path: pl.Path):
-    #     process = subprocess.Popen(
-    #         [
-    #             *self._bake_common_cmd_args,
-    #             "-f",
-    #             str(bake_file_path),
-    #             "--builder",
-    #             self.name,
-    #         ],
-    #         stderr=subprocess.PIPE,
-    #     )
-    #
-    #     def _real_line():
-    #         raw_line = process.stderr.readline().decode()
-    #
-    #         if not raw_line:
-    #             return None
-    #
-    #         return raw_line.strip()
-    #
-    #     def _check_if_run_command_is_missed_cache(line: str):
-    #         if line == f"#{number} CACHED":
-    #             return False
-    #
-    #         if re.match(rf"#{number} sha256:[\da-fA-F]+ .*", line):
-    #             return False
-    #
-    #         if re.match(rf"#{number} extracting sha256:[\da-fA-F]+ .*", line):
-    #             return False
-    #
-    #         return True
-    #
-    #     is_missed_cache = False
-    #
-    #     while True:
-    #         line = _real_line()
-    #
-    #         if line is None:
-    #             break
-    #
-    #         print(line, file=sys.stderr)
-    #
-    #         m = re.match(r"#(\d+) \[[^]]+] RUN .*", line)
-    #
-    #         if not m:
-    #             continue
-    #
-    #         number = m.group(1)
-    #         line = _real_line()
-    #
-    #         is_missed_cache = _check_if_run_command_is_missed_cache(line=line)
-    #         print(line, file=sys.stderr)
-    #
-    #         if is_missed_cache:
-    #             break
-    #
-    #     if is_missed_cache:
-    #         import psutil
-    #
-    #         pr = psutil.Process(process.pid)
-    #
-    #         def _get_child_process(process: psutil.Process):
-    #             result = []
-    #             for child in process.children():
-    #                 result.append(child)
-    #                 result.extend(_get_child_process(process=child))
-    #
-    #             return result
-    #
-    #         all_children = _get_child_process(process=pr)
-    #
-    #         process.terminate()
-    #         for c in all_children:
-    #             c.terminate()
-    #
-    #         process.wait()
-    #     else:
-    #         process.wait()
-    #         if process.returncode != 0:
-    #             raise Exception(f"Build command finished with error code {process.returncode}.")
-    #
-    #     while True:
-    #         raw_line = process.stderr.readline()
-    #         try:
-    #             line = raw_line.decode(errors="replace")
-    #         except:
-    #             print(f"Line: {raw_line}")
-    #             raise
-    #
-    #         if not line:
-    #             break
-    #
-    #         print(line.strip(), file=sys.stderr)
-    #
-    #     return is_missed_cache
 
 
 @dataclasses.dataclass
@@ -199,7 +105,6 @@ class RemoteBuildxBuilderWrapper(BuildxBuilderWrapper):
             "--driver",
             "remote",
             "--bootstrap",
-            f"--platform={self.architecture.as_docker_platform()}",
             f"tcp://localhost:{self.host_port}",
         ]
 
@@ -227,33 +132,6 @@ class RemoteBuildxBuilderWrapper(BuildxBuilderWrapper):
             check=True
         )
 
-        # subprocess.run(
-        #     [
-        #         *self.docker_common_cmd_args,
-        #         "docker",
-        #         "create",
-        #         "--rm",
-        #         f"--name={self.container_name}",
-        #         "--privileged",
-        #         "-p",
-        #         f"0:{_BUILDX_BUILDER_PORT}/tcp",
-        #         f"moby/buildkit:{BUILDKIT_VERSION}",
-        #         "--addr", f"tcp://0.0.0.0:{_BUILDX_BUILDER_PORT}",
-        #     ],
-        #     check=True
-        # )
-
-
-        # subprocess.run(
-        #     [
-        #         *self.docker_common_cmd_args,
-        #         "docker",
-        #         "cp",
-        #         f"{self.container_name}:/tmp/config.toml"
-        #     ],
-        #     check=True
-        # )
-
         subprocess.run(
             [
                 *self.docker_common_cmd_args,
@@ -263,7 +141,6 @@ class RemoteBuildxBuilderWrapper(BuildxBuilderWrapper):
                 #"-i",
                 "--rm",
                 f"--name={self.container_name}",
-                f"--platform={self.architecture.as_docker_platform()}",
                 "--privileged",
                 "-p",
                 f"0:{_BUILDX_BUILDER_PORT}/tcp",
@@ -461,6 +338,7 @@ _BUILDX_BUILDER_PORT = "1234"
 BUILDKIT_VERSION = "v0.11.6"
 USE_GHA_CACHE = bool(os.environ.get("USE_GHA_CACHE"))
 CACHE_VERSION = os.environ.get("CACHE_VERSION", "")
+REMOTE_BUILDX_BUILDER_TYPE = os.environ.get("REMOTE_BUILDX_BUILDER_TYPE", "docker")
 
 _BUILD_STEPS_OUTPUT_OCI_DIR = AGENT_BUILD_OUTPUT_PATH / "oci"
 _BUILD_STEPS_OUTPUT_OUTPUT_DIR = AGENT_BUILD_OUTPUT_PATH / "output"
@@ -512,6 +390,7 @@ RUN mkdir -p /tmp/empty
 FROM scratch as cache_check_dummy_files
 COPY --from=cache_check /tmp/empty/. /
 """
+
 
 
 class BuilderStep():
@@ -600,7 +479,6 @@ class BuilderStep():
                 cache_name = f"{cache_name}_{CACHE_VERSION}"
 
             if USE_GHA_CACHE:
-
                 cache_from_value = f"type=gha,scope={cache_name}"
                 cache_to_value = f"type=gha,scope={cache_name}"
             else:
@@ -750,13 +628,9 @@ class BuilderStep():
         local = True
 
         if local:
-            name = "local_agent_builder"
-            builder_info = LocalBuildxBuilderWrapper(
-                name=name,
-            )
-            builder_info.create_builder()
+            builder_info = self.prepare_buildx_builders(local=True)
         else:
-            builder_info = self.prepare_remote_buildx_builders(in_ec2=False)
+            builder_info = self.prepare_buildx_builders(local=False)
 
         self.oci_layout.parent.mkdir(parents=True, exist_ok=True)
 
@@ -889,39 +763,39 @@ class BuilderStep():
             cache_policy=cache_policy,
         )
 
-    def prepare_remote_buildx_builders(
+    def prepare_buildx_builders(
         self,
-        in_ec2: bool = False
+        local: bool,
     ):
-
         global _existing_builders
 
-        if in_ec2:
-            suffix = "ec2"
-        else:
-            suffix = "docker"
+        # if in_ec2:
+        #     suffix = "ec2"
+        # else:
+        #     suffix = "docker"
 
-        builder_name = f"{BUILDER_NAME}_{self.platform.value}_{suffix}"
+        builder_name_suffix = "local" if local else "remote"
+        builder_name = f"{BUILDER_NAME}_{self.platform.value}_{builder_name_suffix}"
 
         info = _existing_builders.get(builder_name)
 
         if info:
             return info
 
-        if in_ec2:
-            info = EC2BackedRemoteBuildxBuilderWrapper(
-                name=builder_name,
-                architecture=self.platform
+        if local:
+            info = LocalBuildxBuilderWrapper(
+                name=builder_name
             )
-            # info = DockerBackedBuildxBuilderWrapper(
-            #     name=builder_name,
-            #     architecture=self.platform
-            # )
         else:
-            info = DockerBackedBuildxBuilderWrapper(
-                name=builder_name,
-                architecture=self.platform
-            )
+            if REMOTE_BUILDX_BUILDER_TYPE == "docker":
+
+                info = DockerBackedBuildxBuilderWrapper(
+                    name=builder_name,
+                )
+            else:
+                info = EC2BackedRemoteBuildxBuilderWrapper(
+                    name=builder_name,
+                )
 
         info.create_builder()
 

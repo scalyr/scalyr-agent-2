@@ -140,9 +140,6 @@ def docker_build_or_stop_on_cache_miss(
     return is_missed_cache
 
 
-#_existing_builders: Dict[CpuArch, Dict[str, RemoteBuildxBuilderWrapper]] = collections.defaultdict(dict)
-_existing_builders: Dict[str, RemoteBuildxBuilderWrapper] = {}
-
 _IN_DOCKER_SOURCE_ROOT = pl.Path("/tmp/source")
 
 _DOCKERFILE_CONTENT_TEMPLATE = f"""
