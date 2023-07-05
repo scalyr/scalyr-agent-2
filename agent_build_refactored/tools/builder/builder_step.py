@@ -614,7 +614,7 @@ class BuilderStep():
                 cache_policy=dependencies_cache_policy,
             )
 
-        use_only_cache = cache_policy in [CachePolicy.USE_ONLY_CACHE, CachePolicy.USE_ONLY_CACHE_FOR_DEPENDENCIES]
+        use_only_cache = cache_policy == CachePolicy.USE_ONLY_CACHE
 
 
         machine_name = platform.machine()
