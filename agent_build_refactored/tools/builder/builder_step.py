@@ -721,9 +721,12 @@ COPY --from
                 "--builder",
                 builder_info.name,
             ],
+            stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
+
+        process.stdin.write(dockerfile_content.encode())
 
         stderr_buffer = io.BytesIO()
         while True:
