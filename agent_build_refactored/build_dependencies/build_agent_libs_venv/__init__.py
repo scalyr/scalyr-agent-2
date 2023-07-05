@@ -19,10 +19,15 @@ class BuildAgentLibsVenvStep(BuilderStep):
         self.prepare_build_base_with_python_step = prepare_build_base_with_python_step
         self.build_python_step = prepare_build_base_with_python_step.build_python_step
         self.build_dev_requirements_step = prepare_build_base_with_python_step.build_dev_requirements_step
+
+        self.architecture = self.prepare_build_base_with_python_step.architecture
+        self.libc = self.prepare_build_base_with_python_step.libc
+
         super(BuildAgentLibsVenvStep, self).__init__(
             name=_PARENT_DIR.name,
             context=_PARENT_DIR,
             dockerfile=_PARENT_DIR / "Dockerfile",
+            platform=self.architecture,
             build_contexts=[
                 self.prepare_build_base_with_python_step,
                 self.build_dev_requirements_step,

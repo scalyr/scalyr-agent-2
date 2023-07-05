@@ -30,19 +30,19 @@ class BuilderPythonStep(BuilderStep):
         self,
         download_sources_step: DownloadSourcesStep,
         prepare_build_base_step: PrepareBuildBaseStep,
+        build_python_dependencies: BuildPytonDependenciesStep,
         openssl_version: str,
         install_prefix: pl.Path,
         dependencies_install_prefix: pl.Path,
-        architecture: CpuArch,
-        libc: LibC,
     ):
         self.download_sources_step = download_sources_step
-        self.architecture = architecture
-        self.libc = libc
+        self.prepare_build_base_step = prepare_build_base_step
+        self.build_python_dependencies = build_python_dependencies
         self.openssl_version = openssl_version
         self.install_prefix = install_prefix
         self.dependencies_install_prefix = dependencies_install_prefix
-        self.prepare_build_base_step = prepare_build_base_step
+        self.architecture = self.prepare_build_base_step.architecture
+        self.libc = self.prepare_build_base_step.libc
 
         # self.build_xz_step = BuildXZStep(
         #     download_source_step=self.download_sources_step,
@@ -111,20 +111,13 @@ class BuilderPythonStep(BuilderStep):
         #     libc=self.libc,
         # )
 
-        self.build_python_dependencies = BuildPytonDependenciesStep(
-            download_sources_step=self.download_sources_step,
-            prepare_build_base=self.prepare_build_base_step,
-            install_prefix=dependencies_install_prefix,
-            architecture=architecture,
-            libc=libc,
-        )
-
         openssl_major_version = openssl_version.strip(".")[0]
 
         super(BuilderPythonStep, self).__init__(
             name=_PARENT_DIR.name,
             context=_PARENT_DIR,
             dockerfile=_PARENT_DIR / "Dockerfile",
+            platform=self.architecture,
             build_contexts=[
                 self.prepare_build_base_step,
                 self.download_sources_step,
@@ -143,9 +136,8 @@ class BuilderPythonStep(BuilderStep):
                 "INSTALL_PREFIX": str(self.install_prefix),
                 "OPENSSL_MAJOR_VERSION": openssl_major_version,
                 "COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX": COMMON_PYTHON_DEPENDENCY_INSTALL_PREFIX,
-                "ARCH": architecture.value,
-                "LIBC": libc,
+                "ARCH": self.architecture.value,
+                "LIBC": self.libc,
             },
-            platform=architecture,
             unique_name_suffix=f"_with_openssl_{openssl_major_version}"
         )

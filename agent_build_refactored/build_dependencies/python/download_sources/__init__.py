@@ -39,6 +39,7 @@ class DownloadSourcesStep(BuilderStep):
             name=_PARENT_DIR.name,
             context=_PARENT_DIR,
             dockerfile=_PARENT_DIR / "Dockerfile",
+            platform=CpuArch.x86_64,
             build_args={
                 "PYTHON_VERSION": python_version,
                 "BZIP_VERSION": bzip_version,
@@ -53,5 +54,4 @@ class DownloadSourcesStep(BuilderStep):
                 "XZ_VERSION": xz_version,
                 "ZLIB_VERSION": zlib_version,
             },
-            platform=CpuArch.x86_64,
         )

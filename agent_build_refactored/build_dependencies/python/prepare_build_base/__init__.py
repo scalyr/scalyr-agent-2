@@ -15,13 +15,15 @@ class PrepareBuildBaseStep(BuilderStep):
         libc: LibC,
     ):
 
+        self.architecture = architecture
+        self.libc = libc
         super(PrepareBuildBaseStep, self).__init__(
             name=_PARENT_DIR.name,
             context=_PARENT_DIR,
-            platform=architecture,
             dockerfile=_PARENT_DIR / "Dockerfile",
+            platform=architecture,
             build_args={
-                "ARCH": architecture.value,
-                "LIBC": libc.value,
+                "ARCH": self.architecture.value,
+                "LIBC": self.libc.value,
             }
         )

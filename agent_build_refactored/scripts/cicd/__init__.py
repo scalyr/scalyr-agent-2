@@ -40,7 +40,9 @@ def group_dependencies():
 
             if add_to_current:
                 current_group[dep_id] = dep
-                remaining_dependencies.pop(dep_id)
+
+        for dep_id in current_group.keys():
+            remaining_dependencies.pop(dep_id)
 
         result.append(current_group)
 

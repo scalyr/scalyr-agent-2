@@ -25,23 +25,27 @@ class BuildPytonDependenciesStep(BuilderStep):
         download_sources_step: DownloadSourcesStep,
         prepare_build_base: PrepareBuildBaseStep,
         install_prefix: pl.Path,
-        architecture: CpuArch,
-        libc: LibC,
+        #architecture: CpuArch,
+        #libc: LibC,
     ):
         self.download_sources_step = download_sources_step
         self.prepare_build_base = prepare_build_base
         self.install_prefix = install_prefix
+        self.architecture = self.prepare_build_base.architecture
+        self.libc = self.prepare_build_base.libc
+
         super(BuildPytonDependenciesStep, self).__init__(
             name="build_python_dependencies",
             context=_PARENT_DIR,
             dockerfile=_PARENT_DIR / "Dockerfile",
+            platform=self.architecture,
             build_contexts=[
                 self.download_sources_step,
                 self.prepare_build_base,
             ],
             build_args={
                 "INSTALL_PREFIX": str(install_prefix),
-                "ARCH": architecture.value,
-                "LIBC": libc.value,
+                "ARCH": self.architecture.value,
+                "LIBC": self.libc.value,
             },
         )

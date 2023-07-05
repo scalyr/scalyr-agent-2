@@ -198,11 +198,10 @@ AGENT_LIBS_REQUIREMENTS_CONTENT = (
     f"{REQUIREMENTS_COMMON}\n" f"{REQUIREMENTS_COMMON_PLATFORM_DEPENDENT}"
 )
 
-
-SUPPORTED_ARCHITECTURES = [
-    Architecture.X86_64,
-    Architecture.ARM64,
-]
+SUPPORTED_ARCHITECTURES = {
+    CpuArch.x86_64,
+    #CpuArch.AARCH64
+}
 
 
 def cpu_arch_as_fpm_arch(arch: CpuArch):
@@ -466,24 +465,28 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
             libc=self.libc
         )
 
+        self.build_python_dependencies = BuildPytonDependenciesStep.create(
+            download_sources_step=self.download_sources_step,
+            prepare_build_base=self.prepare_build_base_step,
+            install_prefix=PYTHON_DEPENDENCIES_INSTALL_PREFIX,
+        )
+
         self.build_python_step_with_openssl_3 = BuilderPythonStep.create(
             download_sources_step=self.download_sources_step,
             prepare_build_base_step=self.prepare_build_base_step,
+            build_python_dependencies = self.build_python_dependencies,
             openssl_version=OPENSSL_3_VERSION,
             install_prefix=PYTHON_INSTALL_PREFIX,
             dependencies_install_prefix=PYTHON_DEPENDENCIES_INSTALL_PREFIX,
-            architecture=self.architecture,
-            libc=self.libc,
         )
 
         self.build_python_step_with_openssl_1 = BuilderPythonStep.create(
             download_sources_step=self.download_sources_step,
             prepare_build_base_step=self.prepare_build_base_step,
+            build_python_dependencies=self.build_python_dependencies,
             openssl_version=OPENSSL_1_VERSION,
             install_prefix=PYTHON_INSTALL_PREFIX,
             dependencies_install_prefix=PYTHON_DEPENDENCIES_INSTALL_PREFIX,
-            architecture=self.architecture,
-            libc=self.libc,
         )
 
         #prepare_build_base_with_python = PREPARE_PYTHON_ENVIRONMENT_STEPS[self.libs][self.architecture]
@@ -812,7 +815,7 @@ for package_type in ["deb", "rpm"]:
     ALL_PACKAGE_BUILDERS[name] = _LinuxNonAIOPackagesBuilder
 
     for package_libc in [LibC.GNU]:
-        for package_arch in [CpuArch.x86_64, CpuArch.AARCH64]:
+        for package_arch in SUPPORTED_ARCHITECTURES:
             name = f"{package_type}-aio-{package_arch.value}"
 
             class _LinuxAIOPackagesBuilder(LinuxAIOPackagesBuilder):
