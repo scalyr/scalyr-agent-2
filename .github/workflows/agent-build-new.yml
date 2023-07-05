@@ -26,6 +26,7 @@ jobs:
     outputs:
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
       python_version: ${{ steps.define_constants.outputs.python_version }}
+      cache_version: ${{ steps.define_constants.outputs.cache_version }}
     steps:
       - id: skip_check
         uses: fkirc/skip-duplicate-actions@12aca0a884f6137d619d6a8a09fcc3406ced5281 # v4.0.0
