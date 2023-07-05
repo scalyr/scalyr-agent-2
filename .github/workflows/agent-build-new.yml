@@ -65,6 +65,7 @@ jobs:
 #          echo "${MATRICES}" >> "${GITHUB_OUTPUT}"
 
   build_cacheable_dependencies:
+    if: needs.build_linux_packages.outputs.cache_hit != 'true'
     needs:
       - prepare_dependencies_build
     uses: ./.github/workflows/reusable-build-cacheable-dependencies.yml
