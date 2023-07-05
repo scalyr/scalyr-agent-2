@@ -32,6 +32,9 @@ jobs:
           cancel_others: 'true'
           github_token: ${{ github.token }}
 
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
       - name: install python and requirements
         uses: ./.github/actions/install_python_and_requirements
         with:
