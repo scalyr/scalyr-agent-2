@@ -17,7 +17,6 @@ RUN echo -e "source /opt/rh/devtoolset-9/enable" >> /root/.bash_env
 ENV BASH_ENV="/root/.bash_env"
 
 FROM ubuntu:14.04 as base_armv7_gnu
-#FROM ubuntu:14.04 as base_aarch64_gnu
 ENV DEBIAN_FRONTEND="noninteractive"
 RUN apt-get update && apt-get install -y software-properties-common
 RUN add-apt-repository -y ppa:ubuntu-toolchain-r/test

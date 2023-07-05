@@ -650,8 +650,14 @@ COPY --from
             flags=re.MULTILINE
         )
 
-        dockerfile_content = f"{TEMPLATE}\n" \
-                             f"{dockerfile_content}"
+        dockerfile_content = re.sub(
+            r"(^FROM [^\n]+$)",
+            fr"{TEMPLATE}\n\1",
+            dockerfile_content,
+            count=1,
+            flags=re.MULTILINE
+        )
+
 
         if fail_on_cache_miss:
             nginc_container_name = "nginx"
