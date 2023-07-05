@@ -311,12 +311,13 @@ jobs:
           
           OUTPUT=$(python3 build_package_new_refactored.py ${{ matrix.builder_name }} --use-only-cache)
           
-          echo "$OUTPUT 55555555555"
+
           
           if [ "${OUTPUT}" = "cache_hit" ]; then
             echo "cache_hit=true" >> "$GITHUB_OUTPUT"
           fi
           
+          echo "$GITHUB_OUTPUT 55555555555"
 #          set -e
 #
 #          echo "EEEEE ${EXIT_CODE}"
