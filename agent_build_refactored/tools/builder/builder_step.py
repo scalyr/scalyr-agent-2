@@ -1,5 +1,6 @@
 import abc
 import dataclasses
+import enum
 import json
 import os
 import pathlib as pl
@@ -472,6 +473,12 @@ _BUILD_STEPS_OUTPUT_OUTPUT_DIR = AGENT_BUILD_OUTPUT_PATH / "output"
 ALL_BUILDER_STEPS: Dict[str, 'BuilderStep'] = {}
 
 
+class CachePolicy(enum.Enum):
+    USE_ONLY_CACHE = "use_only_cache"
+    USE_ONLY_CACHE_FOR_DEPENDENCIES = "use_only_cache_for_dependencies"
+    BUILD_ON_CACHE_MISS = "build_cache_miss"
+
+
 class BuilderStep():
     def __init__(
         self,
@@ -530,7 +537,7 @@ class BuilderStep():
 
     def get_build_command_args(
             self,
-            use_only_cache: bool
+            cache_policy: CachePolicy,
     ):
         cmd_args = [
             "docker",
@@ -556,7 +563,7 @@ class BuilderStep():
                 cache_from_value,
             ])
 
-            if not use_only_cache:
+            if cache_policy != CachePolicy.USE_ONLY_CACHE:
                 cmd_args.extend([
                     "--cache-to",
                     cache_to_value
@@ -587,15 +594,22 @@ class BuilderStep():
 
         return cmd_args
 
-    def run(self,
-            output: str = None,
-            tags: List[str] = None,
-            use_only_cache: bool = False,
-            ):
+    def run(
+        self,
+        output: str = None,
+        tags: List[str] = None,
+        cache_policy: CachePolicy = CachePolicy.BUILD_ON_CACHE_MISS,
+    ):
+
+        if cache_policy == CachePolicy.USE_ONLY_CACHE_FOR_DEPENDENCIES:
+            dependencies_cache_policy = CachePolicy.USE_ONLY_CACHE
+        else:
+            dependencies_cache_policy = cache_policy
+
 
         for step in self.build_contexts:
             step.run_and_output_in_oci_tarball(
-                use_only_cache=use_only_cache,
+                cache_policy=dependencies_cache_policy,
             )
 
         machine_name = platform.machine()
@@ -612,7 +626,7 @@ class BuilderStep():
         #     return
 
         cmd_args = self.get_build_command_args(
-            use_only_cache=use_only_cache
+            cache_policy=cache_policy,
         )
 
         if output:
@@ -669,7 +683,7 @@ COPY --from
             check=True
         )
 
-        if use_only_cache:
+        if cache_policy == CachePolicy.USE_ONLY_CACHE:
             subprocess.run(
                 [
                     "docker",
@@ -713,19 +727,17 @@ COPY --from
             full_no_cache_error_message = "Can not continue. This build is supposed to be rebuilt from cache"
             build_process_stderr = e.stderr.decode()
             print(build_process_stderr, file=sys.stderr)
-            if use_only_cache and full_no_cache_error_message in build_process_stderr:
+            if cache_policy.USE_ONLY_CACHE and full_no_cache_error_message in build_process_stderr:
                 raise BuilderCacheMissError(f"Can not find cache for '{self.name}' with flag 'fail_on_cache_miss' set.")
             raise
 
-        if not use_only_cache:
+        if cache_policy != CachePolicy.USE_ONLY_CACHE:
             print(result.stderr.decode(errors="replace"), file=sys.stderr)
 
 
     def run_and_output_in_oci_tarball(
             self,
-            #tarball_path: pl.Path = None,
-            use_only_cache: bool = False,
-            #no_cleanup: bool = False,
+            cache_policy: CachePolicy = CachePolicy.BUILD_ON_CACHE_MISS,
     ):
         # if not no_cleanup:
         #     _cleanup_output_dirs()
@@ -741,7 +753,7 @@ COPY --from
 
         self.run(
             output=f"type=oci,dest={self.oci_layout_tarball}",
-            use_only_cache=use_only_cache,
+            cache_policy=cache_policy,
         )
 
         with tarfile.open(self.oci_layout_tarball) as tar:
@@ -755,8 +767,7 @@ COPY --from
     def run_and_output_in_local_directory(
             self,
             output_dir: pl.Path = None,
-            use_only_cache:bool = False,
-            #no_cleanup: bool = False,
+            cache_policy: CachePolicy = CachePolicy.BUILD_ON_CACHE_MISS,
 
     ):
         # if not no_cleanup:
@@ -768,7 +779,7 @@ COPY --from
 
             self.run(
                 output=f"type=local,dest={self.output_dir}",
-                use_only_cache=use_only_cache,
+                cache_policy=cache_policy,
             )
             self.local_output_ready = True
 
@@ -784,15 +795,14 @@ COPY --from
     def run_and_output_in_docker(
             self,
             tags: List[str] = None,
-            use_only_cache: bool = False,
-            #no_cleanup: bool = False,
+            cache_policy: CachePolicy = CachePolicy.BUILD_ON_CACHE_MISS,
     ):
         if tags is None:
             tags = [self.name]
 
         self.run(
             output=f"type=docker", tags=tags,
-            use_only_cache=use_only_cache,
+            cache_policy=cache_policy,
         )
 
     def prepare_remote_buildx_builders(
