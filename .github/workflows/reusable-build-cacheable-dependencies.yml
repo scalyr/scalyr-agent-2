@@ -73,10 +73,11 @@ jobs:
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_0) }}
     steps:
-      - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Build dependency
+      - run: |
+          echo "${{ needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_0 }}
+
         uses: ./.github/actions/build_cacheable_dependency
         with:
           dependency_id: ${{ matrix.id }}
