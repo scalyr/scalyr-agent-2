@@ -65,7 +65,7 @@ from agent_build_refactored.build_dependencies.versions import PYTHON_VERSION
 from agent_build_refactored.build_dependencies.ubuntu_toolset import ToolsetStep
 
 from agent_build_refactored.build_dependencies.build_agent_libs_venv import BuildAgentLibsVenvStep
-from agent_build_refactored.build_dependencies.python.build_python_dependencies import BuildPytonDependenciesStep, DownloadSourcesStep
+from agent_build_refactored.build_dependencies.python.build_python_dependencies import BuildPytonDependenciesStep, DownloadSourcesStep, PrepareBuildBaseStep
 from agent_build_refactored.build_dependencies.python.build_python import BuilderPythonStep
 from agent_build_refactored.tools import check_call_with_log
 from agent_build_refactored.prepare_agent_filesystem import (
@@ -442,7 +442,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
     def __init__(self):
 
         self.architecture = self.__class__.ARCHITECTURE
-        self.libs = self.__class__.LIBC
+        self.libc = self.__class__.LIBC
 
         self.ubuntu_toolset = ToolsetStep.create()
 
@@ -461,22 +461,29 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
             zlib_version="1.2.13",
         )
 
+        self.prepare_build_base_step = PrepareBuildBaseStep.create(
+            architecture=self.architecture,
+            libc=self.libc
+        )
+
         self.build_python_step_with_openssl_3 = BuilderPythonStep.create(
             download_sources_step=self.download_sources_step,
+            prepare_build_base_step=self.prepare_build_base_step,
             openssl_version=OPENSSL_3_VERSION,
             install_prefix=PYTHON_INSTALL_PREFIX,
             dependencies_install_prefix=PYTHON_DEPENDENCIES_INSTALL_PREFIX,
             architecture=self.architecture,
-            libc=self.libs,
+            libc=self.libc,
         )
 
         self.build_python_step_with_openssl_1 = BuilderPythonStep.create(
             download_sources_step=self.download_sources_step,
+            prepare_build_base_step=self.prepare_build_base_step,
             openssl_version=OPENSSL_1_VERSION,
             install_prefix=PYTHON_INSTALL_PREFIX,
             dependencies_install_prefix=PYTHON_DEPENDENCIES_INSTALL_PREFIX,
             architecture=self.architecture,
-            libc=self.libs,
+            libc=self.libc,
         )
 
         #prepare_build_base_with_python = PREPARE_PYTHON_ENVIRONMENT_STEPS[self.libs][self.architecture]
@@ -490,6 +497,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         super(LinuxAIOPackagesBuilder, self).__init__(
             dependencies=[
                 self.build_python_step_with_openssl_3,
+                self.build_python_step_with_openssl_1,
                 self.prepare_build_base_with_python,
                 self.build_agent_libs_venv_step,
             ]

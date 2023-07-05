@@ -29,6 +29,7 @@ class BuilderPythonStep(BuilderStep):
     def __init__(
         self,
         download_sources_step: DownloadSourcesStep,
+        prepare_build_base_step: PrepareBuildBaseStep,
         openssl_version: str,
         install_prefix: pl.Path,
         dependencies_install_prefix: pl.Path,
@@ -41,10 +42,7 @@ class BuilderPythonStep(BuilderStep):
         self.openssl_version = openssl_version
         self.install_prefix = install_prefix
         self.dependencies_install_prefix = dependencies_install_prefix
-        self.prepare_build_base_step = PrepareBuildBaseStep(
-            architecture=architecture,
-            libc=libc
-        )
+        self.prepare_build_base_step = prepare_build_base_step
 
         # self.build_xz_step = BuildXZStep(
         #     download_source_step=self.download_sources_step,
