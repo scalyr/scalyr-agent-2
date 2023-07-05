@@ -10,10 +10,12 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import logging
 from typing import List, Any, Union, Dict
 
 from agent_build_refactored.tools.constants import CpuArch, AGENT_BUILD_OUTPUT_PATH
 
+logger = logging.getLogger(__name__)
 
 @dataclasses.dataclass
 class BuildxBuilderWrapper:
@@ -537,7 +539,7 @@ class BuilderStep():
 
     def get_build_command_args(
             self,
-            cache_policy: CachePolicy,
+            use_only_cache: bool
     ):
         cmd_args = [
             "docker",
@@ -563,7 +565,7 @@ class BuilderStep():
                 cache_from_value,
             ])
 
-            if cache_policy != CachePolicy.USE_ONLY_CACHE:
+            if not use_only_cache:
                 cmd_args.extend([
                     "--cache-to",
                     cache_to_value
@@ -612,6 +614,9 @@ class BuilderStep():
                 cache_policy=dependencies_cache_policy,
             )
 
+        use_only_cache = cache_policy in [CachePolicy.USE_ONLY_CACHE, CachePolicy.USE_ONLY_CACHE_FOR_DEPENDENCIES]
+
+
         machine_name = platform.machine()
         if machine_name.lower() in ["x86_64"]:
             current_machine_arch = CpuArch.x86_64
@@ -626,7 +631,7 @@ class BuilderStep():
         #     return
 
         cmd_args = self.get_build_command_args(
-            cache_policy=cache_policy,
+            use_only_cache=use_only_cache,
         )
 
         if output:
@@ -731,8 +736,11 @@ COPY --from
                 raise BuilderCacheMissError(f"Can not find cache for '{self.name}' with flag 'fail_on_cache_miss' set.")
             raise
 
-        if cache_policy != CachePolicy.USE_ONLY_CACHE:
+        if use_only_cache:
+            logger.info(f"Dependency '{self.id}' is successfully restored from cache.")
+        else:
             print(result.stderr.decode(errors="replace"), file=sys.stderr)
+            logger.info(f"Dependency '{self.id}' is successfully built.")
 
 
     def run_and_output_in_oci_tarball(
