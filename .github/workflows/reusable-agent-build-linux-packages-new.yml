@@ -261,7 +261,7 @@ jobs:
 #          retention-days: 1
 
   build_packages:
-    name: Build package ${{ matrix.name }}
+    name: Build package ${{ matrix.builder_name }}
     runs-on: ubuntu-22.04
     outputs:
       cache_hit: ${{ steps.build.outputs.cache_hit }}
@@ -303,14 +303,14 @@ jobs:
       - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
         uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
 
-      - name: Build managed package with builder '${{ matrix.name }}'
+      - name: Build package
         shell: bash
         id: build
         env:
             USE_GHA_CACHE: "1"
         run: |
           
-          OUTPUT="$(python3 build_package_new_refactored.py ${{ matrix.builder_name }} --use-only-cache)1111"
+          OUTPUT="$(python3 build_package_new_refactored.py ${{ matrix.builder_name }} --use-only-cache | tr -d '\n')"
           
           echo "${OUTPUT}"
           
