@@ -25,12 +25,17 @@ jobs:
       contents: read
     outputs:
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
+      python_version: ${{ steps.define_constants.outputs.python_version }}
     steps:
       - id: skip_check
         uses: fkirc/skip-duplicate-actions@12aca0a884f6137d619d6a8a09fcc3406ced5281 # v4.0.0
         with:
           cancel_others: 'true'
           github_token: ${{ github.token }}
+
+      - id: define_constants
+        run: |
+          echo "python_version=3.8" >> "${GITHUB_OUTPUT}"
 
   build_linux_packages:
     name: "Build Linux packages"
@@ -39,7 +44,7 @@ jobs:
     uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
     with:
       fail_on_cache_miss: true
-      python_version: ${{ inputs.python_version }}
+      python_version: ${{ needs.pre_job.outputs.python_version }}
 
 #  prepare_dependencies_build:
 #    name: Prepare dependencies build
@@ -67,11 +72,10 @@ jobs:
 
   build_cacheable_dependencies:
     if: needs.build_linux_packages.outputs.cache_hit != 'true'
-    needs:
-      - build_linux_packages
+    needs: [pre_job, build_linux_packages]
     uses: ./.github/workflows/reusable-build-cacheable-dependencies.yml
     with:
-      python_version: ${{ inputs.python_version }}
+      python_version: ${{ needs.pre_job.outputs.python_version }}
     
 
 #  test:
