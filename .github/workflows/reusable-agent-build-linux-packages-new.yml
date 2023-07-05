@@ -312,35 +312,11 @@ jobs:
           
           OUTPUT="$(python3 build_package_new_refactored.py ${{ matrix.builder_name }} --use-only-cache | tr -d '\n')"
           
-          echo "${OUTPUT}"
-          
           if [ "${OUTPUT}" = "cache_hit" ]; then
             echo "cache_hit=true" >> "$GITHUB_OUTPUT"
           else
             echo "Expected output of the build command has to be 'cache_hit' but it is '${OUTPUT}'"
           fi
-          cat "$GITHUB_OUTPUT"
-
-#          set -e
-#
-#          echo "EEEEE ${EXIT_CODE}"
-#          case $EXIT_CODE in
-#            0)
-#              echo "cache_found=false" >> "$GITHUB_OUTPUT"
-#              ;;
-#
-#            400)
-#              echo "cache_found=true" >> "$GITHUB_OUTPUT"
-#              exit 400
-#              ;;
-#            *)
-#              exit 1
-#              ;;
-#          esac
-
-#          if [ "${EXIT_CODE}" = "400"]; then
-#            echo "CACHE_IS_MISSING=true" >> "$GITHUB_OUTPUT"
-#          fi
 
       - name: Save packages as artifact
         if: steps.build_with_cache.outputs.cache_hit == 'true'

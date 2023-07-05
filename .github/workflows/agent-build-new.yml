@@ -37,8 +37,8 @@ jobs:
         run: |
           echo "python_version=3.8" >> "${GITHUB_OUTPUT}"
 
-  build_linux_packages:
-    name: "Build Linux packages"
+  build_linux_packages_cached:
+    name: "Build cached Linux packages"
     needs:
       - pre_job
     uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
@@ -46,15 +46,15 @@ jobs:
       python_version: ${{ needs.pre_job.outputs.python_version }}
 
 
-  ggg:
-    name: GGGGG
-    runs-on: ubuntu-latest
-    needs: [pre_job, build_linux_packages]
-    steps:
-
-      - id: define_constants
-        run: |
-          echo "${{ needs.build_linux_packages.outputs.cache_hit }}"
+#  ggg:
+#    name: GGGGG
+#    runs-on: ubuntu-latest
+#    needs: [pre_job, build_linux_packages]
+#    steps:
+#
+#      - id: define_constants
+#        run: |
+#          echo "${{ needs.build_linux_packages.outputs.cache_hit }}"
   
 
   #  prepare_dependencies_build:
@@ -81,12 +81,22 @@ jobs:
 #          echo "${MATRICES}"
 #          echo "${MATRICES}" >> "${GITHUB_OUTPUT}"
 
-#  build_cacheable_dependencies:
-#    needs: [pre_job, build_linux_packages]
-#    if: needs.build_linux_packages.outputs.cache_hit != 'true'
-#    uses: ./.github/workflows/reusable-build-cacheable-dependencies.yml
-#    with:
-#      python_version: ${{ needs.pre_job.outputs.python_version }}
+  build_cacheable_dependencies:
+    needs: [pre_job, build_linux_packages]
+    if: needs.build_linux_packages.outputs.cache_hit != 'true'
+    uses: ./.github/workflows/reusable-build-cacheable-dependencies.yml
+    with:
+      python_version: ${{ needs.pre_job.outputs.python_version }}
+
+
+  build_linux_packages:
+    name: "Build Linux packages"
+    needs:
+      - pre_job
+      - build_cacheable_dependencies
+    uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
+    with:
+      python_version: ${{ needs.pre_job.outputs.python_version }}
 #
 
 #  test:
