@@ -698,7 +698,7 @@ class BuilderStep():
 
         dockerfile_content = self.dockerfile_content
 
-        if self.needs_essential_dependencies:
+        if self.needs_essential_dependencies or self.cache:
             dockerfile_content = re.sub(
                 r"(^FROM [^\n]+$)",
                 r"\1\nCOPY --from=cache_check_dummy_files / /",
