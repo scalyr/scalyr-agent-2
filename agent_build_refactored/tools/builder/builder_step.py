@@ -661,6 +661,8 @@ class BuilderStep():
                 cache_policy=dependencies_cache_policy,
             )
 
+        logger.info(f"Build dependency: {self.id}")
+
         use_only_cache = cache_policy == CachePolicy.USE_ONLY_CACHE
 
 
