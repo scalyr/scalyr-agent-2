@@ -312,7 +312,7 @@ jobs:
         id: build
         env:
             USE_GHA_CACHE: "1"
-            CACHE_VERSION: ${{ inputs.cache_version }}
+            CACHE_VERSION: ${{ inputs.cache_version }}1234
         run: |
           
           OUTPUT="$(python3 build_package_new_refactored.py ${{ matrix.builder_name }} --use-only-cache | tr -d '\n')"
