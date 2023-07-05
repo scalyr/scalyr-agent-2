@@ -736,7 +736,7 @@ COPY --from
             if not line:
                 break
 
-            if use_only_cache:
+            if not use_only_cache:
                 sys.stderr.buffer.write(line)
 
             stderr_buffer.write(line)
@@ -746,7 +746,7 @@ COPY --from
             full_no_cache_error_message = b"Can not continue. This build is supposed to be rebuilt from cache"
             if use_only_cache and full_no_cache_error_message in stderr_buffer.getvalue():
                 logger.error(
-                    "This build has failed due to a cache miss, when it was expected to be fully resued from cache."
+                    "This build has failed due to a cache miss, when it is expected to be fully reused from cache."
                 )
                 raise BuilderCacheMissError(f"Can not find cache for '{self.name}' with flag 'fail_on_cache_miss' set.")
 
