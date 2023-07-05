@@ -21,7 +21,6 @@ runs:
     - name: Get cached venv
       id: cache_venv
       uses: actions/cache@v2
-      working-directory: ${{ github.workspace }}
       with:
         path: venv
         key: ${{ runner.os }}-requirements-venv-${{ hashFiles('dev-requirements-new.txt') }}
