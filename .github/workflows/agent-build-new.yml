@@ -47,7 +47,7 @@ jobs:
 
 
   ggg:
-    name: Skip Duplicate Jobs Pre Job
+    name: GGGGG
     runs-on: ubuntu-latest
     needs: [pre_job, build_linux_packages]
     steps:
