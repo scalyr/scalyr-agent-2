@@ -310,7 +310,7 @@ jobs:
             USE_GHA_CACHE: "1"
         run: |
           
-          OUTPUT=$(python3 build_package_new_refactored.py ${{ matrix.builder_name }} --use-only-cache)
+          OUTPUT="$(python3 build_package_new_refactored.py ${{ matrix.builder_name }} --use-only-cache)1111"
           
           echo "${OUTPUT}"
           
