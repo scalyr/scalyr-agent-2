@@ -715,25 +715,36 @@ class BuilderStep():
             )
 
             nginc_container_name = "nginx"
-            subprocess.run(
-                ["docker", "rm", "-f", nginc_container_name],
-                check=True
-            )
+            try:
+                subprocess.run(
+                    ["docker", "rm", "-f", nginc_container_name],
+                    check=True,
+                    capture_output=True,
+                )
+            except subprocess.CalledProcessError as e:
+                logger.exception(f"Container force remove has failed. Stderr: {e.stderr.decode()}")
+                raise
+
 
             if use_only_cache:
-                subprocess.run(
-                    [
-                        "docker",
-                        "run",
-                        "-d",
-                        "--name",
-                        nginc_container_name,
-                        "-p",
-                        "8080:80",
-                        "nginx"
-                    ],
-                    check=True
-                )
+                try:
+                    subprocess.run(
+                        [
+                            "docker",
+                            "run",
+                            "-d",
+                            "--name",
+                            nginc_container_name,
+                            "-p",
+                            "8080:80",
+                            "nginx"
+                        ],
+                        check=True,
+                        capture_output=True,
+                    )
+                except subprocess.SubprocessError as e:
+                    logger.exception(f"Container creation has failed. Stderr: {e.stderr.decode()}")
+                    raise
 
         local = True
 
