@@ -14,7 +14,7 @@ from typing import Dict, List, Union, Type
 
 from agent_build_refactored.tools.builder.builder_step import BuilderStep
 from agent_build_refactored.tools.builder.builder_step import \
-    RemoteBuildxBuilderWrapper, BuilderCacheMissError, BuilderStep
+    RemoteBuildxBuilderWrapper, BuilderCacheMissError, BuilderStep, CachePolicy
 
 from agent_build_refactored.tools.constants import SOURCE_ROOT, AGENT_BUILD_OUTPUT_PATH
 
@@ -436,7 +436,7 @@ class Builder(metaclass=BuilderMeta):
         reuse_existing_dependencies_outputs = self.get_builder_arg_value(
             self.REUSE_EXISTING_DEPENDENCIES_OUTPUTS
         )
-        fail_on_cache_miss = self.get_builder_arg_value(
+        use_only_cache = self.get_builder_arg_value(
             self.USE_ONLY_CACHE
         )
 
@@ -466,9 +466,14 @@ class Builder(metaclass=BuilderMeta):
             docker_step = self.get_docker_step(
                 run_args=kwargs,
             )
+
+            if use_only_cache:
+                cache_policy = CachePolicy.USE_ONLY_CACHE
+            else:
+                cache_policy = CachePolicy.BUILD_ON_CACHE_MISS
+
             docker_step.run_and_output_in_local_directory(
-                #no_cleanup=no_cleanup,
-                use_only_cache=fail_on_cache_miss,
+                cache_policy=cache_policy
             )
             shutil.copytree(
                 docker_step.output_dir / "work_dir",
