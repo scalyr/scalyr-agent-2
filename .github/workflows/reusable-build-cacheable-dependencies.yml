@@ -58,7 +58,7 @@ jobs:
           echo "${MATRICES}" >> "${GITHUB_OUTPUT}"
 
   group_0:
-    name: ${{ matrix.id }} }}
+    name: ${{ matrix.id }}
     runs-on: ubuntu-latest
     needs: [prepare_before_build]
     strategy:
@@ -74,7 +74,7 @@ jobs:
           python_version: ${{ inputs.python_version }}
 
   group_1:
-    name: ${{ matrix.id }} }}
+    name: ${{ matrix.id }}
     runs-on: ubuntu-latest
     needs: [ prepare_before_build, group_0]
     strategy:
@@ -90,7 +90,7 @@ jobs:
           python_version: ${{ inputs.python_version }}
 
   group_2:
-    name: ${{ matrix.id }} }}
+    name: ${{ matrix.id }}
     runs-on: ubuntu-latest
     needs: [ prepare_before_build, group_1]
     strategy:
@@ -106,7 +106,7 @@ jobs:
           python_version: ${{ inputs.python_version }}
 
   group_3:
-    name: ${{ matrix.id }} }}
+    name: ${{ matrix.id }}
     runs-on: ubuntu-latest
     needs: [ prepare_before_build, group_2]
     strategy:
@@ -122,7 +122,7 @@ jobs:
           python_version: ${{ inputs.python_version }}
 
   group_4:
-    name: ${{ matrix.id }} }}
+    name: ${{ matrix.id }}
     runs-on: ubuntu-latest
     needs: [ prepare_before_build, group_3]
     strategy:
@@ -138,7 +138,7 @@ jobs:
           python_version: ${{ inputs.python_version }}
 
   group_5:
-    name: ${{ matrix.id }} }}
+    name: ${{ matrix.id }}
     runs-on: ubuntu-latest
     needs: [ prepare_before_build, group_4]
     strategy:
@@ -154,9 +154,10 @@ jobs:
           python_version: ${{ inputs.python_version }}
 
   group_6:
-    name: ${{ matrix.id }} }}
+    name: ${{ matrix.id }}
     runs-on: ubuntu-latest
     needs: [ prepare_before_build, group_5 ]
+    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_6 != "{}"
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_6) }}
     steps:
