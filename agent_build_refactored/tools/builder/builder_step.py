@@ -595,18 +595,17 @@ class BuilderStep():
         ]
 
         if self.cache:
+
+            raise Exception(CACHE_VERSION)
+            cache_name = f"{self.id}"
+            if CACHE_VERSION:
+                cache_name = f"{cache_name}_{CACHE_VERSION}"
+
             if USE_GHA_CACHE:
-                scope = f"{self.id}"
-                if CACHE_VERSION:
-                    scope = f"{scope}_{CACHE_VERSION}"
 
-                cache_from_value = f"type=gha,scope={scope}"
-                cache_to_value = f"type=gha,scope={scope}"
+                cache_from_value = f"type=gha,scope={cache_name}"
+                cache_to_value = f"type=gha,scope={cache_name}"
             else:
-                cache_name = f"{self.id}"
-                if CACHE_VERSION:
-                    cache_name = f"{cache_name}_{CACHE_VERSION}"
-
                 cache_path = AGENT_BUILD_OUTPUT_PATH / "cache" / cache_name
                 cache_from_value = f"type=local,src={cache_path}"
                 cache_to_value = f"type=local,dest={cache_path}"
