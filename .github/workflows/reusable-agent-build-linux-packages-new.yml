@@ -317,6 +317,8 @@ jobs:
           else
             echo "Expected output of the build command has to be 'cache_hit' but it is '${OUTPUT}'"
           fi
+          
+          cat "${$GITHUB_OUTPUT}"
 
       - name: Save packages as artifact
         if: steps.build_with_cache.outputs.cache_hit == 'true'
