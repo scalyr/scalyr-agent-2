@@ -1,7 +1,7 @@
-#name: Build all cacheable dependencies
-#
-#on:
-#  workflow_call:
+name: Build all cacheable dependencies
+
+on:
+  workflow_call:
 #    secrets:
 #      CT_AWS_DEV_EC2_PRIVATE_KEY:
 #        required: true
@@ -13,14 +13,28 @@
 #        required: true
 #      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ:
 #        required: true
-#
-#env:
-#  DOCKER_BUILDKIT: 1
-#
-#
-#jobs:
-#  pre_job:
-#    name: Get All Job Matrices
-#      id: get_all_gob_matrices
-#      run: |
-#        python3
+
+env:
+  DOCKER_BUILDKIT: 1
+
+
+jobs:
+  prepare_before_build:
+    name: Prepare before dependencies build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: install python and requirements
+        uses: ./.github/actions/install_python_and_requirements
+        with:
+          python_version: 3.8
+
+      - name: Get dependency matrices
+        id: get_dependency_matrices
+        run: |
+          MATRICES=$(python3 agent_build_refactored/scripts/cicd/create_cacheable_steps_matrix.py)
+          echo "Matrices:"
+          echo "${MATRICES}"
+          echo "${MATRICES}" >> "${GITHUB_OUTPUT}"

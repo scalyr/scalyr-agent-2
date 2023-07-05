@@ -32,17 +32,10 @@ jobs:
           cancel_others: 'true'
           github_token: ${{ github.token }}
 
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: install python and requirements
-        uses: ./.github/actions/install_python_and_requirements
-        with:
-          python_version: 3.8
-
   build_linux_packages:
     name: "Build Linux packages"
-    needs: pre_job
+    needs:
+      - pre_job
     uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
     with:
       fail_on_cache_miss: true
@@ -70,6 +63,12 @@ jobs:
           echo "Matrices:"
           echo "${MATRICES}"
           echo "${MATRICES}" >> "${GITHUB_OUTPUT}"
+
+  build_cacheable_dependencies:
+    name: "Build cacheable dependencies"
+    needs:
+      - prepare_dependencies_build
+    uses: ./.github/workflows/reusable-build-cacheable-dependencies.yml
     
 
 #  test:
