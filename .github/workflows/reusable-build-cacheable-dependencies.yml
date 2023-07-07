@@ -10,20 +10,33 @@ on:
       cache_version:
         description: Version suffix for the cache key. May be useful when it is needed to invalidate the cache.
         type: string
-#    secrets:
-#      CT_AWS_DEV_EC2_PRIVATE_KEY:
-#        required: true
-#      CT_AWS_DEV_EC2_ACCESS_KEY:
-#        required: true
-#      CT_AWS_DEV_EC2_SECRET_KEY:
-#        required: true
-#      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE:
-#        required: true
-#      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ:
-#        required: true
+
+
+    secrets:
+      CT_AWS_DEV_EC2_PRIVATE_KEY_NAME:
+        required: true
+      CT_AWS_DEV_EC2_PRIVATE_KEY:
+        required: true
+      CT_AWS_DEV_EC2_ACCESS_KEY:
+        required: true
+      CT_AWS_DEV_EC2_SECRET_KEY:
+        required: true
+      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE:
+        required: true
+      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ:
+        required: true
+
+
 
 env:
-  DOCKER_BUILDKIT: 1
+  AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
+  AWS_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
+  AWS_PRIVATE_KEY_NAME: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY_NAME }}
+  AWS_DEV_EC2_PRIVATE_KEY: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
+  AWS_REGION: ${{ needs.pre_job.outputs.aws_region }}
+  AWS_SECURITY_GROUP: ${{ needs.pre_job.outputs.aws_security_group }}
+  AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ needs.pre_job.outputs.aws_prefix_list_id }}
+  AWS_OBJECTS_NAME_PREFIX: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
 
 
 
