@@ -356,7 +356,7 @@ class CachePolicy(enum.Enum):
 
 
 class CacheMissPolicy(enum.Enum):
-    FALLBACK_TO_REMOTE_BUILDX_BUILDER = "fallback_to_remot_buildx_buildere"
+    #FALLBACK_TO_REMOTE_BUILDX_BUILDER = "fallback_to_remot_buildx_buildere"
     CONTINUE = "continue"
     FAIL = "fail"
 
