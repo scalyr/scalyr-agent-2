@@ -355,6 +355,13 @@ class CachePolicy(enum.Enum):
     BUILD_ON_CACHE_MISS = "build_cache_miss"
 
 
+class CacheMissPolicy(enum.Enum):
+    FALLBACK_TO_REMOTE_BUILDX_BUILDER = "fallback_to_remot_buildx_buildere"
+    CONTINUE = "continue"
+    FAIL = "fail"
+
+
+
 # TEMPLATE  = """
 # FROM ubuntu:22.04 as cache_check
 # RUN apt update && apt install -y curl dnsutils
@@ -530,23 +537,23 @@ class BuilderStep():
         self,
         output: str = None,
         tags: List[str] = None,
-        cache_policy: CachePolicy = CachePolicy.BUILD_ON_CACHE_MISS,
+        on_cache_miss: CacheMissPolicy = CacheMissPolicy.CONTINUE,
+        on_children_cache_miss: CacheMissPolicy = CacheMissPolicy.CONTINUE,
+        enable_output: bool = True,
+        enable_children_output: bool = True
     ):
-
-        if cache_policy == CachePolicy.USE_ONLY_CACHE_FOR_DEPENDENCIES:
-            dependencies_cache_policy = CachePolicy.USE_ONLY_CACHE
-        else:
-            dependencies_cache_policy = cache_policy
-
 
         for step in self.build_contexts:
             step.run_and_output_in_oci_tarball(
-                cache_policy=dependencies_cache_policy,
+                on_cache_miss=on_children_cache_miss,
+                on_children_cache_miss=on_children_cache_miss,
+                enable_output=enable_children_output,
+                enable_children_output=enable_children_output,
             )
 
         logger.info(f"Build dependency: {self.id}")
 
-        use_only_cache = cache_policy == CachePolicy.USE_ONLY_CACHE
+        use_only_cache = on_cache_miss != CacheMissPolicy.CONTINUE
 
         cmd_args = self.get_build_command_args(
             use_only_cache=use_only_cache,
@@ -594,7 +601,6 @@ class BuilderStep():
                 logger.exception(f"Container force remove has failed. Stderr: {e.stderr.decode()}")
                 raise
 
-
             if use_only_cache:
                 try:
                     subprocess.run(
@@ -630,7 +636,7 @@ class BuilderStep():
         builder_info = None
         if self.platform != current_machine_arch:
             if self.run_in_remote_builder_if_possible:
-                builder_info = self.prepare_buildx_builders(local=False)
+                builder_info = self.prepare_buildx_builders(local=True)
 
         if builder_info is None:
             builder_info = self.prepare_buildx_builders(local=True)
@@ -659,18 +665,18 @@ class BuilderStep():
             if not line:
                 break
 
-            if not use_only_cache:
+            if enable_output:
                 sys.stderr.buffer.write(line)
 
             stderr_buffer.write(line)
 
         process.wait()
 
-
         if process.returncode != 0:
-            sys.stderr.buffer.write(stderr_buffer.getvalue())
+            if not enable_output:
+                sys.stderr.buffer.write(stderr_buffer.getvalue())
             full_no_cache_error_message = b"Can not continue. This build is supposed to be rebuilt from cache"
-            if use_only_cache and full_no_cache_error_message in stderr_buffer.getvalue():
+            if full_no_cache_error_message in stderr_buffer.getvalue():
                 raise BuilderCacheMissError(full_no_cache_error_message.decode())
 
             raise subprocess.CalledProcessError(
@@ -680,25 +686,17 @@ class BuilderStep():
                 stderr=stderr_buffer.getvalue(),
             )
 
-
-        # except subprocess.SubprocessError as e:
-        #     full_no_cache_error_message = "Can not continue. This build is supposed to be rebuilt from cache"
-        #     build_process_stderr = e.stderr.decode()
-        #     print(build_process_stderr, file=sys.stderr)
-        #
-        #     if use_only_cache and full_no_cache_error_message in build_process_stderr:
-        #         raise BuilderCacheMissError(f"Can not find cache for '{self.name}' with flag 'fail_on_cache_miss' set.")
-        #     raise
-
         if use_only_cache:
             logger.info(f"Dependency '{self.id}' is successfully restored from cache.")
         else:
             logger.info(f"Dependency '{self.id}' is successfully built.")
 
-
     def run_and_output_in_oci_tarball(
             self,
-            cache_policy: CachePolicy = CachePolicy.BUILD_ON_CACHE_MISS,
+            on_cache_miss: CacheMissPolicy = CacheMissPolicy.CONTINUE,
+            on_children_cache_miss: CacheMissPolicy = CacheMissPolicy.CONTINUE,
+            enable_output: bool = True,
+            enable_children_output: bool = True
     ):
         # if not no_cleanup:
         #     _cleanup_output_dirs()
@@ -714,7 +712,10 @@ class BuilderStep():
 
         self.run(
             output=f"type=oci,dest={self.oci_layout_tarball}",
-            cache_policy=cache_policy,
+            on_cache_miss=on_cache_miss,
+            on_children_cache_miss=on_children_cache_miss,
+            enable_output=enable_output,
+            enable_children_output=enable_children_output,
         )
 
         with tarfile.open(self.oci_layout_tarball) as tar:
@@ -728,7 +729,10 @@ class BuilderStep():
     def run_and_output_in_local_directory(
             self,
             output_dir: pl.Path = None,
-            cache_policy: CachePolicy = CachePolicy.BUILD_ON_CACHE_MISS,
+            on_cache_miss: CacheMissPolicy = CacheMissPolicy.CONTINUE,
+            on_children_cache_miss: CacheMissPolicy = CacheMissPolicy.CONTINUE,
+            enable_output: bool = True,
+            enable_children_output: bool = True,
 
     ):
         # if not no_cleanup:
@@ -740,7 +744,10 @@ class BuilderStep():
 
             self.run(
                 output=f"type=local,dest={self.output_dir}",
-                cache_policy=cache_policy,
+                on_cache_miss=on_cache_miss,
+                on_children_cache_miss=on_children_cache_miss,
+                enable_output=enable_output,
+                enable_children_output=enable_children_output,
             )
             self.local_output_ready = True
 
@@ -756,14 +763,20 @@ class BuilderStep():
     def run_and_output_in_docker(
             self,
             tags: List[str] = None,
-            cache_policy: CachePolicy = CachePolicy.BUILD_ON_CACHE_MISS,
+            on_cache_miss: CacheMissPolicy = CacheMissPolicy.CONTINUE,
+            on_children_cache_miss: CacheMissPolicy = CacheMissPolicy.CONTINUE,
+            enable_output: bool = True,
+            enable_children_output: bool = True,
     ):
         if tags is None:
             tags = [self.name]
 
         self.run(
             output=f"type=docker", tags=tags,
-            cache_policy=cache_policy,
+            on_cache_miss=on_cache_miss,
+            on_children_cache_miss=on_children_cache_miss,
+            enable_output=enable_output,
+            enable_children_output=enable_children_output,
         )
 
     def prepare_buildx_builders(

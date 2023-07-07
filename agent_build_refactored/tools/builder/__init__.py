@@ -1,5 +1,6 @@
 import abc
 import dataclasses
+import enum
 import importlib
 import json
 import logging
@@ -14,7 +15,7 @@ from typing import Dict, List, Union, Type
 
 from agent_build_refactored.tools.builder.builder_step import BuilderStep
 from agent_build_refactored.tools.builder.builder_step import \
-    RemoteBuildxBuilderWrapper, BuilderCacheMissError, BuilderStep, CachePolicy
+    RemoteBuildxBuilderWrapper, BuilderCacheMissError, BuilderStep, CachePolicy, CacheMissPolicy
 
 from agent_build_refactored.tools.constants import SOURCE_ROOT, AGENT_BUILD_OUTPUT_PATH
 
@@ -167,7 +168,7 @@ class BuilderMeta(type):
     def __new__(mcs, *args, **kwargs):
         global BUILDER_CLASSES
 
-        builder_cls: Type[Builder] = super(BuilderMeta, mcs).__new__(mcs, *args, **kwargs)
+        builder_cls: Type[Builder] = super(BuilderMeta, mcs).__new__(mcs, *args, **kwargs)  # NOQA
 
         if builder_cls.NAME is None:
             return builder_cls
@@ -194,20 +195,6 @@ class BuilderMeta(type):
         BUILDER_CLASSES[builder_fqdn] = builder_cls
         return builder_cls
 
-        # if builder_cls.NAME is None:
-        #     return builder_cls
-        #
-        # attrs = args[2]
-        # fqdn = f'{attrs["__module__"]}.{builder_cls.NAME}'
-        #
-        # existing_builder_cls = BUILDER_CLASSES.get(fqdn)
-        # if existing_builder_cls:
-        #     return existing_builder_cls
-        #
-        # builder_cls.FQDN = fqdn
-        # BUILDER_CLASSES[fqdn] = builder_cls
-        # return builder_cls
-
 
 @dataclasses.dataclass
 class BuilderArg:
@@ -215,6 +202,7 @@ class BuilderArg:
     cmd_line_name: str
     cmd_line_action: str = None
     default: Union[str, int, bool] = None
+    choices: List[str] = None
     type: Type = None
 
     def get_value(self, values: Dict):
@@ -254,16 +242,12 @@ class Builder(metaclass=BuilderMeta):
         default=False,
     )
 
-    # RUN_DEPENDENCY_STEP_ARG = BuilderArg(
-    #     name="run_dependency_step",
-    #     cmd_line_name="--run-dependency-step",
-    # )
-
-    USE_ONLY_CACHE = BuilderArg(
-        name="use_only_cache",
-        cmd_line_name="--use-only-cache",
-        cmd_line_action="store_true",
-        default=False,
+    ON_CACHE_MISS_ARG = BuilderArg(
+        name="on_cache_miss",
+        cmd_line_name="--on-cache-miss",
+        choices=[p.value for p in CacheMissPolicy],
+        default=CacheMissPolicy.CONTINUE.value,
+        type=CacheMissPolicy,
     )
 
     GET_ALL_DEPENDENCIES_ARG = BuilderArg(
@@ -356,6 +340,8 @@ class Builder(metaclass=BuilderMeta):
                     build_args_contexts[arg_context_name] = arg_value
                     copy_args_dirs_str = f"{copy_args_dirs_str}\n" \
                                          f"COPY --from={arg_context_name} . {in_docker_arg_dir}"
+                elif issubclass(builder_arg.type, enum.Enum):
+                    final_arg_value = arg_value.value
                 else:
                     final_arg_value = arg_value
 
@@ -433,8 +419,8 @@ class Builder(metaclass=BuilderMeta):
         reuse_existing_dependencies_outputs = self.get_builder_arg_value(
             self.REUSE_EXISTING_DEPENDENCIES_OUTPUTS
         )
-        use_only_cache = self.get_builder_arg_value(
-            self.USE_ONLY_CACHE
+        on_cache_miss: CacheMissPolicy = self.get_builder_arg_value(
+            self.ON_CACHE_MISS_ARG
         )
 
         def _copy_to_output():
@@ -464,13 +450,11 @@ class Builder(metaclass=BuilderMeta):
                 run_args=kwargs,
             )
 
-            if use_only_cache:
-                cache_policy = CachePolicy.USE_ONLY_CACHE
-            else:
-                cache_policy = CachePolicy.BUILD_ON_CACHE_MISS
-
             docker_step.run_and_output_in_local_directory(
-                cache_policy=cache_policy
+                on_cache_miss=on_cache_miss,
+                on_children_cache_miss=on_cache_miss,
+                enable_output=False,
+                enable_children_output=False,
             )
             shutil.copytree(
                 docker_step.output_dir / "work_dir",
@@ -495,15 +479,6 @@ class Builder(metaclass=BuilderMeta):
 
         _copy_to_output()
 
-
-
-
-
-
-
-
-
-
     @classmethod
     def add_command_line_arguments(cls, parser: argparse.ArgumentParser):
 
@@ -516,6 +491,9 @@ class Builder(metaclass=BuilderMeta):
 
             if builder_arg.default:
                 extra_args["default"] = builder_arg.default
+
+            if builder_arg.choices:
+                extra_args["choices"] = builder_arg.choices
 
             parser.add_argument(
                 builder_arg.cmd_line_name,
@@ -531,6 +509,10 @@ class Builder(metaclass=BuilderMeta):
                 continue
 
             value = getattr(args, builder_arg.name)
+
+            if builder_arg.type:
+                value = builder_arg.type(value)
+
             result[builder_arg.name] = value
 
         return result
@@ -556,13 +538,6 @@ class Builder(metaclass=BuilderMeta):
 
         run_args = cls.get_run_arguments_from_command_line(args=args)
 
-        # if args.run_dependency_step:
-        #     builder.run_step(path=args.run_dependency_step)
-        # else:
-        #     builder.run_builder(
-        #         **run_args
-        #     )
-
         if args.get_fqdn:
             print(cls.FQDN)
             exit(0)
@@ -574,6 +549,7 @@ class Builder(metaclass=BuilderMeta):
             print(json.dumps(all_dependencies_ids))
             exit(0)
 
+        use_only_cache = args.on_cache_miss != CacheMissPolicy.CONTINUE
         try:
             builder.run_builder(
                 **run_args
@@ -581,59 +557,14 @@ class Builder(metaclass=BuilderMeta):
         except BuilderCacheMissError:
             logging.exception(f"Builder {cls.NAME} failed")
 
-            if args.use_only_cache:
+            if use_only_cache:
                 print("cache_miss")
                 exit(0)
             raise
 
-        if args.use_only_cache:
+        if use_only_cache:
             print("cache_hit")
             exit(0)
-
-
-
-# def _cleanup_output_dirs():
-#     if _BUILD_STEPS_OUTPUT_OCI_DIR.exists():
-#         shutil.rmtree(_BUILD_STEPS_OUTPUT_OCI_DIR)
-#     _BUILD_STEPS_OUTPUT_OCI_DIR.mkdir(parents=True)
-#
-#     if _BUILD_STEPS_OUTPUT_OUTPUT_DIR.exists():
-#         shutil.rmtree(_BUILD_STEPS_OUTPUT_OUTPUT_DIR)
-#     _BUILD_STEPS_OUTPUT_OUTPUT_DIR.mkdir(parents=True)
-#
-#     if _BUILDERS_OUTPUT_DIR.exists():
-#         shutil.rmtree(_BUILDERS_OUTPUT_DIR)
-#     _BUILDERS_OUTPUT_DIR.mkdir(parents=True)
-#
-#     if _BUILDERS_WORK_DIR.exists():
-#         shutil.rmtree(_BUILDERS_WORK_DIR)
-#     _BUILDERS_WORK_DIR.mkdir(parents=True)
-
-# if __name__ == '__main__':
-#     base_parser = argparse.ArgumentParser()
-#     base_parser.add_argument("fqdn")
-#     base_args, other_argv = base_parser.parse_known_args()
-#
-#     module_name, builder_name = base_args.fqdn.rsplit(".", 1)
-#     #spec = importlib.util.spec_from_file_location(module_name, file_path)
-#     # print("MODULE_NAME", module_name)
-#     # print("NAMEEEE", builder_name)
-#
-#     from agent_build_refactored.tools.builder import Builder
-#
-#     #__import__(module_name)
-#     module = importlib.import_module(module_name)
-#
-#     m = sys.modules[__name__]
-#
-#     builder_cls = sys.modules[__name__].BUILDER_CLASSES[builder_name]
-#
-#     parser = argparse.ArgumentParser()
-#
-#     builder_cls.add_command_line_arguments(parser=parser)
-#     args = parser.parse_args(args=other_argv)
-#
-#     builder = builder_cls.create_and_run_builder_from_command_line(args=args)
 
 
 def main(builder_fqdn: str, argv=None):
