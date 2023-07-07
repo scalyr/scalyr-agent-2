@@ -619,7 +619,7 @@ class BuilderStep():
 
         builder_info = None
         if self.platform != current_machine_arch:
-            if self.run_in_remote_builder_if_possible:
+            if not use_only_cache and self.run_in_remote_builder_if_possible:
                 builder_info = self.prepare_buildx_builders(local=False)
 
         if builder_info is None:
