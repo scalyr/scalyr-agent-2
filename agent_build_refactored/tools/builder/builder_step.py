@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tarfile
 import logging
+import atexit
 from typing import List, Any, Union, Dict
 
 from agent_build_refactored.tools.constants import CpuArch, AGENT_BUILD_OUTPUT_PATH, SOURCE_ROOT
@@ -27,6 +28,10 @@ class BuildxBuilderWrapper:
 
     @abc.abstractmethod
     def create_builder(self):
+        pass
+
+    @abc.abstractmethod
+    def close(self):
         pass
 
 
@@ -306,6 +311,7 @@ class EC2BackedRemoteBuildxBuilderWrapper(RemoteBuildxBuilderWrapper):
             raise
 
     def close(self):
+        logger.info(f"Terminate EC2 instance '{self.ec2_instance.id}'")
         self.ec2_instance.terminate()
 
         subprocess.run(
@@ -852,3 +858,12 @@ class EssentialTools(BuilderStep):
             needs_essential_dependencies=False,
         )
 
+
+def cleanup():
+    global _existing_builders
+
+    for buildx_builder in _existing_builders.values():
+        buildx_builder.close()
+
+
+atexit.register(cleanup)
