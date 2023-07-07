@@ -361,22 +361,6 @@ class CacheMissPolicy(enum.Enum):
     FAIL = "fail"
 
 
-
-# TEMPLATE  = """
-# FROM ubuntu:22.04 as cache_check
-# RUN apt update && apt install -y curl dnsutils
-# ARG d=3
-# ARG ERROR_MESSAGE
-# RUN echo -n "Can not continue." >> /tmp/error_mgx.txt
-# RUN echo " ${ERROR_MESSAGE}" >> /tmp/error_mgx.txt
-# RUN if curl -s localhost:8080 > /dev/null; then cat /tmp/error_mgx.txt ; exit 1; fi
-# RUN mkdir -p /tmp/empty
-#
-# FROM scratch as cache_check2
-# COPY --from=cache_check /tmp/empty/. /
-# """
-
-
 TEMPLATE = """
 
 # This is a special stage that has to fail when it is not reused from cache ad has to run from the beginning.
@@ -636,7 +620,7 @@ class BuilderStep():
         builder_info = None
         if self.platform != current_machine_arch:
             if self.run_in_remote_builder_if_possible:
-                builder_info = self.prepare_buildx_builders(local=True)
+                builder_info = self.prepare_buildx_builders(local=False)
 
         if builder_info is None:
             builder_info = self.prepare_buildx_builders(local=True)
