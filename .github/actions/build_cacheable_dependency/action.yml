@@ -30,7 +30,7 @@ runs:
           CACHE_VERSION: ${{ inputs.cache_version }}
           AWS_PRIVATE_KEY_PATH: /tmp/private_key.pem
       run: |
-        echo "${CT_AWS_DEV_EC2_PRIVATE_KEY}" > "${AWS_PRIVATE_KEY_PATH}"
-        chmod 600 /tmp/private_key.pem
+        echo "${AWS_DEV_EC2_PRIVATE_KEY}" > "${AWS_PRIVATE_KEY_PATH}"
+        chmod 600 "${AWS_PRIVATE_KEY_PATH}"
         python3 agent_build_refactored/scripts/cicd/run_dependency.py ${{ inputs.dependency_id }}
       
