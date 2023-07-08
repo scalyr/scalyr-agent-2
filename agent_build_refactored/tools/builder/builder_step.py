@@ -1,8 +1,5 @@
-import abc
-import dataclasses
 import enum
 import io
-import json
 import os
 import pathlib as pl
 import platform
@@ -13,326 +10,13 @@ import sys
 import tarfile
 import logging
 import atexit
-from typing import List, Any, Union, Dict
+from typing import List, Union, Dict, Optional, Set
 
-from agent_build_refactored.tools.constants import CpuArch, AGENT_BUILD_OUTPUT_PATH, SOURCE_ROOT
+from agent_build_refactored.tools.constants import CpuArch, AGENT_BUILD_OUTPUT_PATH
+from agent_build_refactored.tools.docker.buildx_builder import LocalBuildxBuilderWrapper, BuildxBuilderWrapper
+from agent_build_refactored.tools.docker.common import get_docker_container_host_port, delete_container, ContainerWrapper
 
 logger = logging.getLogger(__name__)
-
-_existing_builders: Dict[str, 'RemoteBuildxBuilderWrapper'] = {}
-
-
-@dataclasses.dataclass
-class BuildxBuilderWrapper:
-    name: str
-
-    @abc.abstractmethod
-    def create_builder(self):
-        pass
-
-    @abc.abstractmethod
-    def close(self):
-        pass
-
-
-@dataclasses.dataclass
-class LocalBuildxBuilderWrapper(BuildxBuilderWrapper):
-
-    def create_builder(self):
-
-        result = subprocess.run(
-            [
-                "docker", "buildx", "ls"
-            ],
-            check=True,
-            capture_output=True
-        )
-        result_output = result.stdout.decode()
-
-        if self.name in result_output:
-            return
-
-        create_builder_args = [
-            "docker",
-            "buildx",
-            "create",
-            "--name",
-            self.name,
-            "--driver",
-            "docker-container",
-            "--driver-opt",
-            f"image=moby/buildkit:{BUILDKIT_VERSION}",
-            "--driver-opt",
-            "network=host",
-            "--bootstrap",
-
-        ]
-
-        try:
-            subprocess.run(
-                create_builder_args,
-                check=True,
-                capture_output=True,
-            )
-        except subprocess.SubprocessError as e:
-            logger.exception(f"Can not create buildx builder. Stderr: {e.stderr.decode}")
-            raise
-
-
-
-@dataclasses.dataclass
-class RemoteBuildxBuilderWrapper(BuildxBuilderWrapper):
-    host_port: int = dataclasses.field(init=False)
-    container_name: str = dataclasses.field(init=False)
-
-    def create_builder(self):
-
-        try:
-            subprocess.run(
-                ["docker", "buildx", "rm", "-f", self.name],
-                check=True,
-                capture_output=True,
-                timeout=60,
-            )
-        except subprocess.SubprocessError as e:
-            stderr = e.stderr.decode()
-            if stderr != f'ERROR: no builder "{self.name}" found\n':
-                raise Exception(f"Can not inspect builder. Stderr: {stderr}")
-
-        self.host_port = self.start_builder_container()
-
-        create_builder_args = [
-            "docker",
-            "buildx",
-            "create",
-            "--name",
-            self.name,
-            "--driver",
-            "remote",
-            "--bootstrap",
-            f"tcp://localhost:{self.host_port}",
-        ]
-
-        subprocess.run(
-            create_builder_args,
-            check=True
-        )
-
-    @property
-    @abc.abstractmethod
-    def docker_common_cmd_args(self) -> List[str]:
-        return []
-
-    def start_builder_container(self):
-
-        self.container_name = self.name
-        subprocess.run(
-            [
-                *self.docker_common_cmd_args,
-                "docker",
-                "rm",
-                "-f",
-                self.container_name,
-            ],
-            check=True
-        )
-
-        subprocess.run(
-            [
-                *self.docker_common_cmd_args,
-                "docker",
-                "run",
-                "-d",
-                #"-i",
-                "--rm",
-                f"--name={self.container_name}",
-                "--privileged",
-                "-p",
-                f"0:{_BUILDX_BUILDER_PORT}/tcp",
-                f"moby/buildkit:{BUILDKIT_VERSION}",
-                "--addr", f"tcp://0.0.0.0:{_BUILDX_BUILDER_PORT}",
-            ],
-            check=True
-        )
-
-        # subprocess.run(
-        #     [
-        #         *self.docker_common_cmd_args,
-        #         "docker",
-        #         "start",
-        #         self.container_name
-        #     ],
-        #     check=True
-        # )
-
-        host_port = self.get_host_port(container_name=self.container_name, cmd_args=self.docker_common_cmd_args)
-        return host_port
-
-    @staticmethod
-    def get_host_port(container_name: str, cmd_args: List[str] = None):
-        cmd_args = cmd_args or []
-
-        inspect_result = subprocess.run(
-            [
-                *cmd_args,
-                "docker",
-                "inspect",
-                container_name
-            ],
-            check=True,
-            capture_output=True,
-        )
-
-        inspect_infos = json.loads(
-            inspect_result.stdout.decode()
-        )
-        container_info = inspect_infos[0]
-        host_port = container_info["NetworkSettings"]["Ports"][f"{_BUILDX_BUILDER_PORT}/tcp"][0]["HostPort"]
-        return host_port
-
-    def close(self):
-        subprocess.run(
-            ["docker", "rm", "-f", self.container_name],
-            check=True
-        )
-
-
-@dataclasses.dataclass
-class DockerBackedBuildxBuilderWrapper(RemoteBuildxBuilderWrapper):
-    @property
-    def docker_common_cmd_args(self) -> List[str]:
-        return []
-
-
-@dataclasses.dataclass
-class EC2BackedRemoteBuildxBuilderWrapper(RemoteBuildxBuilderWrapper):
-    architecture: CpuArch
-    ec2_instance: Any = dataclasses.field(init=False)
-    ssh_container_name: str = dataclasses.field(init=False)
-    ssh_host: str = dataclasses.field(init=False)
-    ssh_container_mapped_private_key_path: pl.Path = dataclasses.field(default=pl.Path("/tmp/private.pem"), init=False)
-
-    def start_builder_container(self):
-
-        from agent_build_refactored.tools.run_in_ec2.remote_docker_buildx_builder.buildx_builder_ami import \
-            get_buildx_builder_ami_image
-        from agent_build_refactored.tools.run_in_ec2.boto3_tools import create_and_deploy_ec2_instance, AWSSettings, \
-            EC2DistroImage
-
-        _ARM_IMAGE = EC2DistroImage(
-            image_id="ami-0e2b332e63c56bcb5",
-            image_name="Ubuntu Server 22.04 LTS (HVM), SSD Volume Type",
-            short_name="ubuntu2204_ARM",
-            size_id="c7g.medium",
-            ssh_username="ubuntu",
-        )
-
-        DOCKER_EC2_BUILDERS = {
-            CpuArch.x86_64: _ARM_IMAGE,
-            CpuArch.AARCH64: _ARM_IMAGE,
-            CpuArch.ARMV7: _ARM_IMAGE
-        }
-
-        base_ec2_image = DOCKER_EC2_BUILDERS[self.architecture]
-        aws_settings = AWSSettings.create_from_env()
-        boto3_session = aws_settings.create_boto3_session()
-        image = get_buildx_builder_ami_image(
-            architecture=self.architecture,
-            base_ec2_image=base_ec2_image,
-            boto3_session=boto3_session,
-            aws_settings=aws_settings,
-
-        )
-
-        ec2_image = EC2DistroImage(
-            image_id=image.id,
-            image_name=image.name,
-            short_name=base_ec2_image.short_name,
-            size_id=base_ec2_image.size_id,
-            ssh_username=base_ec2_image.ssh_username,
-        )
-
-        self.ec2_instance = create_and_deploy_ec2_instance(
-            boto3_session=boto3_session,
-            ec2_image=ec2_image,
-            name_prefix="remote_docker",
-            aws_settings=aws_settings,
-            root_volume_size=32,
-        )
-
-        try:
-            self.ssh_host = f"{ec2_image.ssh_username}@{self.ec2_instance.public_ip_address}"
-            self.ssh_container_name = "ssh"
-
-            subprocess.run(
-                ["docker", "rm", "-f", self.ssh_container_name],
-                check=True
-            )
-
-            subprocess.run(
-                [
-                    "docker",
-                    "run",
-                    "-d",
-                    "--rm",
-                    "--name",
-                    self.ssh_container_name,
-                    "-p",
-                    f"0:{_BUILDX_BUILDER_PORT}/tcp",
-                    "-v",
-                    f"{aws_settings.private_key_path}:{self.ssh_container_mapped_private_key_path}",
-                    "kroniak/ssh-client",
-                    "sleep",
-                    "99999"
-                ],
-                check=True
-            )
-
-            host_port = self.get_host_port(container_name=self.ssh_container_name)
-
-            builder_container_host_port = super(EC2BackedRemoteBuildxBuilderWrapper, self).start_builder_container()
-
-            subprocess.run(
-                [
-                    "docker",
-                    "exec",
-                    "-d",
-                    self.ssh_container_name,
-                    "ssh", "-i", str(self.ssh_container_mapped_private_key_path), "-N", "-L",
-                    f"0.0.0.0:{_BUILDX_BUILDER_PORT}:localhost:{builder_container_host_port}", self.ssh_host
-                ],
-                check=True
-            )
-
-            return host_port
-
-        except Exception:
-            self.ec2_instance.terminate()
-            raise
-
-    def close(self):
-        logger.info(f"Terminate EC2 instance '{self.ec2_instance.id}'")
-        self.ec2_instance.terminate()
-
-        subprocess.run(
-            ["docker", "rm", "-f", self.ssh_container_name],
-            check=True
-        )
-
-    @property
-    def docker_common_cmd_args(self) -> List[str]:
-        return [
-            "docker",
-            "exec",
-            "-i",
-            self.ssh_container_name,
-            "ssh",
-            "-i",
-            str(self.ssh_container_mapped_private_key_path),
-            "-o",
-            "StrictHostKeyChecking=no",
-            self.ssh_host
-        ]
 
 
 class BuilderCacheMissError(Exception):
@@ -340,9 +24,6 @@ class BuilderCacheMissError(Exception):
 
 
 
-BUILDER_NAME = "agent_cicd"
-_BUILDX_BUILDER_PORT = "1234"
-BUILDKIT_VERSION = "v0.11.6"
 USE_GHA_CACHE = bool(os.environ.get("USE_GHA_CACHE"))
 CACHE_VERSION = os.environ.get("CACHE_VERSION", "")
 #REMOTE_BUILDX_BUILDER_TYPE = os.environ.get("REMOTE_BUILDX_BUILDER_TYPE", "docker")
@@ -354,11 +35,9 @@ _BUILD_STEPS_OUTPUT_OUTPUT_DIR = AGENT_BUILD_OUTPUT_PATH / "output"
 
 ALL_BUILDER_STEPS: Dict[str, 'BuilderStep'] = {}
 
+_essential_images: Set[str] = set()
 
-class CachePolicy(enum.Enum):
-    USE_ONLY_CACHE = "use_only_cache"
-    USE_ONLY_CACHE_FOR_DEPENDENCIES = "use_only_cache_for_dependencies"
-    BUILD_ON_CACHE_MISS = "build_cache_miss"
+_running_essential_containers: List[str] = []
 
 
 class CacheMissPolicy(enum.Enum):
@@ -379,10 +58,10 @@ RUN echo " ${ERROR_MESSAGE}" >> /tmp/error_mgx.txt
 # When the curl command finishes with failure, that means we allow build without cache.
 # If the curl command finishes successfully, that meant that this build is not meant to be run without cache.
 
-# If build is supposed to be run from the beginning and without cache, 
+# If build is supposed to be run from the beginning and without cache,
 # the endpoint that is queried by the curl has to be unreachable.
 # When we expect that build has to be fully reused from cache, we make this endpoint available for curl,
-# so the next this instruction will fail if it's not cached. 
+# so the next this instruction will fail if it's not cached.
 RUN if curl -s localhost:8080 > /dev/null; then cat /tmp/error_mgx.txt ; exit 1; fi
 RUN mkdir -p /tmp/empty
 
@@ -390,6 +69,7 @@ FROM scratch as cache_check_dummy_files
 COPY --from=cache_check /tmp/empty/. /
 """
 
+_BUILDX_BUILDER_NAME_PREFIX = "agent_cicd"
 
 
 class BuilderStep():
@@ -422,13 +102,14 @@ class BuilderStep():
         else:
             self.dockerfile_content = dockerfile
 
-        #self.dockerfile = dockerfile
-
         build_contexts = build_contexts or []
 
+        self.essential_ubuntu_tools: Optional[EssentialTools] = None
+
         if needs_essential_dependencies:
+            self.essential_ubuntu_tools = EssentialTools.create()
             build_contexts.extend([
-                EssentialTools.create(),
+                self.essential_ubuntu_tools,
             ])
 
         self.build_contexts = build_contexts or []
@@ -523,22 +204,46 @@ class BuilderStep():
 
         return cmd_args
 
+    def render_final_dockerfile(self):
+
+        dockerfile_content = self.dockerfile_content
+        if not self.needs_essential_dependencies or not  self.cache:
+            return dockerfile_content
+
+        dockerfile_content = re.sub(
+            r"(^FROM [^\n]+$)",
+            r"\1\nCOPY --from=cache_check_dummy_files / /",
+            dockerfile_content,
+            flags=re.MULTILINE
+        )
+
+        dockerfile_content = re.sub(
+            r"(^FROM [^\n]+$)",
+            fr"{TEMPLATE}\n\1",
+            dockerfile_content,
+            count=1,
+            flags=re.MULTILINE
+        )
+
+        return dockerfile_content
+
     def run(
         self,
         output: str = None,
         tags: List[str] = None,
         on_cache_miss: CacheMissPolicy = CacheMissPolicy.CONTINUE,
         on_children_cache_miss: CacheMissPolicy = CacheMissPolicy.CONTINUE,
-        enable_output: bool = True,
-        enable_children_output: bool = True
+        verbose: bool = True,
+        verbose_children: bool = True
     ):
+        global _MISSED_CACHE_BUILD_CRASHER
 
         for step in self.build_contexts:
             step.run_and_output_in_oci_tarball(
                 on_cache_miss=on_children_cache_miss,
                 on_children_cache_miss=on_children_cache_miss,
-                enable_output=enable_children_output,
-                enable_children_output=enable_children_output,
+                verbose=verbose_children,
+                verbose_children=verbose_children,
             )
 
         logger.info(f"Build dependency: {self.id}")
@@ -562,54 +267,13 @@ class BuilderStep():
                     tag
                 ])
 
-        dockerfile_content = self.dockerfile_content
+        dockerfile_content = self.render_final_dockerfile()
 
         if self.needs_essential_dependencies and self.cache:
-            dockerfile_content = re.sub(
-                r"(^FROM [^\n]+$)",
-                r"\1\nCOPY --from=cache_check_dummy_files / /",
-                dockerfile_content,
-                flags=re.MULTILINE
-            )
-
-            dockerfile_content = re.sub(
-                r"(^FROM [^\n]+$)",
-                fr"{TEMPLATE}\n\1",
-                dockerfile_content,
-                count=1,
-                flags=re.MULTILINE
-            )
-
-            nginc_container_name = "nginx"
-            try:
-                subprocess.run(
-                    ["docker", "rm", "-f", nginc_container_name],
-                    check=True,
-                    capture_output=True,
-                )
-            except subprocess.CalledProcessError as e:
-                logger.exception(f"Container force remove has failed. Stderr: {e.stderr.decode()}")
-                raise
-
             if use_only_cache:
-                try:
-                    subprocess.run(
-                        [
-                            "docker",
-                            "run",
-                            "-d",
-                            "--name",
-                            nginc_container_name,
-                            "-p",
-                            "8080:80",
-                            "nginx"
-                        ],
-                        check=True,
-                        capture_output=True,
-                    )
-                except subprocess.SubprocessError as e:
-                    logger.exception(f"Container creation has failed. Stderr: {e.stderr.decode()}")
-                    raise
+                if _MISSED_CACHE_BUILD_CRASHER is None:
+                    _MISSED_CACHE_BUILD_CRASHER = MissedCacheBuildCrasher()
+                    _MISSED_CACHE_BUILD_CRASHER
 
         local = False
 
@@ -655,7 +319,7 @@ class BuilderStep():
             if not line:
                 break
 
-            if enable_output:
+            if verbose:
                 sys.stderr.buffer.write(line)
 
             stderr_buffer.write(line)
@@ -663,9 +327,9 @@ class BuilderStep():
         process.wait()
 
         if process.returncode != 0:
-            if not enable_output:
+            if not verbose:
                 sys.stderr.buffer.write(stderr_buffer.getvalue())
-            full_no_cache_error_message = b"Can not continue. This build is supposed to be rebuilt from cache"
+            full_no_cache_error_message = b"Can not continue. This build is supposed to be cached"
             if full_no_cache_error_message in stderr_buffer.getvalue():
                 raise BuilderCacheMissError(full_no_cache_error_message.decode())
 
@@ -685,11 +349,9 @@ class BuilderStep():
             self,
             on_cache_miss: CacheMissPolicy = CacheMissPolicy.CONTINUE,
             on_children_cache_miss: CacheMissPolicy = CacheMissPolicy.CONTINUE,
-            enable_output: bool = True,
-            enable_children_output: bool = True
+            verbose: bool = True,
+            verbose_children: bool = True
     ):
-        # if not no_cleanup:
-        #     _cleanup_output_dirs()
 
         if self.oci_layout_ready:
             return
@@ -704,8 +366,8 @@ class BuilderStep():
             output=f"type=oci,dest={self.oci_layout_tarball}",
             on_cache_miss=on_cache_miss,
             on_children_cache_miss=on_children_cache_miss,
-            enable_output=enable_output,
-            enable_children_output=enable_children_output,
+            verbose=verbose,
+            verbose_children=verbose_children,
         )
 
         with tarfile.open(self.oci_layout_tarball) as tar:
@@ -713,20 +375,15 @@ class BuilderStep():
 
         self.oci_layout_ready = True
 
-        # if tarball_path:
-        #     shutil.copy(self.oci_layout_tarball, tarball_path)
-
     def run_and_output_in_local_directory(
             self,
             output_dir: pl.Path = None,
             on_cache_miss: CacheMissPolicy = CacheMissPolicy.CONTINUE,
             on_children_cache_miss: CacheMissPolicy = CacheMissPolicy.CONTINUE,
-            enable_output: bool = True,
-            enable_children_output: bool = True,
+            verbose: bool = True,
+            verbose_children: bool = True,
 
     ):
-        # if not no_cleanup:
-        #     _cleanup_output_dirs()
 
         if not self.local_output_ready:
             if self.output_dir.exists():
@@ -736,8 +393,8 @@ class BuilderStep():
                 output=f"type=local,dest={self.output_dir}",
                 on_cache_miss=on_cache_miss,
                 on_children_cache_miss=on_children_cache_miss,
-                enable_output=enable_output,
-                enable_children_output=enable_children_output,
+                verbose=verbose,
+                verbose_children=verbose_children,
             )
             self.local_output_ready = True
 
@@ -755,8 +412,8 @@ class BuilderStep():
             tags: List[str] = None,
             on_cache_miss: CacheMissPolicy = CacheMissPolicy.CONTINUE,
             on_children_cache_miss: CacheMissPolicy = CacheMissPolicy.CONTINUE,
-            enable_output: bool = True,
-            enable_children_output: bool = True,
+            verbose: bool = True,
+            verbose_children: bool = True,
     ):
         if tags is None:
             tags = [self.name]
@@ -765,43 +422,42 @@ class BuilderStep():
             output=f"type=docker", tags=tags,
             on_cache_miss=on_cache_miss,
             on_children_cache_miss=on_children_cache_miss,
-            enable_output=enable_output,
-            enable_children_output=enable_children_output,
+            verbose=verbose,
+            verbose_children=verbose_children,
         )
 
     def prepare_buildx_builders(
         self,
         local: bool,
     ):
-        global _existing_builders
+        global _essential_images
 
         builder_name_suffix = "local" if local else "remote"
-        builder_name = f"{BUILDER_NAME}_{self.platform.value}_{builder_name_suffix}"
-
-        info = _existing_builders.get(builder_name)
-
-        if info:
-            return info
-
+        builder_name = f"{_BUILDX_BUILDER_NAME_PREFIX}_{self.platform.value}_{builder_name_suffix}"
         if local:
-            info = LocalBuildxBuilderWrapper(
+            info = LocalBuildxBuilderWrapper.create(
                 name=builder_name
             )
         else:
-            if REMOTE_BUILDX_BUILDER_TYPE == "docker":
+            ssh_client_image_name = "agent_remote_build_ssh_client_image_name"
 
-                info = DockerBackedBuildxBuilderWrapper(
-                    name=builder_name,
+            if ssh_client_image_name not in _essential_images:
+                self.essential_ubuntu_tools.run_and_output_in_docker(
+                    tags=[ssh_client_image_name],
+                    verbose=False,
+                    verbose_children=False
                 )
-            else:
-                info = EC2BackedRemoteBuildxBuilderWrapper(
-                    name=builder_name,
-                    architecture=self.platform,
-                )
+                _essential_images.add(ssh_client_image_name)
 
-        info.create_builder()
+            from agent_build_refactored.tools.docker.buildx_builder.remote import (
+                EC2BackedRemoteBuildxBuilderWrapper
+            )
 
-        _existing_builders[builder_name] = info
+            info = EC2BackedRemoteBuildxBuilderWrapper.create(
+                name=builder_name,
+                architecture=self.platform,
+                ssh_client_image_name=ssh_client_image_name,
+            )
 
         return info
 
@@ -855,15 +511,64 @@ class EssentialTools(BuilderStep):
             dockerfile=self.__class__.CONTEXT_DIR / "Dockerfile",
             platform=CpuArch.x86_64,
             cache=True,
+            run_in_remote_builder_if_possible=False,
             needs_essential_dependencies=False,
         )
 
 
-def cleanup():
-    global _existing_builders
+class MissedCacheBuildCrasher:
+    def __init__(
+        self
+    ):
 
-    for buildx_builder in _existing_builders.values():
-        buildx_builder.close()
+        self._container_name = "cache_test"
+        self._container_port = "80/tcp"
+
+        self._container = ContainerWrapper(
+            name=self._container_name,
+            image="nginx",
+            network="test",
+            rm=True,
+            ports={0: self._container_port},
+        )
+
+        self.host_port = None
+
+    def start(self):
+
+        self._container.run()
+
+        self.host_port = self._container.get_host_port(
+            container_port=self._container_port,
+        )
+
+    def add_entry(self, name: str, value: str):
+        subprocess.run(
+            [
+                "docker",
+                "exec",
+                "-i",
+                self._container_name,
+                "/bin/bash",
+                "-e",
+                f'echo "{value}" /usr/share/nginx/html/{name}.html'
+            ]
+        )
+
+    def stop(self):
+        self._container.remove(force=True)
+
+
+_MISSED_CACHE_BUILD_CRASHER: Optional[MissedCacheBuildCrasher] = None
+
+
+def cleanup():
+    global _MISSED_CACHE_BUILD_CRASHER
+
+    if _MISSED_CACHE_BUILD_CRASHER:
+        delete_container(
+            container_name=_CACHE_CHECKER_CONTAINER_NAME,
+        )
 
 
 atexit.register(cleanup)

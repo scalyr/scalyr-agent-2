@@ -27,7 +27,7 @@ from typing import List, Dict, Union
 # )
 from agent_build_refactored.tools.constants import CpuArch
 from agent_build_refactored.managed_packages.managed_packages_builders import EMBEDDED_OPENSSL_VERSION_NUMBER
-from agent_build_refactored.tools.run_in_ec2.constants import EC2DistroImage
+from agent_build_refactored.tools.aws.constants import EC2DistroImage
 
 logger = logging.getLogger(__name__)
 
@@ -233,7 +233,7 @@ def run_test_remotely(
 
     if remote_machine_type == "ec2":
 
-        from agent_build_refactored.tools.run_in_ec2.boto3_tools import (
+        from agent_build_refactored.tools.aws.boto3_tools import (
             create_and_deploy_ec2_instance,
             ssh_run_command,
             create_ssh_connection,

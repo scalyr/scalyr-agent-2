@@ -4417,7 +4417,7 @@ cluster.
 
         if self.__container_checker:
             self._logger.debug("Starting ContainerChecker")
-            self.__container_checker.start()
+            self.__container_checker.run()
 
         k8s_cache = self.__get_k8s_cache()
 

@@ -4,12 +4,13 @@ import time
 from typing import List
 
 from agent_build_refactored.tools.constants import CpuArch
-from agent_build_refactored.tools.run_in_ec2.boto3_tools import AWSSettings, create_and_deploy_ec2_instance
-from agent_build_refactored.tools.run_in_ec2.constants import EC2DistroImage
+from agent_build_refactored.tools.aws.boto3_tools import AWSSettings, create_and_deploy_ec2_instance
+from agent_build_refactored.tools.aws.constants import EC2DistroImage
 
 PARENT_DIR = pl.Path(__file__).parent.absolute()
 
 IMAGE_NAME_PREFIX = "dataset-agent-ci-cd-builder-builder"
+
 
 def get_all_cicd_docker_buildx_builder_images(boto3_session):
 
@@ -87,7 +88,6 @@ def create_new_ami_image(
 
 
 def get_buildx_builder_ami_image(
-        architecture: CpuArch,
         base_ec2_image: EC2DistroImage,
         boto3_session,
         aws_settings: AWSSettings
@@ -108,7 +108,8 @@ def get_buildx_builder_ami_image(
                 break
 
     images_to_remove = builder_images[:]
-    images_to_remove.remove(needed_image)
+    if needed_image:
+        images_to_remove.remove(needed_image)
 
     # Cleanup old images.
     ec2_client = boto3_session.client("ec2")
@@ -126,7 +127,7 @@ def get_buildx_builder_ami_image(
         boto3_session=boto3_session,
         aws_settings=aws_settings,
         name_prefix="remote_docker",
-        ec2_image=ec2_image,
+        ec2_image=base_ec2_image,
         root_volume_size=32,
         deployment_script=deployment_script_path,
     )

@@ -32,7 +32,7 @@ import boto3
 
 sys.path.append(str(pl.Path(__file__).parent.parent.parent.parent))
 
-from agent_build_refactored.tools.run_in_ec2.boto3_tools import (
+from agent_build_refactored.tools.aws.boto3_tools import (
     AWSSettings,
     PREFIX_LIST_ENTRY_REMOVE_THRESHOLD,
     INSTANCE_NAME_STRING,
@@ -163,7 +163,7 @@ def cleanup_volumes(
             continue
 
         logger.info(f"Deleting volume with name: {name}")
-        volume.delete()
+        volume.remove()
 
 
 def _get_instance_name(instance):

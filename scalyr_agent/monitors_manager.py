@@ -394,7 +394,7 @@ class MonitorsManager(StoppableThread):
             if six.PY3:
                 monitor._is_stopped = False
 
-            monitor.start()
+            monitor.run()
 
             self.__running_monitors.append(monitor)
         else:

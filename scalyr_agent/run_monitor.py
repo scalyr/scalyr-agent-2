@@ -135,7 +135,7 @@ def run_standalone_monitor(
         log.log(scalyr_logging.DEBUG_LEVEL_1, "Constructed monitor")
         monitor.open_metric_log()
         log.log(scalyr_logging.DEBUG_LEVEL_1, "Starting monitor")
-        monitor.start()
+        monitor.run()
 
         while monitor.isAlive():
             time.sleep(0.1)

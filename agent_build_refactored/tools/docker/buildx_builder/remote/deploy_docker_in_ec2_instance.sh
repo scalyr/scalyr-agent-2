@@ -138,5 +138,3 @@ sudo usermod -aG docker "$USER"
 # keep alive messages to prevent SSH connection from closing.
 echo "ClientAliveInterval 60" | sudo tee -a /etc/ssh/sshd_config
 sudo systemctl restart ssh.service
-
-# 3

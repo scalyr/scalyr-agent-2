@@ -29,7 +29,7 @@ import botocore.exceptions  # pylint: disable=import-error
 import paramiko
 import requests
 
-from agent_build_refactored.tools.run_in_ec2.constants import EC2DistroImage
+from agent_build_refactored.tools.aws.constants import EC2DistroImage
 
 logger = logging.getLogger(__name__)
 

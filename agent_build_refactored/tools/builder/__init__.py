@@ -15,7 +15,7 @@ from typing import Dict, List, Union, Type
 
 from agent_build_refactored.tools.builder.builder_step import BuilderStep
 from agent_build_refactored.tools.builder.builder_step import \
-    RemoteBuildxBuilderWrapper, BuilderCacheMissError, BuilderStep, CachePolicy, CacheMissPolicy
+    BuilderCacheMissError, BuilderStep, CacheMissPolicy
 
 from agent_build_refactored.tools.constants import SOURCE_ROOT, AGENT_BUILD_OUTPUT_PATH
 
@@ -264,6 +264,13 @@ class Builder(metaclass=BuilderMeta):
         default=False
     )
 
+    VERBOSE_ARG = BuilderArg(
+        name="verbose",
+        cmd_line_name="--verbose",
+        cmd_line_action="store_true",
+        default=False,
+    )
+
     def __init__(
             self,
             base: BuilderStep,
@@ -422,6 +429,7 @@ class Builder(metaclass=BuilderMeta):
         on_cache_miss: CacheMissPolicy = self.get_builder_arg_value(
             self.ON_CACHE_MISS_ARG
         )
+        verbose = self.get_builder_arg_value(self.VERBOSE_ARG)
 
         def _copy_to_output():
             if output_dir:
@@ -453,8 +461,8 @@ class Builder(metaclass=BuilderMeta):
             docker_step.run_and_output_in_local_directory(
                 on_cache_miss=on_cache_miss,
                 on_children_cache_miss=on_cache_miss,
-                enable_output=False,
-                enable_children_output=False,
+                verbose=verbose,
+                verbose_children=verbose,
             )
             shutil.copytree(
                 docker_step.output_dir / "work_dir",

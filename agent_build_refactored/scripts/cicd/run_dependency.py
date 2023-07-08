@@ -24,6 +24,6 @@ if __name__ == '__main__':
     dependency.run(
         on_cache_miss=CacheMissPolicy.CONTINUE,
         on_children_cache_miss=CacheMissPolicy.FAIL,
-        enable_output=True,
-        enable_children_output=False,
+        verbose=True,
+        verbose_children=False,
     )

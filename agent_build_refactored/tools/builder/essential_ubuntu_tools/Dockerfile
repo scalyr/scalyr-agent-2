@@ -7,6 +7,7 @@ RUN DEBIAN_FRONTEND="noninteractive" \
     git \
     tar \
     curl \
+    openssh-client \
     python3 \
     python3-dev \
     python3-pip \
