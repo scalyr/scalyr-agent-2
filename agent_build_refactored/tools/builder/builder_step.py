@@ -149,6 +149,7 @@ class BuilderStep():
             "docker",
             "buildx",
             "build",
+            "--progress=plain",
             "--platform",
             self.platform.as_docker_platform(),
             "-f",
