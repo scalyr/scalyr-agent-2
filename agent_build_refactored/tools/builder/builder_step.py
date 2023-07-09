@@ -427,6 +427,7 @@ class BuilderStep():
             fail_on_first_attempt_cache_miss = False
 
 
+        logger.error(cmd_args)
         try:
             self._run_and_verify_cache(
                 cmd_args=cmd_args,
