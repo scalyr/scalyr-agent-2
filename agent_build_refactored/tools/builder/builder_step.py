@@ -299,14 +299,17 @@ class BuilderStep():
                 _print_line(run_line)
 
                 if not run_line.startswith(f"#{command_number} "):
+                    print("CONT", file=sys.stderr)
                     continue
 
                 if run_line.startswith(f"#{command_number} sha256:"):
+                    print("TRUE", file=sys.stderr)
                     return True
                     done_message_allowed = True
                     continue
 
                 if run_line.startswith(f"#{command_number} extracting sha256:"):
+                    print("TRUE", file=sys.stderr)
                     return True
                     continue
 
@@ -314,8 +317,10 @@ class BuilderStep():
                 #     return done_message_allowed
 
                 if re.match(rf"#{command_number} CACHED\n", run_line):
+                    print("TRUE", file=sys.stderr)
                     return True
 
+                print("FALSE", file=sys.stderr)
                 return False
 
         cache_miss = False
