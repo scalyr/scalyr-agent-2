@@ -242,12 +242,19 @@ class Builder(metaclass=BuilderMeta):
         default=False,
     )
 
-    ON_CACHE_MISS_ARG = BuilderArg(
-        name="on_cache_miss",
-        cmd_line_name="--on-cache-miss",
-        choices=[p.value for p in CacheMissPolicy],
-        default=CacheMissPolicy.CONTINUE.value,
-        type=CacheMissPolicy,
+    # ON_CACHE_MISS_ARG = BuilderArg(
+    #     name="on_cache_miss",
+    #     cmd_line_name="--on-cache-miss",
+    #     choices=[p.value for p in CacheMissPolicy],
+    #     default=CacheMissPolicy.FALLBACK_TO_REMOTE_BUILDX_BUILDER.value,
+    #     type=CacheMissPolicy,
+    # )
+
+    FAIL_ON_CACHE_MISS_ARG = BuilderArg(
+        name="fail_on_cache_miss",
+        cmd_line_name="--fail-on-cache-miss",
+        cmd_line_action="store_true",
+        default=False,
     )
 
     GET_ALL_DEPENDENCIES_ARG = BuilderArg(
@@ -426,9 +433,10 @@ class Builder(metaclass=BuilderMeta):
         reuse_existing_dependencies_outputs = self.get_builder_arg_value(
             self.REUSE_EXISTING_DEPENDENCIES_OUTPUTS
         )
-        on_cache_miss: CacheMissPolicy = self.get_builder_arg_value(
-            self.ON_CACHE_MISS_ARG
-        )
+        # on_cache_miss: CacheMissPolicy = self.get_builder_arg_value(
+        #     self.ON_CACHE_MISS_ARG
+        # )
+        fail_on_cache_miss = self.get_builder_arg_value(self.FAIL_ON_CACHE_MISS_ARG)
         verbose = self.get_builder_arg_value(self.VERBOSE_ARG)
 
         def _copy_to_output():
@@ -459,8 +467,8 @@ class Builder(metaclass=BuilderMeta):
             )
 
             docker_step.run_and_output_in_local_directory(
-                on_cache_miss=on_cache_miss,
-                on_children_cache_miss=on_cache_miss,
+                fail_on_cache_miss=fail_on_cache_miss,
+                fail_on_children_cache_miss=fail_on_cache_miss,
                 verbose=verbose,
                 verbose_children=verbose,
             )
@@ -557,7 +565,6 @@ class Builder(metaclass=BuilderMeta):
             print(json.dumps(all_dependencies_ids))
             exit(0)
 
-        use_only_cache = args.on_cache_miss != CacheMissPolicy.CONTINUE
         try:
             builder.run_builder(
                 **run_args
@@ -565,12 +572,12 @@ class Builder(metaclass=BuilderMeta):
         except BuilderCacheMissError:
             logging.exception(f"Builder {cls.NAME} failed")
 
-            if use_only_cache:
+            if args.fail_on_cache_miss:
                 print("cache_miss")
                 exit(0)
             raise
 
-        if use_only_cache:
+        if args.fail_on_cache_miss:
             print("cache_hit")
             exit(0)
 

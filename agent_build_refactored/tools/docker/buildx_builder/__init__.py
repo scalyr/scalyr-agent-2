@@ -37,20 +37,7 @@ class BuildxBuilderWrapper:
         pass
 
     def close(self):
-        try:
-            subprocess.run(
-                [
-                    "docker",
-                    "buildx",
-                    "rm",
-                    self.name,
-                ],
-                check=True,
-                capture_output=True,
-            )
-        except subprocess.CalledProcessError as e:
-            logger.exception(f"Can not remove docker buildx builder '{self.name}'. Stderr: {e.stderr.decode()}")
-            raise
+        pass
 
 
 class LocalBuildxBuilderWrapper(BuildxBuilderWrapper):
@@ -79,8 +66,6 @@ class LocalBuildxBuilderWrapper(BuildxBuilderWrapper):
             "docker-container",
             "--driver-opt",
             f"image=moby/buildkit:{BUILDKIT_VERSION}",
-            "--driver-opt",
-            "network=host",
             "--bootstrap",
 
         ]
@@ -94,6 +79,10 @@ class LocalBuildxBuilderWrapper(BuildxBuilderWrapper):
         except subprocess.SubprocessError as e:
             logger.exception(f"Can not create buildx builder. Stderr: {e.stderr.decode}")
             raise
+
+
+class BuildxBuildWarcher:
+    pass
 
 
 def cleanup():

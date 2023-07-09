@@ -41,7 +41,7 @@ _running_essential_containers: List[str] = []
 
 
 class CacheMissPolicy(enum.Enum):
-    #FALLBACK_TO_REMOTE_BUILDX_BUILDER = "fallback_to_remot_buildx_buildere"
+    FALLBACK_TO_REMOTE_BUILDX_BUILDER = "fallback_to_remot_buildx_buildere"
     CONTINUE = "continue"
     FAIL = "fail"
 
@@ -204,54 +204,181 @@ class BuilderStep():
 
         return cmd_args
 
-    def render_final_dockerfile(self):
+    def _run_and_continue_on_cache_miss(
+        self,
+        cmd_args: List[str],
+        dockerfile_content: str,
+        buildr_name: str,
+        verbose: bool = True,
+    ):
 
-        dockerfile_content = self.dockerfile_content
-        if not self.needs_essential_dependencies or not  self.cache:
-            return dockerfile_content
+        try:
+            subprocess.run(
+                [
+                    *cmd_args,
+                    f"--builder={buildr_name}",
+                ],
+                input=dockerfile_content.encode(),
+                check=True,
+                capture_output= not verbose
+            )
+        except subprocess.CalledProcessError as e:
+            if not verbose:
+                sys.stderr.write(e.stderr)
 
-        dockerfile_content = re.sub(
-            r"(^FROM [^\n]+$)",
-            r"\1\nCOPY --from=cache_check_dummy_files / /",
-            dockerfile_content,
-            flags=re.MULTILINE
+            logger.exception(f"Can not build dependency '{self.id}'")
+            raise
+
+    def _stop_build_process(self, process):
+        import psutil
+
+        def terminate_children_processes(_process: psutil.Process):
+            child_processes = _process.children()
+
+            for child_process in child_processes:
+                terminate_children_processes(
+                    _process=child_process
+                )
+
+            _process.terminate()
+
+        psutil_process = psutil.Process(pid=process.pid)
+
+        terminate_children_processes(
+            _process=psutil_process
         )
 
-        dockerfile_content = re.sub(
-            r"(^FROM [^\n]+$)",
-            fr"{TEMPLATE}\n\1",
-            dockerfile_content,
-            count=1,
-            flags=re.MULTILINE
+    def _run_and_verify_cache(
+        self,
+        cmd_args: List[str],
+        dockerfile_content: str,
+        buildr_name: str,
+        fail_on_cache_miss: bool,
+        verbose: bool = True,
+    ):
+        process = subprocess.Popen(
+            [
+                *cmd_args,
+                f"--builder={buildr_name}",
+            ],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
 
-        return dockerfile_content
+        process.stdin.write(dockerfile_content.encode())
+        process.stdin.close()
+
+        stderr_buffer = io.BytesIO()
+
+        def read_line():
+            line_bytes = process.stderr.readline()
+
+            if not line_bytes:
+                return ""
+
+            stderr_buffer.write(line_bytes)
+            line_str = line_bytes.decode(errors="replace")
+            return line_str
+
+        def _print_line(line):
+            if verbose:
+                print(line, end="", file=sys.stderr)
+
+        def read_run_lines(command_number: int):
+            lines_count = 0
+            while True:
+                run_line = read_line()
+
+                if not run_line:
+                    raise Exception("Expected at least one message related to the previous RUN command")
+
+                lines_count += 1
+                _print_line(run_line)
+
+                if not run_line.startswith(f"#{command_number} "):
+                    continue
+
+                if run_line.startswith(f"#{command_number} sha256:"):
+                    continue
+
+                if run_line.startswith(f"#{command_number} extracting sha256:"):
+                    continue
+
+                if re.match(rf"#{command_number} CACHED\n", run_line):
+                    return True
+                else:
+                    return False
+
+        cache_miss = False
+        if fail_on_cache_miss:
+            while True:
+                line = read_line()
+
+                if not line:
+                    break
+
+                _print_line(line)
+
+                m = re.match(r"#(\d+) \[[^]]*\] RUN .+", line)
+                if m:
+                    command_number = m.group(1)
+                    if not read_run_lines(command_number=command_number):
+                        self._stop_build_process(
+                            process=process
+                        )
+                        cache_miss = True
+                        break
+
+
+        while True:
+            line = read_line()
+
+            if not line:
+                break
+
+            _print_line(line)
+
+        process.wait()
+
+        if process.returncode != 0:
+            if not fail_on_cache_miss or not cache_miss:
+                stderr = stderr_buffer.getvalue()
+                if not verbose:
+                    sys.stderr.buffer.write(stderr)
+                raise subprocess.CalledProcessError(
+                    returncode=process.returncode,
+                    cmd=cmd_args,
+                    stderr=stderr,
+                )
+
+        if cache_miss:
+            raise BuilderCacheMissError()
 
     def run(
         self,
         output: str = None,
         tags: List[str] = None,
-        on_cache_miss: CacheMissPolicy = CacheMissPolicy.CONTINUE,
-        on_children_cache_miss: CacheMissPolicy = CacheMissPolicy.CONTINUE,
+        fail_on_cache_miss: bool = False,
+        fail_on_children_cache_miss: bool = False,
+        # on_cache_miss: CacheMissPolicy = CacheMissPolicy.CONTINUE,
+        # on_children_cache_miss: CacheMissPolicy = CacheMissPolicy.CONTINUE,
         verbose: bool = True,
         verbose_children: bool = True
     ):
-        global _MISSED_CACHE_BUILD_CRASHER
 
         for step in self.build_contexts:
             step.run_and_output_in_oci_tarball(
-                on_cache_miss=on_children_cache_miss,
-                on_children_cache_miss=on_children_cache_miss,
+                fail_on_cache_miss=fail_on_children_cache_miss,
+                fail_on_children_cache_miss=fail_on_children_cache_miss,
                 verbose=verbose_children,
                 verbose_children=verbose_children,
             )
 
         logger.info(f"Build dependency: {self.id}")
 
-        use_only_cache = on_cache_miss != CacheMissPolicy.CONTINUE
-
         cmd_args = self.get_build_command_args(
-            use_only_cache=use_only_cache,
+            use_only_cache=fail_on_cache_miss,
         )
 
         if output:
@@ -267,16 +394,6 @@ class BuilderStep():
                     tag
                 ])
 
-        dockerfile_content = self.render_final_dockerfile()
-
-        if self.needs_essential_dependencies and self.cache:
-            if use_only_cache:
-                if _MISSED_CACHE_BUILD_CRASHER is None:
-                    _MISSED_CACHE_BUILD_CRASHER = MissedCacheBuildCrasher()
-                    _MISSED_CACHE_BUILD_CRASHER
-
-        local = False
-
         machine_name = platform.machine()
         if machine_name.lower() in ["x86_64"]:
             current_machine_arch = CpuArch.x86_64
@@ -287,68 +404,243 @@ class BuilderStep():
         else:
             raise Exception(f"Unknown uname machine {machine_name}")
 
+        self.oci_layout.parent.mkdir(parents=True, exist_ok=True)
+
+        local_builder_info = self.prepare_buildx_builders(local=True)
+
+        # if not self.cache:
+        #     self._run_and_continue_on_cache_miss(
+        #         cmd_args=cmd_args,
+        #         dockerfile_content=self.dockerfile_content,
+        #         buildr_name=local_builder_info.name,
+        #         verbose=verbose,
+        #     )
+        #     return
+
+        if self.cache and fail_on_cache_miss:
+            fail_on_first_attempt_cache_miss = True
+        elif self.run_in_remote_builder_if_possible and self.platform != current_machine_arch:
+            fail_on_first_attempt_cache_miss = True
+        else:
+            fail_on_first_attempt_cache_miss = False
+
+
+        try:
+            self._run_and_verify_cache(
+                cmd_args=cmd_args,
+                dockerfile_content=self.dockerfile_content,
+                buildr_name=local_builder_info.name,
+                fail_on_cache_miss=fail_on_first_attempt_cache_miss,
+                verbose=verbose,
+            )
+        except BuilderCacheMissError:
+            if fail_on_cache_miss:
+                raise
+        else:
+            return
+
+        logger.info("Build from the local cache is impossible, fallback to remote builder")
+
+        remote_builder_info = self.prepare_buildx_builders(local=False)
+        try:
+            subprocess.run(
+                [
+                    *cmd_args,
+                    f"--builder={remote_builder_info.name}",
+                ],
+                input=self.dockerfile_content.encode(),
+                check=True,
+                capture_output= not verbose
+            )
+        except subprocess.CalledProcessError as e:
+            if not verbose:
+                sys.stderr.write(e.stderr)
+
+            logger.exception(f"Can not build dependency '{self.id}'")
+            raise
+
+        return
+
+        if on_cache_miss == CacheMissPolicy.FAIL:
+            self._run_and_verify_cache(
+                cmd_args=cmd_args,
+                dockerfile_content=self.dockerfile_content,
+                buildr_name=local_builder_info.name,
+                verbose=verbose,
+            )
+            return
+
+        same_arch = self.platform == current_machine_arch
+        if not self.run_in_remote_builder_if_possible or same_arch:
+            self._run_and_continue_on_cache_miss(
+                cmd_args=cmd_args,
+                dockerfile_content=self.dockerfile_content,
+                buildr_name=local_builder_info.name,
+                verbose=verbose,
+            )
+            return
+
+        try:
+            self._run_and_verify_cache(
+                cmd_args=cmd_args,
+                dockerfile_content=self.dockerfile_content,
+                buildr_name=local_builder_info.name,
+                verbose=verbose,
+            )
+        except BuilderCacheMissError:
+            cache_hit = False
+        else:
+            cache_hit = True
+
+        if cache_hit:
+            return
+
+        logger.info("Build from the local cache is impossible, fallback to remote builder")
+
+        remote_builder_info = self.prepare_buildx_builders(local=False)
+        self._run_and_continue_on_cache_miss(
+            cmd_args=cmd_args,
+            dockerfile_content=self.dockerfile_content,
+            buildr_name=remote_builder_info.name,
+            verbose=verbose,
+        )
+
+
+        return
+
+        if self.run_in_remote_builder_if_possible:
+            try:
+                self._run_and_verify_cache(
+                    cmd_args=cmd_args,
+                    dockerfile_content=self.dockerfile_content,
+                    buildr_name=local_builder_info.name,
+                    verbose=verbose,
+                )
+                return
+            except BuilderCacheMissError:
+                logger.info("Build from the local cache is impossible, fallback to remote builder")
+
+            remote_builder_info = self.prepare_buildx_builders(local=False)
+            self._run_and_continue_on_cache_miss(
+                cmd_args=cmd_args,
+                dockerfile_content=self.dockerfile_content,
+                buildr_name=remote_builder_info.name,
+                verbose=verbose,
+            )
+
+
+        if on_cache_miss == CacheMissPolicy.CONTINUE:
+            builder_info = self.prepare_buildx_builders(local=True)
+            self._run_and_continue_on_cache_miss(
+                cmd_args=cmd_args,
+                dockerfile_content=self.dockerfile_content,
+                buildr_name=builder_info.name,
+                verbose=verbose,
+            )
+        elif on_cache_miss == CacheMissPolicy.FAIL:
+            builder_info = self.prepare_buildx_builders(local=True)
+            self._run_and_verify_cache(
+                cmd_args=cmd_args,
+                dockerfile_content=self.dockerfile_content,
+                buildr_name=builder_info.name,
+                verbose=verbose,
+            )
+        elif on_cache_miss == CacheMissPolicy.FALLBACK_TO_REMOTE_BUILDX_BUILDER:
+
+            local_builder_info = self.prepare_buildx_builders(local=True)
+            try:
+                self._run_and_verify_cache(
+                    cmd_args=cmd_args,
+                    dockerfile_content=self.dockerfile_content,
+                    buildr_name=local_builder_info.name,
+                    verbose=verbose,
+                )
+                return
+            except BuilderCacheMissError:
+                logger.info("Build from the local cache is impossible, fallback to remote builder")
+
+            remote_builder_info = self.prepare_buildx_builders(local=False)
+            self._run_and_continue_on_cache_miss(
+                cmd_args=cmd_args,
+                dockerfile_content=self.dockerfile_content,
+                buildr_name=remote_builder_info.name,
+                verbose=verbose,
+            )
+
+
+        return
+
+
         builder_info = None
         if self.platform != current_machine_arch:
             if not use_only_cache and self.run_in_remote_builder_if_possible:
                 builder_info = self.prepare_buildx_builders(local=False)
+                buildx_build_or_fail_on_cache_miss(
+                    cmd_args=cmd_args,
+                    dockerfile_content=self.dockerfile_content,
+                    builder_name=builder_info.name,
+                )
 
         if builder_info is None:
             builder_info = self.prepare_buildx_builders(local=True)
-
-        self.oci_layout.parent.mkdir(parents=True, exist_ok=True)
-
-        process = subprocess.Popen(
-            [
-                *cmd_args,
-                "--build-arg",
-                "ERROR_MESSAGE=This build is supposed to be rebuilt from cache",
-                "--builder",
-                builder_info.name,
-            ],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-
-        process.stdin.write(dockerfile_content.encode())
-        process.stdin.close()
-
-        stderr_buffer = io.BytesIO()
-        while True:
-            line = process.stderr.readline()
-            if not line:
-                break
-
-            if verbose:
-                sys.stderr.buffer.write(line)
-
-            stderr_buffer.write(line)
-
-        process.wait()
-
-        if process.returncode != 0:
-            if not verbose:
-                sys.stderr.buffer.write(stderr_buffer.getvalue())
-            full_no_cache_error_message = b"Can not continue. This build is supposed to be cached"
-            if full_no_cache_error_message in stderr_buffer.getvalue():
-                raise BuilderCacheMissError(full_no_cache_error_message.decode())
-
-            raise subprocess.CalledProcessError(
-                returncode=process.returncode,
-                cmd=cmd_args,
-                output=process.stdout.read(),
-                stderr=stderr_buffer.getvalue(),
+            buildx_build_or_fail_on_cache_miss(
+                cmd_args=cmd_args,
+                dockerfile_content=self.dockerfile_content,
+                builder_name=builder_info.name
             )
 
-        if use_only_cache:
-            logger.info(f"Dependency '{self.id}' is successfully restored from cache.")
-        else:
-            logger.info(f"Dependency '{self.id}' is successfully built.")
+        # process = subprocess.Popen(
+        #     [
+        #         *cmd_args,
+        #         "--build-arg",
+        #         "ERROR_MESSAGE=This build is supposed to be rebuilt from cache",
+        #         "--builder",
+        #         builder_info.name,
+        #     ],
+        #     stdin=subprocess.PIPE,
+        #     stdout=subprocess.PIPE,
+        #     stderr=subprocess.PIPE,
+        # )
+        #
+        # process.stdin.write(dockerfile_content.encode())
+        # process.stdin.close()
+        #
+        # stderr_buffer = io.BytesIO()
+        # while True:
+        #     line = process.stderr.readline()
+        #     if not line:
+        #         break
+        #
+        #     if verbose:
+        #         sys.stderr.buffer.write(line)
+        #
+        #     stderr_buffer.write(line)
+        #
+        # process.wait()
+        #
+        # if process.returncode != 0:
+        #     if not verbose:
+        #         sys.stderr.buffer.write(stderr_buffer.getvalue())
+        #     full_no_cache_error_message = b"Can not continue. This build is supposed to be cached"
+        #     if full_no_cache_error_message in stderr_buffer.getvalue():
+        #         raise BuilderCacheMissError(full_no_cache_error_message.decode())
+        #
+        #     raise subprocess.CalledProcessError(
+        #         returncode=process.returncode,
+        #         cmd=cmd_args,
+        #         output=process.stdout.read(),
+        #         stderr=stderr_buffer.getvalue(),
+        #     )
+        #
+        # if use_only_cache:
+        #     logger.info(f"Dependency '{self.id}' is successfully restored from cache.")
+        # else:
+        #     logger.info(f"Dependency '{self.id}' is successfully built.")
 
     def run_and_output_in_oci_tarball(
             self,
-            on_cache_miss: CacheMissPolicy = CacheMissPolicy.CONTINUE,
-            on_children_cache_miss: CacheMissPolicy = CacheMissPolicy.CONTINUE,
+            fail_on_cache_miss: bool = False,
+            fail_on_children_cache_miss: bool = False,
             verbose: bool = True,
             verbose_children: bool = True
     ):
@@ -364,8 +656,8 @@ class BuilderStep():
 
         self.run(
             output=f"type=oci,dest={self.oci_layout_tarball}",
-            on_cache_miss=on_cache_miss,
-            on_children_cache_miss=on_children_cache_miss,
+            fail_on_cache_miss=fail_on_cache_miss,
+            fail_on_children_cache_miss=fail_on_children_cache_miss,
             verbose=verbose,
             verbose_children=verbose_children,
         )
@@ -378,8 +670,8 @@ class BuilderStep():
     def run_and_output_in_local_directory(
             self,
             output_dir: pl.Path = None,
-            on_cache_miss: CacheMissPolicy = CacheMissPolicy.CONTINUE,
-            on_children_cache_miss: CacheMissPolicy = CacheMissPolicy.CONTINUE,
+            fail_on_cache_miss: bool = False,
+            fail_on_children_cache_miss: bool = False,
             verbose: bool = True,
             verbose_children: bool = True,
 
@@ -391,8 +683,8 @@ class BuilderStep():
 
             self.run(
                 output=f"type=local,dest={self.output_dir}",
-                on_cache_miss=on_cache_miss,
-                on_children_cache_miss=on_children_cache_miss,
+                fail_on_cache_miss=fail_on_cache_miss,
+                fail_on_children_cache_miss=fail_on_children_cache_miss,
                 verbose=verbose,
                 verbose_children=verbose_children,
             )
@@ -410,8 +702,8 @@ class BuilderStep():
     def run_and_output_in_docker(
             self,
             tags: List[str] = None,
-            on_cache_miss: CacheMissPolicy = CacheMissPolicy.CONTINUE,
-            on_children_cache_miss: CacheMissPolicy = CacheMissPolicy.CONTINUE,
+            fail_on_cache_miss: bool = False,
+            fail_on_children_cache_miss: bool = False,
             verbose: bool = True,
             verbose_children: bool = True,
     ):
@@ -420,8 +712,8 @@ class BuilderStep():
 
         self.run(
             output=f"type=docker", tags=tags,
-            on_cache_miss=on_cache_miss,
-            on_children_cache_miss=on_children_cache_miss,
+            fail_on_cache_miss=fail_on_cache_miss,
+            fail_on_children_cache_miss=fail_on_children_cache_miss,
             verbose=verbose,
             verbose_children=verbose_children,
         )
@@ -516,59 +808,10 @@ class EssentialTools(BuilderStep):
         )
 
 
-class MissedCacheBuildCrasher:
-    def __init__(
-        self
-    ):
-
-        self._container_name = "cache_test"
-        self._container_port = "80/tcp"
-
-        self._container = ContainerWrapper(
-            name=self._container_name,
-            image="nginx",
-            network="test",
-            rm=True,
-            ports={0: self._container_port},
-        )
-
-        self.host_port = None
-
-    def start(self):
-
-        self._container.run()
-
-        self.host_port = self._container.get_host_port(
-            container_port=self._container_port,
-        )
-
-    def add_entry(self, name: str, value: str):
-        subprocess.run(
-            [
-                "docker",
-                "exec",
-                "-i",
-                self._container_name,
-                "/bin/bash",
-                "-e",
-                f'echo "{value}" /usr/share/nginx/html/{name}.html'
-            ]
-        )
-
-    def stop(self):
-        self._container.remove(force=True)
-
-
-_MISSED_CACHE_BUILD_CRASHER: Optional[MissedCacheBuildCrasher] = None
 
 
 def cleanup():
-    global _MISSED_CACHE_BUILD_CRASHER
-
-    if _MISSED_CACHE_BUILD_CRASHER:
-        delete_container(
-            container_name=_CACHE_CHECKER_CONTAINER_NAME,
-        )
+    pass
 
 
 atexit.register(cleanup)

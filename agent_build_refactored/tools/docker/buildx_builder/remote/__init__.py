@@ -172,6 +172,22 @@ class EC2BackedRemoteBuildxBuilderWrapper(BuildxBuilderWrapper):
         return buildkit_tunneled_local_port
 
     def close(self):
+
+        try:
+            subprocess.run(
+                [
+                    "docker",
+                    "buildx",
+                    "rm",
+                    self.name,
+                ],
+                check=True,
+                capture_output=True,
+            )
+        except subprocess.CalledProcessError as e:
+            logger.exception(f"Can not remove docker buildx builder '{self.name}'. Stderr: {e.stderr.decode()}")
+            raise
+
         if self.buildkit_builder_container:
             self.buildkit_builder_container.remove(force=True)
 

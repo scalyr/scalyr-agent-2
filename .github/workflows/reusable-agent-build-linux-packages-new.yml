@@ -315,7 +315,7 @@ jobs:
             CACHE_VERSION: ${{ inputs.cache_version }}
         run: |
           
-          OUTPUT="$(python3 build_package_new_refactored.py ${{ matrix.builder_name }} --on-cache-miss fail | tr -d '\n')"
+          OUTPUT="$(python3 build_package_new_refactored.py ${{ matrix.builder_name }} --fail-on-cache-miss)"
           
           if [ "${OUTPUT}" = "cache_hit" ]; then
             echo "cache_hit=true" >> "$GITHUB_OUTPUT"

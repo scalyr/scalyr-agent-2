@@ -22,8 +22,8 @@ if __name__ == '__main__':
     dependency: BuilderStep = all_dependencies[args.dependency_id]
 
     dependency.run(
-        on_cache_miss=CacheMissPolicy.CONTINUE,
-        on_children_cache_miss=CacheMissPolicy.FAIL,
+        fail_on_cache_miss=False,
+        fail_on_children_cache_miss=True,
         verbose=True,
         verbose_children=False,
     )
