@@ -353,7 +353,9 @@ class BuilderStep():
                 )
 
         if cache_miss:
-            raise BuilderCacheMissError()
+            raise BuilderCacheMissError(
+                f"Dependency '{self.id}' build has had cache miss and can not be continues"
+            )
 
     def run(
         self,
