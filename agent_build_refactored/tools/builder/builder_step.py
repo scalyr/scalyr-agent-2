@@ -301,19 +301,21 @@ class BuilderStep():
                     continue
 
                 if run_line.startswith(f"#{command_number} sha256:"):
+                    return True
                     done_message_allowed = True
                     continue
 
                 if run_line.startswith(f"#{command_number} extracting sha256:"):
+                    return True
                     continue
 
-                if run_line.startswith(f"#{command_number} DONE"):
-                    return done_message_allowed
+                # if run_line.startswith(f"#{command_number} DONE"):
+                #     return done_message_allowed
 
                 if re.match(rf"#{command_number} CACHED\n", run_line):
                     return True
-                else:
-                    return False
+
+                return False
 
         cache_miss = False
         if fail_on_cache_miss:
