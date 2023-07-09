@@ -308,6 +308,7 @@ class BuilderStep():
                     continue
 
                 if run_line.startswith(f"#{command_number} DONE") and done_message_allowed:
+                    done_message_allowed = False
                     continue
 
                 if re.match(rf"#{command_number} CACHED\n", run_line):
