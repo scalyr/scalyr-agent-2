@@ -287,6 +287,7 @@ class BuilderStep():
 
         def read_run_lines(command_number: int):
             lines_count = 0
+            done_message_allowed = False
             while True:
                 run_line = read_line()
 
@@ -300,9 +301,13 @@ class BuilderStep():
                     continue
 
                 if run_line.startswith(f"#{command_number} sha256:"):
+                    done_message_allowed = True
                     continue
 
                 if run_line.startswith(f"#{command_number} extracting sha256:"):
+                    continue
+
+                if run_line.startswith(f"#{command_number} DONE") and done_message_allowed:
                     continue
 
                 if re.match(rf"#{command_number} CACHED\n", run_line):
