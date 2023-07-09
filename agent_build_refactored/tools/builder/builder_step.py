@@ -307,9 +307,8 @@ class BuilderStep():
                 if run_line.startswith(f"#{command_number} extracting sha256:"):
                     continue
 
-                if run_line.startswith(f"#{command_number} DONE") and done_message_allowed:
-                    done_message_allowed = False
-                    continue
+                if run_line.startswith(f"#{command_number} DONE"):
+                    return done_message_allowed
 
                 if re.match(rf"#{command_number} CACHED\n", run_line):
                     return True
