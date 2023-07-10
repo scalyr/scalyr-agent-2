@@ -428,7 +428,6 @@ jobs:
       - name: Download built packages.
         uses: actions/download-artifact@v3
         with:
-          linux-packages-${{ matrix.builder.name }}
           name:  linux-packages-${{ matrix.test_target.builder }}
           path: /tmp/packages
 
