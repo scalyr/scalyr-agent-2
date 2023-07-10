@@ -44,7 +44,7 @@ from agent_build_refactored.tools.runner import (
     IN_DOCKER,
 )
 from agent_build_refactored.tools.constants import CpuArch, LibC
-from agent_build_refactored.tools.builder import Builder
+from agent_build_refactored.tools.builder import Builder, BuilderPathArg
 
 from agent_build_refactored.tools.constants import (
     SOURCE_ROOT,
@@ -343,9 +343,6 @@ class LinuxPackageBuilder(Builder):
             build_dev_requirements_step=build_dev_requirement_step
         )
 
-    def get_dependencies(self) -> List[BuilderStep]:
-        return []
-
     @property
     def common_agent_package_build_args(self) -> List[str]:
         """
@@ -405,9 +402,9 @@ class LinuxPackageBuilder(Builder):
         # Add config file
         add_config(SOURCE_ROOT / "config", package_root_path / "etc/scalyr-agent-2")
 
-    @property
-    def package_output_dir(self):
-        return self.output_dir / self.PACKAGE_TYPE
+    # @property
+    # def package_output_dir(self):
+    #     return self.output_dir / self.PACKAGE_TYPE
 
 
 class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
@@ -516,7 +513,7 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
         changelogs_path.mkdir()
         create_change_logs(output_dir=changelogs_path)
 
-        self.package_output_dir.mkdir(parents=True, exist_ok=True)
+        #self.package_output_dir.mkdir(parents=True, exist_ok=True)
 
         subprocess.check_call(
             [
@@ -537,7 +534,7 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
                 "--conflicts", AGENT_AIO_PACKAGE_NAME
                 # fmt: on
             ],
-            cwd=str(self.package_output_dir),
+            cwd=str(self.output_dir),
         )
 
 
@@ -583,14 +580,6 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
                 self.build_agent_libs_venv_step,
             ]
         )
-
-    def get_dependencies(self) -> List[BuilderStep]:
-        return [
-            self.build_python_step_with_openssl_3,
-            self.build_python_step_with_openssl_3.build_python_dependencies_step,
-            self.build_agent_libs_venv_step,
-            self.build_python_step_with_openssl_1,
-        ]
 
     def _prepare_package_python_and_libraries_files(self, package_root: pl.Path):
         """
@@ -852,7 +841,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         changelogs_path.mkdir()
         create_change_logs(output_dir=changelogs_path)
 
-        self.package_output_dir.mkdir(parents=True, exist_ok=True)
+        #self.package_output_dir.mkdir(parents=True, exist_ok=True)
 
         subprocess.check_call(
             [
@@ -876,7 +865,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
                 "--conflicts", AGENT_NON_AIO_AIO_PACKAGE_NAME
                 # fmt: on
             ],
-            cwd=str(self.package_output_dir),
+            cwd=str(self.output_dir),
         )
 
 

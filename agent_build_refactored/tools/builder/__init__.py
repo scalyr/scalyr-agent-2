@@ -204,6 +204,7 @@ class BuilderArg:
     default: Union[str, int, bool] = None
     choices: List[str] = None
     type: Type = None
+    required: bool = False
 
     def get_value(self, values: Dict):
         if self.name in values:
@@ -213,6 +214,9 @@ class BuilderArg:
                 return value
 
             return self.type(value)
+
+        if not self.required:
+            return None
 
         if self.default is None:
             raise Exception(f"Value for build argument {self.name} is not specified.")
@@ -242,14 +246,6 @@ class Builder(metaclass=BuilderMeta):
         default=False,
     )
 
-    # ON_CACHE_MISS_ARG = BuilderArg(
-    #     name="on_cache_miss",
-    #     cmd_line_name="--on-cache-miss",
-    #     choices=[p.value for p in CacheMissPolicy],
-    #     default=CacheMissPolicy.FALLBACK_TO_REMOTE_BUILDX_BUILDER.value,
-    #     type=CacheMissPolicy,
-    # )
-
     FAIL_ON_CACHE_MISS_ARG = BuilderArg(
         name="fail_on_cache_miss",
         cmd_line_name="--fail-on-cache-miss",
@@ -276,6 +272,19 @@ class Builder(metaclass=BuilderMeta):
         cmd_line_name="--verbose",
         cmd_line_action="store_true",
         default=False,
+    )
+
+    # OUTPUT_DIR_ARG = BuilderPathArg(
+    #     "output_dir",
+    #     cmd_line_name="--output-dir",
+    #     required=False,
+    # )
+
+    OUTPUT_DIR_ARG = BuilderArg(
+        "output_dir",
+        cmd_line_name="--output-dir",
+        required=False,
+        type=pl.Path,
     )
 
     def __init__(
@@ -333,13 +342,16 @@ class Builder(metaclass=BuilderMeta):
 
             arg_value = run_args.get(builder_arg.name)
 
+            if arg_value is None:
+                continue
+
             if builder_arg.cmd_line_action:
                 if builder_arg.cmd_line_action.startswith("store_") and arg_value is not None:
                     store_action = f"store_{str(arg_value).lower()}"
                     if store_action == builder_arg.cmd_line_action:
                         dockerfile_cmd_args.append(builder_arg.cmd_line_name)
             else:
-                if isinstance(builder_arg, BuilderPathArg):
+                if isinstance(builder_arg.type, pl.Path):
 
                     arg_path = pl.Path(arg_value).absolute()
                     in_docker_arg_path = pl.Path(f"/tmp/builder_arg_dirs{arg_path}")
@@ -439,6 +451,9 @@ class Builder(metaclass=BuilderMeta):
         fail_on_cache_miss = self.get_builder_arg_value(self.FAIL_ON_CACHE_MISS_ARG)
         verbose = self.get_builder_arg_value(self.VERBOSE_ARG)
 
+        if output_dir is None:
+            output_dir = self.get_builder_arg_value(self.OUTPUT_DIR_ARG)
+
         def _copy_to_output():
             if output_dir:
                 output_dir.mkdir(parents=True, exist_ok=True)
@@ -511,6 +526,9 @@ class Builder(metaclass=BuilderMeta):
             if builder_arg.choices:
                 extra_args["choices"] = builder_arg.choices
 
+            if builder_arg.required:
+                extra_args["required"] = builder_arg.required
+
             parser.add_argument(
                 builder_arg.cmd_line_name,
                 dest=builder_arg.name,
@@ -525,6 +543,12 @@ class Builder(metaclass=BuilderMeta):
                 continue
 
             value = getattr(args, builder_arg.name)
+
+            # if isinstance(builder_arg, BuilderPathArg):
+            #     value = pl.Path(value)
+
+            if not builder_arg.required and value is None:
+                continue
 
             if builder_arg.type:
                 value = builder_arg.type(value)

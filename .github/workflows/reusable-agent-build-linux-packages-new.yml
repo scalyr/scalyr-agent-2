@@ -281,9 +281,12 @@ jobs:
       #   "python-version": Version of python to set up on this runner.
       #   "os": Runner OS.
       matrix:
-        builder_name:
-          - deb-aio-x86_64
-          - deb-aio-aarch64
+        builder:
+          - name: deb-aio-x86_64
+            package_type: deb
+
+          - name: deb-aio-aarch64
+            package_type: deb
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -316,7 +319,12 @@ jobs:
             CACHE_VERSION: ${{ inputs.cache_version }}
         run: |
           
-          OUTPUT="$(python3 build_package_new_refactored.py ${{ matrix.builder_name }} --fail-on-cache-miss --verbose)"
+          OUTPUT="$(
+            python3 build_package_new_refactored.py ${{ matrix.builder.name }} \
+              --fail-on-cache-miss \
+              --verbose \
+              --output-dir ./build/${{ matrix.builder.package_type}} 
+          )"
           
           if [ "${OUTPUT}" = "cache_hit" ]; then
             echo "cache_hit=true" >> "$GITHUB_OUTPUT"
@@ -330,7 +338,7 @@ jobs:
         if: steps.build.outputs.cache_hit == 'true'
         uses: actions/upload-artifact@v3
         with:
-          name: linux-packages-${{ matrix.name }}
+          name: linux-packages-${{ matrix.builder.name }}
           path: build
           retention-days: 1
 
