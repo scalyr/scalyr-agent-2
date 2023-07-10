@@ -4,20 +4,35 @@ on:
   workflow_call:
     inputs:
       python_version:
-        description: Version of Python to use
+        description: "Version of Python to use."
         type: string
 
       cache_version:
         description: Version suffix for the cache key. May be useful when it is needed to invalidate the cache.
         type: string
 
-    outputs:
-      cache_hit:
-        description: "Flag that indicates that packages are build build by using cache."
-        value: ${{ jobs.build_packages.outputs.cache_hit }}
-    secrets:
+      aws_region:
+        description: AWS region for remote builds.
+        type: string
+
+      aws_security_group:
+        description: AWS security group for remote builds.
+        type: string
+
+      aws_prefix_list_id:
+        description: AWS prefix list for remote builds.
+        type: string
+
+      aws_objects_name_prefix:
+        description: Prefix for all AWS oject that are created by this workflow..
+        type: string
+
       CT_AWS_DEV_EC2_PRIVATE_KEY_NAME:
-        required: true
+        description: Prefix for all AWS oject that are created by this workflow..
+        type: string
+
+
+    secrets:
       CT_AWS_DEV_EC2_PRIVATE_KEY:
         required: true
       CT_AWS_DEV_EC2_ACCESS_KEY:
