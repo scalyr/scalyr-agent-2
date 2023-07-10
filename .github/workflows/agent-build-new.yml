@@ -8,20 +8,6 @@ on:
   pull_request:
     branches:
       - master
-  workflow_call:
-    secrets:
-      CT_AWS_DEV_EC2_PRIVATE_KEY_NAME:
-        required: true
-      CT_AWS_DEV_EC2_PRIVATE_KEY:
-        required: true
-      CT_AWS_DEV_EC2_ACCESS_KEY:
-        required: true
-      CT_AWS_DEV_EC2_SECRET_KEY:
-        required: true
-      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE:
-        required: true
-      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ:
-        required: true
 
   workflow_dispatch:
 
@@ -72,6 +58,17 @@ jobs:
     with:
       python_version: ${{ needs.pre_job.outputs.python_version }}
       cache_version: ${{ needs.pre_job.outputs.cache_version }}
+      aws_region: ${{ needs.pre_job.outputs.aws_region }}
+      aws_security_group: ${{ needs.pre_job.outputs.aws_security_group }}
+      aws_prefix_list_id: ${{ needs.pre_job.outputs.aws_prefix_list_id }}
+      aws_objects_name_prefix: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
+      CT_AWS_DEV_EC2_PRIVATE_KEY_NAME: ${{ needs.pre_job.outputs.CT_AWS_DEV_EC2_PRIVATE_KEY_NAME }}
+    secrets:
+      CT_AWS_DEV_EC2_PRIVATE_KEY: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
+      CT_AWS_DEV_EC2_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
+      CT_AWS_DEV_EC2_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
+      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
+      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
 
 
   build_cacheable_dependencies:
@@ -93,14 +90,13 @@ jobs:
       CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
       CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
 
-  rerun:
-    name: "Rerun"
+
+  build_linux_packages:
+    name: "Build Linux packages"
     needs:
       - pre_job
-      - build_cached_linux_packages
       - build_cacheable_dependencies
-    if: needs.build_cached_linux_packages.outputs.cache_hit != 'true'
-    uses: ./.github/workflows/agent-build-new.yml
+    uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
     with:
       python_version: ${{ needs.pre_job.outputs.python_version }}
       cache_version: ${{ needs.pre_job.outputs.cache_version }}
@@ -115,25 +111,6 @@ jobs:
       CT_AWS_DEV_EC2_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
       CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
       CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
-
-  continue:
-    runs-on: ubuntu-latest
-    needs:
-      - build_cached_linux_packages
-    if: needs.build_cached_linux_packages.outputs.cache_hit == 'true'
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-#  build_linux_packages:
-#    name: "Build Linux packages"
-#    needs:
-#      - pre_job
-#      - build_cacheable_dependencies
-#    uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
-#    with:
-#      python_version: ${{ needs.pre_job.outputs.python_version }}
-#      cache_version: ${{ needs.pre_job.outputs.cache_version }}
 
 
 #  build-linux-packages:
