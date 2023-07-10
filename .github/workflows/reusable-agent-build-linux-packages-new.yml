@@ -457,7 +457,7 @@ jobs:
             --distro-name ${{ matrix.test_target.distro-name }} \
             --remote-machine-type ${{ matrix.test_target.remote-machine-type }} \
             --packages-source-type dir \
-            --packages-source /tmp/packages \
+            --packages-source /tmp/packages/${{ matrix.test_target.package_type }} \
             --scalyr-api-key ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }} \
             --scalyr-api-read-key ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }} \
             --test-session-suffix ${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}
