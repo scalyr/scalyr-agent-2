@@ -119,6 +119,9 @@ jobs:
     needs:
       - build_cached_linux_packages
     if: needs.build_cached_linux_packages.outputs.cache_hit == 'true'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
 #  build_linux_packages:
 #    name: "Build Linux packages"
