@@ -6,8 +6,10 @@ import os
 from typing import Dict
 
 from agent_build_refactored.tools.constants import SOURCE_ROOT, CpuArch, LibC
-from agent_build_refactored.tools.builder import BuilderStep, Builder
-from agent_build_refactored.build_dependencies import PREPARE_PYTHON_ENVIRONMENT_STEPS
+from agent_build_refactored.tools.builder import BuilderStep
+from agent_build_refactored.build_dependencies.python import (
+    PREPARE_BUILD_BASE_WITH_PYTHON_STEPS
+)
 from agent_build_refactored.build_dependencies.python.prepare_build_base_with_python import PrepareBuildBaseWithPythonStep
 
 _PARENT_DIR = pl.Path(__file__).parent
@@ -27,6 +29,7 @@ class PortablePytestRunnerBuilderStep(BuilderStep):
             name="build_portable_pytest_runner",
             context=SOURCE_ROOT,
             dockerfile=_PARENT_DIR / "Dockerfile",
+            platform=self.prepare_python_environment_step.platform,
             build_contexts=[
                 self.prepare_python_environment_step,
             ],
@@ -45,10 +48,10 @@ class PortablePytestRunnerBuilderStep(BuilderStep):
 PORTABLE_PYTEST_RUNNER_BUILDER_STEPS: Dict[LibC, Dict[CpuArch, PortablePytestRunnerBuilderStep]] = collections.defaultdict(dict)
 
 
-for runner_libc, architectures in PREPARE_PYTHON_ENVIRONMENT_STEPS.items():
+for runner_libc, architectures in PREPARE_BUILD_BASE_WITH_PYTHON_STEPS.items():
     for runner_architecture, prepare_python_env_step in architectures.items():
         step = PortablePytestRunnerBuilderStep(
-            prepare_python_environment_step=prepare_python_env_step
+            prepare_python_environment_step=prepare_python_env_step,
         )
 
         PORTABLE_PYTEST_RUNNER_BUILDER_STEPS[runner_libc][runner_architecture] = step

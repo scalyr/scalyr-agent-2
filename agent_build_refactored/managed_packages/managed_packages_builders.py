@@ -62,9 +62,15 @@ from agent_build_refactored.build_dependencies.python.prepare_build_base_with_py
 # )
 from agent_build_refactored.build_dependencies.versions import PYTHON_VERSION
 
-from agent_build_refactored.build_dependencies.ubuntu_toolset import UbuntuToolset
+from agent_build_refactored.build_dependencies.ubuntu_toolset import UbuntuToolset, UBUNTU_TOOLSET_X86_64
 
 from agent_build_refactored.build_dependencies.build_agent_libs_venv import BuildAgentLibsVenvStep
+from agent_build_refactored.build_dependencies.python import (
+    PREPARE_BUILD_BASE_WITH_PYTHON_STEPS,
+    BUILD_PYTHON_STEPS,
+    BUILD_PYTHON_STEPS_WITH_OPENSSL_1,
+    BUILD_PYTHON_DEPENDENCIES_STEPS,
+)
 from agent_build_refactored.build_dependencies.python.build_python_dependencies import (
     BuildPytonDependenciesStep,
     DownloadSourcesStep,
@@ -230,118 +236,13 @@ class LinuxPackageBuilder(Builder):
 
     def __init__(self, dependencies: List[BuilderStep] = None):
 
-        self.ubuntu_toolset = self.create_ubuntu_toolset()
+        self.ubuntu_toolset = UBUNTU_TOOLSET_X86_64
 
         super(LinuxPackageBuilder, self).__init__(
             base=self.ubuntu_toolset,
             dependencies=dependencies,
         )
 
-    @staticmethod
-    def create_python_step(
-            openssl_version: str,
-            architecture: CpuArch,
-            libc: LibC,
-    ):
-        download_sources_step = DownloadSourcesStep.create(
-            python_version=PYTHON_VERSION,
-            bzip_version="1.0.8",
-            libedit_version_commit="0cdd83b3ebd069c1dee21d81d6bf716cae7bf5da",  # tag - "upstream/3.1-20221030"
-            libffi_version="3.4.2",
-            ncurses_version="6.3",
-            openssl_1_version=OPENSSL_1_VERSION,
-            openssl_3_version=OPENSSL_3_VERSION,
-            tcl_version_commit="338c6692672696a76b6cb4073820426406c6f3f9",  # tag - "core-8-6-13"
-            sqlite_version_commit="e671c4fbc057f8b1505655126eaf90640149ced6",  # tag - "version-3.41.2"
-            util_linux_version="2.38",
-            xz_version="5.2.6",
-            zlib_version="1.2.13",
-        )
-
-        prepare_build_base_step = PrepareBuildBaseStep.create(
-            architecture=architecture,
-            libc=libc,
-            run_in_remote_builder_if_possible=True,
-        )
-
-        build_python_dependencies_step = BuildPytonDependenciesStep.create(
-            download_sources_step=download_sources_step,
-            prepare_build_base=prepare_build_base_step,
-            install_prefix=PYTHON_DEPENDENCIES_INSTALL_PREFIX,
-            run_in_remote_builder_if_possible=True,
-        )
-
-        build_python_step = BuilderPythonStep.create(
-            download_sources_step=download_sources_step,
-            prepare_build_base_step=prepare_build_base_step,
-            build_python_dependencies_step=build_python_dependencies_step,
-            openssl_version=openssl_version,
-            install_prefix=PYTHON_INSTALL_PREFIX,
-            dependencies_install_prefix=PYTHON_DEPENDENCIES_INSTALL_PREFIX,
-            run_in_remote_builder_if_possible=True,
-        )
-
-        return build_python_step
-
-    @staticmethod
-    def build_dev_requirements(
-        architecture: CpuArch,
-        libc: LibC,
-    ):
-        build_python_step= LinuxPackageBuilder.create_python_step(
-            openssl_version=OPENSSL_3_VERSION,
-            architecture=architecture,
-            libc=libc,
-        )
-
-        return BuildDevRequirementsStep.create(
-            build_python_step=build_python_step,
-            run_in_remote_builder_if_possible=True,
-        )
-
-    @staticmethod
-    def create_build_base_with_python(
-        architecture: CpuArch,
-        libc: LibC,
-    ):
-        build_python_step = LinuxPackageBuilder.create_python_step(
-            openssl_version=OPENSSL_3_VERSION,
-            architecture=architecture,
-            libc=libc,
-        )
-
-        build_dev_requirements_step = LinuxPackageBuilder.build_dev_requirements(
-            architecture=architecture,
-            libc=libc
-        )
-
-        return PrepareBuildBaseWithPythonStep(
-            build_python_step=build_python_step,
-            build_dev_requirements_step=build_dev_requirements_step,
-            run_in_remote_builder_if_possible=True,
-        )
-
-    @staticmethod
-    def create_ubuntu_toolset():
-
-        architecture = CpuArch.x86_64
-        libc = LibC.GNU
-
-        build_python_step = LinuxPackageBuilder.create_python_step(
-            openssl_version=OPENSSL_3_VERSION,
-            architecture=architecture,
-            libc=libc,
-        )
-
-        build_dev_requirement_step = LinuxPackageBuilder.build_dev_requirements(
-            architecture=architecture,
-            libc=libc,
-        )
-
-        return UbuntuToolset(
-            build_python_step=build_python_step,
-            build_dev_requirements_step=build_dev_requirement_step
-        )
 
     @property
     def common_agent_package_build_args(self) -> List[str]:
@@ -553,24 +454,17 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         self.architecture = self.__class__.ARCHITECTURE
         self.libc = self.__class__.LIBC
 
-        self.prepare_build_base_with_python = self.create_build_base_with_python(
-            architecture=self.architecture,
-            libc=self.libc,
-        )
+        self.prepare_build_base_with_python = PREPARE_BUILD_BASE_WITH_PYTHON_STEPS[self.libc][self.architecture]
 
-        self.build_python_step = self.prepare_build_base_with_python.build_python_step
+        self.build_python_step = BUILD_PYTHON_STEPS[self.libc][self.architecture]
 
-        self.build_python_dependencies_step = self.build_python_step.build_python_dependencies_step
+        self.build_python_dependencies_step = BUILD_PYTHON_DEPENDENCIES_STEPS[self.libc][self.architecture]
 
         self.build_agent_libs_venv_step = BuildAgentLibsVenvStep.create(
             prepare_build_base_with_python_step=self.prepare_build_base_with_python,
         )
 
-        self.build_python_step_with_openssl_1 = self.create_python_step(
-            openssl_version=OPENSSL_1_VERSION,
-            architecture=self.architecture,
-            libc=self.libc,
-        )
+        self.build_python_step_with_openssl_1 = BUILD_PYTHON_STEPS_WITH_OPENSSL_1[self.libc][self.architecture]
         
         super(LinuxAIOPackagesBuilder, self).__init__(
             dependencies=[

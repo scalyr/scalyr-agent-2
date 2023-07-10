@@ -3,8 +3,8 @@ import pathlib as pl
 import shutil
 import subprocess
 
-from agent_build_refactored.build_dependencies import UBUNTU_TOOLSET_STEP
-from agent_build_refactored.tools.builder import Builder, BuilderPathArg
+from agent_build_refactored.build_dependencies.ubuntu_toolset import UBUNTU_TOOLSET_X86_64
+from agent_build_refactored.tools.builder import Builder, BuilderArg
 
 
 class RepoBuilder(Builder):
@@ -13,7 +13,7 @@ class RepoBuilder(Builder):
     The result repo is used as a mock repository for testing.
     """
 
-    PACKAGES_DIR_ARG = BuilderPathArg(
+    PACKAGES_DIR_ARG = BuilderArg(
         name="packages_dir",
         cmd_line_name="--packages-dir",
         type=pl.Path,
@@ -23,7 +23,7 @@ class RepoBuilder(Builder):
         self,
     ):
         super(RepoBuilder, self).__init__(
-            base=UBUNTU_TOOLSET_STEP,
+            base=UBUNTU_TOOLSET_X86_64,
         )
 
     def _build_repo_files(

@@ -8,6 +8,21 @@ on:
   pull_request:
     branches:
       - master
+  workflow_call:
+    secrets:
+      CT_AWS_DEV_EC2_PRIVATE_KEY_NAME:
+        required: true
+      CT_AWS_DEV_EC2_PRIVATE_KEY:
+        required: true
+      CT_AWS_DEV_EC2_ACCESS_KEY:
+        required: true
+      CT_AWS_DEV_EC2_SECRET_KEY:
+        required: true
+      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE:
+        required: true
+      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ:
+        required: true
+
   workflow_dispatch:
 
   schedule:
@@ -27,6 +42,11 @@ jobs:
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
       python_version: ${{ steps.define_constants.outputs.python_version }}
       cache_version: ${{ steps.define_constants.outputs.cache_version }}
+      aws_region: ${{ steps.define_constants.outputs.aws_region }}
+      aws_security_group: ${{ steps.define_constants.outputs.aws_security_group }}
+      aws_prefix_list_id: ${{ steps.define_constants.outputs.aws_prefix_list_id }}
+      aws_objects_name_prefix: ${{ steps.define_constants.outputs.aws_objects_name_prefix }}
+      CT_AWS_DEV_EC2_PRIVATE_KEY_NAME: ${{ steps.define_constants.outputs.CT_AWS_DEV_EC2_PRIVATE_KEY_NAME }}
     steps:
       - id: skip_check
         uses: fkirc/skip-duplicate-actions@12aca0a884f6137d619d6a8a09fcc3406ced5281 # v4.0.0
@@ -38,6 +58,11 @@ jobs:
         run: |
           echo "python_version=3.8" >> "${GITHUB_OUTPUT}"
           echo "cache_version=4" >> "${GITHUB_OUTPUT}"
+          echo "aws_region=us-east-1" >> "${GITHUB_OUTPUT}"
+          echo "aws_security_group=github-actions-remote-access" >> "${GITHUB_OUTPUT}"
+          echo "aws_prefix_list_id=pl-04a16228a97704d23" >> "${GITHUB_OUTPUT}"
+          echo "aws_objects_name_prefix=${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}" >> "${GITHUB_OUTPUT}"
+          echo "CT_AWS_DEV_EC2_PRIVATE_KEY_NAME=CT_SCALYR_AGENT_GHA" >> "${GITHUB_OUTPUT}"
 
   build_cached_linux_packages:
     name: "Build cached Linux packages"
@@ -56,28 +81,54 @@ jobs:
     with:
       python_version: ${{ needs.pre_job.outputs.python_version }}
       cache_version: ${{ needs.pre_job.outputs.cache_version }}
-      aws_region: us-east-1
-      aws_security_group: github-actions-remote-access
-      aws_prefix_list_id: pl-04a16228a97704d23
-      aws_objects_name_prefix: ${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}
+      aws_region: ${{ needs.pre_job.outputs.aws_region }}
+      aws_security_group: ${{ needs.pre_job.outputs.aws_security_group }}
+      aws_prefix_list_id: ${{ needs.pre_job.outputs.aws_prefix_list_id }}
+      aws_objects_name_prefix: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
+      CT_AWS_DEV_EC2_PRIVATE_KEY_NAME: ${{ needs.pre_job.outputs.CT_AWS_DEV_EC2_PRIVATE_KEY_NAME }}
     secrets:
-      CT_AWS_DEV_EC2_PRIVATE_KEY_NAME: CT_SCALYR_AGENT_GHA
       CT_AWS_DEV_EC2_PRIVATE_KEY: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
       CT_AWS_DEV_EC2_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
       CT_AWS_DEV_EC2_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
       CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
       CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
 
-
-  build_linux_packages:
-    name: "Build Linux packages"
+  rerun:
+    name: "Rerun"
     needs:
       - pre_job
       - build_cacheable_dependencies
-    uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
+    uses: ./.github/workflows/agent-build-new.yml
     with:
       python_version: ${{ needs.pre_job.outputs.python_version }}
       cache_version: ${{ needs.pre_job.outputs.cache_version }}
+      aws_region: ${{ needs.pre_job.outputs.aws_region }}
+      aws_security_group: ${{ needs.pre_job.outputs.aws_security_group }}
+      aws_prefix_list_id: ${{ needs.pre_job.outputs.aws_prefix_list_id }}
+      aws_objects_name_prefix: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
+      CT_AWS_DEV_EC2_PRIVATE_KEY_NAME: ${{ needs.pre_job.outputs.CT_AWS_DEV_EC2_PRIVATE_KEY_NAME }}
+    secrets:
+      CT_AWS_DEV_EC2_PRIVATE_KEY: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
+      CT_AWS_DEV_EC2_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
+      CT_AWS_DEV_EC2_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
+      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
+      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
+
+  continue:
+    runs-on: ubuntu-latest
+    needs:
+      - build_cached_linux_packages
+    if: needs.build_cached_linux_packages.outputs.cache_hit == 'true'
+
+#  build_linux_packages:
+#    name: "Build Linux packages"
+#    needs:
+#      - pre_job
+#      - build_cacheable_dependencies
+#    uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
+#    with:
+#      python_version: ${{ needs.pre_job.outputs.python_version }}
+#      cache_version: ${{ needs.pre_job.outputs.cache_version }}
 
 
 #  build-linux-packages:

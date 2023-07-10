@@ -84,11 +84,10 @@ def create_server_root(
             # Build packages now.
             builder = package_builder()
             builder.run_package_builder()
-            builder_output = builder.output_dir
+            packages_dir = builder.output_dir
         else:
-            builder_output = pl.Path(packages_source)
+            packages_dir = pl.Path(packages_source)
 
-        packages_dir = builder_output / package_builder.PACKAGE_TYPE
         repo_packages = work_dir / "repo_packages"
         repo_packages.mkdir(parents=True)
         shutil.copytree(packages_dir, repo_packages, dirs_exist_ok=True)

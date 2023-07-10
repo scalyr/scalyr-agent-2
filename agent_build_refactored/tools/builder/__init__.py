@@ -427,11 +427,14 @@ class Builder(metaclass=BuilderMeta):
         self,
         output_dir: pl.Path = None,
         locally: bool = False,
+        verbose: bool = True,
     ):
         return self.run_builder(
             output_dir=output_dir,
+
             **{
                 self.__class__.LOCALLY_ARG.name: locally,
+                self.__class__.VERBOSE_ARG.name: verbose,
             }
         )
 

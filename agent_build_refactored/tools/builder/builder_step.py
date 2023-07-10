@@ -288,7 +288,6 @@ class BuilderStep():
 
         def read_run_lines(command_number: int):
             lines_count = 0
-            done_message_allowed = False
             while True:
                 run_line = read_line()
 
@@ -299,28 +298,17 @@ class BuilderStep():
                 _print_line(run_line)
 
                 if not run_line.startswith(f"#{command_number} "):
-                    print("CONT", file=sys.stderr)
                     continue
 
                 if run_line.startswith(f"#{command_number} sha256:"):
-                    print("TRUE", file=sys.stderr)
                     return True
-                    done_message_allowed = True
-                    continue
 
                 if run_line.startswith(f"#{command_number} extracting sha256:"):
-                    print("TRUE", file=sys.stderr)
                     return True
-                    continue
-
-                # if run_line.startswith(f"#{command_number} DONE"):
-                #     return done_message_allowed
 
                 if re.match(rf"#{command_number} CACHED\n", run_line):
-                    print("TRUE", file=sys.stderr)
                     return True
 
-                print("FALSE", file=sys.stderr)
                 return False
 
         cache_miss = False
@@ -343,7 +331,6 @@ class BuilderStep():
                         cache_miss = True
                         break
 
-
         while True:
             line = read_line()
 
@@ -355,10 +342,11 @@ class BuilderStep():
         process.wait()
 
         if process.returncode != 0:
+            stderr = stderr_buffer.getvalue()
+            if not verbose:
+                sys.stderr.buffer.write(stderr)
             if not fail_on_cache_miss or not cache_miss:
-                stderr = stderr_buffer.getvalue()
-                if not verbose:
-                    sys.stderr.buffer.write(stderr)
+
                 raise subprocess.CalledProcessError(
                     returncode=process.returncode,
                     cmd=cmd_args,
