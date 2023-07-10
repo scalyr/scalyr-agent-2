@@ -11,8 +11,8 @@ env/
 .env/
 bin/
 !agent_build_refactored/managed_packages/files/bin/
-!agent_build_refactored/build_dependencies/python/build_python_with_switchable_openssl/files/venv
-!agent_build_refactored/build_dependencies/python/build_python_with_switchable_openssl/files/bin
+!agent_build_refactored/build_dependencies/python/build_python_for_packages/files/venv
+!agent_build_refactored/build_dependencies/python/build_python_for_packages/files/bin
 !agent_build_refactored/managed_packages/non-aio/files/bin/
 build/
 cover/
