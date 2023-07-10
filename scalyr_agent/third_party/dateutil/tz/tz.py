@@ -1102,7 +1102,7 @@ class tzstr(tzrange):
             self._start_delta = None
             self._end_delta = None
         else:
-            self._start_delta = self._delta(res.run)
+            self._start_delta = self._delta(res.start)
             if self._start_delta:
                 self._end_delta = self._delta(res.end, isend=1)
 

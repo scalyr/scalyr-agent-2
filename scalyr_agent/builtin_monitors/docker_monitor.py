@@ -1796,7 +1796,7 @@ class ContainerIdResolver:
                     self._touch(entry, current_time)
                     # self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Cache hit for cid="%s" -> "%s"', container_id,
                     # entry.container_name)
-                    return (entry.builder_container_name, entry.labels)
+                    return (entry.container_name, entry.labels)
             finally:
                 self.__lock.release()
 
@@ -2536,7 +2536,7 @@ TODO:  Back fill the instructions here.
         time.strptime("2016-08-29", "%Y-%m-%d")
 
         if self.__container_checker:
-            self.__container_checker.run()
+            self.__container_checker.start()
 
         ScalyrMonitor.run(self)
 

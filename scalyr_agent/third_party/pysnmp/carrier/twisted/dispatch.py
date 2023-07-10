@@ -36,7 +36,7 @@ class TwistedDispatcher(AbstractTransportDispatcher):
 
     def registerTransport(self, tDomain, transport):
         if not self.loopingcall.running and self.getTimerResolution() > 0:
-            self.loopingcall.run(self.getTimerResolution(), now = False)
+            self.loopingcall.start(self.getTimerResolution(), now = False)
         AbstractTransportDispatcher.registerTransport(
             self, tDomain, transport
             )
