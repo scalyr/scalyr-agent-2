@@ -300,11 +300,11 @@ jobs:
       matrix:
         builder:
           - { "name": "deb-aio-x86_64",  "package_type": "deb" }
-          - { "name": "deb-aio-aarch64", "package_type": "rpm" }
-          - { "name": "rpm-aio-x86_64",  "package_type": "deb" }
+          - { "name": "deb-aio-aarch64", "package_type": "deb" }
+          - { "name": "rpm-aio-x86_64",  "package_type": "rpm" }
           - { "name": "rpm-aio-aarch64", "package_type": "rpm" }
           - { "name": "deb-non-aio",     "package_type": "deb" }
-          - { "name": "deb-non-aio",     "package_type": "rpm" }
+          - { "name": "rpm-non-aio",     "package_type": "rpm" }
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
