@@ -97,7 +97,9 @@ jobs:
     name: "Rerun"
     needs:
       - pre_job
+      - build_cached_linux_packages
       - build_cacheable_dependencies
+    if: needs.build_cached_linux_packages.outputs.cache_hit != 'true'
     uses: ./.github/workflows/agent-build-new.yml
     with:
       python_version: ${{ needs.pre_job.outputs.python_version }}
