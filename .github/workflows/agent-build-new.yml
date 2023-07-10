@@ -37,7 +37,7 @@ jobs:
       - id: define_constants
         run: |
           echo "python_version=3.8" >> "${GITHUB_OUTPUT}"
-          echo "cache_version=2" >> "${GITHUB_OUTPUT}"
+          echo "cache_version=3" >> "${GITHUB_OUTPUT}"
 
   build_cached_linux_packages:
     name: "Build cached Linux packages"
