@@ -11,6 +11,79 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+
+"""
+This module is responsible for building Python agent for Linux distributions with package managers.
+
+It defines builder classes that are responsible for the building of the Linux agent deb and rpm packages that are
+    managed by package managers such as apt and yum.
+
+There are two variants of packages that can be built:
+    1. All in one (aio) package named "scalyr-agent-2-aio", that contains all required dependencies, so it can run basically on any Linux
+        glibc-based distribution.
+    2. Package that depends on some system packages, such as Python or OpenSLL, named "scalyr-agent-2". Probably will be
+        discontinued in the future in favour of the first one.
+
+The aio package provides the "embedded" Python interpreter that is specially built to be used by the agent.
+    It is built against the oldest possible version of gLibc, so it has to be enough to maintain
+    only one build of the package in order to support all target systems.
+
+    One of the features on the package, is that is can use system's OpenSSL if it has appropriate version, or
+    fallback to the OpenSSL library which is shipped with the package. To achieve that, the Python interpreter from the
+    package contains multiple versions of OpenSSL (1.1.1 and 3) and Python's 'OpenSSL-related' C bindings - _ssl.cpython*.so and _hashlib.cpython.so.
+    On each new installation/upgrade of the package (or user's manual run of the command
+    `/opt/scalyr-agent-2/bin/agent-python3-config initialize`), the package follows next steps in order to
+    resolve OpenSSL library to use:
+        - 1: First it tries to find system's OpenSSL 3+. It creates a symlink '/opt/scalyr-agent-2/lib/openssl/current'
+            that points to the directory `/opt/scalyr-agent-2/lib/openssl/3`. This directory contains directory
+            named 'bindings' that, in turn, contains Python's C bindings - '_ssl' and '_hashlib' that are compiled
+            against OpenSSL 3. The Python's OpenSSL-related C bindings in '/opt/scalyr-agent-2/python3/lib/pythonX.Y/lib-dynload'
+            are also linked to the bindings in the `current` directory, so by changing the target of the `current` symlink
+            we also change OpenSSL version of the Python's C bindings.
+            Then the package will try "probe" the system's OpenSSL. That is done basically just by running new
+            process of the interpreter and importing the 'ssl' module. If there's no exception, then appropriate
+            OpenSSL 3 is presented in the system and Python can use it. If there is an exception, then
+            OpenSSL 3 can not be found and we go to the step 2.
+
+        - 2: If first step is not successful and system does not have appropriate OpenSSL 3, then we re-create the
+            `current` symlink and link it with the `/opt/scalyr-agent-2/lib/openssl/1_1_1` which has bindings for
+            OpenSSL 1.1.1+, so we can repeat the same "probing", but now for OpenSSL 1.1.1+.
+
+        - 3: If OpenSSL 1.1.1+ is also not presented in a system, then we fallback to the 'embedded' OpenSSL library that
+            is shipped with the package. This is achieved by making the `current` symlink to target the
+            '/opt/scalyr-agent-2/lib/openssl/embedded' directory. This directory, as in previous steps, contains
+            C bindings for OpenSSL (for now we use 1.1.1 for the embedded OpenSSL), but it also has another
+            subdirectory named 'libs', and this subdirectory contains shared objects of the embedded OpenSSL.
+            Agent, when starts new process of the Python interpreter, adds '/opt/scalyr-agent-2/lib/openssl/current' to
+            the 'LD_LIBRARY_PATH' environment variable, so when the `current` directory is linked with the `embedded`
+            directory, system's dynamic linker has to find the shared objects of the embedded OpenSSL earlier that
+            anything else that may be presented in a system.
+
+The package also provides requirement libraries for the agent, for example Python 'requests' or 'orjson' libraries.
+    Agent requirements are shipped in form of virtualenv (or just venv). The venv with agent's 'core' requirements is shipped with this packages.
+    User can also install their own additional requirements by specifying them in the package's config file -
+    /opt/scalyr-agent-2/etc/additional-requirements.txt.
+    The original venv that is shipped with the package is never used directly by the agent. Instead of that, the package
+    follows the next steps:
+        - 1: The original venv is copied to the `/var/opt/scalyr-agent/venv` directory, the path that is
+               expected to be used by the agent.
+        - 2: The requirements from the additional-requirements.txt file are installed to a copied venv. The core
+                requirements are already there, so it has to install only additional ones.
+
+    This new venv initialization process is triggered every time by the package's 'postinstall' script, guaranteeing
+    that venv is up to date on each install/upgrade. For the same purpose, the `additional-requirements.txt` file is
+    set as package's config file, to be able to 'survive' upgrades. User also can 're-initialize' agent requirements
+    manually by running the command `/opt/scalyr-agent-2/bin/agent-libs-config initialize`
+
+
+The structure of the package has to guarantee that files of these packages does not interfere with
+    files of local system Python interpreter. To achieve that, Python interpreter files are installed in the
+    '/opt/scalyr-agent-2/python3' directory.
+
+
+"""
+
 import abc
 import dataclasses
 import hashlib
@@ -53,14 +126,7 @@ from agent_build_refactored.tools.constants import (
     REQUIREMENTS_COMMON,
     REQUIREMENTS_COMMON_PLATFORM_DEPENDENT,
 )
-from agent_build_refactored.build_dependencies.python.prepare_build_base_with_python import PrepareBuildBaseWithPythonStep
-# from agent_build_refactored.build_dependencies import (
-#     BUILD_PYTHON_WITH_OPENSSL_1_STEPS,
-#     BUILD_PYTHON_WITH_OPENSSL_3_STEPS,
-#     PREPARE_PYTHON_ENVIRONMENT_STEPS,
-#     UBUNTU_TOOLSET_STEP,
-# )
-from agent_build_refactored.build_dependencies.versions import PYTHON_VERSION
+from agent_build_refactored.build_dependencies.versions import PYTHON_VERSION, EMBEDDED_OPENSSL_VERSION_NUMBER
 
 from agent_build_refactored.build_dependencies.ubuntu_toolset import UbuntuToolset, UBUNTU_TOOLSET_X86_64
 
@@ -71,93 +137,16 @@ from agent_build_refactored.build_dependencies.python import (
     BUILD_PYTHON_STEPS_WITH_OPENSSL_1,
     BUILD_PYTHON_DEPENDENCIES_STEPS,
 )
-from agent_build_refactored.build_dependencies.python.build_python_dependencies import (
-    BuildPytonDependenciesStep,
-    DownloadSourcesStep,
-    PrepareBuildBaseStep,
-)
 
-from agent_build_refactored.build_dependencies.python.build_python import BuilderPythonStep
-from agent_build_refactored.build_dependencies.python.build_dev_requirements import BuildDevRequirementsStep
-from agent_build_refactored.tools import check_call_with_log
 from agent_build_refactored.prepare_agent_filesystem import (
     build_linux_fhs_agent_files,
     add_config,
     create_change_logs,
 )
 
+
 logger = logging.getLogger(__name__)
 
-"""
-This module is responsible for building Python agent for Linux distributions with package managers.
-
-It defines builder classes that are responsible for the building of the Linux agent deb and rpm packages that are
-    managed by package managers such as apt and yum.
-
-There are two variants of packages that can be built:
-    1. All in one (aio) package named "scalyr-agent-2-aio", that contains all required dependencies, so it can run basically on any Linux 
-        glibc-based distribution.
-    2. Package that depends on some system packages, such as Python or OpenSLL, named "scalyr-agent-2". Probably will be 
-        discontinued in the future in favour of the first one.
-        
-The aio package provides the "embedded" Python interpreter that is specially built to be used by the agent.
-    It is built against the oldest possible version of gLibc, so it has to be enough to maintain
-    only one build of the package in order to support all target systems.
-
-    One of the features on the package, is that is can use system's OpenSSL if it has appropriate version, or
-    fallback to the OpenSSL library which is shipped with the package. To achieve that, the Python interpreter from the
-    package contains multiple versions of OpenSSL (1.1.1 and 3) and Python's 'OpenSSL-related' C bindings - _ssl.cpython*.so and _hashlib.cpython.so.
-    On each new installation/upgrade of the package (or user's manual run of the command
-    `/opt/scalyr-agent-2/bin/agent-python3-config initialize`), the package follows next steps in order to
-    resolve OpenSSL library to use:
-        - 1: First it tries to find system's OpenSSL 3+. It creates a symlink '/opt/scalyr-agent-2/lib/openssl/current' 
-            that points to the directory `/opt/scalyr-agent-2/lib/openssl/3`. This directory contains directory
-            named 'bindings' that, in turn, contains Python's C bindings - '_ssl' and '_hashlib' that are compiled 
-            against OpenSSL 3. The Python's OpenSSL-related C bindings in '/opt/scalyr-agent-2/python3/lib/pythonX.Y/lib-dynload'
-            are also linked to the bindings in the `current` directory, so by changing the target of the `current` symlink
-            we also change OpenSSL version of the Python's C bindings. 
-            Then the package will try "probe" the system's OpenSSL. That is done basically just by running new 
-            process of the interpreter and importing the 'ssl' module. If there's no exception, then appropriate 
-            OpenSSL 3 is presented in the system and Python can use it. If there is an exception, then 
-            OpenSSL 3 can not be found and we go to the step 2.
-            
-        - 2: If first step is not successful and system does not have appropriate OpenSSL 3, then we re-create the
-            `current` symlink and link it with the `/opt/scalyr-agent-2/lib/openssl/1_1_1` which has bindings for
-            OpenSSL 1.1.1+, so we can repeat the same "probing", but now for OpenSSL 1.1.1+.
-
-        - 3: If OpenSSL 1.1.1+ is also not presented in a system, then we fallback to the 'embedded' OpenSSL library that
-            is shipped with the package. This is achieved by making the `current` symlink to target the 
-            '/opt/scalyr-agent-2/lib/openssl/embedded' directory. This directory, as in previous steps, contains 
-            C bindings for OpenSSL (for now we use 1.1.1 for the embedded OpenSSL), but it also has another 
-            subdirectory named 'libs', and this subdirectory contains shared objects of the embedded OpenSSL.
-            Agent, when starts new process of the Python interpreter, adds '/opt/scalyr-agent-2/lib/openssl/current' to
-            the 'LD_LIBRARY_PATH' environment variable, so when the `current` directory is linked with the `embedded`
-            directory, system's dynamic linker has to find the shared objects of the embedded OpenSSL earlier that 
-            anything else that may be presented in a system. 
-
-The package also provides requirement libraries for the agent, for example Python 'requests' or 'orjson' libraries. 
-    Agent requirements are shipped in form of virtualenv (or just venv). The venv with agent's 'core' requirements is shipped with this packages.
-    User can also install their own additional requirements by specifying them in the package's config file -
-    /opt/scalyr-agent-2/etc/additional-requirements.txt.
-    The original venv that is shipped with the package is never used directly by the agent. Instead of that, the package
-    follows the next steps:
-        - 1: The original venv is copied to the `/var/opt/scalyr-agent/venv` directory, the path that is
-               expected to be used by the agent.
-        - 2: The requirements from the additional-requirements.txt file are installed to a copied venv. The core
-                requirements are already there, so it has to install only additional ones.
-
-    This new venv initialization process is triggered every time by the package's 'postinstall' script, guaranteeing
-    that venv is up to date on each install/upgrade. For the same purpose, the `additional-requirements.txt` file is
-    set as package's config file, to be able to 'survive' upgrades. User also can 're-initialize' agent requirements
-    manually by running the command `/opt/scalyr-agent-2/bin/agent-libs-config initialize`
-
-
-The structure of the package has to guarantee that files of these packages does not interfere with
-    files of local system Python interpreter. To achieve that, Python interpreter files are installed in the
-    '/opt/scalyr-agent-2/python3' directory.
-
-
-"""
 
 # Name of the subdirectory of the agent packages.
 AGENT_SUBDIR_NAME = "scalyr-agent-2"
@@ -469,6 +458,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         super(LinuxAIOPackagesBuilder, self).__init__(
             dependencies=[
                 self.build_python_step,
+                self.build_python_dependencies_step,
                 self.prepare_build_base_with_python,
                 self.build_python_step_with_openssl_1,
                 self.build_agent_libs_venv_step,
@@ -541,7 +531,9 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
             "/"
         )
         build_openssl_libs_dir = openssl_3_dir / rel_dependencies_install_prefix / "lib"
-        for path in build_openssl_libs_dir.glob("*.so.*"):
+        openssl_3_shared_object_to_copy = list(build_openssl_libs_dir.glob("*.so.*"))
+        assert openssl_3_shared_object_to_copy, "No shared object files are found"
+        for path in openssl_3_shared_object_to_copy:
             shutil.copy(path, embedded_openssl_libs_dir)
 
         # Create the `current` symlink which by default targets the embedded OpenSSL.
@@ -735,8 +727,6 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         changelogs_path.mkdir()
         create_change_logs(output_dir=changelogs_path)
 
-        #self.package_output_dir.mkdir(parents=True, exist_ok=True)
-
         subprocess.check_call(
             [
                 # fmt: off
@@ -790,21 +780,3 @@ for package_type in ["deb", "rpm"]:
 
 def get_package_builder_by_name(name: str):
     return ALL_PACKAGE_BUILDERS[name]
-
-
-# def main(args=None):
-#     base_parser = argparse.ArgumentParser()
-#     base_parser.add_argument("builder_name", choices=_BUILDERS.keys())
-#     base_args, other_args = base_parser.parse_known_args(args=args)
-#     builder_cls = get_package_builder_by_name(name=base_args.builder_name)
-#
-#     builder = builder_cls()
-#     parser = builder.create_parser()
-#     args = parser.parse_args(args=other_args)
-#
-#     run_builder = builder.run_builder_from_command_line(args=args)
-#     run_builder()
-#
-#
-# if __name__ == '__main__':
-#     main()

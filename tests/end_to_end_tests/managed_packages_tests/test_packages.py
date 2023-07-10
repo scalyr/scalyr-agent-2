@@ -35,7 +35,7 @@ from agent_build_refactored.tools.constants import SOURCE_ROOT
 from agent_build_refactored.managed_packages.managed_packages_builders import (
     AGENT_SUBDIR_NAME,
     AGENT_AIO_PACKAGE_NAME,
-    EMBEDDED_OPENSSL_VERSION,
+    OPENSSL_3_VERSION,
 )
 from tests.end_to_end_tests.tools import AgentPaths, AgentCommander, TimeoutTracker
 from tests.end_to_end_tests.verify import (
@@ -704,7 +704,7 @@ def _install_from_convenience_script(
             assert "Looking for system OpenSSL >= 3: Not found" in output
             assert "Looking for system OpenSSL >= 1.1.1: Not found" in output
             assert (
-                f"Using embedded OpenSSL == OpenSSL {EMBEDDED_OPENSSL_VERSION}"
+                f"Using embedded OpenSSL == OpenSSL {OPENSSL_3_VERSION}"
                 in output
             )
 

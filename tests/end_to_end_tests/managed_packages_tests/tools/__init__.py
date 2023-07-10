@@ -97,7 +97,6 @@ def create_server_root(
             packages_version=stable_packages_version,
             output_dir=repo_packages,
         )
-        #shutil.copytree(stable_version_packages, repo_packages, dirs_exist_ok=True)
 
         # Build mock repo from packages.
         if package_builder.PACKAGE_TYPE == "deb":
@@ -109,7 +108,7 @@ def create_server_root(
 
         repo_builder.build_repo(
             output_dir=server_root,
-            packages_dir=packages_dir,
+            packages_dir=repo_packages,
         )
         shutil.copytree(repo_builder.output_dir, server_root, dirs_exist_ok=True)
 

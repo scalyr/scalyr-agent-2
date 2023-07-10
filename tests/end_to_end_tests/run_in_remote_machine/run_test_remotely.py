@@ -44,6 +44,7 @@ def main(
     distro_name,
     remote_machine_type,
     package_builder_name,
+    test_path: str,
     other_cmd_args: List[str],
 ):
 
@@ -59,7 +60,7 @@ def main(
         stable_packages_version=stable_version_package_version,
     )
 
-    use_aio_package =  is_builder_creates_aio_package(
+    use_aio_package = is_builder_creates_aio_package(
         package_builder_name=package_builder_name
     )
 
@@ -86,7 +87,8 @@ def main(
             target_distro=distro,
             remote_machine_type=remote_machine_type,
             command=[
-                "tests/end_to_end_tests/managed_packages_tests",
+                #"tests/end_to_end_tests/managed_packages_tests",
+                test_path,
                 "--builder-name",
                 package_builder_name,
                 "--distro-name",
@@ -113,6 +115,8 @@ if __name__ == '__main__':
 
     add_cmd_args(parser=parser, is_pytest_parser=False)
 
+    parser.add_argument("test_path")
+
     args, other_argv = parser.parse_known_args()
 
     main(
@@ -121,5 +125,6 @@ if __name__ == '__main__':
         distro_name=args.distro_name,
         remote_machine_type=args.remote_machine_type,
         package_builder_name=args.builder_name,
+        test_path=args.test_path,
         other_cmd_args=other_argv,
     )

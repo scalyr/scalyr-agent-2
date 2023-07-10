@@ -60,6 +60,10 @@ class RepoBuilder(Builder):
             ]
         )
 
+        print("!!!!!!!!")
+        for p in packages_dir.iterdir():
+            print(str(p))
+
         self._build_repo_files(
             packages_dir=packages_dir,
             repo_output_dir=self.output_dir / "repo",
@@ -69,12 +73,14 @@ class RepoBuilder(Builder):
     def build_repo(
         self,
         output_dir: pl.Path,
-        packages_dir: pl.Path
+        packages_dir: pl.Path,
+        verbose: bool = True,
     ):
         self.run_builder(
             output_dir=output_dir,
             **{
                 self.PACKAGES_DIR_ARG.name: packages_dir,
+                self.VERBOSE_ARG.name: verbose,
             },
         )
 

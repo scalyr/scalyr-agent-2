@@ -426,25 +426,26 @@ jobs:
           name:  linux-packages-${{ matrix.test_target.builder }}
           path: /tmp/packages
 
-      - name: Test '${{ matrix.name }}' packages
+      - name: Test '${{ matrix.test_target.builder }}' packages
         env:
           AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
           AWS_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
-          AWS_PRIVATE_KEY_NAME: ${{ needs.pre_job.outputs.aws_private_key_name }}
+          AWS_PRIVATE_KEY_NAME: ${{ inputs.CT_AWS_DEV_EC2_PRIVATE_KEY_NAME }}
           AWS_PRIVATE_KEY_PATH: "/tmp/private_key.pem"
-          AWS_REGION: ${{ needs.pre_job.outputs.aws_region }}
-          AWS_SECURITY_GROUP: ${{ needs.pre_job.outputs.aws_security_group }}
-          AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ needs.pre_job.outputs.aws_prefix_list_id }}
-          AWS_OBJECTS_NAME_PREFIX: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
+          AWS_REGION: ${{ inputs.aws_region }}
+          AWS_SECURITY_GROUP: ${{ inputs.aws_security_group }}
+          AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ inputs.aws_prefix_list_id }}
+          AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
         run: |
-          echo "${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}" > /tmp/private_key.pem
-          chmod 600 /tmp/private_key.pem
+          echo "${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}" > "${AWS_PRIVATE_KEY_PATH}"
+          chmod 600 "${AWS_PRIVATE_KEY_PATH}"
 
-          python3 -m pytest tests/end_to_end_tests/managed_packages_tests \
+          python3 tests/end_to_end_tests/run_in_remote_machine/run_test_remotely.py \
+            tests/end_to_end_tests/managed_packages_tests \
             -s \
-            --builder-name ${{ matrix.name }} \
-            --distro-name ${{ matrix.distro-name }} \
-            --remote-machine-type ${{ matrix.remote-machine-type }} \
+            --builder-name ${{ matrix.test_target.builder }} \
+            --distro-name ${{ matrix.test_target.distro-name }} \
+            --remote-machine-type ${{ matrix.test_target.remote-machine-type }} \
             --packages-source-type dir \
             --packages-source /tmp/packages \
             --scalyr-api-key ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }} \

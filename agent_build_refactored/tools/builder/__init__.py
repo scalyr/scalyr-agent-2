@@ -351,7 +351,7 @@ class Builder(metaclass=BuilderMeta):
                     if store_action == builder_arg.cmd_line_action:
                         dockerfile_cmd_args.append(builder_arg.cmd_line_name)
             else:
-                if isinstance(builder_arg.type, pl.Path):
+                if issubclass(builder_arg.type, pl.Path):
 
                     arg_path = pl.Path(arg_value).absolute()
                     in_docker_arg_path = pl.Path(f"/tmp/builder_arg_dirs{arg_path}")
@@ -546,9 +546,6 @@ class Builder(metaclass=BuilderMeta):
                 continue
 
             value = getattr(args, builder_arg.name)
-
-            # if isinstance(builder_arg, BuilderPathArg):
-            #     value = pl.Path(value)
 
             if not builder_arg.required and value is None:
                 continue
