@@ -73,7 +73,7 @@ jobs:
 
   build_cacheable_dependencies:
     needs: [pre_job, build_cached_linux_packages]
-    if: needs.build_cached_linux_packages.outputs.cache_hit != 'true'
+    if: needs.build_cached_linux_packages.outputs.cache_miss == 'true'
     uses: ./.github/workflows/reusable-build-cacheable-dependencies.yml
     with:
       python_version: ${{ needs.pre_job.outputs.python_version }}

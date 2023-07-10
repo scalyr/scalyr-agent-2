@@ -31,6 +31,11 @@ on:
         description: Prefix for all AWS oject that are created by this workflow..
         type: string
 
+    outputs:
+      cache_miss:
+        description: "Flag that indicates that packages are can not be build by using cache."
+        value: ${{ jobs.build_packages.outputs.cache_miss }}
+
 
     secrets:
       CT_AWS_DEV_EC2_PRIVATE_KEY:
@@ -280,7 +285,7 @@ jobs:
     name: Build package ${{ matrix.builder.name }}
     runs-on: ubuntu-22.04
     outputs:
-      cache_hit: ${{ steps.build.outputs.cache_hit }}
+      cache_miss: ${{ steps.build.outputs.cache_miss }}
 
     strategy:
       # This job receives its matrix from the 'pre_job' job. The matrix itself is created by the .github/actions/init-job-matrices action.
@@ -338,16 +343,15 @@ jobs:
               --output-dir ./build/${{ matrix.builder.package_type}} 
           )"
           
-          if [ "${OUTPUT}" = "cache_hit" ]; then
-            echo "cache_hit=true" >> "$GITHUB_OUTPUT"
-          else
+          if [ "${OUTPUT}" != "cache_hit" ]; then
+            echo "cache_miss=true" >> "$GITHUB_OUTPUT"
             echo "Expected output of the build command has to be 'cache_hit' but it is '${OUTPUT}'"
           fi
           
           cat "${GITHUB_OUTPUT}"
 
       - name: Save packages as artifact
-        if: steps.build.outputs.cache_hit == 'true'
+        if: steps.build.outputs.cache_miss != 'true'
         uses: actions/upload-artifact@v3
         with:
           name: linux-packages-${{ matrix.builder.name }}
@@ -373,7 +377,7 @@ jobs:
 
   test_packages:
     name: Test package on ${{ matrix.test_target.distro-name }}-${{ matrix.test_target.remote-machine-type }}, ${{ matrix.test_target.builder }}
-    if: needs.build_packages.outputs == 'cache_hit'
+    if: needs.build_packages.outputs.cache_miss != 'true'
     needs:
       - build_packages
 
