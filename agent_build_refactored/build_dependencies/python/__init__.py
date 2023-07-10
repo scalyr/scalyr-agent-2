@@ -83,7 +83,7 @@ for libc in [LibC.GNU]:
         )
         BUILD_DEV_REQUIREMENTS_STEPS[libc][arch] = build_dev_requirements_step
 
-        prepare_build_base_with_python_step = PrepareBuildBaseWithPythonStep(
+        prepare_build_base_with_python_step = PrepareBuildBaseWithPythonStep.create(
             build_python_step=build_python_step,
             build_dev_requirements_step=build_dev_requirements_step,
             run_in_remote_builder_if_possible=True,

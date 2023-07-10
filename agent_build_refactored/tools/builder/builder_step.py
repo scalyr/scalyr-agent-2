@@ -107,7 +107,7 @@ class BuilderStep():
         self.essential_ubuntu_tools: Optional[EssentialTools] = None
 
         if needs_essential_dependencies:
-            self.essential_ubuntu_tools = EssentialTools.create()
+            self.essential_ubuntu_tools = ESSENTIAL_TOOLS_STEP_X86_64
             build_contexts.extend([
                 self.essential_ubuntu_tools,
             ])
@@ -621,6 +621,9 @@ class EssentialTools(BuilderStep):
             run_in_remote_builder_if_possible=False,
             needs_essential_dependencies=False,
         )
+
+
+ESSENTIAL_TOOLS_STEP_X86_64 = EssentialTools.create()
 
 
 
