@@ -282,6 +282,7 @@ jobs:
       #   "os": Runner OS.
       matrix:
         builder_name:
+          - deb-aio-x86_64
           - deb-aio-aarch64
     steps:
       - name: Checkout repository
