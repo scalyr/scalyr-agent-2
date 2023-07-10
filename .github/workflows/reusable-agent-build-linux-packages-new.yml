@@ -299,11 +299,12 @@ jobs:
       #   "os": Runner OS.
       matrix:
         builder:
-          - name: deb-aio-x86_64
-            package_type: deb
-
-          - name: deb-aio-aarch64
-            package_type: deb
+          - { "name": "deb-aio-x86_64",  "package_type": "deb" }
+          - { "name": "deb-aio-aarch64", "package_type": "rpm" }
+          - { "name": "rpm-aio-x86_64",  "package_type": "deb" }
+          - { "name": "rpm-aio-aarch64", "package_type": "rpm" }
+          - { "name": "deb-non-aio",     "package_type": "deb" }
+          - { "name": "deb-non-aio",     "package_type": "rpm" }
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -427,6 +428,7 @@ jobs:
       - name: Download built packages.
         uses: actions/download-artifact@v3
         with:
+          linux-packages-${{ matrix.builder.name }}
           name:  linux-packages-${{ matrix.test_target.builder }}
           path: /tmp/packages
 
