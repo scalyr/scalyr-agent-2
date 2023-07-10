@@ -375,7 +375,6 @@ jobs:
     name: Test package on ${{ matrix.test_target.distro-name }}-${{ matrix.test_target.remote-machine-type }}, ${{ matrix.test_target.builder }}
     if: github.ref_type == 'branch' && github.ref_name != '_release_build' && needs.build_packages.outputs == 'cache_hit'
     needs:
-      - pre_job
       - build_packages
 
     runs-on: ${{ matrix.os }}
