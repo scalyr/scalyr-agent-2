@@ -1,5 +1,18 @@
 FROM essential_ubuntu_tools as base
-# Remove system python because we'll install our own Python, which has more predictable version.
+RUN DEBIAN_FRONTEND="noninteractive" \
+    apt-get update ; \
+    apt-get dist-upgrade --yes --no-install-recommends --no-install-suggests && \
+    apt-get install -y \
+    build-essential \
+    ruby  \
+    ruby-dev  \
+    rubygems \
+    reprepro \
+    createrepo-c \
+    aptly \
+    rpm && \
+    apt-get autoremove --yes && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY --from=build_python_with_openssl_3 / /
 COPY --from=build_python_dependencies /openssl_3/. /
