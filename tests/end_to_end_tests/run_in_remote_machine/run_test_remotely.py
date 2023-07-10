@@ -17,11 +17,15 @@ This special test module is responsible for running the 'managed_packages' tests
 for example ec2 instance or docker container.
 """
 import argparse
+import pathlib as pl
 import logging
+import sys
 import tarfile
 from typing import List
 
 import pytest
+
+sys.path.append(str(pl.Path(__file__).parent.parent.parent.parent))
 
 from agent_build_refactored.managed_packages.managed_packages_builders import get_package_builder_by_name
 from agent_build_refactored.tools.constants import CpuArch, LibC, SOURCE_ROOT
