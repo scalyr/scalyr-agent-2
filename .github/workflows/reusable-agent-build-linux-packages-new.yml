@@ -377,7 +377,7 @@ jobs:
 
   test_packages:
     name: Test package on ${{ matrix.test_target.distro-name }}-${{ matrix.test_target.remote-machine-type }}, ${{ matrix.test_target.builder }}
-    if: needs.build_packages.outputs.cache_miss != 'true'
+    #if: needs.build_packages.outputs.cache_miss != 'true'
     needs:
       - build_packages
 
