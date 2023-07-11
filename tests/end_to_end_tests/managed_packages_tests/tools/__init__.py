@@ -109,6 +109,7 @@ def create_server_root(
         repo_builder.build_repo(
             output_dir=server_root,
             packages_dir=repo_packages,
+            verbose=False,
         )
         shutil.copytree(repo_builder.output_dir, server_root, dirs_exist_ok=True)
 

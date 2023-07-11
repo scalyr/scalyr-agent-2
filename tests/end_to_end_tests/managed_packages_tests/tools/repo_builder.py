@@ -156,8 +156,6 @@ class YumRepoBuilder(RepoBuilder):
     ):
         # Create rpm repository using 'createrepo_c'.
         for package_path in packages_dir.glob("*.rpm"):
-            print("######")
-            print(str(package_path))
             shutil.copy(package_path, repo_output_dir)
         subprocess.check_call(["createrepo_c", str(repo_output_dir)])
 
