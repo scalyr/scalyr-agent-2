@@ -83,27 +83,27 @@ jobs:
             echo "Expected output of the build command has to be 'cache_hit' but it is '${OUTPUT}'"
           fi
 
-#  build_cacheable_dependencies:
-#    needs:
-#      - pre_job
-#      - verify_all_cacheable_dependencies
-#    if: needs.verify_all_cacheable_dependencies.outputs.cache_miss == 'true'
-#    uses: ./.github/workflows/reusable-build-cacheable-dependencies.yml
-#    with:
-#      is_cache_miss: ${{ needs.verify_all_cacheable_dependencies.outputs.cache_miss }}
-#      python_version: ${{ needs.pre_job.outputs.python_version }}
-#      cache_version: ${{ needs.pre_job.outputs.cache_version }}
-#      aws_region: ${{ needs.pre_job.outputs.aws_region }}
-#      aws_security_group: ${{ needs.pre_job.outputs.aws_security_group }}
-#      aws_prefix_list_id: ${{ needs.pre_job.outputs.aws_prefix_list_id }}
-#      aws_objects_name_prefix: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
-#      CT_AWS_DEV_EC2_PRIVATE_KEY_NAME: ${{ needs.pre_job.outputs.CT_AWS_DEV_EC2_PRIVATE_KEY_NAME }}
-#    secrets:
-#      CT_AWS_DEV_EC2_PRIVATE_KEY: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
-#      CT_AWS_DEV_EC2_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
-#      CT_AWS_DEV_EC2_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
-#      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
-#      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
+  build_cacheable_dependencies:
+    needs:
+      - pre_job
+      - verify_all_cacheable_dependencies
+    if: needs.verify_all_cacheable_dependencies.outputs.cache_miss == 'true'
+    uses: ./.github/workflows/reusable-build-cacheable-dependencies.yml
+    with:
+      is_cache_miss: ${{ needs.verify_all_cacheable_dependencies.outputs.cache_miss }}
+      python_version: ${{ needs.pre_job.outputs.python_version }}
+      cache_version: ${{ needs.pre_job.outputs.cache_version }}
+      aws_region: ${{ needs.pre_job.outputs.aws_region }}
+      aws_security_group: ${{ needs.pre_job.outputs.aws_security_group }}
+      aws_prefix_list_id: ${{ needs.pre_job.outputs.aws_prefix_list_id }}
+      aws_objects_name_prefix: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
+      CT_AWS_DEV_EC2_PRIVATE_KEY_NAME: ${{ needs.pre_job.outputs.CT_AWS_DEV_EC2_PRIVATE_KEY_NAME }}
+    secrets:
+      CT_AWS_DEV_EC2_PRIVATE_KEY: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
+      CT_AWS_DEV_EC2_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
+      CT_AWS_DEV_EC2_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
+      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
+      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
 
 
 #  build_cached_linux_packages:
