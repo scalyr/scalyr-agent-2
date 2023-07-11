@@ -16,10 +16,10 @@ def main():
     for group in grouped_dependencies:
         for dep in group.values():
             dep.run_and_output_in_oci_tarball(
-                fail_on_cache_miss=False,
-                fail_on_children_cache_miss=False,
-                verbose=False,
-                verbose_children=False,
+                fail_on_cache_miss=True,
+                fail_on_children_cache_miss=True,
+                verbose=True,
+                verbose_children=True,
             )
 
 
