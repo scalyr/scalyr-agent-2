@@ -48,6 +48,7 @@ more-itertools==5.0.0; python_version <= '2.7'
 distro==1.6.0
 xmltodict==0.13.0; python_version >= '3.0'
 syslogmp==0.3; python_version >= '3.6'
+PyYAML==6.0
 
 paramiko==2.12.0; python_version >= '3.7'
 apache-libcloud==3.6.1; python_version >= '3.7'
