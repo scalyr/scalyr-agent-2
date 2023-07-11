@@ -429,7 +429,7 @@ class BuilderStep():
                 raise
         else:
             if self.cache and fail_on_first_attempt_cache_miss:
-                logger.info(f"THe dependency '{self.id}' is successfully reused from cache")
+                logger.info(f"The dependency '{self.id}' is successfully reused from cache")
             else:
                 logger.info(f"Dependency '{self.id}' is successfully built")
 
