@@ -14,6 +14,9 @@ on:
     workflows: ["Build all cacheable dependencies"]
     types:
       - completed
+    branches:
+      - master
+      - build-python-dockerfile
 
   schedule:
     - cron: '0 4 * * *'
