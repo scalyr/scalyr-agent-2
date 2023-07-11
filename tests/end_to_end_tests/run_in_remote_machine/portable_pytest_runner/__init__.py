@@ -6,7 +6,7 @@ import os
 from typing import Dict
 
 from agent_build_refactored.tools.constants import SOURCE_ROOT, CpuArch, LibC
-from agent_build_refactored.tools.builder import BuilderStep
+from agent_build_refactored.tools.builder import BuilderStep, Builder
 from agent_build_refactored.build_dependencies.python import (
     PREPARE_BUILD_BASE_WITH_PYTHON_STEPS
 )
@@ -37,7 +37,9 @@ class PortablePytestRunnerBuilderStep(BuilderStep):
                 "PATH_SEP": os.pathsep,
                 "PYTHON_INSTALL_PREFIX": str(build_python_step.install_prefix),
                 "PORTABLE_RUNNER_NAME": self.__class__.PORTABLE_RUNNER_NAME,
-            }
+            },
+            run_in_remote_builder_if_possible=True,
+            cache=True,
         )
 
     @property
@@ -48,10 +50,45 @@ class PortablePytestRunnerBuilderStep(BuilderStep):
 PORTABLE_PYTEST_RUNNER_BUILDER_STEPS: Dict[LibC, Dict[CpuArch, PortablePytestRunnerBuilderStep]] = collections.defaultdict(dict)
 
 
-for runner_libc, architectures in PREPARE_BUILD_BASE_WITH_PYTHON_STEPS.items():
-    for runner_architecture, prepare_python_env_step in architectures.items():
-        step = PortablePytestRunnerBuilderStep(
-            prepare_python_environment_step=prepare_python_env_step,
+class PortablePyTestRunnerBuilder(Builder):
+    ARCHITECTURE: CpuArch
+    LIBC: LibC
+
+    def __init__(self):
+
+        self.prepare_python_environment_step = PREPARE_BUILD_BASE_WITH_PYTHON_STEPS[self.LIBC][self.ARCHITECTURE]
+        self.build_portable_pytest_runner_step = PortablePytestRunnerBuilderStep(
+            prepare_python_environment_step=self.prepare_python_environment_step,
         )
 
-        PORTABLE_PYTEST_RUNNER_BUILDER_STEPS[runner_libc][runner_architecture] = step
+        super(PortablePyTestRunnerBuilder, self).__init__(
+            base=self.prepare_python_environment_step,
+            dependencies=[
+                self.build_portable_pytest_runner_step,
+            ],
+        )
+
+    def build(self):
+        shutil.copytree(
+            self.build_portable_pytest_runner_step.output_dir,
+            self.output_dir,
+            dirs_exist_ok=True
+        )
+
+
+for runner_libc, architectures in PREPARE_BUILD_BASE_WITH_PYTHON_STEPS.items():
+    for runner_architecture, prepare_python_env_step in architectures.items():
+
+        class _PortablePyTestRunnerBuilder(PortablePyTestRunnerBuilder):
+            NAME = f"portable_pytest_runner_builder_{runner_libc.value}_{runner_architecture.value}"
+            ARCHITECTURE = runner_architecture
+            LIBC = runner_libc
+        # step = PortablePytestRunnerBuilderStep(
+        #     prepare_python_environment_step=prepare_python_env_step,
+        # )
+
+        #PORTABLE_PYTEST_RUNNER_BUILDER_STEPS[runner_libc][runner_architecture] = step
+
+
+
+

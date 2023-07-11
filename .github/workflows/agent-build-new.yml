@@ -50,6 +50,36 @@ jobs:
           echo "aws_objects_name_prefix=${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}" >> "${GITHUB_OUTPUT}"
           echo "CT_AWS_DEV_EC2_PRIVATE_KEY_NAME=CT_SCALYR_AGENT_GHA" >> "${GITHUB_OUTPUT}"
 
+  verify_all_cacheable_dependencies:
+    name: "Verify all cacheable dependencies"
+    needs:
+      - pre_job
+    runs-on: ubuntu-22.04
+    outputs:
+      cache_miss: ${{ steps.verify.outputs.cache_miss }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: install python and requirements
+        uses: ./.github/actions/install_python_and_requirements
+        with:
+          python_version: ${{ inputs.python_version }}
+
+      - name: Verify
+        id: verify
+        env:
+          BUILDER_MODULES: tests.end_to_end_tests
+        run: |
+          python3 agent_build_refactored/scripts/cicd/verify_all_dependencies_caches.py
+          
+          OUTPUT="$(python3 agent_build_refactored/scripts/cicd/verify_all_dependencies_caches.py)"
+          
+          if [ "${OUTPUT}" == "cache_miss" ]; then
+            echo "cache_miss=true" >> "$GITHUB_OUTPUT"
+            echo "Expected output of the build command has to be 'cache_hit' but it is '${OUTPUT}'"
+          fi
+
   build_cached_linux_packages:
     name: "Build cached Linux packages"
     needs:
@@ -72,8 +102,11 @@ jobs:
 
 
   build_cacheable_dependencies:
-    needs: [pre_job, build_cached_linux_packages]
-    if: needs.build_cached_linux_packages.outputs.cache_miss == 'true'
+    needs:
+      - pre_job
+      - verify_all_cacheable_dependencies
+      - build_cached_linux_packages
+    if: needs.verify_all_cacheable_dependencies.outputs.cache_miss == 'true'
     uses: ./.github/workflows/reusable-build-cacheable-dependencies.yml
     with:
       python_version: ${{ needs.pre_job.outputs.python_version }}
@@ -95,7 +128,9 @@ jobs:
     name: "Build Linux packages"
     needs:
       - pre_job
+      - build_cached_linux_packages
       - build_cacheable_dependencies
+    if: needs.build_cached_linux_packages.outputs.cache_miss == 'true'
     uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
     with:
       python_version: ${{ needs.pre_job.outputs.python_version }}
