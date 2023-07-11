@@ -78,6 +78,7 @@ jobs:
         run: |
           #OUTPUT="$(python3 agent_build_refactored/scripts/cicd/verify_all_dependencies_caches.py)"
           OUTPUT="cache_miss"
+          exit 0
 
           if [ "${OUTPUT}" == "cache_miss" ]; then
             echo "cache_miss=true" >> "$GITHUB_OUTPUT"
