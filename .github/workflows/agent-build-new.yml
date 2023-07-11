@@ -132,7 +132,7 @@ jobs:
       - pre_job
       - verify_all_cacheable_dependencies
       - build_cacheable_dependencies
-    if: ( success() && ( needs.build_cacheable_dependencies.result == 'skipped') || ( success() && needs.build_cacheable_dependencies.result != 'skipped' )
+    if: ( success() && needs.build_cacheable_dependencies.result == 'skipped') || ( success() && needs.build_cacheable_dependencies.result != 'skipped' )
     uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
     with:
       python_version: ${{ needs.pre_job.outputs.python_version }}
