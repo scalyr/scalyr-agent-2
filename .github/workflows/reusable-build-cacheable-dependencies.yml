@@ -3,6 +3,10 @@ name: Build all cacheable dependencies
 on:
   workflow_call:
     inputs:
+      is_cache_miss:
+        description: If 'true', we do not do anything.
+        type: string
+
       python_version:
         description: "Version of Python to use."
         type: string
@@ -62,6 +66,7 @@ jobs:
   prepare_before_build:
     name: Prepare before dependencies build
     runs-on: ubuntu-latest
+    if: inputs.is_cache_miss == 'true'
     outputs:
       runs_on: ${{ steps.get_dependency_matrices.outputs.runs_on }}
 
