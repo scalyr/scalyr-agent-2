@@ -90,6 +90,7 @@ jobs:
     if: needs.verify_all_cacheable_dependencies.outputs.cache_miss == 'true'
     uses: ./.github/workflows/reusable-build-cacheable-dependencies.yml
     with:
+      is_cache_miss: ${{ needs.verify_all_cacheable_dependencies.outputs.cache_miss }}
       python_version: ${{ needs.pre_job.outputs.python_version }}
       cache_version: ${{ needs.pre_job.outputs.cache_version }}
       aws_region: ${{ needs.pre_job.outputs.aws_region }}
@@ -132,8 +133,7 @@ jobs:
     needs:
       - pre_job
       - verify_all_cacheable_dependencies
-      - build_cacheable_dependencies
-    if: success() || needs.build_cacheable_dependencies.result == 'skipped'
+    if: needs.build_cacheable_dependencies.result == 'skipped' || success()
     steps:
       - run: echo "continue"
 
