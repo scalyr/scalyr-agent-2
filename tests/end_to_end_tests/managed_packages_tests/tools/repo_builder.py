@@ -64,9 +64,11 @@ class RepoBuilder(Builder):
         for p in packages_dir.iterdir():
             print(str(p))
 
+        repo_output_dir = self.output_dir / "repo"
+        repo_output_dir.mkdir(parents=True)
         self._build_repo_files(
             packages_dir=packages_dir,
-            repo_output_dir=self.output_dir / "repo",
+            repo_output_dir=repo_output_dir,
             sign_key_id=sign_key_id,
         )
 
@@ -154,6 +156,8 @@ class YumRepoBuilder(RepoBuilder):
     ):
         # Create rpm repository using 'createrepo_c'.
         for package_path in packages_dir.glob("*.rpm"):
+            print("######")
+            print(str(package_path))
             shutil.copy(package_path, repo_output_dir)
         subprocess.check_call(["createrepo_c", str(repo_output_dir)])
 

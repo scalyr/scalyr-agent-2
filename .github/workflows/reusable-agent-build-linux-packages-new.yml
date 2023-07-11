@@ -341,7 +341,7 @@ jobs:
             python3 build_package_new_refactored.py ${{ matrix.builder.name }} \
               --fail-on-cache-miss \
               --verbose \
-              --output-dir ./build/${{ matrix.builder.package_type}} 
+              --output-dir ./build/${{ matrix.builder.package_type }} 
           )"
           
           if [ "${OUTPUT}" != "cache_hit" ]; then

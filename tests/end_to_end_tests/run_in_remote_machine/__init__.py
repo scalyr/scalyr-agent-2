@@ -143,7 +143,7 @@ DISTROS = {
                 )
             },
             docker_image="debian:10",
-            expected_openssl_version_number=0x1010104F,
+            expected_openssl_version_number=0x101010EF,
         ),
         TargetDistro(
             name="centos8",

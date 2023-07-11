@@ -174,7 +174,7 @@ OPENSSL_1_VERSION = "1.1.1s"
 OPENSSL_3_VERSION = "3.0.7"
 
 # Integer (hex) representation of the OpenSSL version.
-EMBEDDED_OPENSSL_VERSION_NUMBER = 0x1010113F
+EMBEDDED_OPENSSL_VERSION_NUMBER = 0x30000070
 
 # Version of Rust to use in order to build some of agent's requirements, e.g. orjson.
 RUST_VERSION = "1.63.0"
