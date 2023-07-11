@@ -23,7 +23,7 @@ import sys
 import tarfile
 from typing import List
 
-import pytest
+logging.basicConfig(level=logging.INFO)
 
 sys.path.append(str(pl.Path(__file__).parent.parent.parent.parent))
 

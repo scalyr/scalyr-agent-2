@@ -487,7 +487,7 @@ class Builder(metaclass=BuilderMeta):
             docker_step.run_and_output_in_local_directory(
                 fail_on_cache_miss=fail_on_cache_miss,
                 fail_on_children_cache_miss=fail_on_cache_miss,
-                verbose=verbose,
+                verbose=True,
                 verbose_children=verbose,
             )
             shutil.copytree(

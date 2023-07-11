@@ -428,7 +428,11 @@ class BuilderStep():
             if fail_on_cache_miss:
                 raise
         else:
-            logger.info(f"THe dependency '{self.id}' is successfully reused from cache")
+            if self.cache and fail_on_first_attempt_cache_miss:
+                logger.info(f"THe dependency '{self.id}' is successfully reused from cache")
+            else:
+                logger.info(f"Dependency '{self.id}' is successfully built")
+
             return
 
         logger.info(
@@ -453,7 +457,7 @@ class BuilderStep():
             logger.exception(f"Can not build dependency '{self.id}'")
             raise
 
-        logger.info(f"Dependency '{self.id}' is successfully build.")
+        logger.info(f"Dependency '{self.id}' is successfully built in the remote builder.")
 
     def run_and_output_in_oci_tarball(
             self,
