@@ -187,9 +187,7 @@ class BuilderMeta(type):
         builder_fqdn = f"{module_fqdn}.{builder_cls.NAME}"
 
         if builder_fqdn in BUILDER_CLASSES:
-            raise Exception(
-                f"Builder class with fqdn '{builder_fqdn}' already exist"
-            )
+            return BUILDER_CLASSES[builder_fqdn]
 
         builder_cls.FQDN = builder_fqdn
         BUILDER_CLASSES[builder_fqdn] = builder_cls

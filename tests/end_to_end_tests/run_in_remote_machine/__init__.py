@@ -212,6 +212,7 @@ def run_test_remotely(
     command: List[str],
     architecture: CpuArch,
     pytest_runner_path: pl.Path,
+    source_tarball_path: pl.Path,
     file_mappings: Dict = None,
 ):
     """
@@ -230,6 +231,8 @@ def run_test_remotely(
     """
 
     file_mappings = file_mappings or {}
+    file_mappings[pytest_runner_path] = "/tmp/test_runner"
+    file_mappings[source_tarball_path] = "/tmp/source.tar.gz"
 
     if remote_machine_type == "ec2":
 
@@ -242,9 +245,6 @@ def run_test_remotely(
 
         distro_image = target_distro.ec2_images[architecture]
 
-        file_mappings = file_mappings or {}
-        file_mappings[pytest_runner_path] = "/tmp/test_runner"
-
         aws_settings = AWSSettings.create_from_env()
         boto3_session = aws_settings.create_boto3_session()
 
@@ -256,7 +256,11 @@ def run_test_remotely(
             files_to_upload=file_mappings,
         )
 
-        final_command = ["/tmp/test_runner", "-s", *command]
+        final_command = [
+            "/tmp/test_runner",
+            "/tmp/source.tar.gz",
+            "-s", *command
+        ]
 
         try:
             ssh = create_ssh_connection(
@@ -287,6 +291,7 @@ def run_test_remotely(
                 architecture.as_docker_platform(),
                 target_distro.docker_image,
                 "/test_runner",
+                "/tmp/source.tar.gz",
                 "-s",
                 *command,
             ]

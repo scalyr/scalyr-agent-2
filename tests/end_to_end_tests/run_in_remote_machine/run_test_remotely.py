@@ -31,7 +31,8 @@ from agent_build_refactored.managed_packages.managed_packages_builders import ge
 from agent_build_refactored.tools.constants import CpuArch, LibC, SOURCE_ROOT
 from tests.end_to_end_tests.run_in_remote_machine import run_test_remotely
 from tests.end_to_end_tests.run_in_remote_machine.portable_pytest_runner import (
-    PORTABLE_PYTEST_RUNNER_BUILDER_STEPS
+    PORTABLE_PYTEST_RUNNER_BUILDERS,
+    PORTABLE_RUNNER_NAME,
 )
 from tests.end_to_end_tests.run_in_remote_machine import DISTROS
 
@@ -75,10 +76,11 @@ def main(
         arch = CpuArch.x86_64
         libc = LibC.GNU
 
-    pytest_runner_builder = PORTABLE_PYTEST_RUNNER_BUILDER_STEPS[libc][arch]
-    pytest_runner_builder.run_and_output_in_local_directory(
-        output_dir=WORK_DIR
-    )
+    pytest_runner_builder_cls = PORTABLE_PYTEST_RUNNER_BUILDERS[libc][arch]
+    pytest_runner_builder = pytest_runner_builder_cls()
+    pytest_runner_builder.run_portable_pytest_runner_builder()
+
+    source_tarball_path = pytest_runner_builder.output_dir / "source.tar.gz"
 
     packages_archive_path = WORK_DIR / "packages.tar"
     with tarfile.open(packages_archive_path, "w") as tf:
@@ -90,6 +92,7 @@ def main(
         run_test_remotely(
             target_distro=distro,
             remote_machine_type=remote_machine_type,
+
             command=[
                 #"tests/end_to_end_tests/managed_packages_tests",
                 test_path,
@@ -106,8 +109,11 @@ def main(
                 *other_cmd_args,
             ],
             architecture=arch,
-            pytest_runner_path=WORK_DIR / pytest_runner_builder.__class__.PORTABLE_RUNNER_NAME,
-            file_mappings={str(packages_archive_path): "/tmp/packages.tar"},
+            pytest_runner_path=pytest_runner_builder.output_dir / PORTABLE_RUNNER_NAME,
+            source_tarball_path=source_tarball_path,
+            file_mappings={
+                str(packages_archive_path): "/tmp/packages.tar",
+            },
         )
     except Exception as e:
         logger.error(f"Remote test failed. Error: {str(e)}")
