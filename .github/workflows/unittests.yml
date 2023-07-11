@@ -104,11 +104,6 @@ jobs:
         id: setup-python
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'pip' # caching pip dependencies
-          cache-dependency-path: |
-            dev-requirements.txt
-            windows-unit-tests-requirements.txt
-            benchmarks/micro/requirements-compression-algorithms.txt
       - name: Install tox
         env:
           TOX_VERSION: 3.20.1
@@ -177,7 +172,6 @@ jobs:
         id: setup-python
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'pip' # caching pip dependencies
       - name: Install tox
         env:
           TOX_VERSION: 3.20.1
@@ -240,7 +234,6 @@ jobs:
         id: setup-python
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'pip' # caching pip dependencies
       - name: Install tox
         env:
           TOX_VERSION: 3.20.1
