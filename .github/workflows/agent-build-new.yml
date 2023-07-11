@@ -76,7 +76,7 @@ jobs:
           USE_GHA_CACHE: "1"
           CACHE_VERSION: ${{ needs.pre_job.outputs.cache_version }}
         run: |
-          №OUTPUT="$(python3 agent_build_refactored/scripts/cicd/verify_all_dependencies_caches.py)"
+          #OUTPUT="$(python3 agent_build_refactored/scripts/cicd/verify_all_dependencies_caches.py)"
           OUTPUT="cache_miss"
 
           if [ "${OUTPUT}" == "cache_miss" ]; then
