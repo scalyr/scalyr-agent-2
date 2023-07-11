@@ -65,8 +65,7 @@ env:
 jobs:
   prepare_before_build:
     name: Prepare before dependencies build
-    runs-on: ubuntu-latest
-    if: inputs.is_cache_miss == 'true'
+    runs-on: ubuntu-22.04
     outputs:
       runs_on: ${{ steps.get_dependency_matrices.outputs.runs_on }}
 

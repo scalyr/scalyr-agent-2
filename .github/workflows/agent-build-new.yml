@@ -142,7 +142,8 @@ jobs:
   build_linux_packages:
     name: "Build Linux packages"
     needs:
-      - continue
+      - pre_job
+      - verify_all_cacheable_dependencies
     uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
     with:
       python_version: ${{ needs.pre_job.outputs.python_version }}
