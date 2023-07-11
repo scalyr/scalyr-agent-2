@@ -126,13 +126,21 @@ jobs:
 #      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
 
 
-  build_linux_packages:
-    name: "Build Linux packages"
+  continue:
+    name: "Continue"
+    runs-on: ubuntu-22.04
     needs:
       - pre_job
       - verify_all_cacheable_dependencies
       - build_cacheable_dependencies
     if: success() || needs.build_cacheable_dependencies.result == 'skipped'
+
+
+
+  build_linux_packages:
+    name: "Build Linux packages"
+    needs:
+      - continue
     uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
     with:
       python_version: ${{ needs.pre_job.outputs.python_version }}
