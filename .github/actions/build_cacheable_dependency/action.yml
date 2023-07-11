@@ -26,6 +26,7 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}
       env:
+          BUILDER_MODULES: tests.end_to_end_tests
           USE_GHA_CACHE: "1"
           CACHE_VERSION: ${{ inputs.cache_version }}
           AWS_PRIVATE_KEY_PATH: /tmp/private_key.pem
