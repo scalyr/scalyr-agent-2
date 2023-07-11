@@ -4,7 +4,7 @@ from typing import Dict, List
 
 from agent_build_refactored.tools.builder.builder_step import BuilderStep
 from agent_build_refactored.tools.builder import BUILDER_CLASSES
-BUILDER_MODULES = os.environ.get("BUILDER_MODULES", [])
+BUILDER_MODULES = os.environ.get("BUILDER_MODULES", "")
 
 for module in BUILDER_MODULES.split(","):
     importlib.import_module(module)
