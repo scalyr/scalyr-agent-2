@@ -1,15 +1,19 @@
 name: Agent Build Refactored
 
 on:
-  push:
-    branches:
-      - master
-      - build-python-dockerfile
-  pull_request:
-    branches:
-      - master
-
-  workflow_dispatch:
+#  push:
+#    branches:
+#      - master
+#      - build-python-dockerfile
+#  pull_request:
+#    branches:
+#      - master
+#
+#  workflow_dispatch:
+  workflow_run:
+    workflows: ["Build all cacheable dependencies"]
+    types:
+      - completed
 
   schedule:
     - cron: '0 4 * * *'
