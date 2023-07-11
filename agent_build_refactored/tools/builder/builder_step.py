@@ -378,8 +378,6 @@ class BuilderStep():
                 verbose_children=verbose_children,
             )
 
-        logger.info(f"Build dependency: {self.id}")
-
         cmd_args = self.get_build_command_args(
             use_only_cache=fail_on_cache_miss,
         )
@@ -430,9 +428,12 @@ class BuilderStep():
             if fail_on_cache_miss:
                 raise
         else:
+            logger.info(f"THe dependency '{self.id}' is successfully reused from cache")
             return
 
-        logger.info("Build from the local cache is impossible, fallback to remote builder")
+        logger.info(
+            f"Build of the dependency {self.id} from the local cache is impossible, fallback to remote builder"
+        )
 
         remote_builder_info = self.prepare_buildx_builders(local=False)
         try:
@@ -451,6 +452,8 @@ class BuilderStep():
 
             logger.exception(f"Can not build dependency '{self.id}'")
             raise
+
+        logger.info(f"Dependency '{self.id}' is successfully build.")
 
     def run_and_output_in_oci_tarball(
             self,
