@@ -88,6 +88,8 @@ jobs:
 
       - name: Get dependency matrices
         id: get_dependency_matrices
+        env:
+          BUILDER_MODULES: tests.end_to_end_tests
         run: |
           echo "::notice::Need to build and cache some dependencies first (May take longer than fully cached build)"
           echo "runs_on=ubuntu-22.04" >> "${GITHUB_OUTPUT}"
