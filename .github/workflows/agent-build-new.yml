@@ -87,7 +87,6 @@ jobs:
     needs:
       - pre_job
       - verify_all_cacheable_dependencies
-    if: needs.verify_all_cacheable_dependencies.outputs.cache_miss == 'true'
     uses: ./.github/workflows/reusable-build-cacheable-dependencies.yml
     with:
       is_cache_miss: ${{ needs.verify_all_cacheable_dependencies.outputs.cache_miss }}
