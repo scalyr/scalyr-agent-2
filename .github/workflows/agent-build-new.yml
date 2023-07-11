@@ -73,9 +73,9 @@ jobs:
         id: verify
         env:
           BUILDER_MODULES: tests.end_to_end_tests
+          USE_GHA_CACHE: "1"
+          CACHE_VERSION: ${{ needs.pre_job.outputs.cache_version }}
         run: |
-          python3 agent_build_refactored/scripts/cicd/verify_all_dependencies_caches.py
-          
           OUTPUT="$(python3 agent_build_refactored/scripts/cicd/verify_all_dependencies_caches.py)"
           
           if [ "${OUTPUT}" == "cache_miss" ]; then
