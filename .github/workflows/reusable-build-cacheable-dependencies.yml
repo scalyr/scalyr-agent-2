@@ -27,6 +27,7 @@ jobs:
     name: Prepare before dependencies build
     runs-on: ubuntu-22.04
     outputs:
+      cache_miss: ${{ steps.get_dependency_matrices.outputs.cache_miss }}
       runs_on: ${{ steps.get_dependency_matrices.outputs.runs_on }}
 
       DEPENDENCY_GROUP_MATRIX_0: ${{ steps.get_dependency_matrices.outputs.DEPENDENCY_GROUP_MATRIX_0 }}
@@ -50,11 +51,25 @@ jobs:
         with:
           python_version: ${{ inputs.python_version }}
 
+      - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
+        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+
       - name: Get dependency matrices
         id: get_dependency_matrices
         env:
           BUILDER_MODULES: tests.end_to_end_tests
+          USE_GHA_CACHE: "1"
+          CACHE_VERSION: ${{ needs.pre_job.outputs.cache_version }}
         run: |
+          
+          OUTPUT="$(python3 agent_build_refactored/scripts/cicd/verify_all_dependencies_caches.py)"
+
+          if [ "${OUTPUT}" == "cache_miss" ]; then
+            echo "cache_miss=true" >> "$GITHUB_OUTPUT"
+            echo "Expected output of the build command has to be 'cache_hit' but it is '${OUTPUT}'"
+            exit 0
+          fi
+          
           echo "::notice::Need to build and cache some dependencies first (May take longer than fully cached build)"
           echo "runs_on=ubuntu-22.04" >> "${GITHUB_OUTPUT}"
           
@@ -67,7 +82,7 @@ jobs:
     name: (0)${{ matrix.id }}
     needs: [prepare_before_build]
     runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
-    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_0 != '' && inputs.is_cache_miss == 'true'
+    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_0 != '' && needs.prepare_before_build.outputs.cache_miss == 'true'
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_0) }}
     steps:
@@ -83,7 +98,7 @@ jobs:
     name: (1)${{ matrix.id }}
     needs: [ prepare_before_build, group_0]
     runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
-    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_1 != '' && inputs.is_cache_miss == 'true'
+    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_1 != '' && needs.prepare_before_build.outputs.cache_miss == 'true'
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_1) }}
     steps:
@@ -101,7 +116,7 @@ jobs:
     name: (2)${{ matrix.id }}
     needs: [ prepare_before_build, group_1 ]
     runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
-    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_2 != '' && inputs.is_cache_miss == 'true'
+    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_2 != '' && needs.prepare_before_build.outputs.cache_miss == 'true'
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_2) }}
     steps:
@@ -119,7 +134,7 @@ jobs:
     name: (3)${{ matrix.id }}
     needs: [ prepare_before_build, group_2 ]
     runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
-    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_3 != '' && inputs.is_cache_miss == 'true'
+    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_3 != '' && needs.prepare_before_build.outputs.cache_miss == 'true'
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_3) }}
     steps:
@@ -137,7 +152,7 @@ jobs:
     name: (4)${{ matrix.id }}
     needs: [ prepare_before_build, group_3 ]
     runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
-    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_4 != '' && inputs.is_cache_miss == 'true'
+    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_4 != '' && needs.prepare_before_build.outputs.cache_miss == 'true'
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_4) }}
     steps:
@@ -155,7 +170,7 @@ jobs:
     name: (5)${{ matrix.id }}
     needs: [ prepare_before_build, group_4 ]
     runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
-    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_5 != '' && inputs.is_cache_miss == 'true'
+    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_5 != '' && needs.prepare_before_build.outputs.cache_miss == 'true'
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_5) }}
     steps:
@@ -173,7 +188,7 @@ jobs:
     name: (6)${{ matrix.id }}
     needs: [ prepare_before_build, group_5 ]
     runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
-    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_6 != '' && inputs.is_cache_miss == 'true'
+    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_6 != '' && needs.prepare_before_build.outputs.cache_miss == 'true'
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_6) }}
     steps:
@@ -191,7 +206,7 @@ jobs:
     name: (7)${{ matrix.id }}
     needs: [ prepare_before_build, group_6 ]
     runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
-    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_7 != '' && inputs.is_cache_miss == 'true'
+    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_7 != '' && needs.prepare_before_build.outputs.cache_miss == 'true'
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_7) }}
     steps:
@@ -209,7 +224,7 @@ jobs:
     name: (8)${{ matrix.id }}
     needs: [ prepare_before_build, group_7 ]
     runs-on: ${{ needs.prepare_before_build.outputs.runs_on }}
-    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_8 != '' && inputs.is_cache_miss == 'true'
+    if: needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_8 != '' && needs.prepare_before_build.outputs.cache_miss == 'true'
     strategy:
       matrix: ${{ fromJSON( needs.prepare_before_build.outputs.DEPENDENCY_GROUP_MATRIX_8) }}
     steps:
