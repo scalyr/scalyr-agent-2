@@ -157,7 +157,7 @@ def main(
         package_builder_name=package_builder_name,
     )
 
-    dependencies_builder.run_builder()
+    dependencies_builder.build()
 
     distro = DISTROS[distro_name]
 

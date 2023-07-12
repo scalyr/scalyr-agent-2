@@ -86,7 +86,7 @@ def create_packages_repo_root(
             builder = package_builder(
                 packages_types=[package_type]
             )
-            builder.run_builder()
+            builder.build()
             packages_dir = builder.result_dir / package_type
         else:
             packages_dir = pl.Path(packages_source)
@@ -113,7 +113,7 @@ def create_packages_repo_root(
         else:
             raise Exception(f"Unknown package type: {package_type}")
 
-        repo_builder.run_builder(
+        repo_builder.build(
             output_dir=packages_repo_root,
         )
         shutil.copytree(repo_builder.result_dir, packages_repo_root, dirs_exist_ok=True)
