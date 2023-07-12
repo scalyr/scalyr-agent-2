@@ -21,6 +21,14 @@ logger = logging.getLogger(__name__)
 BUILDKIT_VERSION = "v0.11.6"
 BUILDX_BUILDER_PORT = 1234
 
+REMOTE_DOCKER_ENGINE_IMAGE_AMD64 = EC2DistroImage(
+    image_id="ami-053b0d53c279acc90",
+    image_name="Ubuntu Server 22.04 LTS (HVM), SSD Volume Type",
+    short_name="ubuntu2204_AMD64",
+    size_id="c7g.4xlarge",
+    ssh_username="ubuntu",
+)
+
 REMOTE_DOCKER_ENGINE_IMAGE_ARM = EC2DistroImage(
     image_id="ami-0e2b332e63c56bcb5",
     image_name="Ubuntu Server 22.04 LTS (HVM), SSD Volume Type",
@@ -31,6 +39,7 @@ REMOTE_DOCKER_ENGINE_IMAGE_ARM = EC2DistroImage(
 
 
 REMOTE_DOCKER_ENGINE_IMAGES = {
+    CpuArch.x86_64: REMOTE_DOCKER_ENGINE_IMAGE_AMD64,
     CpuArch.AARCH64: REMOTE_DOCKER_ENGINE_IMAGE_ARM,
     CpuArch.ARMV7: REMOTE_DOCKER_ENGINE_IMAGE_ARM
 }

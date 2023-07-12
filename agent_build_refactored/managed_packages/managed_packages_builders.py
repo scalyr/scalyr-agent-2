@@ -544,7 +544,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
             build_args=build_args,
             output=output,
             cache_scope=cache_scope,
-            fallback_to_remote_builder=fallback_to_remote_builder
+            fallback_to_remote_builder=True
         )
 
     def _prepare_package_python_and_libraries_files(self, package_root: pl.Path):
