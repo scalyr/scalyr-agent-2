@@ -21,7 +21,7 @@ from agent_build_refactored.managed_packages.managed_packages_builders import (
     AGENT_NON_AIO_AIO_PACKAGE_NAME,
 )
 from tests.end_to_end_tests.managed_packages_tests.tools import (
-    create_server_root,
+    create_packages_repo_root,
     get_packages_stable_version,
     is_builder_creates_aio_package,
 )
@@ -37,6 +37,14 @@ def add_cmd_args(parser, is_pytest_parser: bool):
         add_func = parser.add_argument
 
     add_func("--builder-name", dest="builder_name", required=True)
+
+    add_func(
+        "--package-type",
+        dest="package_type",
+        required=True,
+        choices=["deb", "rpm"],
+        help="Type of the package to test",
+    )
 
     add_func(
         "--packages-source",
@@ -94,6 +102,11 @@ def package_builder(package_builder_name):
 
 
 @pytest.fixture(scope="session")
+def package_type(request):
+    return request.config.option.package_type
+
+
+@pytest.fixture(scope="session")
 def remote_machine_type(request):
     """
     Fixture with time of the remote machine where tests can run. For now that's ec2 or docker.
@@ -133,29 +146,31 @@ def stable_packages_version(request):
 
 
 @pytest.fixture(scope="session")
-def server_root(request, tmp_path_factory, package_builder, stable_packages_version):
+def packages_repo_root(request, tmp_path_factory, package_builder, stable_packages_version, package_type):
     """
     Root directory which is served by the mock web server.
     The mock repo is located in ./repo folder, the public key is located in ./repo_public_key.gpg
     :return:
     """
 
-    return create_server_root(
+    return create_packages_repo_root(
         packages_source_type=request.config.option.packages_source_type,
         packages_source=request.config.option.packages_source,
         package_builder=package_builder,
+        package_type=package_type,
         stable_packages_version=stable_packages_version,
+        output_dir=tmp_path_factory.mktemp("packages_repo_root")
     )
 
 
 @pytest.fixture(scope="session")
-def repo_root(server_root):
+def repo_root(packages_repo_root):
     """Root directory of the mock repository."""
-    return server_root / "repo"
+    return packages_repo_root / "repo"
 
 
 @pytest.fixture(scope="session")
-def server_url(server_root):
+def server_url(packages_repo_root):
     """
     This fixture prepares http server with package repository and other needed files.
     """
@@ -163,7 +178,7 @@ def server_url(server_root):
     # Create web server which serves repo and public key file.
     class Handler(http.server.SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):
-            super().__init__(*args, directory=str(server_root), **kwargs)
+            super().__init__(*args, directory=str(packages_repo_root), **kwargs)
 
     with socketserver.TCPServer(("", 0), Handler) as httpd:
         repo_server_thread = threading.Thread(target=httpd.serve_forever)
@@ -259,30 +274,36 @@ def _arch_to_package_arch(package_type: str, arch: CpuArch = None):
 
 
 @pytest.fixture(scope="session")
-def agent_package_path(repo_root, package_builder, agent_package_name, use_aio_package):
+def agent_package_path(
+    repo_root,
+    package_builder,
+    agent_package_name,
+    use_aio_package,
+    package_type,
+):
     if repo_root is None:
         return None
 
     if use_aio_package:
         package_arch = _arch_to_package_arch(
-            package_type=package_builder.PACKAGE_TYPE,
+            package_type=package_type,
             arch=package_builder.ARCHITECTURE,
         )
     else:
         package_arch = _arch_to_package_arch(
-            package_type=package_builder.PACKAGE_TYPE,
+            package_type=package_type,
             arch=None,
         )
 
-    if package_builder.PACKAGE_TYPE == "deb":
-        package_filename_glob = f"{agent_package_name}_{AGENT_VERSION}_{package_arch}.{package_builder.PACKAGE_TYPE}"
-    elif package_builder.PACKAGE_TYPE == "rpm":
-        package_filename_glob = f"{agent_package_name}-{AGENT_VERSION}-1.{package_arch}.{package_builder.PACKAGE_TYPE}"
+    if package_type == "deb":
+        package_filename_glob = f"{agent_package_name}_{AGENT_VERSION}_{package_arch}.{package_type}"
+    elif package_type == "rpm":
+        package_filename_glob = f"{agent_package_name}-{AGENT_VERSION}-1.{package_arch}.{package_type}"
     else:
-        raise Exception(f"Unknown package type: {package_builder.PACKAGE_TYPE}")
+        raise Exception(f"Unknown package type: {package_type}")
 
     return _get_package_path_from_repo(
         package_filename_glob=package_filename_glob,
-        package_type=package_builder.PACKAGE_TYPE,
+        package_type=package_type,
         repo_root=repo_root,
     )

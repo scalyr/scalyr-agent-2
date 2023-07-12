@@ -2,9 +2,18 @@ import json
 import pathlib as pl
 import shutil
 import subprocess
+from typing import List
 
 from agent_build_refactored.build_dependencies.ubuntu_toolset import UBUNTU_TOOLSET_X86_64
-from agent_build_refactored.tools.builder import Builder, BuilderArg
+from agent_build_refactored.tools.toolset_image import build_toolset_image
+from agent_build_refactored.tools.builder import Builder
+
+
+from agent_build_refactored.tools.constants import SOURCE_ROOT, CpuArch
+from agent_build_refactored.tools.docker.common import delete_container
+from agent_build_refactored.tools.docker.buildx.build import DockerImageBuildOutput, buildx_build
+
+_PARENT_DIR = pl.Path(__file__).parent
 
 
 class RepoBuilder(Builder):
@@ -13,78 +22,97 @@ class RepoBuilder(Builder):
     The result repo is used as a mock repository for testing.
     """
 
-    PACKAGES_DIR_ARG = BuilderArg(
-        name="packages_dir",
-        cmd_line_name="--packages-dir",
-        type=pl.Path,
-    )
-
     def __init__(
         self,
+        packages_dir: pl.Path
     ):
-        super(RepoBuilder, self).__init__(
-            base=UBUNTU_TOOLSET_X86_64,
-        )
+
+        super(RepoBuilder, self).__init__()
+        self.packages_dir = packages_dir
+        self.container_name = f"{self.__class__.NAME}_container"
 
     def _build_repo_files(
             self,
-            packages_dir: pl.Path,
             repo_output_dir: pl.Path,
             sign_key_id: str
     ):
         pass
 
-    def build(self):
+    @property
+    def docker_exec_args(self) -> List[str]:
+        return [
+            "docker",
+            "exec",
+            "-i",
+            self.container_name,
+        ]
 
-        packages_dir = self.get_builder_arg_value(self.PACKAGES_DIR_ARG)
+    def _build(self):
 
-        sign_key_id = (
-            subprocess.check_output(
-                "gpg2 --with-colons --fingerprint test | awk -F: '$1 == \"pub\" {{print $5;}}'",
-                shell=True,
-            )
-            .strip()
-            .decode()
+        toolset_image_name = build_toolset_image()
+
+        delete_container(
+            container_name=self.container_name,
         )
 
-        repo_public_key_file = self.output_dir / "repo_public_key.gpg"
-
-        subprocess.check_call(
+        subprocess.run(
             [
-                "gpg2",
-                "--output",
-                str(repo_public_key_file),
-                "--armor",
-                "--export",
-                sign_key_id,
-            ]
+                "docker",
+                "run",
+                "-d",
+                f"--name={self.container_name}",
+                f"-v={SOURCE_ROOT}:{self.to_in_docker_path(SOURCE_ROOT)}",
+                toolset_image_name,
+                "/bin/bash",
+                "-c",
+                "while true; do sleep 86400; done"
+            ],
+            check=True
         )
 
-        print("!!!!!!!!")
-        for p in packages_dir.iterdir():
-            print(str(p))
+        try:
+            get_key_id_cmd = "gpg2 --with-colons --fingerprint test | awk -F: '$1 == \"pub\" {{print $5;}}'"
+            result = subprocess.run(
+                [
+                    *self.docker_exec_args,
+                    "/bin/bash",
+                    "-c",
+                    get_key_id_cmd,
+                ],
+                check=True,
+                capture_output=True
+            )
 
-        repo_output_dir = self.output_dir / "repo"
-        repo_output_dir.mkdir(parents=True)
-        self._build_repo_files(
-            packages_dir=packages_dir,
-            repo_output_dir=repo_output_dir,
-            sign_key_id=sign_key_id,
-        )
+            sign_key_id = result.stdout.decode().strip()
 
-    def build_repo(
-        self,
-        output_dir: pl.Path,
-        packages_dir: pl.Path,
-        verbose: bool = True,
-    ):
-        self.run_builder(
-            output_dir=output_dir,
-            **{
-                self.PACKAGES_DIR_ARG.name: packages_dir,
-                self.VERBOSE_ARG.name: verbose,
-            },
-        )
+            repo_public_key_file = self.result_dir / "repo_public_key.gpg"
+
+            in_docker_repo_public_key_file = self.to_in_docker_path(repo_public_key_file)
+            subprocess.run(
+                [
+                    *self.docker_exec_args,
+                    "gpg2",
+                    "--output",
+                    str(in_docker_repo_public_key_file),
+                    "--armor",
+                    "--export",
+                    sign_key_id,
+                ],
+                check=True,
+            )
+
+            repo_output_dir = self.result_dir / "repo"
+            repo_output_dir.mkdir(parents=True)
+
+            self._build_repo_files(
+                repo_output_dir=repo_output_dir,
+                sign_key_id=sign_key_id,
+            )
+
+        finally:
+            delete_container(
+                self.container_name
+            )
 
 
 class AptRepoBuilder(RepoBuilder):
@@ -92,22 +120,25 @@ class AptRepoBuilder(RepoBuilder):
 
     def _build_repo_files(
         self,
-        packages_dir: pl.Path,
         repo_output_dir: pl.Path,
         sign_key_id: str
     ):
         # Create deb repository using 'aptly'.
         aptly_root = self.work_dir / "aptly"
-        aptly_config_path = self.work_dir / "aptly.conf"
+        in_docker_aptly_root = self.to_in_docker_path(aptly_root)
 
-        aptly_config = {"rootDir": str(aptly_root)}
+        aptly_config_path = self.work_dir / "aptly.conf"
+        in_docker_aptly_config_path = self.to_in_docker_path(aptly_config_path)
+
+        aptly_config = {"rootDir": str(in_docker_aptly_root)}
 
         aptly_config_path.write_text(json.dumps(aptly_config))
         subprocess.run(
             [
+                *self.docker_exec_args,
                 "aptly",
                 "-config",
-                str(aptly_config_path),
+                str(in_docker_aptly_config_path),
                 "repo",
                 "create",
                 "-distribution=scalyr",
@@ -116,24 +147,27 @@ class AptRepoBuilder(RepoBuilder):
             check=True,
         )
 
-        for package_path in packages_dir.glob("*.deb"):
+        for package_path in self.packages_dir.glob("*.deb"):
+            in_docker_package_path = self.to_in_docker_path(package_path)
             subprocess.check_call(
                 [
+                    *self.docker_exec_args,
                     "aptly",
                     "-config",
-                    str(aptly_config_path),
+                    str(in_docker_aptly_config_path),
                     "repo",
                     "add",
                     "scalyr",
-                    str(package_path),
+                    str(in_docker_package_path),
                 ]
             )
 
         subprocess.run(
             [
+                *self.docker_exec_args,
                 "aptly",
                 "-config",
-                str(aptly_config_path),
+                str(in_docker_aptly_config_path),
                 "publish",
                 "-architectures=amd64,arm64,all",
                 "-distribution=scalyr",
@@ -150,26 +184,35 @@ class YumRepoBuilder(RepoBuilder):
 
     def _build_repo_files(
             self,
-            packages_dir: pl.Path,
             repo_output_dir: pl.Path,
             sign_key_id: str,
     ):
         # Create rpm repository using 'createrepo_c'.
-        for package_path in packages_dir.glob("*.rpm"):
+        for package_path in self.packages_dir.glob("*.rpm"):
             shutil.copy(package_path, repo_output_dir)
-        subprocess.check_call(["createrepo_c", str(repo_output_dir)])
+
+        in_docker_repo_output_dir = self.to_in_docker_path(repo_output_dir)
+        subprocess.run(
+            [
+                *self.docker_exec_args,
+                "createrepo_c",
+                str(in_docker_repo_output_dir)
+            ]
+        )
 
         # Sign repository's metadata
         metadata_path = repo_output_dir / "repodata/repomd.xml"
+        in_docker_metadata_path = self.to_in_docker_path(metadata_path)
         subprocess.check_call(
             [
+                *self.docker_exec_args,
                 "gpg2",
                 "--local-user",
                 sign_key_id,
                 "--output",
-                f"{metadata_path}.asc",
+                f"{in_docker_metadata_path}.asc",
                 "--detach-sign",
                 "--armor",
-                str(metadata_path),
+                str(in_docker_metadata_path),
             ]
         )

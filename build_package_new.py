@@ -139,7 +139,7 @@ if __name__ == "__main__":
                 "--output-dir",
                 required=True,
                 type=str,
-                dest="output_dir",
+                dest="root_dir",
                 help="The directory where the result package has to be stored.",
             )
 

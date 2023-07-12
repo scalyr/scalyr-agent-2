@@ -85,7 +85,10 @@ The structure of the package has to guarantee that files of these packages does 
 """
 
 import abc
+import collections
+import concurrent.futures
 import dataclasses
+import functools
 import hashlib
 import json
 import logging
@@ -116,16 +119,21 @@ from agent_build_refactored.tools.runner import (
     GitHubActionsSettings,
     IN_DOCKER,
 )
-from agent_build_refactored.tools.constants import CpuArch, LibC
-from agent_build_refactored.tools.builder import Builder, BuilderPathArg
+from agent_build_refactored.tools.builder import Builder
 
 from agent_build_refactored.tools.constants import (
     SOURCE_ROOT,
     DockerPlatform,
     Architecture,
-    REQUIREMENTS_COMMON,
-    REQUIREMENTS_COMMON_PLATFORM_DEPENDENT,
+    CpuArch,
+    REQUIREMENTS_AGENT_COMMON,
+    REQUIREMENTS_AGENT_COMMON_PLATFORM_DEPENDENT,
+    CURRENT_MACHINE_CPU_ARCHITECTURE,
 )
+
+from agent_build_refactored.tools.docker.common import delete_container
+
+
 from agent_build_refactored.build_dependencies.versions import PYTHON_VERSION, EMBEDDED_OPENSSL_VERSION_NUMBER
 
 from agent_build_refactored.build_dependencies.ubuntu_toolset import UbuntuToolset, UBUNTU_TOOLSET_X86_64
@@ -144,9 +152,15 @@ from agent_build_refactored.prepare_agent_filesystem import (
     create_change_logs,
 )
 
+from agent_build_refactored.tools.toolset_image import build_toolset_image
+from agent_build_refactored.tools.docker.buildx.build import BuildOutput, LocalDirectoryBuildOutput, DockerImageBuildOutput, \
+    buildx_build
+from agent_build_refactored.tools.constants import AGENT_REQUIREMENTS
 
 logger = logging.getLogger(__name__)
 
+_PARENT_DIR = pl.Path(__file__).parent
+_DEPENDENCIES_DIR = _PARENT_DIR / "dependencies"
 
 # Name of the subdirectory of the agent packages.
 AGENT_SUBDIR_NAME = "scalyr-agent-2"
@@ -176,6 +190,15 @@ OPENSSL_3_VERSION = "3.0.7"
 # Integer (hex) representation of the OpenSSL version.
 EMBEDDED_OPENSSL_VERSION_NUMBER = 0x30000070
 
+PYTHON_VERSION = "3.11.2"
+OPENSSL_1_VERSION = "1.1.1s"
+OPENSSL_3_VERSION = "3.0.7"
+
+PYTHON_INSTALL_PREFIX = pl.Path("/opt/scalyr-agent-2/python3")
+DEPENDENCIES_INSTALL_PREFIX = pl.Path("/usr/local")
+
+PORTABLE_PYTEST_RUNNER_NAME = "portable_runner"
+
 # Version of Rust to use in order to build some of agent's requirements, e.g. orjson.
 RUST_VERSION = "1.63.0"
 
@@ -196,7 +219,7 @@ def _get_openssl_version_number(version: str):
 #EMBEDDED_OPENSSL_VERSION_NUMBER = _get_openssl_version_number(version=EMBEDDED_OPENSSL_VERSION)
 
 AGENT_LIBS_REQUIREMENTS_CONTENT = (
-    f"{REQUIREMENTS_COMMON}\n" f"{REQUIREMENTS_COMMON_PLATFORM_DEPENDENT}"
+    f"{REQUIREMENTS_AGENT_COMMON}\n" f"{REQUIREMENTS_AGENT_COMMON_PLATFORM_DEPENDENT}"
 )
 
 SUPPORTED_ARCHITECTURES = {
@@ -220,18 +243,14 @@ class LinuxPackageBuilder(Builder):
     This is a base class that is responsible for the building of the Linux agent deb and rpm packages that are managed
         by package managers such as apt and yum.
     """
-    # type of the package, aka 'deb' or 'rpm'
-    PACKAGE_TYPE: str
 
-    def __init__(self, dependencies: List[BuilderStep] = None):
+    def __init__(
+        self,
+        packages_types: List[str] = None,
+    ):
 
-        self.ubuntu_toolset = UBUNTU_TOOLSET_X86_64
-
-        super(LinuxPackageBuilder, self).__init__(
-            base=self.ubuntu_toolset,
-            dependencies=dependencies,
-        )
-
+        super(LinuxPackageBuilder, self).__init__()
+        self.package_types = packages_types or ["deb", "rpm"]
 
     @property
     def common_agent_package_build_args(self) -> List[str]:
@@ -292,9 +311,82 @@ class LinuxPackageBuilder(Builder):
         # Add config file
         add_config(SOURCE_ROOT / "config", package_root_path / "etc/scalyr-agent-2")
 
-    # @property
-    # def package_output_dir(self):
-    #     return self.output_dir / self.PACKAGE_TYPE
+    def _build_package(
+        self,
+        package_type: str,
+        cmd_args: List[str],
+        fpm_image_name: str,
+    ):
+
+        package_dir = self.result_dir / package_type
+        package_dir.mkdir()
+        in_docker_package_dir = self.to_in_docker_path(package_dir)
+
+        in_docker_source_root = self.to_in_docker_path(SOURCE_ROOT)
+
+        container_name = f"{fpm_image_name}_{package_type}"
+        delete_container(
+            container_name=container_name,
+        )
+
+        try:
+            result = subprocess.run(
+                [
+                    # fmt: off
+                    "docker",
+                    "run",
+                    "-i",
+                    "--rm",
+                    f"--name={container_name}",
+                    f"--workdir={in_docker_package_dir}",
+                    f"--volume={SOURCE_ROOT}:{in_docker_source_root}",
+                    fpm_image_name,
+                    *cmd_args,
+                    "-t",
+                    package_type,
+                    # fmt: on
+                ],
+                check=True,
+                stderr=subprocess.STDOUT,
+                stdout=subprocess.PIPE,
+            )
+        except subprocess.CalledProcessError as e:
+            logger.info(f"Fpm process has ended with error. Output: {e.stdout.decode()}")
+            raise
+
+        return result.stdout.decode()
+
+    def _build_all_packages(
+        self,
+        cmd_args: List[str],
+    ):
+
+        toolset_image_name = build_toolset_image()
+
+        parallel_builds_count = os.cpu_count()
+        if parallel_builds_count is None:
+            parallel_builds_count = 1
+
+        executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=parallel_builds_count
+        )
+
+        futures = collections.OrderedDict()
+        for package_type in self.package_types:
+            logger.info(f"Start build of the {package_type} package.")
+            future = executor.submit(
+                self._build_package,
+                package_type=package_type,
+                cmd_args=cmd_args,
+                fpm_image_name=toolset_image_name,
+
+            )
+            futures[package_type] = future
+
+        for package_type, future in futures.items():
+            output = future.result()
+            logger.info(f"The {package_type} package build is finished.\n{output}")
+
 
 
 class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
@@ -352,7 +444,7 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
         replace_code(pre_install_scriptlet)
         replace_code(post_install_scriptlet)
 
-    def build(self):
+    def _build(self):
 
         agent_package_root = self.work_dir / "agent_package_root"
 
@@ -403,28 +495,30 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
         changelogs_path.mkdir()
         create_change_logs(output_dir=changelogs_path)
 
-        #self.package_output_dir.mkdir(parents=True, exist_ok=True)
+        in_docker_package_root = self.to_in_docker_path(agent_package_root)
+        in_docker_scriptlets_path = self.to_in_docker_path(scriptlets_path)
+        in_docker_changelogs_dir = self.to_in_docker_path(changelogs_path)
 
-        subprocess.check_call(
-            [
-                # fmt: off
-                *self.common_agent_package_build_args,
-                "-s", "dir",
-                "-a", "all",
-                "-t", self.PACKAGE_TYPE,
-                "-C", str(agent_package_root),
-                "-n", AGENT_NON_AIO_AIO_PACKAGE_NAME,
-                "--provides", AGENT_NON_AIO_AIO_PACKAGE_NAME,
-                "--description", description,
-                "--before-install", scriptlets_path / "preinstall.sh",
-                "--after-install", scriptlets_path / "postinstall.sh",
-                "--before-remove", scriptlets_path / "preuninstall.sh",
-                "--deb-changelog", str(changelogs_path / "changelog-deb"),
-                "--rpm-changelog", str(changelogs_path / "changelog-rpm"),
-                "--conflicts", AGENT_AIO_PACKAGE_NAME
-                # fmt: on
-            ],
-            cwd=str(self.output_dir),
+        cmd_args = [
+            # fmt: off
+            *self.common_agent_package_build_args,
+            "-s", "dir",
+            "-a", "all",
+            "-C", str(in_docker_package_root),
+            "-n", AGENT_NON_AIO_AIO_PACKAGE_NAME,
+            "--provides", AGENT_NON_AIO_AIO_PACKAGE_NAME,
+            "--description", description,
+            "--before-install", str(in_docker_scriptlets_path / "preinstall.sh"),
+            "--after-install", str(in_docker_scriptlets_path / "postinstall.sh"),
+            "--before-remove", str(in_docker_scriptlets_path / "preuninstall.sh"),
+            "--deb-changelog", str(in_docker_changelogs_dir / "changelog-deb"),
+            "--rpm-changelog", str(in_docker_changelogs_dir / "changelog-rpm"),
+            "--conflicts", AGENT_AIO_PACKAGE_NAME
+            # fmt: on
+        ]
+
+        self._build_all_packages(
+            cmd_args=cmd_args,
         )
 
 
@@ -436,33 +530,49 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
 
     # package architecture, for example: amd64 for deb.
     ARCHITECTURE: CpuArch
-    LIBC: LibC
 
-    def __init__(self):
+    @classmethod
+    def build_dependencies(
+        cls,
+        output: BuildOutput,
+    ):
 
-        self.architecture = self.__class__.ARCHITECTURE
-        self.libc = self.__class__.LIBC
+        rust_platform = f"{cls.ARCHITECTURE.value}-unknown-linux-gnu"
 
-        self.prepare_build_base_with_python = PREPARE_BUILD_BASE_WITH_PYTHON_STEPS[self.libc][self.architecture]
+        build_args = {
+            "ARCH": cls.ARCHITECTURE.value,
+            "PYTHON_VERSION": PYTHON_VERSION,
+            "PYTHON_INSTALL_PREFIX": str(PYTHON_INSTALL_PREFIX),
+            "DEPENDENCIES_INSTALL_PREFIX": str(DEPENDENCIES_INSTALL_PREFIX),
+            "REQUIREMENTS_FILE_CONTENT": AGENT_REQUIREMENTS,
+            "PORTABLE_RUNNER_NAME": PORTABLE_PYTEST_RUNNER_NAME,
+            "RUST_VERSION": "1.63.0",
+            "RUST_PLATFORM": rust_platform,
+            "BZIP_VERSION": "1.0.8",
+            "LIBEDIT_VERSION_COMMIT": "0cdd83b3ebd069c1dee21d81d6bf716cae7bf5da",  # tag - "upstream/3.1-20221030",
+            "LIBFFI_VERSION": "3.4.2",
+            "NCURSES_VERSION": "6.3",
+            "OPENSSL_1_VERSION": OPENSSL_1_VERSION,
+            "OPENSSL_3_VERSION": OPENSSL_3_VERSION,
+            "TCL_VERSION_COMMIT": "338c6692672696a76b6cb4073820426406c6f3f9",  # tag - "core-8-6-13",
+            "SQLITE_VERSION_COMMIT": "e671c4fbc057f8b1505655126eaf90640149ced6",  # tag - "version-3.41.2",
+            "UTIL_LINUX_VERSION": "2.38",
+            "XZ_VERSION": "5.2.6",
+            "ZLIB_VERSION": "1.2.13",
+        }
 
-        self.build_python_step = BUILD_PYTHON_STEPS[self.libc][self.architecture]
+        cache_scope = f"packages_python_{cls.ARCHITECTURE.value}"
 
-        self.build_python_dependencies_step = BUILD_PYTHON_DEPENDENCIES_STEPS[self.libc][self.architecture]
+        fallback_to_remote_builder = cls.ARCHITECTURE != CURRENT_MACHINE_CPU_ARCHITECTURE
 
-        self.build_agent_libs_venv_step = BuildAgentLibsVenvStep.create(
-            prepare_build_base_with_python_step=self.prepare_build_base_with_python,
-        )
-
-        self.build_python_step_with_openssl_1 = BUILD_PYTHON_STEPS_WITH_OPENSSL_1[self.libc][self.architecture]
-        
-        super(LinuxAIOPackagesBuilder, self).__init__(
-            dependencies=[
-                self.build_python_step,
-                self.build_python_dependencies_step,
-                self.prepare_build_base_with_python,
-                self.build_python_step_with_openssl_1,
-                self.build_agent_libs_venv_step,
-            ]
+        buildx_build(
+            dockerfile_path=_DEPENDENCIES_DIR / "Dockerfile",
+            context_path=SOURCE_ROOT,
+            architecture=cls.ARCHITECTURE,
+            build_args=build_args,
+            output=output,
+            cache_scope=cache_scope,
+            fallback_to_remote_builder=fallback_to_remote_builder
         )
 
     def _prepare_package_python_and_libraries_files(self, package_root: pl.Path):
@@ -471,12 +581,20 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         :param package_root: Path to the package root.
         """
 
-        # Copy Python interpreter to package.
+        dependencies_dir = self.work_dir / "dependencies"
+        self.build_dependencies(
+            output=LocalDirectoryBuildOutput(
+                dest=dependencies_dir,
+            )
+        )
+
+        python_dependency_dir = dependencies_dir / "python"
+
         shutil.copytree(
-            self.build_python_step.output_dir,
+            python_dependency_dir,
             package_root,
             dirs_exist_ok=True,
-            symlinks=True
+            symlinks=True,
         )
 
         relative_python_install_prefix = pl.Path(PYTHON_INSTALL_PREFIX).relative_to("/")
@@ -491,8 +609,6 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
                 openssl_major_version: str,
         ):
             """# This function copies Python's ssl module related files."""
-
-
             python_step_bindings_dir = python_dir / relative_python_install_prefix / f"lib/python{PYTHON_X_Y}/lib-dynload"
 
             ssl_binding_path = list(python_step_bindings_dir.glob(python_ssl_bindings_glob))[0]
@@ -505,14 +621,16 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
             shutil.copy(hashlib_binding_path, bindings_dir)
 
         # Copy ssl modules which are compiled for OpenSSL 1.1.1
+        python_with_openssl_1_dependency_dir = dependencies_dir / "python_with_openssl_1"
+
         copy_openssl_files(
-            python_dir=self.build_python_step_with_openssl_1.output_dir,
+            python_dir=python_with_openssl_1_dependency_dir,
             openssl_major_version="1"
         )
 
         # Copy ssl modules which are compiled for OpenSSL 3
         copy_openssl_files(
-            python_dir=self.build_python_step.output_dir,
+            python_dir=python_dependency_dir,
             openssl_major_version="3"
         )
 
@@ -526,11 +644,12 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         embedded_openssl_libs_dir = embedded_openssl_dir / "libs"
         embedded_openssl_libs_dir.mkdir(parents=True)
 
-        openssl_3_dir = self.build_python_dependencies_step.output_dir / f"openssl_3"
-        rel_dependencies_install_prefix = self.build_python_dependencies_step.install_prefix.relative_to(
+        openssl_3_dependency_dir = dependencies_dir / "openssl_3"
+
+        rel_dependencies_install_prefix = DEPENDENCIES_INSTALL_PREFIX.relative_to(
             "/"
         )
-        build_openssl_libs_dir = openssl_3_dir / rel_dependencies_install_prefix / "lib"
+        build_openssl_libs_dir = openssl_3_dependency_dir / rel_dependencies_install_prefix / "lib"
         openssl_3_shared_object_to_copy = list(build_openssl_libs_dir.glob("*.so.*"))
         assert openssl_3_shared_object_to_copy, "No shared object files are found"
         for path in openssl_3_shared_object_to_copy:
@@ -617,10 +736,12 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
             os.remove(package_python_lib_dir / "xdrlib.py")
 
         # Copy agent libraries venv
+        venv_dependency_dir = dependencies_dir / "venv"
+
         package_venv_dir = package_opt_dir / "venv"
         package_venv_dir.mkdir()
         shutil.copytree(
-            self.build_agent_libs_venv_step.output_dir,
+            venv_dependency_dir,
             package_venv_dir,
             dirs_exist_ok=True,
             symlinks=True
@@ -665,7 +786,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         var_opt_dir = package_root / f"var/opt/{AGENT_SUBDIR_NAME}"
         var_opt_dir.mkdir(parents=True)
 
-    def build(self):
+    def _build(self):
 
         agent_package_root = self.work_dir / "agent_package_root"
 
@@ -727,55 +848,60 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         changelogs_path.mkdir()
         create_change_logs(output_dir=changelogs_path)
 
-        subprocess.check_call(
-            [
-                # fmt: off
-                *self.common_agent_package_build_args,
-                "-s", "dir",
-                "-a", cpu_arch_as_fpm_arch(arch=self.architecture),
-                "-t", self.PACKAGE_TYPE,
-                "-C", str(agent_package_root),
-                "-n", AGENT_AIO_PACKAGE_NAME,
-                "--provides", AGENT_AIO_PACKAGE_NAME,
-                "--description", description,
-                "--after-install", scriptlets_path / "postinstall.sh",
-                "--before-remove", scriptlets_path / "preuninstall.sh",
-                "--config-files", f"/opt/{AGENT_SUBDIR_NAME}/etc/preferred_openssl",
-                "--config-files", f"/opt/{AGENT_SUBDIR_NAME}/etc/additional-requirements.txt",
-                "--directories", f"/opt/{AGENT_SUBDIR_NAME}",
-                "--directories", f"/var/opt/{AGENT_SUBDIR_NAME}",
-                "--deb-changelog", str(changelogs_path / "changelog-deb"),
-                "--rpm-changelog", str(changelogs_path / "changelog-rpm"),
-                "--conflicts", AGENT_NON_AIO_AIO_PACKAGE_NAME
-                # fmt: on
-            ],
-            cwd=str(self.output_dir),
+        in_docker_package_root = self.to_in_docker_path(agent_package_root)
+        in_docker_scriptlets_path = self.to_in_docker_path(scriptlets_path)
+        in_docker_changelogs_dir = self.to_in_docker_path(changelogs_path)
+
+        fpm_cmd_args = [
+            # fmt: off
+            *self.common_agent_package_build_args,
+            "-s", "dir",
+            "-a", cpu_arch_as_fpm_arch(arch=self.__class__.ARCHITECTURE),
+            "-C", str(in_docker_package_root),
+            "-n", AGENT_AIO_PACKAGE_NAME,
+            "--provides", AGENT_AIO_PACKAGE_NAME,
+            "--description", description,
+            "--after-install", str(in_docker_scriptlets_path / "postinstall.sh"),
+            "--before-remove", str(in_docker_scriptlets_path / "preuninstall.sh"),
+            "--config-files", f"/opt/{AGENT_SUBDIR_NAME}/etc/preferred_openssl",
+            "--config-files", f"/opt/{AGENT_SUBDIR_NAME}/etc/additional-requirements.txt",
+            "--directories", f"/opt/{AGENT_SUBDIR_NAME}",
+            "--directories", f"/var/opt/{AGENT_SUBDIR_NAME}",
+            "--deb-changelog", str(in_docker_changelogs_dir / "changelog-deb"),
+            "--rpm-changelog", str(in_docker_changelogs_dir / "changelog-rpm"),
+            "--conflicts", AGENT_NON_AIO_AIO_PACKAGE_NAME
+            # fmt: on
+        ]
+
+        self._build_all_packages(
+            cmd_args=fpm_cmd_args,
         )
+
+
 
 
 ALL_PACKAGE_BUILDERS: Dict[str, Union[Type[LinuxAIOPackagesBuilder], Type[LinuxNonAIOPackageBuilder]]] = {}
 
-for package_type in ["deb", "rpm"]:
+non_aio_builder_name = "non-aio"
 
-    name = f"{package_type}-non-aio"
 
-    class _LinuxNonAIOPackagesBuilder(LinuxNonAIOPackageBuilder):
-        NAME = name
-        PACKAGE_TYPE = package_type
+class _LinuxNonAIOPackagesBuilder(LinuxNonAIOPackageBuilder):
+    NAME = non_aio_builder_name
 
-    ALL_PACKAGE_BUILDERS[name] = _LinuxNonAIOPackagesBuilder
 
-    for package_libc in [LibC.GNU]:
-        for package_arch in SUPPORTED_ARCHITECTURES:
-            name = f"{package_type}-aio-{package_arch.value}"
+ALL_PACKAGE_BUILDERS[non_aio_builder_name] = _LinuxNonAIOPackagesBuilder
 
-            class _LinuxAIOPackagesBuilder(LinuxAIOPackagesBuilder):
-                NAME = name
-                PACKAGE_TYPE = package_type
-                ARCHITECTURE = package_arch
-                LIBC = package_libc
+ALL_AIO_PACKAGE_BUILDERS: Dict[str, Type[LinuxAIOPackagesBuilder]] = {}
 
-            ALL_PACKAGE_BUILDERS[name] = _LinuxAIOPackagesBuilder
+for package_arch in SUPPORTED_ARCHITECTURES:
+    aio_builder_name = f"aio-{package_arch.value}"
+
+    class _LinuxAIOPackagesBuilder(LinuxAIOPackagesBuilder):
+        NAME = aio_builder_name
+        ARCHITECTURE = package_arch
+
+    ALL_PACKAGE_BUILDERS[aio_builder_name] = _LinuxAIOPackagesBuilder
+    ALL_AIO_PACKAGE_BUILDERS[aio_builder_name] = _LinuxAIOPackagesBuilder
 
 
 def get_package_builder_by_name(name: str):

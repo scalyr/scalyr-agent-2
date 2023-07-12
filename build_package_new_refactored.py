@@ -28,6 +28,7 @@ import logging
 import pathlib as pl
 import argparse
 import sys
+import pathlib as pl
 
 from typing import Dict, Type
 
@@ -36,73 +37,44 @@ logging.basicConfig(level=logging.INFO)
 if sys.version_info < (3, 8, 0):
     raise ValueError("This script requires Python 3.8 or above")
 
-__PARENT_DIR__ = pl.Path(__file__).absolute().parent
-__SOURCE_ROOT__ = __PARENT_DIR__
-
 # This file can be executed as script. Add source root to the PYTHONPATH in order to be able to import
 # local packages. All such imports also have to be done after that.
-sys.path.append(str(__SOURCE_ROOT__))
+sys.path.append(str(pl.Path(__file__).parent.absolute()))
 
-from agent_build_refactored.tools.runner import Runner
 from agent_build_refactored.docker_image_builders import (
     ALL_IMAGE_BUILDERS,
 )
+from agent_build_refactored.tools.constants import SOURCE_ROOT
 from agent_build_refactored.managed_packages.managed_packages_builders import (
     ALL_PACKAGE_BUILDERS,
 )
-from agent_build_refactored.tools.builder import BUILDER_CLASSES, Builder
-from agent_build_refactored.scripts.builder_helper import builder_main
 
+from agent_build_refactored.tools.builder import Builder
 
-ALL_BUILDERS: Dict[str, Type[Builder]] = {
-    **ALL_IMAGE_BUILDERS,
-    **ALL_PACKAGE_BUILDERS
-}
-
-_AGENT_BUILD_PATH = __SOURCE_ROOT__ / "agent_build"
-
-#
-# BUILDERS: Dict[str, Runner] = UniqueDict(
-#     **ALL_IMAGE_BUILDERS, **ALL_MANAGED_PACKAGE_BUILDERS
-# )
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
 
-    # First, we use base parser just to parse the builder name.
-    # When we determine the name, we create another parser which will be used by the builder itself.
-    base_parser = argparse.ArgumentParser(add_help=False)
-    base_parser.add_argument("builder_name", choices=ALL_BUILDERS.keys())
+    subparsers = parser.add_subparsers(dest="command")
 
-    # base_parser.add_argument(
-    #     "--fqdn",
-    #     dest="fqdn",
-    #     action="store_true",
-    #     help="If this flag specified then just print fully qualified name for the builder. Mainly needed for CI/CD.",
-    # )
+    package_parser = subparsers.add_parser("package")
 
-    base_args, other_argv = base_parser.parse_known_args()
-
-    builder_cls = ALL_BUILDERS[base_args.builder_name]
-
-    builder_main(
-        builder_fqdn=builder_cls.FQDN,
-        argv=other_argv,
+    package_parser.add_argument(
+        "package_builder_name",
+        choices=ALL_PACKAGE_BUILDERS.keys(),
+    )
+    package_parser.add_argument(
+        "--output-dir",
+        default=str(SOURCE_ROOT / "build")
     )
 
-    a=10
+    args = parser.parse_args()
 
-    #
-    # builder_cls = BUILDER_CLASSES[base_args.builder_name]
-    #
-    # if base_args.fqdn:
-    #     print(builder_cls.get_fully_qualified_name())
-    #     exit(0)
-    #
-    # # Create parser for builder commands and parse them.
-    # parser = argparse.ArgumentParser()
-    #
-    # builder_cls.add_command_line_arguments(parser=parser)
-    #
-    # args = parser.parse_args(args=other_args)
-    #
-    # builder_cls.handle_command_line_arguments(args=args)
+    if args.command == "package":
+        package_builder_cls = ALL_PACKAGE_BUILDERS[args.package_builder_name]
+
+        builder = package_builder_cls()
+        builder.build(
+            output_dir=pl.Path(args.output_dir),
+        )
+        exit(0)

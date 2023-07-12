@@ -1,7 +1,7 @@
 import json
 import subprocess
 import pathlib as pl
-from typing import List, Dict, Union
+from typing import List, Dict
 
 
 def get_docker_container_host_port(
@@ -155,4 +155,5 @@ class ContainerWrapper:
             container_name=self.name,
             force=force,
         )
+
 

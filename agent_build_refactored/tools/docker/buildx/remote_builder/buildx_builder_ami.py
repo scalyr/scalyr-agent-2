@@ -37,13 +37,7 @@ def create_new_ami_image(
 
     ec2_client = boto3_session.client("ec2")
 
-    #root_ebs_volume = instance.block_device_mappings[0]
     created_image_info = ec2_client.create_image(
-        # BlockDeviceMappings=[
-        #     {
-        #         'DeviceName': root_ebs_volume["DeviceName"],
-        #     },
-        # ],
         InstanceId=instance_id,
         Description="Image with pre-installed docker engine that is used in dataset agent's CI-CD",
         Name=f"{IMAGE_NAME_PREFIX}-{deployment_script_sha}",

@@ -43,7 +43,7 @@ class LinuxPackageBuilder(Builder):
 
         shutil.copytree(
             python_dir,
-            self.output_dir / "python"
+            self.root_dir / "python"
         )
 
 

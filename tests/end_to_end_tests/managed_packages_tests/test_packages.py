@@ -59,7 +59,7 @@ LINUX_PACKAGE_AGENT_PATHS = AgentPaths(
 
 def test_packages(
     package_builder_name,
-    package_builder,
+    package_type,
     remote_machine_type,
     convenience_script_path,
     target_distro,
@@ -79,7 +79,7 @@ def test_packages(
 
     _print_system_information()
     _prepare_environment(
-        package_type=package_builder.PACKAGE_TYPE,
+        package_type=package_type,
         remote_machine_type=remote_machine_type,
         target_distro=target_distro,
         timeout_tracker=timeout_tracker,
@@ -195,7 +195,7 @@ def test_packages(
 
     logger.info("Cleanup")
     _remove_all_agent_files(
-        package_name=agent_package_name, package_type=package_builder.PACKAGE_TYPE
+        package_name=agent_package_name, package_type=package_type
     )
 
     assert monitor_file_path.exists()
@@ -203,7 +203,12 @@ def test_packages(
 
 
 def test_aio_package_paths(
-    package_builder, tmp_path, target_distro, agent_package_path, use_aio_package
+    #package_builder,
+    package_type,
+    tmp_path,
+    target_distro,
+    agent_package_path,
+    use_aio_package,
 ):
 
     if not use_aio_package:
@@ -212,7 +217,7 @@ def test_aio_package_paths(
     if target_distro.name not in ["ubuntu2204", "amazonlinux2"]:
         pytest.skip("No need to check on all distros.")
 
-    package_type = package_builder.PACKAGE_TYPE
+    package_type = package_type
     package_root = tmp_path / AGENT_AIO_PACKAGE_NAME
     package_root.mkdir()
 
@@ -261,7 +266,7 @@ def test_aio_package_paths(
     #     package_path=agent_package_path,
     #     package_type=package_builder.PACKAGE_TYPE,
     #     package_name=AGENT_AIO_PACKAGE_NAME,
-    #     output_dir=tmp_path,
+    #     root_dir=tmp_path,
     #     expected_paths=[
     #         f"opt/{AGENT_SUBDIR_NAME}/",
     #         f"etc/{AGENT_SUBDIR_NAME}/",
@@ -280,15 +285,18 @@ def test_aio_package_paths(
     #     ],
     # )
 
-
-def test_agent_package_config_ownership(package_builder, agent_package_path, tmp_path):
+def test_agent_package_config_ownership(
+    package_type,
+    agent_package_path,
+    tmp_path
+):
     """
     Test ownership and permissions of the config files.
     """
 
     logger.info("Verifying agent.json and agent.d permissions")
     _extract_package(
-        package_type=package_builder.PACKAGE_TYPE,
+        package_type=package_type,
         package_path=agent_package_path,
         output_path=tmp_path,
     )
@@ -335,13 +343,14 @@ def test_agent_package_config_ownership(package_builder, agent_package_path, tmp
 
 
 def test_upgrade(
-    package_builder,
+    #package_builder,
     package_builder_name,
+    package_type,
     repo_url,
     repo_public_key_url,
     remote_machine_type,
     distro_name,
-        stable_packages_version,
+    stable_packages_version,
     scalyr_api_key,
     test_session_suffix,
     agent_version,
@@ -375,7 +384,7 @@ def test_upgrade(
     else:
         system_python_package_name = "python3"
 
-    if package_builder.PACKAGE_TYPE == "deb":
+    if package_type == "deb":
         repo_source_list_path = pl.Path("/etc/apt/sources.list.d/scalyr.list")
         repo_source_list_path.write_text(
             f"deb [allow-insecure=yes] {repo_url} scalyr main"
@@ -391,7 +400,7 @@ def test_upgrade(
                 f"{agent_package_name}={stable_packages_version}",
             ]
         )
-    elif package_builder.PACKAGE_TYPE == "rpm":
+    elif package_type == "rpm":
         yum_repo_file_path = pl.Path("/etc/yum.repos.d/scalyr.repo")
         yum_repo_file_content = f"""
 [scalyr]
@@ -407,7 +416,7 @@ repo_gpgcheck=0
             ["install", "-y", f"{agent_package_name}-{stable_packages_version}-1"]
         )
     else:
-        raise Exception(f"Unknown package type: {package_builder.PACKAGE_TYPE}")
+        raise Exception(f"Unknown package type: {package_type}")
 
     # Write config
     server_host = (
@@ -426,7 +435,7 @@ repo_gpgcheck=0
     agent_commander.agent_paths.agent_config_path.write_text(json.dumps(config))
 
     logger.info("Upgrade agent")
-    if package_builder.PACKAGE_TYPE == "deb":
+    if package_type == "deb":
         _call_apt(
             [
                 "install",
@@ -436,10 +445,10 @@ repo_gpgcheck=0
                 f"{agent_package_name}",
             ]
         )
-    elif package_builder.PACKAGE_TYPE == "rpm":
+    elif package_type == "rpm":
         _call_yum(["install", "-y", f"{agent_package_name}"])
     else:
-        raise Exception(f"Unknown package type: {package_builder.PACKAGE_TYPE}")
+        raise Exception(f"Unknown package type: {package_type}")
 
     logger.info("Verify that agent config remains after upgrade.")
     assert LINUX_PACKAGE_AGENT_PATHS.agent_config_path.exists()
@@ -457,7 +466,7 @@ repo_gpgcheck=0
 
     logger.info("Cleanup")
     _remove_all_agent_files(
-        package_name=agent_package_name, package_type=package_builder.PACKAGE_TYPE
+        package_name=agent_package_name, package_type=package_type
     )
 
 
