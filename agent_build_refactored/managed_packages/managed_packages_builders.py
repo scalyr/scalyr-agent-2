@@ -101,24 +101,7 @@ import pathlib as pl
 import re
 from typing import List, Tuple, Optional, Dict, Type, Union
 
-# from agent_build_refactored.managed_packages.build_dependencies_versions import (
-#     #EMBEDDED_PYTHON_VERSION,
-#     PYTHON_PACKAGE_SSL_1_1_1_VERSION,
-#     PYTHON_PACKAGE_SSL_3_VERSION,
-#     RUST_VERSION,
-#     EMBEDDED_PYTHON_PIP_VERSION,
-# )
-from agent_build_refactored.tools.builder import BuilderStep
-from agent_build_refactored.tools.runner import (
-    Runner,
-    RunnerStep,
-    ArtifactRunnerStep,
-    RunnerMappedPath,
-    EnvironmentRunnerStep,
-    DockerImageSpec,
-    GitHubActionsSettings,
-    IN_DOCKER,
-)
+
 from agent_build_refactored.tools.builder import Builder
 
 from agent_build_refactored.tools.constants import (
@@ -133,18 +116,6 @@ from agent_build_refactored.tools.constants import (
 
 from agent_build_refactored.tools.docker.common import delete_container
 
-
-from agent_build_refactored.build_dependencies.versions import PYTHON_VERSION, EMBEDDED_OPENSSL_VERSION_NUMBER
-
-from agent_build_refactored.build_dependencies.ubuntu_toolset import UbuntuToolset, UBUNTU_TOOLSET_X86_64
-
-from agent_build_refactored.build_dependencies.build_agent_libs_venv import BuildAgentLibsVenvStep
-from agent_build_refactored.build_dependencies.python import (
-    PREPARE_BUILD_BASE_WITH_PYTHON_STEPS,
-    BUILD_PYTHON_STEPS,
-    BUILD_PYTHON_STEPS_WITH_OPENSSL_1,
-    BUILD_PYTHON_DEPENDENCIES_STEPS,
-)
 
 from agent_build_refactored.prepare_agent_filesystem import (
     build_linux_fhs_agent_files,
@@ -179,9 +150,10 @@ AGENT_OPT_DIR = pl.Path("/opt") / AGENT_SUBDIR_NAME
 PYTHON_INSTALL_PREFIX = pl.Path(f"{AGENT_OPT_DIR}/python3")
 PYTHON_DEPENDENCIES_INSTALL_PREFIX = pl.Path("/usr/local")
 
+PYTHON_VERSION = "3.11.2"
+
 PYTHON_X_Y = ".".join(PYTHON_VERSION.split(".")[:2])
 
-PYTHON_VERSION = "3.11.2"
 
 # Versions of OpenSSL libraries to build for Python.
 OPENSSL_1_VERSION = "1.1.1s"

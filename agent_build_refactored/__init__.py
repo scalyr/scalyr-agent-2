@@ -12,7 +12,6 @@
 # # See the License for the specific language governing permissions and
 # # limitations under the License.
 
-import agent_build_refactored.build_dependencies
 import agent_build_refactored.managed_packages.managed_packages_builders
 #
 # from agent_build_refactored.tools.runner import (

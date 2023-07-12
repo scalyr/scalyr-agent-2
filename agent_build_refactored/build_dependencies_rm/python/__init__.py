@@ -4,7 +4,6 @@ from typing import Dict
 
 from agent_build_refactored.tools.constants import CpuArch, LibC
 
-from agent_build_refactored.tools.builder.builder_step import BuilderStep
 from agent_build_refactored.build_dependencies.python.download_sources import DownloadSourcesStep
 from agent_build_refactored.build_dependencies.python.prepare_build_base import PrepareBuildBaseStep
 from agent_build_refactored.build_dependencies.python.build_python_dependencies import BuildPytonDependenciesStep

@@ -11,6 +11,7 @@ from agent_build_refactored.tools.aws.constants import EC2DistroImage
 
 from agent_build_refactored.tools.docker.common import delete_container, ContainerWrapper
 from agent_build_refactored.tools.docker.buildx.remote_builder.buildx_builder_ami import get_buildx_builder_ami_image
+from agent_build_refactored.tools.aws.boto3_tools import create_and_deploy_ec2_instance, AWSSettings
 
 from agent_build_refactored.tools.aws.ec2 import EC2InstanceWrapper
 
