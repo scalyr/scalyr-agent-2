@@ -25,15 +25,15 @@ REMOTE_DOCKER_ENGINE_IMAGE_AMD64 = EC2DistroImage(
     image_id="ami-053b0d53c279acc90",
     image_name="Ubuntu Server 22.04 LTS (HVM), SSD Volume Type",
     short_name="ubuntu2204_AMD64",
-    size_id="c7g.4xlarge",
+    size_id="c6i.2xlarge",
     ssh_username="ubuntu",
 )
 
 REMOTE_DOCKER_ENGINE_IMAGE_ARM = EC2DistroImage(
-    image_id="ami-0e2b332e63c56bcb5",
+    image_id="ami-0a0c8eebcdd6dcbd0",
     image_name="Ubuntu Server 22.04 LTS (HVM), SSD Volume Type",
     short_name="ubuntu2204_ARM",
-    size_id="c7g.4xlarge",
+    size_id="c7g.2xlarge",
     ssh_username="ubuntu",
 )
 
