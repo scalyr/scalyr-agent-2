@@ -6,7 +6,6 @@ RUN yum install -y centos-release-scl
 RUN yum install -y devtoolset-9 perl-core
 RUN echo -e "source /opt/rh/devtoolset-9/enable" >> /root/.bash_env
 ENV BASH_ENV="/root/.bash_env"
-ARG e=1
 
 FROM centos:7 as base_aarch64
 RUN yum install -y centos-release-scl
