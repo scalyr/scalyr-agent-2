@@ -209,7 +209,7 @@ jobs:
     name: Remove ec2 test workflow prefix list entries
     if: ${{ always() }}
     needs:
-      - pre_job
+      - build_packages
       - test_packages
     runs-on: ubuntu-20.04
     steps:
