@@ -106,6 +106,7 @@ jobs:
           AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ inputs.aws_prefix_list_id }}
           AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
           USE_GHA_CACHE: "1"
+          ALLOW_FALLBACK_TO_REMOTE_BUILDER: "1"
           CACHE_VERSION: ${{ inputs.cache_version }}
         run: |
           echo "${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}" > "${AWS_PRIVATE_KEY_PATH}"
@@ -189,6 +190,7 @@ jobs:
           AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ inputs.aws_prefix_list_id }}
           AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
           USE_GHA_CACHE: "1"
+          ALLOW_FALLBACK_TO_REMOTE_BUILDER: "1"
           CACHE_VERSION: ${{ inputs.cache_version }}
         run: |
           echo "${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}" > "${AWS_PRIVATE_KEY_PATH}"

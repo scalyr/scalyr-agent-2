@@ -20,6 +20,9 @@ logger = logging.getLogger(__name__)
 
 USE_GHA_CACHE = bool(os.environ.get("USE_GHA_CACHE"))
 CACHE_VERSION = os.environ.get("CACHE_VERSION", "")
+ALLOW_FALLBACK_TO_REMOTE_BUILDER = bool(
+    os.environ.get("ALLOW_FALLBACK_TO_REMOTE_BUILDER")
+)
 
 
 class BuilderCacheMissError(Exception):
@@ -126,7 +129,7 @@ def buildx_build(
     )
 
     retry = False
-    if cache_scope and fallback_to_remote_builder:
+    if cache_scope and fallback_to_remote_builder and ALLOW_FALLBACK_TO_REMOTE_BUILDER:
         if USE_GHA_CACHE:
             # Give more time if we build inside GitHub Action, because its cache may be pretty slow.
             fallback_timeout = 60 * 2
