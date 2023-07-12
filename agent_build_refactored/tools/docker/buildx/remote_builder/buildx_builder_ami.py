@@ -90,11 +90,11 @@ def get_buildx_builder_ami_image(
     # calculate checksum of the AMI image, so we can rebuild it if some
     # data of the image has been changed.
     sha256.update(deployment_script_path.read_bytes())
-    sha256.update(base_ec2_image.image_id)
-    sha256.update(base_ec2_image.image_name)
-    sha256.update(base_ec2_image.size_id)
-    sha256.update(base_ec2_image.short_name)
-    sha256.update(base_ec2_image.ssh_username)
+    sha256.update(base_ec2_image.image_id.encode())
+    sha256.update(base_ec2_image.image_name.encode())
+    sha256.update(base_ec2_image.size_id.encode())
+    sha256.update(base_ec2_image.short_name.encode())
+    sha256.update(base_ec2_image.ssh_username.encode())
 
     checksum = sha256.hexdigest()
 
