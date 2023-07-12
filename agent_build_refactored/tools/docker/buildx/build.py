@@ -1,5 +1,6 @@
 import logging
 import os
+import shlex
 import sys
 import io
 import re
@@ -8,6 +9,7 @@ import dataclasses
 import pathlib as pl
 import subprocess
 import tarfile
+import time
 from typing import List, Dict
 
 
@@ -122,21 +124,31 @@ def buildx_build(
     cmd_args.append(
         str(context_path)
     )
+
     retry = False
     if cache_scope and fallback_to_remote_builder:
-        try:
-            _build_and_verify_cache(
-                cmd_args=cmd_args,
-                fail_on_cache_miss=True,
-                #builder_name="test_builder",
-            )
-        except BuilderCacheMissError:
-            retry = True
-    else:
-        _build_and_verify_cache(
-            cmd_args=cmd_args,
-            fail_on_cache_miss=False,
+        if USE_GHA_CACHE:
+            # Give more time if we build inside GitHub Action, because its cache may be pretty slow.
+            fallback_timeout = 60 * 2
+        else:
+            fallback_timeout = 20
+        logger.info(
+            "Try to preform build locally from cache. If that's not possible, will fallback to a remote builder."
         )
+    else:
+        fallback_timeout = None
+
+    process = subprocess.Popen(
+        cmd_args,
+    )
+
+    try:
+        process.communicate(timeout=fallback_timeout)
+    except subprocess.TimeoutExpired:
+        _stop_buildx_build_process(
+            process=process
+        )
+        retry = True
 
     if retry:
 
@@ -148,17 +160,13 @@ def buildx_build(
             architecture=architecture,
         )
 
-        _build_and_verify_cache(
-            cmd_args=cmd_args,
-            fail_on_cache_miss=False,
-            builder_name=builder.name,
+        subprocess.run(
+            [
+                *cmd_args,
+                f"--builder={builder.name}",
+            ],
+            check=True,
         )
-
-
-    # subprocess.run(
-    #     cmd_args,
-    #     check=True
-    # )
 
     if output:
         if isinstance(output, OCITarballBuildOutput) and output.extract:
@@ -166,112 +174,112 @@ def buildx_build(
                 tar.extractall(path=output.dest)
 
 
-def _build_and_verify_cache(
-        cmd_args: List[str],
-        fail_on_cache_miss: bool,
-        builder_name: str = None,
-        verbose: bool = True,
-):
-
-    final_cmd_args = cmd_args[:]
-
-    if builder_name:
-        final_cmd_args.append(
-            f"--builder={builder_name}"
-        )
-
-    process = subprocess.Popen(
-        final_cmd_args,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-
-    stderr_buffer = io.BytesIO()
-
-    def read_line():
-        line_bytes = process.stderr.readline()
-
-        if not line_bytes:
-            return ""
-
-        stderr_buffer.write(line_bytes)
-        line_str = line_bytes.decode(errors="replace")
-        return line_str
-
-    def _print_line(line):
-        if verbose:
-            print(line, end="", file=sys.stderr)
-
-    def read_run_lines(command_number: int):
-        lines_count = 0
-        while True:
-            run_line = read_line()
-
-            if not run_line:
-                raise Exception("Expected at least one message related to the previous RUN command")
-
-            lines_count += 1
-            _print_line(run_line)
-
-            if not run_line.startswith(f"#{command_number} "):
-                continue
-
-            if run_line.startswith(f"#{command_number} sha256:"):
-                return True
-
-            if run_line.startswith(f"#{command_number} extracting sha256:"):
-                return True
-
-            if re.match(rf"#{command_number} CACHED\n", run_line):
-                return True
-
-            return False
-
-    cache_miss = False
-    if fail_on_cache_miss:
-        while True:
-            line = read_line()
-
-            if not line:
-                break
-
-            _print_line(line)
-
-            m = re.match(r"#(\d+) \[[^]]*\] RUN .+", line)
-            if m:
-                command_number = m.group(1)
-                if not read_run_lines(command_number=command_number):
-                    _stop_buildx_build_process(
-                        process=process
-                    )
-                    cache_miss = True
-                    break
-
-    while True:
-        line = read_line()
-
-        if not line:
-            break
-
-        _print_line(line)
-
-    process.wait()
-
-    if process.returncode != 0:
-        stderr = stderr_buffer.getvalue()
-        if not verbose:
-            sys.stderr.buffer.write(stderr)
-        if not fail_on_cache_miss or not cache_miss:
-            raise subprocess.CalledProcessError(
-                returncode=process.returncode,
-                cmd=cmd_args,
-                stderr=stderr,
-            )
-
-    if cache_miss:
-        raise BuilderCacheMissError(
-            f"Build has had cache miss and can not be continues"
-        )
+# def _build_and_verify_cache(
+#         cmd_args: List[str],
+#         fail_on_cache_miss: bool,
+#         builder_name: str = None,
+#         verbose: bool = True,
+# ):
+#
+#     final_cmd_args = cmd_args[:]
+#
+#     if builder_name:
+#         final_cmd_args.append(
+#             f"--builder={builder_name}"
+#         )
+#
+#     process = subprocess.Popen(
+#         final_cmd_args,
+#         stdout=subprocess.PIPE,
+#         stderr=subprocess.PIPE,
+#     )
+#
+#     stderr_buffer = io.BytesIO()
+#
+#     def read_line():
+#         line_bytes = process.stderr.readline()
+#
+#         if not line_bytes:
+#             return ""
+#
+#         stderr_buffer.write(line_bytes)
+#         line_str = line_bytes.decode(errors="replace")
+#         return line_str
+#
+#     def _print_line(line):
+#         if verbose:
+#             print(line, end="", file=sys.stderr)
+#
+#     def read_run_lines(command_number: int):
+#         lines_count = 0
+#         while True:
+#             run_line = read_line()
+#
+#             if not run_line:
+#                 raise Exception("Expected at least one message related to the previous RUN command")
+#
+#             lines_count += 1
+#             _print_line(run_line)
+#
+#             if not run_line.startswith(f"#{command_number} "):
+#                 continue
+#
+#             if run_line.startswith(f"#{command_number} sha256:"):
+#                 return True
+#
+#             if run_line.startswith(f"#{command_number} extracting sha256:"):
+#                 return True
+#
+#             if re.match(rf"#{command_number} CACHED\n", run_line):
+#                 return True
+#
+#             return False
+#
+#     cache_miss = False
+#     if fail_on_cache_miss:
+#         while True:
+#             line = read_line()
+#
+#             if not line:
+#                 break
+#
+#             _print_line(line)
+#
+#             m = re.match(r"#(\d+) \[[^]]*\] RUN .+", line)
+#             if m:
+#                 command_number = m.group(1)
+#                 if not read_run_lines(command_number=command_number):
+#                     _stop_buildx_build_process(
+#                         process=process
+#                     )
+#                     cache_miss = True
+#                     break
+#
+#     while True:
+#         line = read_line()
+#
+#         if not line:
+#             break
+#
+#         _print_line(line)
+#
+#     process.wait()
+#
+#     if process.returncode != 0:
+#         stderr = stderr_buffer.getvalue()
+#         if not verbose:
+#             sys.stderr.buffer.write(stderr)
+#         if not fail_on_cache_miss or not cache_miss:
+#             raise subprocess.CalledProcessError(
+#                 returncode=process.returncode,
+#                 cmd=cmd_args,
+#                 stderr=stderr,
+#             )
+#
+#     if cache_miss:
+#         raise BuilderCacheMissError(
+#             f"Build has had cache miss and can not be continues"
+#         )
 
 
 def _stop_buildx_build_process(process):

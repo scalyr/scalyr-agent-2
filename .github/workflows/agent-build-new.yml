@@ -43,7 +43,7 @@ jobs:
       - id: define_constants
         run: |
           echo "python_version=3.8" >> "${GITHUB_OUTPUT}"
-          echo "cache_version=4" >> "${GITHUB_OUTPUT}"
+          echo "cache_version=5" >> "${GITHUB_OUTPUT}"
           echo "aws_region=us-east-1" >> "${GITHUB_OUTPUT}"
           echo "aws_security_group=github-actions-remote-access" >> "${GITHUB_OUTPUT}"
           echo "aws_prefix_list_id=pl-04a16228a97704d23" >> "${GITHUB_OUTPUT}"
