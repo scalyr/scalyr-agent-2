@@ -30,9 +30,7 @@ def get_all_cicd_docker_buildx_builder_images(boto3_session):
 def create_new_ami_image(
         boto3_session,
         instance_id: str,
-        deployment_script_sha: str,
-        # deployment_script_path: pl.Path,
-        # aws_settings: AWSSettings
+        checksum: str,
 ):
 
     ec2_client = boto3_session.client("ec2")
@@ -40,7 +38,7 @@ def create_new_ami_image(
     created_image_info = ec2_client.create_image(
         InstanceId=instance_id,
         Description="Image with pre-installed docker engine that is used in dataset agent's CI-CD",
-        Name=f"{IMAGE_NAME_PREFIX}-{deployment_script_sha}",
+        Name=f"{IMAGE_NAME_PREFIX}-{checksum}",
         TagSpecifications=[
             {
                 "ResourceType": "image",
@@ -50,8 +48,8 @@ def create_new_ami_image(
                         "Value": ""
                     },
                     {
-                        'Key': "source-sha",
-                        "Value": deployment_script_sha
+                        'Key': "checksum",
+                        "Value": checksum
                     },
 
                 ]
@@ -88,16 +86,24 @@ def get_buildx_builder_ami_image(
 ):
     deployment_script_path = PARENT_DIR / "deploy_docker_in_ec2_instance.sh"
     sha256 = hashlib.sha256()
-    sha256.update(deployment_script_path.read_bytes())
 
-    deployment_script_sha = sha256.hexdigest()
+    # calculate checksum of the AMI image, so we can rebuild it if some
+    # data of the image has been changed.
+    sha256.update(deployment_script_path.read_bytes())
+    sha256.update(base_ec2_image.image_id)
+    sha256.update(base_ec2_image.image_name)
+    sha256.update(base_ec2_image.size_id)
+    sha256.update(base_ec2_image.short_name)
+    sha256.update(base_ec2_image.ssh_username)
+
+    checksum = sha256.hexdigest()
 
     builder_images = get_all_cicd_docker_buildx_builder_images(boto3_session=boto3_session)
 
     needed_image = None
     for image in builder_images:
         for tag in image.tags:
-            if tag["Key"] == "source-sha" and tag["Value"] == deployment_script_sha:
+            if tag["Key"] == "checksum" and tag["Value"] == checksum:
                 needed_image = image
                 break
 
@@ -129,9 +135,7 @@ def get_buildx_builder_ami_image(
     image = create_new_ami_image(
         boto3_session=boto3_session,
         instance_id=instance.id,
-        deployment_script_sha=deployment_script_sha,
-        # deployment_script_path=deployment_script_path,
-        # aws_settings=aws_settings
+        checksum=checksum,
     )
 
     return image
