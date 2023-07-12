@@ -108,6 +108,9 @@ jobs:
           USE_GHA_CACHE: "1"
           CACHE_VERSION: ${{ inputs.cache_version }}
         run: |
+          echo "${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}" > "${AWS_PRIVATE_KEY_PATH}"
+          chmod 600 "${AWS_PRIVATE_KEY_PATH}"
+          
           python3 build_package_new_refactored.py package ${{ matrix.builder.name }}
 
       - name: Save packages as artifact
