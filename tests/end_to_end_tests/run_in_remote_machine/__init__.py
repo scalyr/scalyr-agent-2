@@ -237,18 +237,16 @@ def run_test_remotely(
     if remote_machine_type == "ec2":
 
         from agent_build_refactored.tools.aws.boto3_tools import (
-            create_and_deploy_ec2_instance,
-            ssh_run_command,
-            create_ssh_connection,
             AWSSettings,
         )
+        from agent_build_refactored.tools.aws.ec2 import EC2InstanceWrapper
 
         distro_image = target_distro.ec2_images[architecture]
 
         aws_settings = AWSSettings.create_from_env()
         boto3_session = aws_settings.create_boto3_session()
 
-        instance = create_and_deploy_ec2_instance(
+        instance = EC2InstanceWrapper.create_and_deploy_ec2_instance(
             boto3_session=boto3_session,
             ec2_image=distro_image,
             name_prefix=distro_image.short_name,
@@ -263,13 +261,7 @@ def run_test_remotely(
         ]
 
         try:
-            ssh = create_ssh_connection(
-                instance.public_ip_address,
-                username=distro_image.ssh_username,
-                private_key_path=aws_settings.private_key_path,
-            )
-
-            ssh_run_command(ssh_connection=ssh, command=final_command, run_as_root=True)
+            instance.run_ssh_command(command=final_command, run_as_root=True)
         finally:
             logger.info("Terminating EC2 instance.")
             instance.terminate()

@@ -1024,9 +1024,9 @@ class Runner:
             """
 
             from agent_build_refactored.tools.aws.boto3_tools import (
-                create_and_deploy_ec2_instance,
                 AWSSettings,
             )
+            from agent_build_refactored.tools.aws.ec2 import create_and_deploy_ec2_instance
 
             if not step.github_actions_settings.run_in_remote_docker:
                 return None

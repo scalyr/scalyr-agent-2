@@ -16,6 +16,10 @@
 import dataclasses
 
 
+COMMON_TAG_NAME = "automated-agent-ci-cd"
+CURRENT_SESSION_TAG_NAME = "current-ci-cd-session"
+
+
 @dataclasses.dataclass
 class EC2DistroImage:
     """

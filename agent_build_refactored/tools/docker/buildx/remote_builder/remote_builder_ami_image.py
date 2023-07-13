@@ -1,25 +1,48 @@
 import pathlib as pl
 import hashlib
-import time
-from typing import List
 
 from agent_build_refactored.tools.constants import CpuArch
-from agent_build_refactored.tools.aws.boto3_tools import AWSSettings, create_and_deploy_ec2_instance
 from agent_build_refactored.tools.aws.constants import EC2DistroImage
+from agent_build_refactored.tools.aws.ami import CICD_AMI_IMAGES_NAME_PREFIX, create_new_ami_image
+from agent_build_refactored.tools.aws.boto3_tools import AWSSettings
+from agent_build_refactored.tools.aws.ec2 import create_and_deploy_ec2_instance
 
 PARENT_DIR = pl.Path(__file__).parent.absolute()
 
-IMAGE_NAME_PREFIX = "dataset-agent-ci-cd-builder-builder"
+_DOCKER_ENGINE_IMAGE_TAG = "dataset-agent-build-docker-engine"
+
+BASE_IMAGE_AMD64 = EC2DistroImage(
+    image_id="ami-053b0d53c279acc90",
+    image_name="Ubuntu Server 22.04 LTS (HVM), SSD Volume Type",
+    short_name="ubuntu2204_AMD64",
+    size_id="t2.small",
+    ssh_username="ubuntu",
+)
+
+BASE_IMAGE_ARM64 = EC2DistroImage(
+    image_id="ami-0a0c8eebcdd6dcbd0",
+    image_name="Ubuntu Server 22.04 LTS (HVM), SSD Volume Type",
+    short_name="ubuntu2204_ARM",
+    size_id="t4g.small",
+    ssh_username="ubuntu",
+)
 
 
-def get_all_cicd_docker_buildx_builder_images(boto3_session):
+BASE_IMAGES = {
+    CpuArch.x86_64: BASE_IMAGE_AMD64,
+    CpuArch.AARCH64: BASE_IMAGE_ARM64,
+    # Use the same 64 bit image since it's compatible.
+    CpuArch.ARMV7: BASE_IMAGE_ARM64
+}
 
+
+def get_all_docker_engine_images(boto3_session):
     ec2_resource = boto3_session.resource("ec2")
     images = list(ec2_resource.images.filter(
         Filters=[
             {
                 "Name": "tag-key",
-                "Values": [IMAGE_NAME_PREFIX]
+                "Values": [_DOCKER_ENGINE_IMAGE_TAG]
             }
         ]
     ))
@@ -27,63 +50,13 @@ def get_all_cicd_docker_buildx_builder_images(boto3_session):
     return images
 
 
-def create_new_ami_image(
-        boto3_session,
-        instance_id: str,
-        checksum: str,
-):
-
-    ec2_client = boto3_session.client("ec2")
-
-    created_image_info = ec2_client.create_image(
-        InstanceId=instance_id,
-        Description="Image with pre-installed docker engine that is used in dataset agent's CI-CD",
-        Name=f"{IMAGE_NAME_PREFIX}-{checksum}",
-        TagSpecifications=[
-            {
-                "ResourceType": "image",
-                'Tags': [
-                    {
-                        'Key': IMAGE_NAME_PREFIX,
-                        "Value": ""
-                    },
-                    {
-                        'Key': "checksum",
-                        "Value": checksum
-                    },
-
-                ]
-            },
-        ]
-    )
-
-    image_id = created_image_info["ImageId"]
-    ec2_resource = boto3_session.resource("ec2")
-    images = list(ec2_resource.images.filter(
-        ImageIds=[image_id],
-    ))
-
-    if not images:
-        raise Exception(f"Can not find created image {image_id}")
-
-    new_image = images[0]
-
-    while new_image.state == "pending":
-        time.sleep(60)
-        new_image.reload()
-
-    if new_image.state != "available":
-        raise Exception("Error during the creation of the image")
-
-
-    return new_image
-
-
 def get_buildx_builder_ami_image(
-        base_ec2_image: EC2DistroImage,
+        architecture: CpuArch,
         boto3_session,
         aws_settings: AWSSettings
 ):
+    base_ec2_image = BASE_IMAGES[architecture]
+
     deployment_script_path = PARENT_DIR / "deploy_docker_in_ec2_instance.sh"
     sha256 = hashlib.sha256()
 
@@ -98,7 +71,7 @@ def get_buildx_builder_ami_image(
 
     checksum = sha256.hexdigest()
 
-    builder_images = get_all_cicd_docker_buildx_builder_images(boto3_session=boto3_session)
+    builder_images = get_all_docker_engine_images(boto3_session=boto3_session)
 
     needed_image = None
     for image in builder_images:
@@ -135,18 +108,11 @@ def get_buildx_builder_ami_image(
     image = create_new_ami_image(
         boto3_session=boto3_session,
         instance_id=instance.id,
+
         checksum=checksum,
+        description="Image with pre-installed docker engine that is used in dataset agent's CI-CD",
     )
 
     return image
 
-
-def main():
-    get_buildx_builder_ami_image()
-
-
-if __name__ == '__main__':
-    main()
-
-    a=10
 

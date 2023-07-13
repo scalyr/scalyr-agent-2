@@ -35,11 +35,10 @@ sys.path.append(str(pl.Path(__file__).parent.parent.parent.parent))
 from agent_build_refactored.tools.aws.boto3_tools import (
     AWSSettings,
     PREFIX_LIST_ENTRY_REMOVE_THRESHOLD,
-    INSTANCE_NAME_STRING,
     DELETE_OLD_NODES_THRESHOLD_DT,
     get_prefix_list_version,
 )
-
+from agent_build_refactored.tools.aws.ec2 import INSTANCE_NAME_STRING
 
 logger = logging.getLogger(__name__)
 
@@ -164,6 +163,10 @@ def cleanup_volumes(
 
         logger.info(f"Deleting volume with name: {name}")
         volume.remove()
+
+
+def cleanup_old_ami_images():
+    pass
 
 
 def _get_instance_name(instance):

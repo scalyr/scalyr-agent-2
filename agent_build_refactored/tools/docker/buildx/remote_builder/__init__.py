@@ -10,10 +10,10 @@ from agent_build_refactored.tools.constants import CpuArch
 from agent_build_refactored.tools.aws.constants import EC2DistroImage
 
 from agent_build_refactored.tools.docker.common import delete_container, ContainerWrapper
-from agent_build_refactored.tools.docker.buildx.remote_builder.buildx_builder_ami import get_buildx_builder_ami_image
-from agent_build_refactored.tools.aws.boto3_tools import create_and_deploy_ec2_instance, AWSSettings
+from agent_build_refactored.tools.aws.ami import get_buildx_builder_ami_image
+from agent_build_refactored.tools.aws.boto3_tools import AWSSettings
 
-from agent_build_refactored.tools.aws.ec2 import EC2InstanceWrapper
+from agent_build_refactored.tools.aws.ec2 import EC2InstanceWrapper, create_and_deploy_ec2_instance
 
 logger = logging.getLogger(__name__)
 
@@ -21,27 +21,11 @@ logger = logging.getLogger(__name__)
 BUILDKIT_VERSION = "v0.11.6"
 BUILDX_BUILDER_PORT = 1234
 
-REMOTE_DOCKER_ENGINE_IMAGE_AMD64 = EC2DistroImage(
-    image_id="ami-053b0d53c279acc90",
-    image_name="Ubuntu Server 22.04 LTS (HVM), SSD Volume Type",
-    short_name="ubuntu2204_AMD64",
-    size_id="c6i.2xlarge",
-    ssh_username="ubuntu",
-)
 
-REMOTE_DOCKER_ENGINE_IMAGE_ARM = EC2DistroImage(
-    image_id="ami-0a0c8eebcdd6dcbd0",
-    image_name="Ubuntu Server 22.04 LTS (HVM), SSD Volume Type",
-    short_name="ubuntu2204_ARM",
-    size_id="c7g.2xlarge",
-    ssh_username="ubuntu",
-)
-
-
-REMOTE_DOCKER_ENGINE_IMAGES = {
-    CpuArch.x86_64: REMOTE_DOCKER_ENGINE_IMAGE_AMD64,
-    CpuArch.AARCH64: REMOTE_DOCKER_ENGINE_IMAGE_ARM,
-    CpuArch.ARMV7: REMOTE_DOCKER_ENGINE_IMAGE_ARM
+REMOTE_DOCKER_ENGINE_INSTANCE_SIZES = {
+    CpuArch.x86_64: "c6i.2xlarge",
+    CpuArch.AARCH64: "c7g.2xlarge",
+    CpuArch.ARMV7: "c7g.2xlarge",
 }
 
 
@@ -101,7 +85,7 @@ class EC2BackedRemoteBuildxBuilderWrapper:
     ):
 
         remote_docker_engine_ami_image = get_buildx_builder_ami_image(
-            base_ec2_image=base_ec2_image,
+            architecture=self.architecture,
             boto3_session=boto3_session,
             aws_settings=aws_settings,
 
@@ -111,7 +95,7 @@ class EC2BackedRemoteBuildxBuilderWrapper:
             image_id=remote_docker_engine_ami_image.id,
             image_name=remote_docker_engine_ami_image.name,
             short_name=base_ec2_image.short_name,
-            size_id=base_ec2_image.size_id,
+            size_id=REMOTE_DOCKER_ENGINE_INSTANCE_SIZES[self.architecture],
             ssh_username=base_ec2_image.ssh_username,
         )
 
