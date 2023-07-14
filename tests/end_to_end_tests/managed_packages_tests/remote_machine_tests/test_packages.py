@@ -56,6 +56,8 @@ LINUX_PACKAGE_AGENT_PATHS = AgentPaths(
     install_root=pl.Path(f"/usr/share/{AGENT_SUBDIR_NAME}"),
 )
 
+_PARENT_DIR = pl.Path(__file__).parent
+
 
 def test_packages(
     package_builder_name,
@@ -588,10 +590,7 @@ def _perform_ssl_checks(
     # doesn't trust that cert.
     # Long term we could spawn test HTTP server locally and use that, but that's more
     # involved.
-    bad_ca_cert_path = (
-        SOURCE_ROOT
-        / "tests/end_to_end_tests/managed_packages_tests/fixtures/bad_ca_certs.crt"
-    )
+    bad_ca_cert_path = _PARENT_DIR / "fixtures/bad_ca_certs.crt"
     invalid_bad_cert_config["ca_cert_path"] = str(bad_ca_cert_path)
     _add_config(invalid_bad_cert_config)
     agent_commander.start()

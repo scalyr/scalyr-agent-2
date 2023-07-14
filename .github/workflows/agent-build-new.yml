@@ -52,7 +52,7 @@ jobs:
           echo "cache_version=5" >> "${GITHUB_OUTPUT}"
           echo "aws_region=us-east-1" >> "${GITHUB_OUTPUT}"
           echo "aws_private_key_name=CT_SCALYR_AGENT_GHA" >> "${GITHUB_OUTPUT}"
-          echo "additional_ec2_instance_tags=workflow_${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}" >> "${GITHUB_OUTPUT}"
+          echo "additional_ec2_instance_tags=gha_workflow=${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}" >> "${GITHUB_OUTPUT}"
 
       - name: Init used AMI images, if needed
         env:
