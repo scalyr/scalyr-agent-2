@@ -234,6 +234,14 @@ def run_test_remotely(
     file_mappings[pytest_runner_path] = "/tmp/test_runner"
     file_mappings[source_tarball_path] = "/tmp/source.tar.gz"
 
+    final_command = [
+        "/tmp/test_runner",
+        "/tmp/source.tar.gz",
+        "--set-env=IN_REMOTE_MACHINE=1",
+        "-s",
+        *command
+    ]
+
     if remote_machine_type == "ec2":
 
         from agent_build_refactored.tools.aws.boto3_tools import (
@@ -254,14 +262,11 @@ def run_test_remotely(
             files_to_upload=file_mappings,
         )
 
-        final_command = [
-            "/tmp/test_runner",
-            "/tmp/source.tar.gz",
-            "-s", *command
-        ]
-
         try:
-            instance.run_ssh_command(command=final_command, run_as_root=True)
+            instance.run_ssh_command(
+                command=final_command,
+                run_as_root=True,
+            )
         finally:
             logger.info("Terminating EC2 instance.")
             instance.terminate()
@@ -271,7 +276,7 @@ def run_test_remotely(
         for source, dst in file_mappings.items():
             mount_options.extend(["-v", f"{source}:{dst}"])
 
-        subprocess.check_call(
+        subprocess.run(
             [
                 "docker",
                 "run",
@@ -282,9 +287,7 @@ def run_test_remotely(
                 "--platform",
                 architecture.as_docker_platform(),
                 target_distro.docker_image,
-                "/test_runner",
-                "/tmp/source.tar.gz",
-                "-s",
-                *command,
-            ]
+                *final_command,
+            ],
+            check=True
         )

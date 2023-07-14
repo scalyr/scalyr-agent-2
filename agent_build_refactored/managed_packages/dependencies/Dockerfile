@@ -385,12 +385,12 @@ ARG PORTABLE_RUNNER_NAME
 
 WORKDIR /tmp/source
 
-ADD agent_build_refactored/managed_packages/dependencies/pytest_runer_main.py pytest_runer_main.py
+ADD agent_build_refactored/managed_packages/dependencies/portable_pytest_runner/pytest_runner_main.py pytest_runner_main.py
 
 RUN python3 -m PyInstaller \
     --onefile \
     --name ${PORTABLE_RUNNER_NAME} \
-    pytest_runer_main.py
+    pytest_runner_main.py
 
 
 FROM scratch

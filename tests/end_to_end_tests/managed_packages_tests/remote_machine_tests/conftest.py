@@ -1,3 +1,4 @@
+import os
 import pathlib as pl
 import subprocess
 import http.server
@@ -15,18 +16,19 @@ from agent_build_refactored.tools.constants import (
 )
 from agent_build_refactored.managed_packages.managed_packages_builders import (
     ALL_PACKAGE_BUILDERS,
-    PYTHON_PACKAGE_NAME,
-    AGENT_LIBS_PACKAGE_NAME,
     AGENT_AIO_PACKAGE_NAME,
     AGENT_NON_AIO_AIO_PACKAGE_NAME,
 )
-from tests.end_to_end_tests.managed_packages_tests.tools import (
+from tests.end_to_end_tests.managed_packages_tests.remote_machine_tests.tools import (
     create_packages_repo_root,
     get_packages_stable_version,
     is_builder_creates_aio_package,
 )
 
 from tests.end_to_end_tests.run_in_remote_machine import DISTROS
+
+
+IN_REMOTE_MACHINE = bool(os.environ.get("IN_REMOTE_MACHINE"))
 
 
 def add_cmd_args(parser, is_pytest_parser: bool):
@@ -85,8 +87,19 @@ def add_cmd_args(parser, is_pytest_parser: bool):
         help="Distribution to test.",
     )
 
+
+def pytest_collection_modifyitems(config, items):
+    if IN_REMOTE_MACHINE:
+        return
+
+    skip = pytest.mark.skip(reason="This test is only supposed to be run in a remote machine(docker or ec2)")
+    for item in items:
+        item.add_marker(skip)
+
+
 def pytest_addoption(parser):
-    add_cmd_args(parser, is_pytest_parser=True)
+    if IN_REMOTE_MACHINE:
+        add_cmd_args(parser, is_pytest_parser=True)
 
 
 @pytest.fixture(scope="session")

@@ -17,7 +17,7 @@ import os
 import logging
 import datetime
 import pathlib as pl
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 import boto3
 
@@ -27,13 +27,6 @@ logger = logging.getLogger(__name__)
 # All the instances created by this script will use this string in the name.
 
 MAX_PREFIX_LIST_UPDATE_ATTEMPTS = 20
-
-# Age of the prefix entry ofter which it can be cleaned up.
-PREFIX_LIST_ENTRY_REMOVE_THRESHOLD = 60 * 7  # Minutes
-
-# We delete any old automated test nodes which are older than 4 hours
-DELETE_OLD_NODES_TIMEDELTA = datetime.timedelta(hours=4)
-DELETE_OLD_NODES_THRESHOLD_DT = datetime.datetime.utcnow() - DELETE_OLD_NODES_TIMEDELTA
 
 
 @dataclasses.dataclass
@@ -47,10 +40,7 @@ class AWSSettings:
     private_key_path: pl.Path
     private_key_name: str
     region: str
-    security_group: str
-    security_groups_prefix_list_id: str
-    ec2_objects_name_prefix: str
-    current_session_tag: str
+    additional_ec2_instances_tags: Dict[str, str] = None
 
     @staticmethod
     def create_from_env():
@@ -64,18 +54,24 @@ class AWSSettings:
 
             return value
 
+        additional_ec2_instances_tags_str = os.environ.get("ADDITIONAL_EC2_INSTANCE_TAGS", "")
+
+        if additional_ec2_instances_tags_str:
+            additional_ec2_instances_tags = {}
+
+            for tag_str in additional_ec2_instances_tags_str.split(","):
+                name, value = tag_str.split("=")
+                additional_ec2_instances_tags[name] = value
+        else:
+            additional_ec2_instances_tags = None
+
         return AWSSettings(
             access_key=_validate_setting("AWS_ACCESS_KEY"),
             secret_key=_validate_setting("AWS_SECRET_KEY"),
             private_key_path=pl.Path(_validate_setting("AWS_PRIVATE_KEY_PATH")),
             private_key_name=_validate_setting("AWS_PRIVATE_KEY_NAME"),
             region=_validate_setting("AWS_REGION"),
-            security_group=_validate_setting("AWS_SECURITY_GROUP"),
-            security_groups_prefix_list_id=_validate_setting(
-                "AWS_SECURITY_GROUPS_PREFIX_LIST_ID"
-            ),
-            ec2_objects_name_prefix=_validate_setting("AWS_OBJECTS_NAME_PREFIX"),
-            current_session_tag=_validate_setting("CURRENT_SESSION_TAG")
+            additional_ec2_instances_tags=additional_ec2_instances_tags,
         )
 
     def create_boto3_session(self):

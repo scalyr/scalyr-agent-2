@@ -1,3 +1,5 @@
+import collections
+import datetime
 import json
 import random
 import shlex
@@ -29,12 +31,16 @@ class EC2InstanceWrapper:
         self,
         boto3_instance,
         private_key_path: pl.Path,
-        username: str
+        username: str,
+        security_group_id: str,
+        ec2_client,
     ):
+        self.ec2_client = ec2_client
         self.id = boto3_instance.id.lower()
         self.boto3_instance = boto3_instance
         self.private_key_path = private_key_path
         self.username = username
+        self.security_group_id = security_group_id
 
         self._ssh_container: Optional[ContainerWrapper] = None
         self._ssh_tunnel_containers: Dict[int, ContainerWrapper] = {}
@@ -181,13 +187,15 @@ class EC2InstanceWrapper:
     def run_ssh_command(
         self,
         command: List[str],
-        run_as_root: bool = False
+        run_as_root: bool = False,
+        env: Dict[str, str] = None,
     ):
 
         """
         Run command though SSH.
         :param command: Command to execute.
         :param run_as_root: If True, run command as root.
+        :param env: Additional environment variables
         """
 
         command_str = shlex.join(command)
@@ -195,7 +203,8 @@ class EC2InstanceWrapper:
             command_str = f"sudo -E {command_str}"
 
         stdin, stdout, sterr = self.paramiko_ssh_connection.exec_command(
-            command_str
+            command_str,
+            environment=env,
         )
 
         while True:
@@ -239,6 +248,17 @@ class EC2InstanceWrapper:
             self.paramiko_ssh_connection.close()
 
         self.boto3_instance.terminate()
+        self.boto3_instance.wait_until_stopped()
+
+        for ni in self.boto3_instance.network_interfaces:
+            self.ec2_client.delete_network_interface(
+                NetworkInterfaceId=ni.id
+            )
+
+        self.ec2_client.delete_security_group(
+            self.security_group_id
+        )
+
 
     @classmethod
     def create_and_deploy_ec2_instance(
@@ -262,33 +282,80 @@ class EC2InstanceWrapper:
         :param deployment_script:
         :return:
         """
-        add_current_ip_to_prefix_list(
-            boto3_session=boto3_session,
-            prefix_list_id=aws_settings.security_groups_prefix_list_id,
-            ec2_objects_name_prefix=aws_settings.ec2_objects_name_prefix,
+
+        ec2_client = boto3_session.client("ec2")
+
+        int_time = int(time.time())
+        name = f"dataset-agent-cicd(disposable)-{int_time}"
+        security_group_name = f"dataset-agent-cicd(disposable)-{int_time}"
+
+        resp = ec2_client.create_security_group(
+            Description='Created by the dataset agent Github Actions Ci/CD to access ec2 instance that '
+                        'are created during workflows. ',
+            GroupName=security_group_name,
+            TagSpecifications=[
+                {
+                    "ResourceType": "security-group",
+                    "Tags": [
+                        {
+                            "Key": COMMON_TAG_NAME,
+                            "Value": "",
+                        },
+                        {
+                            "Key": "CreationTime",
+                            "Value": datetime.datetime.utcnow().isoformat()
+                        }
+                    ],
+                },
+            ],
         )
 
-        name = f"{INSTANCE_NAME_STRING}-{ec2_image.short_name}-{aws_settings.ec2_objects_name_prefix}-{name_prefix}"
+        security_group_id = resp["GroupId"]
 
-        ec2_instance = _create_ec2_instance(
-            boto3_session=boto3_session,
-            ec2_image=ec2_image,
-            instance_name=name,
-            aws_settings=aws_settings,
-            root_volume_size=root_volume_size,
-            additional_tags={
-                CURRENT_SESSION_TAG_NAME: aws_settings.current_session_tag,
-            },
+        ip_address = _get_current_ip_address()
+
+        ec2_client.authorize_security_group_ingress(
+            GroupId=security_group_id,
+            IpPermissions=[
+                {
+                    'FromPort': 22,
+                    'IpProtocol': 'tcp',
+                    'IpRanges': [
+                        {
+                            'CidrIp':  f"{ip_address}/32",
+                            'Description': 'SSH access from GitHub Actions Runner',
+                        },
+                    ],
+                    'ToPort': 22,
+                },
+            ],
         )
+
         try:
-            instance = cls(
-                boto3_instance=ec2_instance,
-                private_key_path=aws_settings.private_key_path,
-                username=ec2_image.ssh_username,
+            boto3_instance = _create_ec2_instance(
+                boto3_session=boto3_session,
+                ec2_image=ec2_image,
+                instance_name=name,
+                security_group_id=security_group_id,
+                aws_settings=aws_settings,
+                root_volume_size=root_volume_size,
+                additional_tags=aws_settings.additional_ec2_instances_tags.copy(),
             )
         except Exception:
-            logger.exception("Can not create AWS EC2 instance")
-            ec2_instance.terminate()
+            ec2_client.delete_security_group(
+                security_group_id
+            )
+            raise
+        try:
+            instance = cls(
+                boto3_instance=boto3_instance,
+                private_key_path=aws_settings.private_key_path,
+                username=ec2_image.ssh_username,
+                security_group_id=security_group_id,
+                ec2_client=ec2_client,
+            )
+        except Exception:
+            boto3_instance.terminate()
             raise
 
         try:
@@ -306,7 +373,7 @@ class EC2InstanceWrapper:
                     instance.run_ssh_command(command=deployment_command)
         except Exception as e:
             logger.exception("Error occurred during instance deployment.")
-            ec2_instance.terminate()
+            instance.terminate()
             raise e
 
         return instance
@@ -316,6 +383,7 @@ def _create_ec2_instance(
     boto3_session: boto3.session.Session,
     ec2_image: EC2DistroImage,
     instance_name: str,
+    security_group_id: str,
     aws_settings: AWSSettings,
     root_volume_size: int = None,
     additional_tags: Dict[str, str] = None
@@ -327,16 +395,16 @@ def _create_ec2_instance(
     additional_tags = additional_tags or []
     ec2 = boto3_session.resource("ec2")
 
-    security_groups = list(
-        ec2.security_groups.filter(GroupNames=[aws_settings.security_group])
-    )
+    # security_groups = list(
+    #     ec2.security_groups.filter(GroupNames=[aws_settings.security_group])
+    # )
 
-    if len(security_groups) != 1:
-        raise Exception(
-            f"Number of security groups has to be 1, got '{security_groups}'"
-        )
+    # if len(security_groups) != 1:
+    #     raise Exception(
+    #         f"Number of security groups has to be 1, got '{security_groups}'"
+    #     )
 
-    security_group = security_groups[0]
+    #security_group = security_groups[0]
 
     kwargs = {}
 
@@ -355,33 +423,32 @@ def _create_ec2_instance(
     instance_tags = []
     volume_tags = []
 
-    def _add_tag(key: str, value: str, resource_type: str):
-        tag_dict = {"Key": key, "Value": value}
+    resource_tags = collections.defaultdict(list)
 
-        if resource_type == "instance":
-            instance_tags.append(tag_dict)
-        elif resource_type == "volume":
-            volume_tags.append(tag_dict)
-        else:
-            raise Exception(f"Unknown resource type: {resource_type}")
+    def _add_tag(key: str, value: str, resource_type: str):
+        resource_tags[resource_type].append(
+            {"Key": key, "Value": value}
+        )
 
     _add_tag(key="Name", value=instance_name, resource_type="instance",)
-    _add_tag(key="Name", value=instance_name, resource_type="volume")
+    _add_tag(key="Name", value=f"{instance_name}_volume", resource_type="volume")
+    _add_tag(key="Name", value=f"{instance_name}_ni", resource_type="network-interface")
+
     _add_tag(key=COMMON_TAG_NAME, value="", resource_type="instance")
     _add_tag(key=COMMON_TAG_NAME, value="", resource_type="volume")
+    _add_tag(key=COMMON_TAG_NAME, value="", resource_type="network-interface")
+
     for key, value in additional_tags.items():
         _add_tag(key=key, value=value, resource_type="instance")
 
-    tag_specifications = [
-        {
-            "ResourceType": "instance",
-            "Tags": instance_tags,
-        },
-        {
-            "ResourceType": "volume",
-            "Tags": volume_tags,
-        },
-    ]
+    tag_specifications = []
+    for resource_type, tags in resource_tags.items():
+        tag_specifications.append(
+            {
+                "ResourceType": resource_type,
+                "Tags": tags,
+            },
+        )
 
     kwargs.update(dict(TagSpecifications=tag_specifications))
 
@@ -397,7 +464,7 @@ def _create_ec2_instance(
                 MaxCount=1,
                 InstanceType=ec2_image.size_id,
                 KeyName=aws_settings.private_key_name,
-                SecurityGroupIds=[security_group.id],
+                SecurityGroupIds=[security_group_id],
                 **kwargs,
             )
             break
@@ -434,6 +501,53 @@ def _create_ec2_instance(
         raise e
 
     return instance
+
+
+def create_security_group(
+        boto3_session,
+        cidr: str
+):
+    ec2_client = boto3_session.client("ec2")
+
+    name = f"(disposable)dataset-agent-ci-cd-{int(time.time())}"
+
+    resp = ec2_client.create_security_group(
+        Description='Created by the dataset agent Github Actions Ci/CD to access ec2 instance that '
+                    'are created during workflows',
+        GroupName=name,
+        TagSpecifications=[
+            {
+                "ResourceType": "security-group",
+                "Tags": [
+                    {
+                        "Key": COMMON_TAG_NAME,
+                        "Value": "",
+                    },
+                ],
+            },
+        ],
+    )
+
+    return resp["GroupId"]
+
+
+def _get_current_ip_address():
+    # Get current public IP.
+    with requests.Session() as s:
+        attempts = 10
+        while True:
+            try:
+                resp = s.get("https://api.ipify.org")
+                resp.raise_for_status()
+                break
+            except requests.HTTPError:
+                if attempts == 0:
+                    raise
+                attempts -= 1
+                time.sleep(1)
+
+    public_ip = resp.content.decode()
+    return public_ip
 
 
 def add_current_ip_to_prefix_list(

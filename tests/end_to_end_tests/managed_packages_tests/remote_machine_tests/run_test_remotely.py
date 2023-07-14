@@ -22,7 +22,7 @@ import logging
 import shutil
 import sys
 import tarfile
-from typing import List, Type, Dict
+from typing import List, Type, Dict, Optional
 
 sys.path.append(str(pl.Path(__file__).parent.parent.parent.parent))
 
@@ -41,14 +41,14 @@ from tests.end_to_end_tests.run_in_remote_machine import run_test_remotely
 
 from tests.end_to_end_tests.run_in_remote_machine import DISTROS
 
-from tests.end_to_end_tests.managed_packages_tests.tools import (
+from tests.end_to_end_tests.managed_packages_tests.remote_machine_tests.tools import (
     create_packages_repo_root,
     get_packages_stable_version,
     is_builder_creates_aio_package
 )
-from tests.end_to_end_tests.managed_packages_tests.conftest import add_cmd_args
+from tests.end_to_end_tests.managed_packages_tests.remote_machine_tests.conftest import add_cmd_args
 from tests.end_to_end_tests.run_in_remote_machine.prepare_agent_source import (
-    prepare_agent_source,
+    prepare_agent_source_tarball,
     AGENT_SOURCE_TARBALL_FILENAME,
 )
 
@@ -77,6 +77,14 @@ class RemoteTestDependenciesBuilder(Builder):
         self.packages_source = packages_source
         self.package_builder_name = package_builder_name
 
+    @property
+    def portable_pytest_runner_path(self):
+        return self.result_dir / PORTABLE_PYTEST_RUNNER_NAME
+
+    @property
+    def agent_source_tarball_path(self) -> pl.Path:
+        return self.result_dir / AGENT_SOURCE_TARBALL_FILENAME
+
     def _build(self):
 
         is_aio = is_builder_creates_aio_package(
@@ -99,7 +107,7 @@ class RemoteTestDependenciesBuilder(Builder):
             self.result_dir,
         )
 
-        prepare_agent_source(
+        prepare_agent_source_tarball(
             output_dir=self.result_dir
         )
 
@@ -149,7 +157,6 @@ def main(
     else:
         arch = CpuArch.x86_64
 
-
     dependencies_builder = dependencies_builder_cls(
         package_type=package_type,
         packages_source_type=packages_source_type,
@@ -170,7 +177,7 @@ def main(
             remote_machine_type=remote_machine_type,
 
             command=[
-                test_path,
+                "tests/end_to_end_tests/managed_packages_tests/remote_machine_tests",
                 "--builder-name",
                 package_builder_name,
                 "--package-type",
@@ -186,8 +193,8 @@ def main(
                 *other_cmd_args,
             ],
             architecture=arch,
-            pytest_runner_path=dependencies_builder.result_dir / PORTABLE_PYTEST_RUNNER_NAME,
-            source_tarball_path=dependencies_builder.result_dir / AGENT_SOURCE_TARBALL_FILENAME,
+            pytest_runner_path=dependencies_builder.portable_pytest_runner_path,
+            source_tarball_path=dependencies_builder.agent_source_tarball_path,
             file_mappings={
                 packages_root_tarball: in_docker_packages_root_tarball
             },

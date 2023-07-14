@@ -9,7 +9,7 @@ from agent_build_refactored.managed_packages.managed_packages_builders import (
     LinuxAIOPackagesBuilder,
     LinuxNonAIOPackageBuilder,
 )
-from tests.end_to_end_tests.managed_packages_tests.tools.repo_builder import AptRepoBuilder, YumRepoBuilder
+from tests.end_to_end_tests.managed_packages_tests.remote_machine_tests.tools.repo_builder import AptRepoBuilder, YumRepoBuilder
 
 _STABLE_REPO_URL = "https://scalyr-repo.s3.amazonaws.com/stable"
 

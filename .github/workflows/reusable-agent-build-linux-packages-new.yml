@@ -8,28 +8,19 @@ on:
         type: string
 
       cache_version:
-        description: Version suffix for the cache key. May be useful when it is needed to invalidate the cache.
+        description: "Version suffix for the cache key. May be useful when it is needed to invalidate the cache."
         type: string
 
       aws_region:
-        description: AWS region for remote builds.
+        description: "AWS region for remote builds."
         type: string
 
-      aws_security_group:
-        description: AWS security group for remote builds.
+      aws_private_key_name:
+        description: "Name of a private key that is used to connect to AWS EC2 instances that will be created by this workflow."
         type: string
 
-      aws_prefix_list_id:
-        description: AWS prefix list for remote builds.
-        type: string
-
-      aws_objects_name_prefix:
-        description: Prefix for all AWS oject that are created by this workflow..
-        type: string
-
-      CT_AWS_DEV_EC2_PRIVATE_KEY_NAME:
-        description: Prefix for all AWS oject that are created by this workflow..
-        type: string
+      additional_ec2_instance_tags:
+        description: "Additional comma separated list of tags (key=value) for EC2 instance that will be created by this workflow."
 
     outputs:
       cache_miss:
@@ -99,15 +90,13 @@ jobs:
         env:
           AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
           AWS_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
-          AWS_PRIVATE_KEY_NAME: ${{ inputs.CT_AWS_DEV_EC2_PRIVATE_KEY_NAME }}
+          AWS_PRIVATE_KEY_NAME: ${{ inputs.aws_private_key_name }}
           AWS_PRIVATE_KEY_PATH: "/tmp/private_key.pem"
           AWS_REGION: ${{ inputs.aws_region }}
-          AWS_SECURITY_GROUP: ${{ inputs.aws_security_group }}
-          AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ inputs.aws_prefix_list_id }}
-          AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
           USE_GHA_CACHE: "1"
           ALLOW_FALLBACK_TO_REMOTE_BUILDER: "1"
           CACHE_VERSION: ${{ inputs.cache_version }}
+          ADDITIONAL_EC2_INSTANCE_TAGS: ${{ inputs.additional_ec2_instance_tags }}
         run: |
           echo "${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}" > "${AWS_PRIVATE_KEY_PATH}"
           chmod 600 "${AWS_PRIVATE_KEY_PATH}"
@@ -183,12 +172,10 @@ jobs:
         env:
           AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
           AWS_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
-          AWS_PRIVATE_KEY_NAME: ${{ inputs.CT_AWS_DEV_EC2_PRIVATE_KEY_NAME }}
+          AWS_PRIVATE_KEY_NAME: ${{ inputs.aws_private_key_name }}
           AWS_PRIVATE_KEY_PATH: "/tmp/private_key.pem"
           AWS_REGION: ${{ inputs.aws_region }}
-          AWS_SECURITY_GROUP: ${{ inputs.aws_security_group }}
-          AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ inputs.aws_prefix_list_id }}
-          AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
+          ADDITIONAL_EC2_INSTANCE_TAGS: ${{ inputs.additional_ec2_instance_tags }}
           USE_GHA_CACHE: "1"
           ALLOW_FALLBACK_TO_REMOTE_BUILDER: "1"
           CACHE_VERSION: ${{ inputs.cache_version }}
@@ -208,33 +195,3 @@ jobs:
             --scalyr-api-key ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }} \
             --scalyr-api-read-key ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }} \
             --test-session-suffix ${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}
-
-
-  clean-ec2-tests-objects:
-    name: Remove ec2 test workflow prefix list entries
-    if: ${{ always() }}
-    needs:
-      - build_packages
-      - test_packages
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: install python and requirements
-        uses: ./.github/actions/install_python_and_requirements
-        with:
-          python_version: ${{ inputs.python_version }}
-
-      - name: Cleanup old prefix lists for ec2 test security group.
-        env:
-          AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
-          AWS_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
-          AWS_PRIVATE_KEY_NAME: ${{ inputs.CT_AWS_DEV_EC2_PRIVATE_KEY_NAME }}
-          AWS_PRIVATE_KEY_PATH: "/tmp/private_key.pem"
-          AWS_REGION: ${{ inputs.aws_region }}
-          AWS_SECURITY_GROUP: ${{ inputs.aws_security_group }}
-          AWS_SECURITY_GROUPS_PREFIX_LIST_ID: ${{ inputs.aws_prefix_list_id }}
-          AWS_OBJECTS_NAME_PREFIX: ${{ inputs.aws_objects_name_prefix }}
-        run: |
-          python3 agent_build_refactored/scripts/cicd/cleanup_ec2_objects.py

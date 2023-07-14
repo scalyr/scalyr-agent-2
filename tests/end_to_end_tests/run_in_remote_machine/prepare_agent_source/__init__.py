@@ -9,7 +9,7 @@ _PARENT_DIR = pl.Path(__file__).parent
 AGENT_SOURCE_TARBALL_FILENAME = "source.tar.gz"
 
 
-def prepare_agent_source(
+def prepare_agent_source_tarball(
     output_dir: pl.Path,
 ):
 
