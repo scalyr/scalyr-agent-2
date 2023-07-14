@@ -20,6 +20,8 @@ def main():
     aws_settings = AWSSettings.create_from_env()
 
     boto3_session = aws_settings.create_boto3_session()
+    ec2_client = boto3_session.client("ec2")
+    ec2_resource = boto3_session.resource("ec2")
 
     logger.info(
         "Init AMI images that are required by next cicd workflows. "
@@ -28,7 +30,8 @@ def main():
     for arch in [CpuArch.x86_64, CpuArch.AARCH64]:
         get_remote_docker_ami_image(
             architecture=arch,
-            boto3_session=boto3_session,
+            ec2_client=ec2_client,
+            ec2_resource=ec2_resource,
             aws_settings=aws_settings,
         )
 

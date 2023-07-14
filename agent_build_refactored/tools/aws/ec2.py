@@ -32,7 +32,6 @@ class EC2InstanceWrapper:
         boto3_instance,
         private_key_path: pl.Path,
         username: str,
-        security_group_id: str,
         ec2_client,
     ):
         self.ec2_client = ec2_client
@@ -40,7 +39,6 @@ class EC2InstanceWrapper:
         self.boto3_instance = boto3_instance
         self.private_key_path = private_key_path
         self.username = username
-        self.security_group_id = security_group_id
 
         self._ssh_container: Optional[ContainerWrapper] = None
         self._ssh_tunnel_containers: Dict[int, ContainerWrapper] = {}
@@ -61,37 +59,6 @@ class EC2InstanceWrapper:
         # self._ssh_container = self.start_ssh_client_container()
 
         self._paramiko_ssh_connection: Optional[paramiko.SSHClient] = None
-
-    # def start_ssh_client_container(
-    #     self,
-    #     #ssh_client_docker_image_name: str,
-    # ):
-    #
-    #     delete_container(
-    #         self._ssh_client_container_name
-    #     )
-    #
-    #     # if port:
-    #     #     other_kwargs["ports"] = f"{port}/{port_protocol}"
-    #     from agent_build_refactored.tools.toolset_image import build_toolset_image
-    #
-    #     toolset_image_name = build_toolset_image()
-    #
-    #     container = ContainerWrapper(
-    #         name=self._ssh_client_container_name,
-    #         image=toolset_image_name,
-    #         volumes={self.private_key_path: self._ssh_client_container_in_docker_private_key_path},
-    #         rm=True,
-    #         command_args=[
-    #             "/bin/bash",
-    #             "-c",
-    #             "while true; do sleep 86400; done"
-    #         ],
-    #     )
-    #
-    #     container.run()
-    #
-    #     return container
 
     @property
     def ssh_hostname(self):
@@ -248,24 +215,19 @@ class EC2InstanceWrapper:
             self.paramiko_ssh_connection.close()
 
         self.boto3_instance.terminate()
-        self.boto3_instance.wait_until_stopped()
+        self.boto3_instance.wait_until_terminated()
 
-        for ni in self.boto3_instance.network_interfaces:
-            self.ec2_client.delete_network_interface(
-                NetworkInterfaceId=ni.id
+        for security_group in self.boto3_instance.security_groups:
+            self.ec2_client.delete_security_group(
+                security_group["GroupId"]
             )
-
-        self.ec2_client.delete_security_group(
-            self.security_group_id
-        )
-
 
     @classmethod
     def create_and_deploy_ec2_instance(
         cls,
-        boto3_session: boto3.session.Session,
+        ec2_client,
+        ec2_resource,
         ec2_image: EC2DistroImage,
-        name_prefix: str,
         aws_settings: AWSSettings,
         root_volume_size: int = None,
         files_to_upload: Dict = None,
@@ -282,8 +244,6 @@ class EC2InstanceWrapper:
         :param deployment_script:
         :return:
         """
-
-        ec2_client = boto3_session.client("ec2")
 
         int_time = int(time.time())
         name = f"dataset-agent-cicd(disposable)-{int_time}"
@@ -333,7 +293,7 @@ class EC2InstanceWrapper:
 
         try:
             boto3_instance = _create_ec2_instance(
-                boto3_session=boto3_session,
+                ec2_resource=ec2_resource,
                 ec2_image=ec2_image,
                 instance_name=name,
                 security_group_id=security_group_id,
@@ -380,7 +340,7 @@ class EC2InstanceWrapper:
 
 
 def _create_ec2_instance(
-    boto3_session: boto3.session.Session,
+    ec2_resource,
     ec2_image: EC2DistroImage,
     instance_name: str,
     security_group_id: str,
@@ -393,18 +353,6 @@ def _create_ec2_instance(
     """
 
     additional_tags = additional_tags or []
-    ec2 = boto3_session.resource("ec2")
-
-    # security_groups = list(
-    #     ec2.security_groups.filter(GroupNames=[aws_settings.security_group])
-    # )
-
-    # if len(security_groups) != 1:
-    #     raise Exception(
-    #         f"Number of security groups has to be 1, got '{security_groups}'"
-    #     )
-
-    #security_group = security_groups[0]
 
     kwargs = {}
 
@@ -419,9 +367,6 @@ def _create_ec2_instance(
             }
         ]
         kwargs.update(dict(BlockDeviceMappings=block_device_mappings))
-
-    instance_tags = []
-    volume_tags = []
 
     resource_tags = collections.defaultdict(list)
 
@@ -458,7 +403,7 @@ def _create_ec2_instance(
     attempts = 10
     while True:
         try:
-            instances = ec2.create_instances(
+            instances = ec2_resource.create_instances(
                 ImageId=ec2_image.image_id,
                 MinCount=1,
                 MaxCount=1,

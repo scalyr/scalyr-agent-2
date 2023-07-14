@@ -231,14 +231,14 @@ def cleanup_old_ami_images(
             logger.info(f"AMI image {image.id} has been de-registered.")
 
 
-def _get_instance_name(instance):
-
-    if instance.tags is None:
-        return None
-
-    for tag in instance.tags:
-        if tag["Key"] == "Name":
-            return tag["Value"]
+# def _get_instance_name(instance):
+#
+#     if instance.tags is None:
+#         return None
+#
+#     for tag in instance.tags:
+#         if tag["Key"] == "Name":
+#             return tag["Value"]
 
 
 # def _parse_entry_description(entry: Dict):

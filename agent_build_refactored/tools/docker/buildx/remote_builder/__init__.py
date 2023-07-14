@@ -108,7 +108,6 @@ class EC2BackedRemoteBuildxBuilderWrapper:
 
         self.ec2_instance = EC2InstanceWrapper(
             boto3_instance=boto3_instance,
-            ssh_client_docker_image=self.ssh_client_image_name,
             private_key_path=aws_settings.private_key_path,
             username=remote_docker_engine_image.ssh_username,
         )

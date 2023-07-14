@@ -14,7 +14,6 @@ _used_ami_images = []
 def get_all_cicd_images(
     ec2_resource,
 ):
-
     images = list(ec2_resource.images.filter(
         Filters=[
             {
@@ -28,14 +27,13 @@ def get_all_cicd_images(
 
 
 def create_new_ami_image(
-        boto3_session,
+        ec2_client,
+        ec2_resource,
         ec2_instance_id: str,
         name: str,
         checksum: str,
         description: str,
 ):
-
-    ec2_client = boto3_session.client("ec2")
 
     created_image_info = ec2_client.create_image(
         InstanceId=ec2_instance_id,
@@ -60,7 +58,6 @@ def create_new_ami_image(
     )
 
     image_id = created_image_info["ImageId"]
-    ec2_resource = boto3_session.resource("ec2")
     images = list(ec2_resource.images.filter(
         ImageIds=[image_id],
     ))

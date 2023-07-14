@@ -67,14 +67,15 @@ for cpu_arch, ec2_image in BASE_IMAGES.items():
 
 def get_remote_docker_ami_image(
         architecture: CpuArch,
-        boto3_session,
+        ec2_client,
+        ec2_resource,
         aws_settings: AWSSettings
 ):
 
     base_ec2_image = BASE_IMAGES[architecture]
     checksum = REMOTE_DOCKER_ENGINE_AMI_CHECKSUMS[architecture]
     builder_images = get_all_cicd_images(
-        boto3_session=boto3_session,
+        ec2_resource=ec2_resource,
     )
 
     for image in builder_images:
@@ -87,9 +88,9 @@ def get_remote_docker_ami_image(
     name = f"{CICD_AMI_IMAGES_NAME_PREFIX}_{architecture.value}_{checksum}"
     logger.info(f"Create new ami image '{name}'")
     instance = EC2InstanceWrapper.create_and_deploy_ec2_instance(
-        boto3_session=boto3_session,
+        ec2_client=ec2_client,
+        ec2_resource=ec2_resource,
         aws_settings=aws_settings,
-        name_prefix="remote_docker_ami_base",
         ec2_image=base_ec2_image,
         root_volume_size=32,
         deployment_script=_DEPLOYMENT_SCRIPT_PATH,
@@ -97,7 +98,8 @@ def get_remote_docker_ami_image(
 
     try:
         image = create_new_ami_image(
-            boto3_session=boto3_session,
+            ec2_client=ec2_client,
+            ec2_resource=ec2_resource,
             ec2_instance_id=instance.boto3_instance.id,
             name=name,
             checksum=checksum,
