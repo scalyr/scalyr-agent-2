@@ -21,6 +21,7 @@ on:
 
       additional_ec2_instance_tags:
         description: "Additional comma separated list of tags (key=value) for EC2 instance that will be created by this workflow."
+        type: string
 
     outputs:
       cache_miss:
