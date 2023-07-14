@@ -79,9 +79,6 @@ jobs:
       python_version: ${{ needs.pre_job.outputs.python_version }}
       cache_version: ${{ needs.pre_job.outputs.cache_version }}
       aws_region: ${{ needs.pre_job.outputs.aws_region }}
-      aws_security_group: ${{ needs.pre_job.outputs.aws_security_group }}
-      aws_prefix_list_id: ${{ needs.pre_job.outputs.aws_prefix_list_id }}
-      aws_objects_name_prefix: ${{ needs.pre_job.outputs.aws_objects_name_prefix }}
       aws_private_key_name: ${{ needs.pre_job.outputs.aws_private_key_name }}
       additional_ec2_instance_tags: ${{ needs.pre_job.outputs.additional_ec2_instance_tags }}
     secrets:
