@@ -36,14 +36,12 @@ sys.path.append(str(pl.Path(__file__).parent.parent.parent.parent))
 from agent_build_refactored.tools.common import init_logging
 from agent_build_refactored.tools.aws.boto3_tools import (
     AWSSettings,
-    get_prefix_list_version,
 )
-from agent_build_refactored.tools.aws.ec2 import INSTANCE_NAME_STRING
-from agent_build_refactored.tools.aws.ami import get_all_cicd_images
-from agent_build_refactored.tools.docker.buildx.remote_builder.remote_builder_ami_image import (
-    REMOTE_DOCKER_ENGINE_AMI_CHECKSUMS,
-)
+from agent_build_refactored.tools.aws.ec2 import INSTANCE_NAME_STRING, terminate_ec2_instances_and_security_groups
 from agent_build_refactored.tools.aws.constants import COMMON_TAG_NAME
+from agent_build_refactored.tools.docker.buildx.remote_builder.remote_builder_ami_image import (
+    REMOTE_DOCKER_ENGINE_IMAGES
+)
 
 
 init_logging()
@@ -158,23 +156,10 @@ def cleanup_old_ec2_instances_and_related_objects(
         logger.info(f"Remove ec2 instance {instance.id}")
         instances_to_remove.append(instance)
 
-    security_groups_ids_to_remove = []
-
-    for instance in instances_to_remove:
-        for security_group_info in instance.security_groups:
-            security_groups_ids_to_remove.append(
-                security_group_info["GroupId"]
-            )
-
-        instance.terminate()
-
-    for instance in instances_to_remove:
-        instance.wait_until_terminated()
-
-    for security_group_id in security_groups_ids_to_remove:
-        ec2_client.delete_security_group(
-            GroupId=security_group_id,
-        )
+    terminate_ec2_instances_and_security_groups(
+        instances=instances_to_remove,
+        ec2_client=ec2_client,
+    )
 
 
 def cleanup_old_volumes(
@@ -205,15 +190,22 @@ def cleanup_old_volumes(
 def cleanup_old_ami_images(
     ec2_resource,
 ):
-    all_cicd_images = get_all_cicd_images(
-        ec2_resource=ec2_resource,
-    )
 
-    images_checksums_to_keep = {
-        *set(REMOTE_DOCKER_ENGINE_AMI_CHECKSUMS.values()),
-    }
+    images_checksums_to_keep = set()
 
-    for image in all_cicd_images:
+    for image in REMOTE_DOCKER_ENGINE_IMAGES.values():
+        images_checksums_to_keep.add(image.checksum)
+
+    all_images = list(ec2_resource.images.filter(
+        Filters=[
+            {
+                "Name": "tag-key",
+                "Values": [COMMON_TAG_NAME],
+            },
+        ]
+    ))
+
+    for image in all_images:
         for tag in image.tags:
             if tag["Key"] != "checksum":
                 continue
@@ -229,71 +221,6 @@ def cleanup_old_ami_images(
 
             image.deregister()
             logger.info(f"AMI image {image.id} has been de-registered.")
-
-
-# def _get_instance_name(instance):
-#
-#     if instance.tags is None:
-#         return None
-#
-#     for tag in instance.tags:
-#         if tag["Key"] == "Name":
-#             return tag["Value"]
-
-
-# def _parse_entry_description(entry: Dict):
-#     """
-#     Parse json object from the description of the prefix list entry.
-#     Conventionally, we store useful information in it.
-#     """
-#     return json.loads(entry["Description"])
-
-
-# def _parse_entry_timestamp(entry: Dict) -> float:
-#     """
-#     Parse creation timestamp of the prefix list entry.
-#     """
-#     return float(_parse_entry_description(entry)["time"])
-
-
-# def _remove_entries(client, entries: List, prefix_list_id: str):
-#     """
-#     Remove specified entries from prefix list.
-#     :param client: boto3 client.
-#     :param entries: List of entries to remove.
-#     :param prefix_list_id: Prefix list ID.
-#     :return:
-#     """
-#     import botocore.exceptions
-#
-#     attempts = 20
-#     # Since there may be multiple running ec2 tests, we have to add the retry
-#     # logic to overcome the prefix list concurrent access issues.
-#     while True:
-#         try:
-#             version = get_prefix_list_version(
-#                 client=client, prefix_list_id=prefix_list_id
-#             )
-#             client.modify_managed_prefix_list(
-#                 PrefixListId=prefix_list_id,
-#                 CurrentVersion=version,
-#                 RemoveEntries=[{"Cidr": e["Cidr"]} for e in entries],
-#             )
-#             break
-#         except botocore.exceptions.ClientError as e:
-#             keep_trying = False
-#             if "The prefix list has the incorrect version number" in str(e):
-#                 keep_trying = True
-#
-#             if "The request cannot be completed while the prefix" in str(e):
-#                 keep_trying = True
-#
-#             if attempts == 0 or not keep_trying:
-#                 raise
-#
-#             attempts -= 1
-#             logger.info(f"Can not modify prefix list, retry. Reason: {str(e)}")
-#             time.sleep(random.randint(1, 5))
 
 
 def cleanup_old_security_groups(

@@ -4,11 +4,13 @@ import os
 import tarfile
 import tempfile
 
+
+import logging
+import logging.handlers
 import pytest
 import requests  # NOQA
 import six # NOQA
-import logging
-import logging.handlers
+import boto3
 
 #from agent_build_refactored.tools.constants import SOURCE_ROOT
 

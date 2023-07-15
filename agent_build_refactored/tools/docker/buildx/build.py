@@ -17,16 +17,19 @@ from agent_build_refactored.tools.constants import AGENT_BUILD_OUTPUT_PATH, CpuA
 
 logger = logging.getLogger(__name__)
 
-
+# It is expected to set this env variable to true when build happens inside GitHub Actions.
+# It is also expected that GHA cache authentication environment variables are already exposed to the build process.
+# see more - https://docs.docker.com/build/cache/backends/gha/
 USE_GHA_CACHE = bool(os.environ.get("USE_GHA_CACHE"))
+
+# Just a suffix for the build cache string. May be usefull when it is needed to invalidate the cache.
 CACHE_VERSION = os.environ.get("CACHE_VERSION", "")
+
+# When some build can not be fully done from existing cache, it can fall back to using a remote docker builder in
+# ec2 instance. If this env variable if not set to True, then this behavior is restricted.
 ALLOW_FALLBACK_TO_REMOTE_BUILDER = bool(
     os.environ.get("ALLOW_FALLBACK_TO_REMOTE_BUILDER")
 )
-
-
-class BuilderCacheMissError(Exception):
-    pass
 
 
 @dataclasses.dataclass
@@ -72,7 +75,7 @@ def buildx_build(
         build_args: Dict[str, str] = None,
         build_contexts: Dict[str, str] = None,
         output: BuildOutput = None,
-        cache_scope: str = None,
+        cache_name: str = None,
         fallback_to_remote_builder: bool = False
 ):
 
@@ -98,22 +101,18 @@ def buildx_build(
             f"--build-context={name}={value}"
         )
 
-    if cache_scope and USE_GHA_CACHE:
 
-        final_cache_scope = cache_scope
-        if CACHE_VERSION:
-            final_cache_scope = f"{final_cache_scope}_{CACHE_VERSION}"
-
-        cmd_args.extend([
-            f"--cache-from=type=gha,scope={final_cache_scope}",
-            f"--cache-to=type=gha,scope={final_cache_scope}",
-        ])
-
-        # local_cache_dir = AGENT_BUILD_OUTPUT_PATH / "docker_cache" / cache_scope
-        # cmd_args.extend([
-        #     f"--cache-from=type=local,src={local_cache_dir}",
-        #     f"--cache-to=type=local,dest={local_cache_dir}",
-        # ])
+    if cache_name:
+        if USE_GHA_CACHE:
+            final_cache_scope = _get_gha_cache_scope(name=cache_name)
+            cmd_args.append(
+                f"--cache-from=type=gha,scope={final_cache_scope}",
+            )
+        else:
+            cache_dir = _get_local_cache_dir(name=cache_name)
+            cmd_args.append(
+                f"--cache-from=type=local,src={cache_dir}",
+            )
 
     if output:
         cmd_args.append(
@@ -129,12 +128,13 @@ def buildx_build(
     )
 
     retry = False
-    if cache_scope and fallback_to_remote_builder and ALLOW_FALLBACK_TO_REMOTE_BUILDER:
+    if cache_name and fallback_to_remote_builder and ALLOW_FALLBACK_TO_REMOTE_BUILDER:
         if USE_GHA_CACHE:
             # Give more time if we build inside GitHub Action, because its cache may be pretty slow.
             fallback_timeout = 60 * 2
         else:
-            fallback_timeout = 20
+            fallback_timeout = 60
+            #fallback_timeout = 5
         logger.info(
             "Try to preform build locally from cache. If that's not possible, will fallback to a remote builder."
         )
@@ -163,9 +163,17 @@ def buildx_build(
             architecture=architecture,
         )
 
+        if USE_GHA_CACHE:
+            cache_scope = _get_gha_cache_scope(name=cache_name)
+            cache_to_option = f"type=gha,scope={cache_scope}"
+        else:
+            cache_dir = _get_local_cache_dir(name=cache_name)
+            cache_to_option = f"type=local,dest={cache_dir}"
+
         subprocess.run(
             [
                 *cmd_args,
+                f"--cache-to={cache_to_option}",
                 f"--builder={builder.name}",
             ],
             check=True,
@@ -175,114 +183,6 @@ def buildx_build(
         if isinstance(output, OCITarballBuildOutput) and output.extract:
             with tarfile.open(output.tarball_path) as tar:
                 tar.extractall(path=output.dest)
-
-
-# def _build_and_verify_cache(
-#         cmd_args: List[str],
-#         fail_on_cache_miss: bool,
-#         builder_name: str = None,
-#         verbose: bool = True,
-# ):
-#
-#     final_cmd_args = cmd_args[:]
-#
-#     if builder_name:
-#         final_cmd_args.append(
-#             f"--builder={builder_name}"
-#         )
-#
-#     process = subprocess.Popen(
-#         final_cmd_args,
-#         stdout=subprocess.PIPE,
-#         stderr=subprocess.PIPE,
-#     )
-#
-#     stderr_buffer = io.BytesIO()
-#
-#     def read_line():
-#         line_bytes = process.stderr.readline()
-#
-#         if not line_bytes:
-#             return ""
-#
-#         stderr_buffer.write(line_bytes)
-#         line_str = line_bytes.decode(errors="replace")
-#         return line_str
-#
-#     def _print_line(line):
-#         if verbose:
-#             print(line, end="", file=sys.stderr)
-#
-#     def read_run_lines(command_number: int):
-#         lines_count = 0
-#         while True:
-#             run_line = read_line()
-#
-#             if not run_line:
-#                 raise Exception("Expected at least one message related to the previous RUN command")
-#
-#             lines_count += 1
-#             _print_line(run_line)
-#
-#             if not run_line.startswith(f"#{command_number} "):
-#                 continue
-#
-#             if run_line.startswith(f"#{command_number} sha256:"):
-#                 return True
-#
-#             if run_line.startswith(f"#{command_number} extracting sha256:"):
-#                 return True
-#
-#             if re.match(rf"#{command_number} CACHED\n", run_line):
-#                 return True
-#
-#             return False
-#
-#     cache_miss = False
-#     if fail_on_cache_miss:
-#         while True:
-#             line = read_line()
-#
-#             if not line:
-#                 break
-#
-#             _print_line(line)
-#
-#             m = re.match(r"#(\d+) \[[^]]*\] RUN .+", line)
-#             if m:
-#                 command_number = m.group(1)
-#                 if not read_run_lines(command_number=command_number):
-#                     _stop_buildx_build_process(
-#                         process=process
-#                     )
-#                     cache_miss = True
-#                     break
-#
-#     while True:
-#         line = read_line()
-#
-#         if not line:
-#             break
-#
-#         _print_line(line)
-#
-#     process.wait()
-#
-#     if process.returncode != 0:
-#         stderr = stderr_buffer.getvalue()
-#         if not verbose:
-#             sys.stderr.buffer.write(stderr)
-#         if not fail_on_cache_miss or not cache_miss:
-#             raise subprocess.CalledProcessError(
-#                 returncode=process.returncode,
-#                 cmd=cmd_args,
-#                 stderr=stderr,
-#             )
-#
-#     if cache_miss:
-#         raise BuilderCacheMissError(
-#             f"Build has had cache miss and can not be continues"
-#         )
 
 
 def _stop_buildx_build_process(process):
@@ -303,3 +203,15 @@ def _stop_buildx_build_process(process):
     terminate_children_processes(
         _process=psutil_process
     )
+
+
+def _get_gha_cache_scope(name: str):
+    result = name
+    if CACHE_VERSION:
+        result = f"{result}_{CACHE_VERSION}"
+
+    return result
+
+
+def _get_local_cache_dir(name: str):
+    return AGENT_BUILD_OUTPUT_PATH / "docker_cache" / name

@@ -32,8 +32,6 @@ import pathlib as pl
 
 from typing import Dict, Type
 
-logging.basicConfig(level=logging.INFO)
-
 if sys.version_info < (3, 8, 0):
     raise ValueError("This script requires Python 3.8 or above")
 
@@ -41,13 +39,13 @@ if sys.version_info < (3, 8, 0):
 # local packages. All such imports also have to be done after that.
 sys.path.append(str(pl.Path(__file__).parent.absolute()))
 
-from agent_build_refactored.docker_image_builders import (
-    ALL_IMAGE_BUILDERS,
-)
 from agent_build_refactored.tools.constants import SOURCE_ROOT
+from agent_build_refactored.tools.common import init_logging
 from agent_build_refactored.managed_packages.managed_packages_builders import (
     ALL_PACKAGE_BUILDERS,
 )
+
+init_logging()
 
 from agent_build_refactored.tools.builder import Builder
 

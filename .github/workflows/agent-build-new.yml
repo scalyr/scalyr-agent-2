@@ -53,19 +53,6 @@ jobs:
           echo "aws_region=us-east-1" >> "${GITHUB_OUTPUT}"
           echo "aws_private_key_name=CT_SCALYR_AGENT_GHA" >> "${GITHUB_OUTPUT}"
           echo "additional_ec2_instance_tags=gha_workflow=${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}" >> "${GITHUB_OUTPUT}"
-
-      - name: Init used AMI images, if needed
-        env:
-          AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
-          AWS_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
-          AWS_PRIVATE_KEY_NAME: ${{ steps.define_constants.outputs.aws_private_key_name }}
-          AWS_PRIVATE_KEY_PATH: "/tmp/private_key.pem"
-          AWS_REGION: ${{ steps.define_constants.outputs.aws_region }}
-          ADDITIONAL_EC2_INSTANCE_TAGS: ${{ steps.define_constants.outputs.additional_ec2_instance_tags }}
-        run: |
-          echo "${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}" > "${AWS_PRIVATE_KEY_PATH}"
-          chmod 600 "${AWS_PRIVATE_KEY_PATH}"
-          python3 agent_build_refactored/scripts/cicd/init_used_ami_images.py
       
       
 

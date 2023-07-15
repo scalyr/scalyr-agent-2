@@ -1,13 +1,16 @@
 import collections
 import datetime
+import io
 import json
 import random
 import shlex
+import socket
 import subprocess
 import sys
 import threading
 import pathlib as pl
 import time
+import traceback
 from typing import List, Optional, Dict
 
 import boto3
@@ -16,11 +19,12 @@ import paramiko
 import requests
 
 from agent_build_refactored.tools.aws.constants import COMMON_TAG_NAME, CURRENT_SESSION_TAG_NAME
-from agent_build_refactored.tools.aws.boto3_tools import AWSSettings, logger, get_prefix_list_version, \
+from agent_build_refactored.tools.aws.boto3_tools import AWSSettings, logger, \
     MAX_PREFIX_LIST_UPDATE_ATTEMPTS
 from agent_build_refactored.tools.aws.constants import EC2DistroImage
 
-from agent_build_refactored.tools.docker.common import delete_container, ContainerWrapper
+from agent_build_refactored.tools.docker.common import delete_container, ContainerWrapper, get_docker_container_host_port
+from agent_build_refactored.tools.toolset_image import build_toolset_image
 
 
 INSTANCE_NAME_STRING = "automated-agent-ci-cd"
@@ -41,7 +45,7 @@ class EC2InstanceWrapper:
         self.username = username
 
         self._ssh_container: Optional[ContainerWrapper] = None
-        self._ssh_tunnel_containers: Dict[int, ContainerWrapper] = {}
+        self._ssh_tunnel_containers: Dict[int, str] = {}
 
         self._ssh_client_container_name = f"ec2_instance_{boto3_instance.id}_ssh_client"
         self._ssh_client_container_host_port = f"ec2_instance_{boto3_instance.id}_ssh_client"
@@ -60,9 +64,52 @@ class EC2InstanceWrapper:
 
         self._paramiko_ssh_connection: Optional[paramiko.SSHClient] = None
 
+        self._ssh_container_names = []
+        self._main_ssh_connection_container_name: Optional[str] = None
+
     @property
     def ssh_hostname(self):
         return f"{self.username}@{self.boto3_instance.public_ip_address}"
+
+    def _create_ssh_container(
+        self,
+        name_suffix: str,
+        additional_cmd_args: List[str],
+        port: str = None,
+
+    ):
+        container_name = f"agent_build_ec2_instance{self.boto3_instance.id}_ssh_container_{name_suffix}"
+
+        toolset_image_name = build_toolset_image()
+
+        cmd_args = [
+            "docker",
+            "run",
+            "-d",
+            f"--name={container_name}",
+            f"--volume={self.private_key_path}:{self._ssh_client_container_in_docker_private_key_path}",
+        ]
+
+        if port:
+            cmd_args.append(
+                f"-p=0:{port}"
+            )
+
+        cmd_args.append(
+            toolset_image_name
+        )
+
+        cmd_args.extend(
+            additional_cmd_args
+        )
+
+        subprocess.run(
+            cmd_args,
+            check=True
+        )
+
+        self._ssh_container_names.append(container_name)
+        return container_name
 
     @property
     def _common_ssh_options(self):
@@ -76,19 +123,31 @@ class EC2InstanceWrapper:
 
     @property
     def common_ssh_command_args(self):
+        if not self._main_ssh_connection_container_name:
+            self.init_ssh_connection_in_container()
+
         return [
             "docker",
             "exec",
             "-i",
-            self._ssh_container.name,
+            self._main_ssh_connection_container_name,
             "ssh",
             *self._common_ssh_options
         ]
 
+    def init_ssh_connection_in_container(self):
+        self._main_ssh_connection_container_name = self._create_ssh_container(
+            name_suffix="main",
+            additional_cmd_args=[
+                "/bin/bash",
+                "-c",
+                "while true; do sleep 86400; done"
+            ]
+        )
+
     def open_ssh_tunnel(
         self,
         remote_port: int,
-        ssh_client_docker_image_name: str,
         local_port: int = None
 
     ):
@@ -96,142 +155,147 @@ class EC2InstanceWrapper:
         local_port = local_port or remote_port
         full_local_port = f"{local_port}/tcp"
 
-        container = ContainerWrapper(
-            name=f"{self.id}_{local_port}-{remote_port}",
-            image=ssh_client_docker_image_name,
-            rm=False,
-            ports={0: full_local_port},
-            volumes={self.private_key_path: self._ssh_client_container_in_docker_private_key_path},
-            command_args=[
+        # container = ContainerWrapper(
+        #     name=f"{self.id}_{local_port}-{remote_port}",
+        #     image=ssh_client_docker_image_name,
+        #     rm=False,
+        #     ports={0: full_local_port},
+        #     volumes={self.private_key_path: self._ssh_client_container_in_docker_private_key_path},
+        #     command_args=[
+        #         "ssh",
+        #         *self._common_ssh_options,
+        #         "-N",
+        #         "-L",
+        #         f"0.0.0.0:{local_port}:localhost:{remote_port}",
+        #     ]
+        # )
+        #
+        # container.run(interactive=False)
+
+        container_name = self._create_ssh_container(
+            name_suffix=f"tunnel_port_{local_port}",
+            additional_cmd_args=[
                 "ssh",
                 *self._common_ssh_options,
                 "-N",
                 "-L",
                 f"0.0.0.0:{local_port}:localhost:{remote_port}",
-            ]
+            ],
+            port=full_local_port,
         )
 
-        container.run(interactive=False)
+        host_port = get_docker_container_host_port(
+            container_name=container_name,
+            container_port=full_local_port,
+        )
 
-        host_port = container.get_host_port(container_port=full_local_port)
 
-        self._ssh_tunnel_containers[host_port] = container
+        #host_port = container.get_host_port(container_port=full_local_port)
+        self._ssh_tunnel_containers[host_port] = container_name
 
         return host_port
 
-    @property
-    def paramiko_ssh_connection(self) -> paramiko.SSHClient:
 
-        if self._paramiko_ssh_connection is not None:
-            return self._paramiko_ssh_connection
-
-        attempts = 10
-        while True:
-            try:
-                self._paramiko_ssh_connection = paramiko.SSHClient()
-                self._paramiko_ssh_connection.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                self._paramiko_ssh_connection.connect(
-                    hostname=self.boto3_instance.public_ip_address,
-                    username=self.username,
-                    key_filename=str(self.private_key_path),
-                    timeout=100
-                )
-                break
-            except paramiko.ssh_exception.NoValidConnectionsError:
-                logger.info(
-                    f"Can not establish SSH connection with {self.boto3_instance.public_ip_address}"
-                )
-                if attempts == 0:
-                    logger.exception("Giving up. Error: ")
-                    raise
-
-                attempts -= 1
-                logger.info("    retry in 10 seconds.")
-                time.sleep(10)
-
-        return self._paramiko_ssh_connection
-
-    def run_ssh_command(
-        self,
-        command: List[str],
-        run_as_root: bool = False,
-        env: Dict[str, str] = None,
-    ):
-
-        """
-        Run command though SSH.
-        :param command: Command to execute.
-        :param run_as_root: If True, run command as root.
-        :param env: Additional environment variables
-        """
-
-        command_str = shlex.join(command)
-        if run_as_root:
-            command_str = f"sudo -E {command_str}"
-
-        stdin, stdout, sterr = self.paramiko_ssh_connection.exec_command(
-            command_str,
-            environment=env,
-        )
-
-        while True:
-            data = stdout.channel.recv(1024)
-            if data == b"":
-                break
-            sys.stdout.buffer.write(data)
-
-        logger.info(f"STDERR: {sterr.read().decode()}")
-
-        exit_status = stdout.channel.recv_exit_status()
-        if exit_status != 0:
-            raise Exception(f"SSH command '{command_str}' returned {exit_status}.")
-
-    def ssh_put_files(self, files: Dict):
+    def ssh_put_files(self, src: pl.Path, dest: pl.Path):
         """
         Put files to server.
         """
-        sftp = self.paramiko_ssh_connection.open_sftp()
-        try:
-            for src, dst in files.items():
-                logger.info(f"SSH put file {src} to {dst}")
-                sftp.put(str(src), str(dst))
 
-                # also set file permissions, since it seems that they are not preserved.
-                mode = pl.Path(src).stat().st_mode
-                sftp.chmod(str(dst), mode)
-        finally:
-            sftp.close()
+        if not self._main_ssh_connection_container_name:
+            self.init_ssh_connection_in_container()
 
+        # process = subprocess.run(
+        #     [
+        #         "docker",
+        #         "exec",
+        #         "-i",
+        #         self._main_ssh_connection_container_name,
+        #         "ssh",
+        #         *self._common_ssh_options,
+        #         "tee",
+        #         str(dest)
+        #     ],
+        #     input=src.read_bytes(),
+        #     check=True
+        #)
+
+        cmd = [
+            "docker",
+            "exec",
+            "-i",
+            self._main_ssh_connection_container_name,
+            "ssh",
+            *self._common_ssh_options,
+            "dd",
+            f"of={dest}",
+        ]
+
+        process = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+        )
+
+        with src.open(mode="rb") as f:
+            chunk_size = 1024**2
+            while True:
+                data = f.read(chunk_size)
+                if data == b"":
+                    break
+
+                process.stdin.write(data)
+
+        process.stdin.close()
+
+        process.communicate()
+
+        process.wait()
+
+        if process.returncode != 0:
+            raise subprocess.CalledProcessError(
+                returncode=process.returncode,
+                cmd=cmd,
+            )
+
+#        a=10
+        # sftp = self.paramiko_ssh_connection.open_sftp()
+        # try:
+        #     for src, dst in files.items():
+        #         logger.info(f"SSH put file {src} to {dst}")
+        #         sftp.put(str(src), str(dst))
+        #
+        #         # also set file permissions, since it seems that they are not preserved.
+        #         mode = pl.Path(src).stat().st_mode
+        #         sftp.chmod(str(dst), mode)
+        # finally:
+        #     sftp.close()
 
     def terminate(self):
-        # delete_container(
-        #     container_name=self._ssh_client_container_name
-        # )
 
-        for container in self._ssh_tunnel_containers.values():
-            container.remove(force=True)
-
-        if self.paramiko_ssh_connection is not None:
-            self.paramiko_ssh_connection.close()
-
-        self.boto3_instance.terminate()
-        self.boto3_instance.wait_until_terminated()
-
-        for security_group in self.boto3_instance.security_groups:
-            self.ec2_client.delete_security_group(
-                security_group["GroupId"]
+        for container_name in self._ssh_container_names:
+            delete_container(
+                container_name=container_name,
             )
+
+        terminate_ec2_instances_and_security_groups(
+            instances=[self.boto3_instance],
+            ec2_client=self.ec2_client,
+        )
 
     @classmethod
     def create_and_deploy_ec2_instance(
         cls,
         ec2_client,
         ec2_resource,
-        ec2_image: EC2DistroImage,
-        aws_settings: AWSSettings,
+        image_id: str,
+        size_id: str,
+        ssh_username: str,
+        private_key_name: str,
+        private_key_path: pl.Path,
         root_volume_size: int = None,
         files_to_upload: Dict = None,
         deployment_script: pl.Path = None,
+        additional_ec2_instances_tags: Dict[str, Optional[str]] = None,
+        verbose: bool = True,
     ):
         """
         Create AWS EC2 instance and additional deploy files or scripts.
@@ -273,6 +337,8 @@ class EC2InstanceWrapper:
         security_group_id = resp["GroupId"]
 
         ip_address = _get_current_ip_address()
+        #ip_address = "87.116.167.196"
+        #ip_address = "87.116.180.68"
 
         ec2_client.authorize_security_group_ingress(
             GroupId=security_group_id,
@@ -294,24 +360,24 @@ class EC2InstanceWrapper:
         try:
             boto3_instance = _create_ec2_instance(
                 ec2_resource=ec2_resource,
-                ec2_image=ec2_image,
+                image_id=image_id,
+                size_id=size_id,
                 instance_name=name,
                 security_group_id=security_group_id,
-                aws_settings=aws_settings,
+                private_key_name=private_key_name,
                 root_volume_size=root_volume_size,
-                additional_tags=aws_settings.additional_ec2_instances_tags.copy(),
+                additional_tags=additional_ec2_instances_tags,
             )
         except Exception:
             ec2_client.delete_security_group(
-                security_group_id
+                GroupId=security_group_id
             )
             raise
         try:
             instance = cls(
                 boto3_instance=boto3_instance,
-                private_key_path=aws_settings.private_key_path,
-                username=ec2_image.ssh_username,
-                security_group_id=security_group_id,
+                private_key_path=private_key_path,
+                username=ssh_username,
                 ec2_client=ec2_client,
             )
         except Exception:
@@ -321,16 +387,25 @@ class EC2InstanceWrapper:
         try:
             files_to_upload = files_to_upload or {}
 
-            deployment_command = None
+            deployment_command_args = None
             if deployment_script:
                 remote_deployment_script_path = pl.Path("/tmp") / deployment_script.name
-                files_to_upload[str(deployment_script)] = str(remote_deployment_script_path)
-                deployment_command = ["bash", str(remote_deployment_script_path)]
+                files_to_upload[deployment_script] = remote_deployment_script_path
+                deployment_command_args = ["/bin/bash", str(remote_deployment_script_path)]
 
-            if files_to_upload:
-                instance.ssh_put_files(files=files_to_upload)
-                if deployment_command:
-                    instance.run_ssh_command(command=deployment_command)
+            for src, dest in files_to_upload.items():
+                instance.ssh_put_files(src=pl.Path(src), dest=pl.Path(dest))
+
+            if deployment_command_args:
+
+                logger.info("Run initial deployment script.")
+                subprocess.run(
+                    [
+                        *instance.common_ssh_command_args,
+                        *deployment_command_args,
+                    ],
+                    check=True
+                )
         except Exception as e:
             logger.exception("Error occurred during instance deployment.")
             instance.terminate()
@@ -341,10 +416,11 @@ class EC2InstanceWrapper:
 
 def _create_ec2_instance(
     ec2_resource,
-    ec2_image: EC2DistroImage,
+    image_id: str,
+    size_id: str,
     instance_name: str,
     security_group_id: str,
-    aws_settings: AWSSettings,
+    private_key_name: str,
     root_volume_size: int = None,
     additional_tags: Dict[str, str] = None
 ):
@@ -352,7 +428,7 @@ def _create_ec2_instance(
     Create AWS EC2 instance.
     """
 
-    additional_tags = additional_tags or []
+    additional_tags = additional_tags or {}
 
     kwargs = {}
 
@@ -398,17 +474,17 @@ def _create_ec2_instance(
     kwargs.update(dict(TagSpecifications=tag_specifications))
 
     logger.info(
-        f"Start new EC2 instance using image '{ec2_image.image_id}', size '{ec2_image.size_id}'"
+        f"Start new EC2 instance using image '{image_id}', size '{size_id}'"
     )
     attempts = 10
     while True:
         try:
             instances = ec2_resource.create_instances(
-                ImageId=ec2_image.image_id,
+                ImageId=image_id,
                 MinCount=1,
                 MaxCount=1,
-                InstanceType=ec2_image.size_id,
-                KeyName=aws_settings.private_key_name,
+                InstanceType=size_id,
+                KeyName=private_key_name,
                 SecurityGroupIds=[security_group_id],
                 **kwargs,
             )
@@ -421,7 +497,7 @@ def _create_ec2_instance(
             message = str(e)
             # We may catch capacity limit error from AWS, so just retry.
             no_capacity_error = (
-                f"We currently do not have sufficient {ec2_image.size_id} capacity in zones with "
+                f"We currently do not have sufficient {size_id} capacity in zones with "
                 f"support for 'gp2' volumes. Our system will be working on provisioning additional "
                 f"capacity."
             )
@@ -448,34 +524,6 @@ def _create_ec2_instance(
     return instance
 
 
-def create_security_group(
-        boto3_session,
-        cidr: str
-):
-    ec2_client = boto3_session.client("ec2")
-
-    name = f"(disposable)dataset-agent-ci-cd-{int(time.time())}"
-
-    resp = ec2_client.create_security_group(
-        Description='Created by the dataset agent Github Actions Ci/CD to access ec2 instance that '
-                    'are created during workflows',
-        GroupName=name,
-        TagSpecifications=[
-            {
-                "ResourceType": "security-group",
-                "Tags": [
-                    {
-                        "Key": COMMON_TAG_NAME,
-                        "Value": "",
-                    },
-                ],
-            },
-        ],
-    )
-
-    return resp["GroupId"]
-
-
 def _get_current_ip_address():
     # Get current public IP.
     with requests.Session() as s:
@@ -495,79 +543,26 @@ def _get_current_ip_address():
     return public_ip
 
 
-def add_current_ip_to_prefix_list(
-    boto3_session: boto3.Session,
-    prefix_list_id: str,
-    ec2_objects_name_prefix: str = None,
+def terminate_ec2_instances_and_security_groups(
+    instances: List,
+    ec2_client,
+
 ):
-    """
-    Add new CIDR entry with current public IP in to the prefix list. We also additionally store json object in the
-        Description of the prefix list entry. This json object has required field called 'time' with timestamp
-        which is used by the cleanup script to remove old prefix lists.
+    security_groups_ids_to_remove = []
 
-    We have to add current IP to the prefix list in order to provide access for the runner to ec2 instances and have
-        to do it every time because there are too many IPs for the GitHub actions and AWS prefix lists can not store
-        so many.
-    :param boto3_session: ec2 boto3 client.
-    :param prefix_list_id: ID of the prefix list.
-    :param ec2_objects_name_prefix: Optional filed to add to the json object that is stored in the Description
-        filed of the entry.
-    """
-
-    # Get current public IP.
-    with requests.Session() as s:
-        attempts = 10
-        while True:
-            try:
-                resp = s.get("https://api.ipify.org")
-                resp.raise_for_status()
-                break
-            except requests.HTTPError:
-                if attempts == 0:
-                    raise
-                attempts -= 1
-                time.sleep(1)
-
-    public_ip = resp.content.decode()
-
-    new_cidr = f"{public_ip}/32"
-
-    boto3_client = boto3_session.client("ec2")
-
-    attempts = 0
-    # Since there may be multiple running ec2 tests, we have to add the retry
-    # logic to overcome the prefix list concurrent access issues.
-    while True:
-        try:
-            version = get_prefix_list_version(
-                client=boto3_client, prefix_list_id=prefix_list_id
+    for instance in instances:
+        for security_group in instance.security_groups:
+            security_groups_ids_to_remove.append(
+                security_group["GroupId"]
             )
 
-            boto3_client.modify_managed_prefix_list(
-                PrefixListId=prefix_list_id,
-                CurrentVersion=version,
-                AddEntries=[
-                    {
-                        "Cidr": new_cidr,
-                        "Description": json.dumps(
-                            {
-                                "time": time.time(),
-                                "workflow_id": ec2_objects_name_prefix,
-                            }
-                        ),
-                    },
-                ],
+        instance.terminate()
+
+    for instance in instances:
+        instance.wait_until_terminated()
+
+        for security_group_id in security_groups_ids_to_remove:
+            logger.info(f"Delete Security group '{security_group_id}'.")
+            ec2_client.delete_security_group(
+                GroupId=security_group_id,
             )
-            break
-        except botocore.exceptions.ClientError as e:
-            if attempts >= MAX_PREFIX_LIST_UPDATE_ATTEMPTS:
-                logger.exception(
-                    f"Can not add new entry to the prefix list {prefix_list_id}"
-                )
-                raise e
-
-            attempts += 1
-            print(f"Can not modify prefix list, retry. Reason: {str(e)}")
-            time.sleep(random.randint(1, 5))
-
-    return new_cidr

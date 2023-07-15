@@ -23,7 +23,7 @@ def _build(
         context_path=SOURCE_ROOT,
         architecture=CpuArch.x86_64,
         output=output,
-        cache_scope=_NAME,
+        cache_name=_NAME,
     )
 
 

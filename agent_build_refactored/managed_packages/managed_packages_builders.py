@@ -543,7 +543,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
             architecture=cls.ARCHITECTURE,
             build_args=build_args,
             output=output,
-            cache_scope=cache_scope,
+            cache_name=cache_scope,
             fallback_to_remote_builder=True
         )
 

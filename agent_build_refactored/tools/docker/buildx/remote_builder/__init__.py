@@ -9,10 +9,12 @@ from typing import Any, List, Optional, Dict
 from agent_build_refactored.tools.constants import CpuArch
 from agent_build_refactored.tools.aws.constants import EC2DistroImage
 
-from agent_build_refactored.tools.docker.common import delete_container, ContainerWrapper
+from agent_build_refactored.tools.docker.common import delete_container, ContainerWrapper, get_docker_container_host_port
 from agent_build_refactored.tools.aws.boto3_tools import AWSSettings
 
 from agent_build_refactored.tools.aws.ec2 import EC2InstanceWrapper
+from agent_build_refactored.tools.docker.buildx.remote_builder.remote_builder_ami_image import REMOTE_DOCKER_ENGINE_IMAGES
+from agent_build_refactored.tools.toolset_image import build_toolset_image
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +26,6 @@ BUILDX_BUILDER_PORT = 1234
 REMOTE_DOCKER_ENGINE_INSTANCE_SIZES = {
     CpuArch.x86_64: "c6i.2xlarge",
     CpuArch.AARCH64: "c7g.2xlarge",
-    CpuArch.ARMV7: "c7g.2xlarge",
 }
 
 
@@ -83,34 +84,36 @@ class EC2BackedRemoteBuildxBuilderWrapper:
         base_ec2_image,
     ):
 
-        remote_docker_engine_ami_image = get_buildx_builder_ami_image(
-            architecture=self.architecture,
-            boto3_session=boto3_session,
-            aws_settings=aws_settings,
+        remote_docker_engine_ami_image = REMOTE_DOCKER_ENGINE_IMAGES[self.architecture]
 
-        )
+        # remote_docker_engine_image = EC2DistroImage(
+        #     image_id=remote_docker_engine_ami_image.id,
+        #     image_name=remote_docker_engine_ami_image.name,
+        #     short_name=base_ec2_image.short_name,
+        #     size_id=REMOTE_DOCKER_ENGINE_INSTANCE_SIZES[self.architecture],
+        #     ssh_username=base_ec2_image.ssh_username,
+        # )
 
-        remote_docker_engine_image = EC2DistroImage(
-            image_id=remote_docker_engine_ami_image.id,
-            image_name=remote_docker_engine_ami_image.name,
-            short_name=base_ec2_image.short_name,
+        remote_docker_engine_ami_image.initialize()
+
+        # boto3_instance = create_and_deploy_ec2_instance(
+        #     boto3_session=boto3_session,
+        #     ec2_image=remote_docker_engine_image,
+        #     name_prefix="remote_docker",
+        #     aws_settings=aws_settings,
+        #     root_volume_size=32,
+        # )
+
+        self.ec2_instance = remote_docker_engine_ami_image.deploy_ec2_instance(
             size_id=REMOTE_DOCKER_ENGINE_INSTANCE_SIZES[self.architecture],
-            ssh_username=base_ec2_image.ssh_username,
-        )
-
-        boto3_instance = create_and_deploy_ec2_instance(
-            boto3_session=boto3_session,
-            ec2_image=remote_docker_engine_image,
-            name_prefix="remote_docker",
-            aws_settings=aws_settings,
             root_volume_size=32,
         )
 
-        self.ec2_instance = EC2InstanceWrapper(
-            boto3_instance=boto3_instance,
-            private_key_path=aws_settings.private_key_path,
-            username=remote_docker_engine_image.ssh_username,
-        )
+        # self.ec2_instance = EC2InstanceWrapper(
+        #     boto3_instance=boto3_instance,
+        #     private_key_path=aws_settings.private_key_path,
+        #     username=remote_docker_engine_image.ssh_username,
+        # )
 
     def start_buildkit_container(self):
         base_ec2_image = REMOTE_DOCKER_ENGINE_IMAGES[self.architecture]
@@ -125,31 +128,53 @@ class EC2BackedRemoteBuildxBuilderWrapper:
         )
 
         buildkit_container_name = f"{self.name}_container"
+        #
+        # delete_container(
+        #     container_name=buildkit_container_name,
+        #     initial_cmd_args=self.ec2_instance.common_ssh_command_args
+        # )
 
-        delete_container(
-            container_name=buildkit_container_name,
-            initial_cmd_args=self.ec2_instance.common_ssh_command_args
-        )
 
         full_buildkit_builder_port = f"{BUILDX_BUILDER_PORT}/tcp"
 
-        self.buildkit_builder_container = ContainerWrapper(
-            name=buildkit_container_name,
-            image=f"moby/buildkit:{BUILDKIT_VERSION}",
-            rm=True,
-            ports={0: full_buildkit_builder_port},
-            privileged=True,
-            prefix_command_args=self.ec2_instance.common_ssh_command_args,
-            command_args=[
+        subprocess.run(
+            [
+                *self.ec2_instance.common_ssh_command_args,
+                "docker",
+                "run",
+                "-d",
+                "--rm",
+                f"--name={buildkit_container_name}",
+                f"-p=0:{full_buildkit_builder_port}",
+                "--privileged",
+                f"moby/buildkit:{BUILDKIT_VERSION}",
                 "--addr",
                 f"tcp://0.0.0.0:{BUILDX_BUILDER_PORT}",
-            ]
+            ],
+            check=True,
         )
 
-        self.buildkit_builder_container.run()
+        a=10
 
-        buildkit_container_host_port = self.buildkit_builder_container.get_host_port(
-            container_port=full_buildkit_builder_port
+        # self.buildkit_builder_container = ContainerWrapper(
+        #     name=buildkit_container_name,
+        #     image=f"moby/buildkit:{BUILDKIT_VERSION}",
+        #     rm=True,
+        #     ports={0: full_buildkit_builder_port},
+        #     privileged=True,
+        #     prefix_command_args=self.ec2_instance.common_ssh_command_args,
+        #     command_args=[
+        #         "--addr",
+        #         f"tcp://0.0.0.0:{BUILDX_BUILDER_PORT}",
+        #     ]
+        # )
+
+        # self.buildkit_builder_container.run()
+
+        buildkit_container_host_port = get_docker_container_host_port(
+            container_name=buildkit_container_name,
+            container_port=full_buildkit_builder_port,
+            prefix_cmd_args=self.ec2_instance.common_ssh_command_args
         )
 
         buildkit_tunneled_local_port = self.ec2_instance.open_ssh_tunnel(

@@ -56,14 +56,11 @@ class AWSSettings:
 
         additional_ec2_instances_tags_str = os.environ.get("ADDITIONAL_EC2_INSTANCE_TAGS", "")
 
+        additional_ec2_instances_tags = {}
         if additional_ec2_instances_tags_str:
-            additional_ec2_instances_tags = {}
-
             for tag_str in additional_ec2_instances_tags_str.split(","):
                 name, value = tag_str.split("=")
                 additional_ec2_instances_tags[name] = value
-        else:
-            additional_ec2_instances_tags = None
 
         return AWSSettings(
             access_key=_validate_setting("AWS_ACCESS_KEY"),
