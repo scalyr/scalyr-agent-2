@@ -136,6 +136,7 @@ class EC2InstanceWrapper:
         ]
 
     def init_ssh_connection_in_container(self):
+        logger.info(f"Establish ssh connection with ec2 instance '{self.boto3_instance.id}'")
         self._main_ssh_connection_container_name = self._create_ssh_container(
             name_suffix="main",
             additional_cmd_args=[
@@ -144,6 +145,36 @@ class EC2InstanceWrapper:
                 "while true; do sleep 86400; done"
             ]
         )
+
+        retry_counts = 10
+        retry_delay = 5
+        while True:
+            try:
+                subprocess.run(
+                    [
+                        *self.common_ssh_command_args,
+                        "echo",
+                        "test",
+                    ],
+                    check=True,
+                    capture_output=True,
+                )
+            except subprocess.CalledProcessError as e:
+                stderr = e.stderr.decode()
+                logger.info(f"    SSH connection is not established. Reason: {stderr}")
+                if retry_counts == 0:
+                    logger.error("    Can not establish SSH connection. Give up.")
+                    raise
+
+                retry_counts -= 1
+                logger.info(f"    Retry in {retry_delay} sec.")
+                time.sleep(retry_delay)
+                if retry_delay < 10:
+                    retry_delay += 1
+
+            else:
+                break
+
 
     def open_ssh_tunnel(
         self,
@@ -189,8 +220,6 @@ class EC2InstanceWrapper:
             container_port=full_local_port,
         )
 
-
-        #host_port = container.get_host_port(container_port=full_local_port)
         self._ssh_tunnel_containers[host_port] = container_name
 
         return host_port
@@ -204,20 +233,9 @@ class EC2InstanceWrapper:
         if not self._main_ssh_connection_container_name:
             self.init_ssh_connection_in_container()
 
-        # process = subprocess.run(
-        #     [
-        #         "docker",
-        #         "exec",
-        #         "-i",
-        #         self._main_ssh_connection_container_name,
-        #         "ssh",
-        #         *self._common_ssh_options,
-        #         "tee",
-        #         str(dest)
-        #     ],
-        #     input=src.read_bytes(),
-        #     check=True
-        #)
+
+        mode = src.stat().st_mode
+        a=10
 
         cmd = [
             "docker",

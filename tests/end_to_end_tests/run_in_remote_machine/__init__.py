@@ -250,10 +250,6 @@ def run_test_remotely(
 
     if remote_machine_type == "ec2":
 
-        from agent_build_refactored.tools.aws.boto3_tools import (
-            AWSSettings,
-        )
-
         distro_image = target_distro.ec2_images[architecture]
 
         instance = distro_image.deploy_ec2_instance(
