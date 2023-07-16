@@ -374,7 +374,7 @@ class EC2InstanceWrapper:
         security_group_id = resp["GroupId"]
 
         ip_address = _get_current_ip_address()
-        ip_address = "87.116.167.196"
+        #ip_address = "87.116.167.196"
         #ip_address = "87.116.180.68"
 
         ec2_client.authorize_security_group_ingress(
