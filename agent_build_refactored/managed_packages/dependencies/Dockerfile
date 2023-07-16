@@ -282,10 +282,17 @@ RUN make DESTDIR=/tmp/root install
 # Copy sqlite shared library because it's dfficult to make it compiled statically.
 # TODO: But it would be good to create static.
 COPY --from=build_sqlite /tmp/root /tmp/sqlite
-RUN cp /tmp/sqlite${DEPENDENCIES_INSTALL_PREFIX}/lib/*.so* /tmp/root${PYTHON_INSTALL_PREFIX}/lib
+ARG ROOT_PATH="/tmp/root${PYTHON_INSTALL_PREFIX}"
+RUN cp /tmp/sqlite${DEPENDENCIES_INSTALL_PREFIX}/lib/*.so* ${ROOT_PATH}/lib
 
 # Remove cache files.
-RUN find "/tmp/root${PYTHON_INSTALL_PREFIX}" -name "__pycache__" -type d -prune -exec rm -r {} \;
+RUN find "${ROOT_PATH}" -name "__pycache__" -type d -prune -exec rm -r {} \;
+
+# Remove unneded files
+ARG PYTHON_X_Y_VERSION
+ARG PYTHON_X_Y_LIB_DIR="${ROOT_PATH}/lib/python${PYTHON_X_Y_VERSION}"
+RUN rm -r ${PYTHON_X_Y_LIB_DIR}/test
+RUN rm -r ${PYTHON_X_Y_LIB_DIR}/config-${PYTHON_X_Y_VERSION}-*-*-*
 
 # install built python to the current system
 RUN cp -a /tmp/root/. /

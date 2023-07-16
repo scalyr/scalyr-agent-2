@@ -511,9 +511,12 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
 
         rust_platform = f"{cls.ARCHITECTURE.value}-unknown-linux-gnu"
 
+        python_x_y_version = ".".join(PYTHON_VERSION.split(".")[:2])
+
         build_args = {
             "ARCH": cls.ARCHITECTURE.value,
             "PYTHON_VERSION": PYTHON_VERSION,
+            "PYTHON_X_Y_VERSION": python_x_y_version,
             "PYTHON_INSTALL_PREFIX": str(PYTHON_INSTALL_PREFIX),
             "DEPENDENCIES_INSTALL_PREFIX": str(DEPENDENCIES_INSTALL_PREFIX),
             "REQUIREMENTS_FILE_CONTENT": AGENT_REQUIREMENTS,

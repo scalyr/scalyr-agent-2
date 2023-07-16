@@ -184,7 +184,7 @@ jobs:
           echo "${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}" > "${AWS_PRIVATE_KEY_PATH}"
           chmod 600 "${AWS_PRIVATE_KEY_PATH}"
 
-          python3 tests/end_to_end_tests/managed_packages_tests/run_test_remotely.py \
+          python3 tests/end_to_end_tests/managed_packages_tests/remote_machine_tests/run_test_remotely.py \
             tests/end_to_end_tests/managed_packages_tests \
             -s \
             --builder-name ${{ matrix.test_target.builder }} \

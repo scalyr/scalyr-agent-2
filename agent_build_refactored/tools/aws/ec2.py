@@ -173,6 +173,7 @@ class EC2InstanceWrapper:
                     retry_delay += 1
 
             else:
+                logger.info("    SSH connection has been established.")
                 break
 
 
@@ -235,6 +236,7 @@ class EC2InstanceWrapper:
 
 
         mode = src.stat().st_mode
+        oct_str = oct(mode)
         a=10
 
         cmd = [
@@ -274,7 +276,24 @@ class EC2InstanceWrapper:
                 cmd=cmd,
             )
 
-#        a=10
+        final_mode = "".join(list(oct_str)[-3:])
+        subprocess.run(
+            [
+                "docker",
+                "exec",
+                "-i",
+                self._main_ssh_connection_container_name,
+                "ssh",
+                *self._common_ssh_options,
+                "chmod",
+                final_mode,
+                str(dest)
+
+            ],
+            check=True,
+        )
+
+        a=10
         # sftp = self.paramiko_ssh_connection.open_sftp()
         # try:
         #     for src, dst in files.items():
@@ -355,7 +374,7 @@ class EC2InstanceWrapper:
         security_group_id = resp["GroupId"]
 
         ip_address = _get_current_ip_address()
-        #ip_address = "87.116.167.196"
+        ip_address = "87.116.167.196"
         #ip_address = "87.116.180.68"
 
         ec2_client.authorize_security_group_ingress(

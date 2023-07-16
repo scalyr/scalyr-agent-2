@@ -240,7 +240,7 @@ def run_test_remotely(
     file_mappings[pytest_runner_path] = "/tmp/test_runner"
     file_mappings[source_tarball_path] = "/tmp/source.tar.gz"
 
-    final_command = [
+    common_command_args = [
         "/tmp/test_runner",
         "/tmp/source.tar.gz",
         "--set-env=IN_REMOTE_MACHINE=1",
@@ -261,7 +261,8 @@ def run_test_remotely(
             subprocess.run(
                 [
                     *instance.common_ssh_command_args,
-                    *final_command
+                    "sudo",
+                    *common_command_args,
                 ],
                 check=True,
             )
@@ -289,7 +290,7 @@ def run_test_remotely(
                 "--platform",
                 architecture.as_docker_platform(),
                 target_distro.docker_image,
-                *final_command,
+                *common_command_args,
             ],
             check=True
         )
