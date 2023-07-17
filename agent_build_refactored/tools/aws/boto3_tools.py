@@ -40,27 +40,19 @@ class AWSSettings:
     private_key_path: pl.Path
     private_key_name: str
     region: str
-    additional_ec2_instances_tags: Dict[str, str] = None
+    cicd_session_name: str = None
 
     @staticmethod
     def create_from_env():
         vars_name_prefix = os.environ.get("AWS_ENV_VARS_PREFIX", "")
 
-        def _validate_setting(name):
+        def _validate_setting(name, required: bool = True):
             final_name = f"{vars_name_prefix}{name}"
             value = os.environ.get(final_name)
-            if value is None:
+            if value is None and required:
                 raise Exception(f"Env. variable '{final_name}' is not found.")
 
             return value
-
-        additional_ec2_instances_tags_str = os.environ.get("ADDITIONAL_EC2_INSTANCE_TAGS", "")
-
-        additional_ec2_instances_tags = {}
-        if additional_ec2_instances_tags_str:
-            for tag_str in additional_ec2_instances_tags_str.split(","):
-                name, value = tag_str.split("=")
-                additional_ec2_instances_tags[name] = value
 
         return AWSSettings(
             access_key=_validate_setting("AWS_ACCESS_KEY"),
@@ -68,7 +60,7 @@ class AWSSettings:
             private_key_path=pl.Path(_validate_setting("AWS_PRIVATE_KEY_PATH")),
             private_key_name=_validate_setting("AWS_PRIVATE_KEY_NAME"),
             region=_validate_setting("AWS_REGION"),
-            additional_ec2_instances_tags=additional_ec2_instances_tags,
+            cicd_session_name=_validate_setting("CICD_SESSION_NAME", required=False),
         )
 
     def create_boto3_session(self):

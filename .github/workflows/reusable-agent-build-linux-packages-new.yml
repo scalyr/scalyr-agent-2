@@ -19,8 +19,8 @@ on:
         description: "Name of a private key that is used to connect to AWS EC2 instances that will be created by this workflow."
         type: string
 
-      additional_ec2_instance_tags:
-        description: "Additional comma separated list of tags (key=value) for EC2 instance that will be created by this workflow."
+      cicd_session_name:
+        description: "Name of the session to differentiate created AWS object from different parallel jobs."
         type: string
 
     outputs:
@@ -97,7 +97,7 @@ jobs:
           USE_GHA_CACHE: "1"
           ALLOW_FALLBACK_TO_REMOTE_BUILDER: "1"
           CACHE_VERSION: ${{ inputs.cache_version }}
-          ADDITIONAL_EC2_INSTANCE_TAGS: ${{ inputs.additional_ec2_instance_tags }}
+          CICD_SESSION_NAME: ${{ inputs.cicd_session_name }}
         run: |
           echo "${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}" > "${AWS_PRIVATE_KEY_PATH}"
           chmod 600 "${AWS_PRIVATE_KEY_PATH}"
@@ -176,7 +176,7 @@ jobs:
           AWS_PRIVATE_KEY_NAME: ${{ inputs.aws_private_key_name }}
           AWS_PRIVATE_KEY_PATH: "/tmp/private_key.pem"
           AWS_REGION: ${{ inputs.aws_region }}
-          ADDITIONAL_EC2_INSTANCE_TAGS: ${{ inputs.additional_ec2_instance_tags }}
+          CICD_SESSION_NAME: ${{ inputs.cicd_session_name }}
           USE_GHA_CACHE: "1"
           ALLOW_FALLBACK_TO_REMOTE_BUILDER: "1"
           CACHE_VERSION: ${{ inputs.cache_version }}

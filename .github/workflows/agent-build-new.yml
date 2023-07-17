@@ -30,7 +30,7 @@ jobs:
       cache_version: ${{ steps.define_constants.outputs.cache_version }}
       aws_region: ${{ steps.define_constants.outputs.aws_region }}
       aws_private_key_name: ${{ steps.define_constants.outputs.aws_private_key_name }}
-      additional_ec2_instance_tags: ${{ steps.define_constants.outputs.additional_ec2_instance_tags }}
+      cicd_session_name: ${{ steps.define_constants.outputs.cicd_session_name }}
     steps:
       - id: skip_check
         uses: fkirc/skip-duplicate-actions@12aca0a884f6137d619d6a8a09fcc3406ced5281 # v4.0.0
@@ -52,7 +52,7 @@ jobs:
           echo "cache_version=5" >> "${GITHUB_OUTPUT}"
           echo "aws_region=us-east-1" >> "${GITHUB_OUTPUT}"
           echo "aws_private_key_name=CT_SCALYR_AGENT_GHA" >> "${GITHUB_OUTPUT}"
-          echo "additional_ec2_instance_tags=gha_workflow=${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}" >> "${GITHUB_OUTPUT}"
+          echo "cicd_session_name=${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}" >> "${GITHUB_OUTPUT}"
       
       
 
@@ -67,7 +67,7 @@ jobs:
       cache_version: ${{ needs.pre_job.outputs.cache_version }}
       aws_region: ${{ needs.pre_job.outputs.aws_region }}
       aws_private_key_name: ${{ needs.pre_job.outputs.aws_private_key_name }}
-      additional_ec2_instance_tags: ${{ needs.pre_job.outputs.additional_ec2_instance_tags }}
+      cicd_session_name: ${{ needs.pre_job.outputs.cicd_session_name }}
     secrets:
       CT_AWS_DEV_EC2_PRIVATE_KEY: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
       CT_AWS_DEV_EC2_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
@@ -177,7 +177,7 @@ jobs:
           AWS_PRIVATE_KEY_NAME: ${{ needs.pre_job.outputs.aws_private_key_name }}
           AWS_PRIVATE_KEY_PATH: "/tmp/private_key.pem"
           AWS_REGION: ${{ needs.pre_job.outputs.aws_region }}
-          ADDITIONAL_EC2_INSTANCE_TAGS: ${{ needs.pre_job.outputs.additional_ec2_instance_tags }}
+          CICD_SESSION_NAME: ${{ needs.pre_job.outputs.cicd_session_name }}
         run: |
           echo "${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}" > "${AWS_PRIVATE_KEY_PATH}"
           chmod 600 "${AWS_PRIVATE_KEY_PATH}"

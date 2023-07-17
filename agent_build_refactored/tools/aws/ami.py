@@ -39,7 +39,6 @@ class AMIImage:
             root_volume_size: int = None,
             files_to_upload: Dict = None,
             deployment_script: pl.Path = None,
-            verbose: bool = True,
     ):
         from agent_build_refactored.tools.aws.ec2 import EC2InstanceWrapper
 
@@ -48,20 +47,16 @@ class AMIImage:
         boto3_session = aws_settings.create_boto3_session()
         ec2_client = boto3_session.client("ec2")
         ec2_resource = boto3_session.resource("ec2")
-
         return EC2InstanceWrapper.create_and_deploy_ec2_instance(
             ec2_client=ec2_client,
             ec2_resource=ec2_resource,
             image_id=self.image_id,
             size_id=size_id,
             ssh_username=self.ssh_username,
-            private_key_name=aws_settings.private_key_name,
-            private_key_path=aws_settings.private_key_path,
+            aws_settings=aws_settings,
             root_volume_size=root_volume_size,
             files_to_upload=files_to_upload,
             deployment_script=deployment_script,
-            additional_ec2_instances_tags=aws_settings.additional_ec2_instances_tags,
-            verbose=verbose,
         )
 
 

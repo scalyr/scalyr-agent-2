@@ -326,13 +326,10 @@ class EC2InstanceWrapper:
         image_id: str,
         size_id: str,
         ssh_username: str,
-        private_key_name: str,
-        private_key_path: pl.Path,
+        aws_settings: AWSSettings,
         root_volume_size: int = None,
         files_to_upload: Dict = None,
         deployment_script: pl.Path = None,
-        additional_ec2_instances_tags: Dict[str, Optional[str]] = None,
-        verbose: bool = True,
     ):
         """
         Create AWS EC2 instance and additional deploy files or scripts.
@@ -346,9 +343,8 @@ class EC2InstanceWrapper:
         :return:
         """
 
-        int_time = int(time.time())
-        name = f"dataset-agent-cicd(disposable)-{int_time}"
-        security_group_name = f"dataset-agent-cicd(disposable)-{int_time}"
+        name = f"cicd(disposable)-dataset-agent-{aws_settings.cicd_session_name}"
+        security_group_name = f"cicd(disposable)-dataset-agent-{aws_settings.cicd_session_name}"
 
         resp = ec2_client.create_security_group(
             Description='Created by the dataset agent Github Actions Ci/CD to access ec2 instance that '
@@ -394,6 +390,12 @@ class EC2InstanceWrapper:
             ],
         )
 
+        if aws_settings.cicd_session_name:
+            additional_tags = {
+                aws_settings.cicd_session_name: ""
+            }
+        else:
+            additional_tags = None
         try:
             boto3_instance = _create_ec2_instance(
                 ec2_resource=ec2_resource,
@@ -401,9 +403,9 @@ class EC2InstanceWrapper:
                 size_id=size_id,
                 instance_name=name,
                 security_group_id=security_group_id,
-                private_key_name=private_key_name,
+                private_key_name=aws_settings.private_key_name,
                 root_volume_size=root_volume_size,
-                additional_tags=additional_ec2_instances_tags,
+                additional_tags=additional_tags,
             )
         except Exception:
             ec2_client.delete_security_group(
@@ -413,7 +415,7 @@ class EC2InstanceWrapper:
         try:
             instance = cls(
                 boto3_instance=boto3_instance,
-                private_key_path=private_key_path,
+                private_key_path=aws_settings.private_key_path,
                 username=ssh_username,
                 ec2_client=ec2_client,
             )
