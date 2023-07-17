@@ -474,17 +474,8 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
             " and log files and transmit them to Scalyr."
         )
 
-        # Create package installation scriptlets
-        scriptlets_path = self.work_dir / "scriptlets"
-        scriptlets_path.mkdir()
-        self._create_non_aio_package_scriptlets(output_dir=scriptlets_path)
-        in_docker_scriptlets_path = self.to_in_docker_path(scriptlets_path)
-
-        # prepare packages changelogs
-        changelogs_path = self.work_dir / "changelogs"
-        changelogs_path.mkdir()
-        create_change_logs(output_dir=changelogs_path)
-        in_docker_changelogs_dir = self.to_in_docker_path(changelogs_path)
+        in_docker_changelogs_dir = self.to_in_docker_path(self.changelogs_dir)
+        in_docker_scriptlets_dir = self.to_in_docker_path(self.scriptlets_dir)
 
         return [
             # fmt: off
@@ -496,9 +487,9 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
             "-n", AGENT_NON_AIO_AIO_PACKAGE_NAME,
             "--provides", AGENT_NON_AIO_AIO_PACKAGE_NAME,
             "--description", description,
-            "--before-install", str(in_docker_scriptlets_path / "preinstall.sh"),
-            "--after-install", str(in_docker_scriptlets_path / "postinstall.sh"),
-            "--before-remove", str(in_docker_scriptlets_path / "preuninstall.sh"),
+            "--before-install", str(in_docker_scriptlets_dir / "preinstall.sh"),
+            "--after-install", str(in_docker_scriptlets_dir / "postinstall.sh"),
+            "--before-remove", str(in_docker_scriptlets_dir / "preuninstall.sh"),
             "--deb-changelog", str(in_docker_changelogs_dir / "changelog-deb"),
             "--rpm-changelog", str(in_docker_changelogs_dir / "changelog-rpm"),
             "--conflicts", AGENT_AIO_PACKAGE_NAME,
