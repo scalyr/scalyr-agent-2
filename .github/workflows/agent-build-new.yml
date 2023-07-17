@@ -30,7 +30,7 @@ jobs:
       cache_version: ${{ steps.define_constants.outputs.cache_version }}
       aws_region: ${{ steps.define_constants.outputs.aws_region }}
       aws_private_key_name: ${{ steps.define_constants.outputs.aws_private_key_name }}
-      cicd_session_name: ${{ steps.define_constants.outputs.cicd_session_name }}
+      cicd_workflow: ${{ steps.define_constants.outputs.cicd_workflow }}
     steps:
       - id: skip_check
         uses: fkirc/skip-duplicate-actions@12aca0a884f6137d619d6a8a09fcc3406ced5281 # v4.0.0
@@ -52,7 +52,7 @@ jobs:
           echo "cache_version=5" >> "${GITHUB_OUTPUT}"
           echo "aws_region=us-east-1" >> "${GITHUB_OUTPUT}"
           echo "aws_private_key_name=CT_SCALYR_AGENT_GHA" >> "${GITHUB_OUTPUT}"
-          echo "cicd_session_name=${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}" >> "${GITHUB_OUTPUT}"
+          echo "cicd_workflow=${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}" >> "${GITHUB_OUTPUT}"
       
       
 
