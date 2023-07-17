@@ -178,7 +178,7 @@ jobs:
           AWS_PRIVATE_KEY_PATH: "/tmp/private_key.pem"
           AWS_REGION: ${{ inputs.aws_region }}
           CICD_WORKFLOW: ${{ inputs.cicd_workflow }}
-          CICD_JOB: ${{ matrix.test_target.builder }}
+          CICD_JOB: ${{ matrix.test_target.builder }}-${{ matrix.test_target.package_type }}-${{ matrix.test_target.distro-name }}
           USE_GHA_CACHE: "1"
           ALLOW_FALLBACK_TO_REMOTE_BUILDER: "1"
           CACHE_VERSION: ${{ inputs.cache_version }}
