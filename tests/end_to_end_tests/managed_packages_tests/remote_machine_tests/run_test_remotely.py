@@ -24,7 +24,9 @@ import sys
 import tarfile
 from typing import List, Type, Dict, Optional
 
-sys.path.append(str(pl.Path(__file__).parent.parent.parent.parent))
+sys.path.append(
+    str(pl.Path(__file__).parent.parent.parent.parent.parent)
+)
 
 from agent_build_refactored.tools.builder import Builder
 from agent_build_refactored.managed_packages.managed_packages_builders import (
