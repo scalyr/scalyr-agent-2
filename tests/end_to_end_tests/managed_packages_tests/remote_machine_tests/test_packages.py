@@ -653,7 +653,7 @@ def _verify_python_and_libraries():
     subprocess.check_call(
         [
             str(venv_python_executable),
-            "tests/end_to_end_tests/managed_packages_tests/verify_python_interpreter.py",
+            "tests/end_to_end_tests/managed_packages_tests/remote_machine_tests/verify_python_interpreter.py",
         ],
         env={
             # It's important to override the 'LD_LIBRARY_PATH' to be sure that libraries paths from the test runner
