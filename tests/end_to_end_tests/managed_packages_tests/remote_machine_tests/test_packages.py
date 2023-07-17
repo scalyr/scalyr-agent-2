@@ -58,7 +58,7 @@ LINUX_PACKAGE_AGENT_PATHS = AgentPaths(
 
 _PARENT_DIR = pl.Path(__file__).parent
 
-@pytest.mark.skip("ggg")
+
 def test_packages(
     package_builder_name,
     package_type,
@@ -343,7 +343,7 @@ def test_agent_package_config_ownership(
         oct_mode == "751"
     ), f"Expected permissions of the 'agent.d' is 751, got {oct_mode}"
 
-@pytest.mark.skip("gggg")
+
 def test_upgrade(
     #package_builder,
     package_builder_name,
