@@ -76,7 +76,8 @@ def buildx_build(
         build_contexts: Dict[str, str] = None,
         output: BuildOutput = None,
         cache_name: str = None,
-        fallback_to_remote_builder: bool = False
+        fallback_to_remote_builder: bool = False,
+        capture_output: bool = False
 ):
 
     build_args = build_args or {}
@@ -100,7 +101,6 @@ def buildx_build(
         cmd_args.append(
             f"--build-context={name}={value}"
         )
-
 
     if cache_name:
         if USE_GHA_CACHE:
@@ -135,23 +135,40 @@ def buildx_build(
         else:
             fallback_timeout = 60
             #fallback_timeout = 5
+
         logger.info(
             "Try to preform build locally from cache. If that's not possible, will fallback to a remote builder."
         )
     else:
         fallback_timeout = None
 
+    kwargs = {}
+    if capture_output:
+        kwargs["stdout"] = subprocess.PIPE
+        kwargs["stderr"] = subprocess.STDOUT
+
     process = subprocess.Popen(
         cmd_args,
+        **kwargs
     )
 
+    output_buffer = io.BytesIO()
+
     try:
-        process.communicate(timeout=fallback_timeout)
+        stdout, stdee = process.communicate(timeout=fallback_timeout)
     except subprocess.TimeoutExpired:
         _stop_buildx_build_process(
             process=process
         )
         retry = True
+
+    if capture_output:
+        output_buffer.write(stdout)
+
+    if not retry and process.returncode != 0:
+        if capture_output:
+            sys.stderr.buffer.write(output_buffer.getvalue())
+        raise Exception("Build command has failed.")
 
     if retry:
 
@@ -170,19 +187,26 @@ def buildx_build(
             cache_dir = _get_local_cache_dir(name=cache_name)
             cache_to_option = f"type=local,dest={cache_dir}"
 
-        subprocess.run(
+        result = subprocess.run(
             [
                 *cmd_args,
                 f"--cache-to={cache_to_option}",
                 f"--builder={builder.name}",
             ],
             check=True,
+            **kwargs,
         )
+
+        if capture_output:
+            output_buffer.write(result.stdout.decode())
 
     if output:
         if isinstance(output, OCITarballBuildOutput) and output.extract:
             with tarfile.open(output.tarball_path) as tar:
                 tar.extractall(path=output.dest)
+
+    if capture_output:
+        return output_buffer.getvalue()
 
 
 def _stop_buildx_build_process(process):

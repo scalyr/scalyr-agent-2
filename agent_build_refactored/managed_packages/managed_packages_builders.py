@@ -94,6 +94,7 @@ import json
 import logging
 import operator
 import os
+import shlex
 import shutil
 import subprocess
 import argparse
@@ -123,7 +124,7 @@ from agent_build_refactored.prepare_agent_filesystem import (
     create_change_logs,
 )
 
-from agent_build_refactored.tools.toolset_image import build_toolset_image
+from agent_build_refactored.tools.toolset_image import build_toolset_image, build_toolset_image_oci_layout
 from agent_build_refactored.tools.docker.buildx.build import BuildOutput, LocalDirectoryBuildOutput, DockerImageBuildOutput, \
     buildx_build
 from agent_build_refactored.tools.constants import AGENT_REQUIREMENTS
@@ -232,7 +233,6 @@ class LinuxPackageBuilder(Builder):
         version = (SOURCE_ROOT / "VERSION").read_text().strip()
         return [
                 # fmt: off
-                "fpm",
                 "--license", "Apache 2.0",
                 "--vendor", "Scalyr",
                 "--depends", "bash >= 3.2",
@@ -283,81 +283,94 @@ class LinuxPackageBuilder(Builder):
         # Add config file
         add_config(SOURCE_ROOT / "config", package_root_path / "etc/scalyr-agent-2")
 
+    @property
+    def _package_root(self):
+        return self.work_dir / "agent_package_root"
+
+    @abc.abstractmethod
+    def _build_package_root(self):
+        pass
+
+    @property
+    def changelogs_dir(self) -> pl.Path:
+        return self.work_dir / "changelogs"
+
+    def _create_changelogs(self):
+        self.changelogs_dir.mkdir(parents=True)
+        create_change_logs(output_dir=self.changelogs_dir)
+
+    @property
+    def scriptlets_dir(self) -> pl.Path:
+        return self.work_dir / "scriptlets"
+
+    @abc.abstractmethod
+    def _create_scriptlets(self):
+        pass
+
+    @abc.abstractmethod
+    def _get_fpm_build_cmd_args(
+        self,
+        package_type: str,
+    ) -> List[str]:
+        pass
+
     def _build_package(
         self,
         package_type: str,
-        cmd_args: List[str],
-        fpm_image_name: str,
+        fpm_image_oci_layout: pl.Path,
     ):
 
-        package_dir = self.result_dir / package_type
-        package_dir.mkdir()
-        in_docker_package_dir = self.to_in_docker_path(package_dir)
+        result_package_dir = self.result_dir / package_type
+        result_package_dir.mkdir()
 
-        in_docker_source_root = self.to_in_docker_path(SOURCE_ROOT)
+        build_subdir = self.get_new_work_subdir_path("build")
 
-        container_name = f"{fpm_image_name}_{package_type}"
-        delete_container(
-            container_name=container_name,
+        cmd_args = self._get_fpm_build_cmd_args(
+            package_type=package_type,
         )
 
-        try:
-            result = subprocess.run(
-                [
-                    # fmt: off
-                    "docker",
-                    "run",
-                    "-i",
-                    "--rm",
-                    f"--name={container_name}",
-                    f"--workdir={in_docker_package_dir}",
-                    f"--volume={SOURCE_ROOT}:{in_docker_source_root}",
-                    fpm_image_name,
-                    *cmd_args,
-                    "-t",
-                    package_type,
-                    # fmt: on
-                ],
-                check=True,
-                stderr=subprocess.STDOUT,
-                stdout=subprocess.PIPE,
-            )
-        except subprocess.CalledProcessError as e:
-            logger.info(f"Fpm process has ended with error. Output: {e.stdout.decode()}")
-            raise
+        output = self.run_command_in_docker(
+            cmd_args=cmd_args,
+            output_dir=build_subdir,
+            cwd=build_subdir,
+            base_image_oci_layout_dir=fpm_image_oci_layout,
+        )
 
-        return result.stdout.decode()
+        found = list(build_subdir.glob(f"*.{package_type}"))
+
+        if len(found) != 1:
+            raise Exception("Number of result packages has to be 1.")
+
+        shutil.copy(found[0], result_package_dir)
+
+        return output
 
     def _build_all_packages(
-        self,
-        cmd_args: List[str],
+        self
     ):
 
-        toolset_image_name = build_toolset_image()
+        toolset_image_oci_layout_path = build_toolset_image_oci_layout()
 
-        parallel_builds_count = os.cpu_count()
-        if parallel_builds_count is None:
-            parallel_builds_count = 1
-
-        executor = concurrent.futures.ThreadPoolExecutor(
-            max_workers=parallel_builds_count
-        )
-
-        futures = collections.OrderedDict()
         for package_type in self.package_types:
             logger.info(f"Start build of the {package_type} package.")
-            future = executor.submit(
-                self._build_package,
+
+            self._build_package(
                 package_type=package_type,
-                cmd_args=cmd_args,
-                fpm_image_name=toolset_image_name,
-
+                fpm_image_oci_layout=toolset_image_oci_layout_path,
             )
-            futures[package_type] = future
 
-        for package_type, future in futures.items():
-            output = future.result()
-            logger.info(f"The {package_type} package build is finished.\n{output}")
+            logger.info(f"The {package_type} package build is finished.")
+
+    def _build(
+        self,
+        output_dir: pl.Path = None,
+    ):
+
+        self._build_package_root()
+        self._create_changelogs()
+        self._create_scriptlets()
+
+        self._build_all_packages()
 
 
 
@@ -367,8 +380,7 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
     such as Python and OpenSSL.
     """
 
-    @staticmethod
-    def _create_non_aio_package_scriptlets(output_dir: pl.Path):
+    def _create_scriptlets(self):
         """Copy three scriptlets required by the RPM and Debian non-aio packages.
 
         These are the preinstall.sh, preuninstall.sh, and postuninstall.sh scripts.
@@ -376,9 +388,10 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
 
         source_scriptlets_path = SOURCE_ROOT / "agent_build_refactored/managed_packages/non-aio/install-scriptlets"
 
-        pre_install_scriptlet = output_dir / "preinstall.sh"
-        post_install_scriptlet = output_dir / "postinstall.sh"
-        pre_uninstall_scriptlet = output_dir / "preuninstall.sh"
+        self.scriptlets_dir.mkdir(parents=True)
+        pre_install_scriptlet = self.scriptlets_dir / "preinstall.sh"
+        post_install_scriptlet = self.scriptlets_dir / "postinstall.sh"
+        pre_uninstall_scriptlet = self.scriptlets_dir / "preuninstall.sh"
 
         shutil.copy(source_scriptlets_path / "preinstall.sh", pre_install_scriptlet)
         shutil.copy(source_scriptlets_path / "postinstall.sh", post_install_scriptlet)
@@ -416,28 +429,26 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
         replace_code(pre_install_scriptlet)
         replace_code(post_install_scriptlet)
 
-    def _build(self):
+    def _build_package_root(self):
 
-        agent_package_root = self.work_dir / "agent_package_root"
-
-        self._build_packages_common_files(package_root_path=agent_package_root)
+        self._build_packages_common_files(package_root_path=self._package_root)
 
         # Copy switch python executable script to package's bin
         switch_python_source = SOURCE_ROOT / "agent_build_refactored/managed_packages/non-aio/files/bin/scalyr-switch-python.sh"
 
         switch_python_executable_name = "scalyr-switch-python"
-        package_bin_path = agent_package_root / f"usr/share/{AGENT_SUBDIR_NAME}/bin"
+        package_bin_path = self._package_root / f"usr/share/{AGENT_SUBDIR_NAME}/bin"
         package_switch_python_executable = package_bin_path / switch_python_executable_name
         shutil.copy(
             switch_python_source,
             package_switch_python_executable
         )
-        sbin_python_switch_executable = agent_package_root / "usr/sbin" / switch_python_executable_name
+        sbin_python_switch_executable = self._package_root / "usr/sbin" / switch_python_executable_name
         sbin_python_switch_executable.symlink_to(f"/usr/share/{AGENT_SUBDIR_NAME}/bin/{switch_python_executable_name}")
 
         # Create copies of the agent_main.py with python2 and python3 shebang.
         agent_main_path = SOURCE_ROOT / "scalyr_agent/agent_main.py"
-        agent_package_path = agent_package_root / f"usr/share/{AGENT_SUBDIR_NAME}/py/scalyr_agent"
+        agent_package_path = self._package_root / f"usr/share/{AGENT_SUBDIR_NAME}/py/scalyr_agent"
         agent_main_py2_path = agent_package_path / "agent_main_py2.py"
         agent_main_py3_path = agent_package_path / "agent_main_py3.py"
 
@@ -452,31 +463,36 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
         os.chmod(agent_main_py2_path, main_permissions)
         os.chmod(agent_main_py3_path, main_permissions)
 
-        # Create package installation scriptlets
-        scriptlets_path = self.work_dir / "scriptlets"
-        scriptlets_path.mkdir()
-        self._create_non_aio_package_scriptlets(output_dir=scriptlets_path)
+    def _get_fpm_build_cmd_args(
+        self,
+        package_type: str,
+    ) -> List[str]:
+        in_docker_package_root = self.to_in_docker_path(self._package_root)
 
         description = (
             "Scalyr Agent 2 is the daemon process Scalyr customers run on their servers to collect metrics"
             " and log files and transmit them to Scalyr."
         )
 
+        # Create package installation scriptlets
+        scriptlets_path = self.work_dir / "scriptlets"
+        scriptlets_path.mkdir()
+        self._create_non_aio_package_scriptlets(output_dir=scriptlets_path)
+        in_docker_scriptlets_path = self.to_in_docker_path(scriptlets_path)
+
         # prepare packages changelogs
         changelogs_path = self.work_dir / "changelogs"
         changelogs_path.mkdir()
         create_change_logs(output_dir=changelogs_path)
-
-        in_docker_package_root = self.to_in_docker_path(agent_package_root)
-        in_docker_scriptlets_path = self.to_in_docker_path(scriptlets_path)
         in_docker_changelogs_dir = self.to_in_docker_path(changelogs_path)
 
-        cmd_args = [
+        return [
             # fmt: off
-            *self.common_agent_package_build_args,
+            "fpm",
             "-s", "dir",
             "-a", "all",
             "-C", str(in_docker_package_root),
+            "-t", package_type,
             "-n", AGENT_NON_AIO_AIO_PACKAGE_NAME,
             "--provides", AGENT_NON_AIO_AIO_PACKAGE_NAME,
             "--description", description,
@@ -485,13 +501,14 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
             "--before-remove", str(in_docker_scriptlets_path / "preuninstall.sh"),
             "--deb-changelog", str(in_docker_changelogs_dir / "changelog-deb"),
             "--rpm-changelog", str(in_docker_changelogs_dir / "changelog-rpm"),
-            "--conflicts", AGENT_AIO_PACKAGE_NAME
+            "--conflicts", AGENT_AIO_PACKAGE_NAME,
+            *self.common_agent_package_build_args,
             # fmt: on
         ]
 
-        self._build_all_packages(
-            cmd_args=cmd_args,
-        )
+        # self._build_all_packages(
+        #     cmd_args=cmd_args,
+        # )
 
 
 class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
@@ -761,20 +778,18 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         var_opt_dir = package_root / f"var/opt/{AGENT_SUBDIR_NAME}"
         var_opt_dir.mkdir(parents=True)
 
-    def _build(self):
-
-        agent_package_root = self.work_dir / "agent_package_root"
+    def _build_package_root(self):
 
         self._prepare_package_python_and_libraries_files(
-            package_root=agent_package_root
+            package_root=self._package_root
         )
 
         self._build_packages_common_files(
-            package_root_path=agent_package_root
+            package_root_path=self._package_root
         )
 
         install_root_executable_path = (
-            agent_package_root
+            self._package_root
             / f"usr/share/{AGENT_SUBDIR_NAME}/bin/scalyr-agent-2-new"
         )
         # Add agent's executable script.
@@ -785,13 +800,13 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         )
 
         # Also link agent executable to usr/sbin
-        usr_sbin_executable = agent_package_root / "usr/sbin/scalyr-agent-2"
+        usr_sbin_executable = self._package_root / "usr/sbin/scalyr-agent-2"
         usr_sbin_executable.unlink()
         usr_sbin_executable.symlink_to("../share/scalyr-agent-2/bin/scalyr-agent-2-new")
 
         # Also remove third party libraries except tcollector.
         agent_module_path = (
-            agent_package_root / "usr/share/scalyr-agent-2/py/scalyr_agent"
+            self._package_root / "usr/share/scalyr-agent-2/py/scalyr_agent"
         )
         third_party_libs_dir = agent_module_path / "third_party"
         shutil.rmtree(agent_module_path / "third_party_python2")
@@ -807,10 +822,19 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
             third_party_libs_dir / "__init__.py",
         )
 
-        scriptlets_path = (
-            SOURCE_ROOT
-            / "agent_build_refactored/managed_packages/install-scriptlets"
+    def _create_scriptlets(self):
+        self.scriptlets_dir.mkdir(parents=True)
+
+        shutil.copytree(
+            SOURCE_ROOT / "agent_build_refactored/managed_packages/install-scriptlets",
+            self.scriptlets_dir,
+            dirs_exist_ok=True,
         )
+
+    def _get_fpm_build_cmd_args(
+        self,
+        package_type: str,
+    ) -> List[str]:
 
         description = (
             'Scalyr Agent 2 is the daemon process Scalyr customers run on their servers to collect metrics'
@@ -818,39 +842,32 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
             'dependencies that are required by the package bundled with it.'
         )
 
-        # prepare packages changelogs
-        changelogs_path = self.work_dir / "changelogs"
-        changelogs_path.mkdir()
-        create_change_logs(output_dir=changelogs_path)
+        in_docker_package_root = self.to_in_docker_path(self._package_root)
+        in_docker_scriptlets_dir = self.to_in_docker_path(self.scriptlets_dir)
+        in_docker_changelogs_dir = self.to_in_docker_path(self.changelogs_dir)
 
-        in_docker_package_root = self.to_in_docker_path(agent_package_root)
-        in_docker_scriptlets_path = self.to_in_docker_path(scriptlets_path)
-        in_docker_changelogs_dir = self.to_in_docker_path(changelogs_path)
-
-        fpm_cmd_args = [
+        return [
             # fmt: off
-            *self.common_agent_package_build_args,
+            "fpm",
             "-s", "dir",
             "-a", cpu_arch_as_fpm_arch(arch=self.__class__.ARCHITECTURE),
             "-C", str(in_docker_package_root),
+            "-t", package_type,
             "-n", AGENT_AIO_PACKAGE_NAME,
             "--provides", AGENT_AIO_PACKAGE_NAME,
             "--description", description,
-            "--after-install", str(in_docker_scriptlets_path / "postinstall.sh"),
-            "--before-remove", str(in_docker_scriptlets_path / "preuninstall.sh"),
+            "--after-install", str(in_docker_scriptlets_dir / "postinstall.sh"),
+            "--before-remove", str(in_docker_scriptlets_dir / "preuninstall.sh"),
             "--config-files", f"/opt/{AGENT_SUBDIR_NAME}/etc/preferred_openssl",
             "--config-files", f"/opt/{AGENT_SUBDIR_NAME}/etc/additional-requirements.txt",
             "--directories", f"/opt/{AGENT_SUBDIR_NAME}",
             "--directories", f"/var/opt/{AGENT_SUBDIR_NAME}",
             "--deb-changelog", str(in_docker_changelogs_dir / "changelog-deb"),
             "--rpm-changelog", str(in_docker_changelogs_dir / "changelog-rpm"),
-            "--conflicts", AGENT_NON_AIO_AIO_PACKAGE_NAME
+            "--conflicts", AGENT_NON_AIO_AIO_PACKAGE_NAME,
+            *self.common_agent_package_build_args,
             # fmt: on
         ]
-
-        self._build_all_packages(
-            cmd_args=fpm_cmd_args,
-        )
 
 
 
