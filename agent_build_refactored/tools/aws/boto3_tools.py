@@ -40,7 +40,8 @@ class AWSSettings:
     private_key_path: pl.Path
     private_key_name: str
     region: str
-    cicd_session_name: str = None
+    cicd_workflow: str = None
+    cicd_job: str = None
 
     @staticmethod
     def create_from_env():
@@ -60,7 +61,8 @@ class AWSSettings:
             private_key_path=pl.Path(_validate_setting("AWS_PRIVATE_KEY_PATH")),
             private_key_name=_validate_setting("AWS_PRIVATE_KEY_NAME"),
             region=_validate_setting("AWS_REGION"),
-            cicd_session_name=_validate_setting("CICD_SESSION_NAME", required=False),
+            cicd_workflow=_validate_setting("CICD_WORKFLOW", required=False),
+            cicd_job=_validate_setting("CICD_JOB", required=False),
         )
 
     def create_boto3_session(self):

@@ -343,8 +343,8 @@ class EC2InstanceWrapper:
         :return:
         """
 
-        name = f"cicd(disposable)-dataset-agent-{aws_settings.cicd_session_name}"
-        security_group_name = f"cicd(disposable)-dataset-agent-{aws_settings.cicd_session_name}"
+        name = f"cicd(disposable)-dataset-agent-{aws_settings.cicd_workflow}"
+        security_group_name = f"cicd(disposable)-dataset-agent-{aws_settings.cicd_workflow}_{aws_settings.cicd_job}"
 
         resp = ec2_client.create_security_group(
             Description='Created by the dataset agent Github Actions Ci/CD to access ec2 instance that '
@@ -390,9 +390,9 @@ class EC2InstanceWrapper:
             ],
         )
 
-        if aws_settings.cicd_session_name:
+        if aws_settings.cicd_workflow:
             additional_tags = {
-                aws_settings.cicd_session_name: ""
+                aws_settings.cicd_workflow: ""
             }
         else:
             additional_tags = None

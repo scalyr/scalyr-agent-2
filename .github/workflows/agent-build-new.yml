@@ -177,7 +177,8 @@ jobs:
           AWS_PRIVATE_KEY_NAME: ${{ needs.pre_job.outputs.aws_private_key_name }}
           AWS_PRIVATE_KEY_PATH: "/tmp/private_key.pem"
           AWS_REGION: ${{ needs.pre_job.outputs.aws_region }}
-          CICD_SESSION_NAME: ${{ needs.pre_job.outputs.cicd_session_name }}
+          CICD_WORKFLOW: ${{ needs.pre_job.outputs.cicd_workflow }}
+          CICD_JOB: ${{ needs.pre_job.outputs.cicd_job }}
         run: |
           echo "${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}" > "${AWS_PRIVATE_KEY_PATH}"
           chmod 600 "${AWS_PRIVATE_KEY_PATH}"
