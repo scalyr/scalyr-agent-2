@@ -97,7 +97,7 @@ jobs:
           USE_GHA_CACHE: "1"
           ALLOW_FALLBACK_TO_REMOTE_BUILDER: "1"
           CACHE_VERSION: ${{ inputs.cache_version }}
-          CICD_SESSION_NAME: ${{ inputs.cicd_session_name }}
+          CICD_SESSION_NAME: ${{ inputs.cicd_session_name }}-${{ matrix.builder.name }}
         run: |
           echo "${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}" > "${AWS_PRIVATE_KEY_PATH}"
           chmod 600 "${AWS_PRIVATE_KEY_PATH}"
