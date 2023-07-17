@@ -35,7 +35,7 @@ class Builder:
         pass
 
     def to_in_docker_path(self, path: pl.Path):
-        rel_path = path.relative_to(self.root_dir)
+        rel_path = path.relative_to(SOURCE_ROOT)
         in_docker_output_dir_path = pl.Path("/tmp/root")
         return in_docker_output_dir_path / rel_path
 
