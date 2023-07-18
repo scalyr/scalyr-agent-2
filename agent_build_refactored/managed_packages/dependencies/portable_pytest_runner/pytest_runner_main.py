@@ -4,10 +4,13 @@ import os
 import tarfile
 import tempfile
 
-
-import logging
-import logging.handlers
 import pytest
+
+# We have to explicitly import all needed libraries here in order to help PyInstaller to bundle them,
+# because we do not bundle agent's source code and PyInstaller does not have ability to determine
+# all requirements.
+import logging # NOQA
+import logging.handlers # NOQA
 import requests  # NOQA
 import six # NOQA
 import boto3 # NOQA

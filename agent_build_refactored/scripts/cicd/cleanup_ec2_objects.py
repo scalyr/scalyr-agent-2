@@ -180,7 +180,7 @@ def cleanup_old_volumes(
         if volume.create_time >= DELETE_OLD_NODES_THRESHOLD_DT.replace(tzinfo=tzinfo):
             continue
 
-        logger.info(f"Deleting volume with name: {name}")
+        logger.info(f"Deleting volume with name: {volume.name}")
         volume.remove()
 
 

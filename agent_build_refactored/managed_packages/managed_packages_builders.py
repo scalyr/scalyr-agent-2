@@ -366,7 +366,6 @@ class LinuxPackageBuilder(Builder):
         self._build_all_packages()
 
 
-
 class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
     """
     This class builds non-aio (all in one) version of the package, meaning that this package has some system dependencies,
@@ -538,8 +537,6 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         }
 
         cache_scope = f"packages_python_{cls.ARCHITECTURE.value}"
-
-        fallback_to_remote_builder = cls.ARCHITECTURE != CURRENT_MACHINE_CPU_ARCHITECTURE
 
         buildx_build(
             dockerfile_path=_DEPENDENCIES_DIR / "Dockerfile",
