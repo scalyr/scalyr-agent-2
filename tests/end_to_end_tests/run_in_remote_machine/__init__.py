@@ -138,7 +138,7 @@ _DISTROS_LIST = [
             name="debian10",
             ec2_images={
                 CpuArch.x86_64: StockAMIImage(
-                    image_id="ami-0b9a611a02047d3b1",
+                    image_id="ami-074f8bbb689b1c1a0",
                     name="Debian 10 Buster",
                     short_name="debian10",
                     ssh_username="admin",
