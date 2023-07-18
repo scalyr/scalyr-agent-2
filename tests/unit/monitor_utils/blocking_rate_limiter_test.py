@@ -378,7 +378,7 @@ class BlockingRateLimiterTest(ScalyrTestCase):
             advancer = self.__create_fake_clock_advancer_thread(
                 rl, [threading.currentThread()]
             )
-            advancer.run()
+            advancer.start()
 
             while True:
                 token = rl.acquire_token()
