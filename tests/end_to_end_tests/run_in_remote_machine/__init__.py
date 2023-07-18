@@ -22,9 +22,6 @@ import pathlib as pl
 import subprocess
 from typing import List, Dict, Union
 
-# from agent_build_refactored.managed_packages.build_dependencies_versions import (
-#     EMBEDDED_OPENSSL_VERSION_NUMBER,
-# )
 from agent_build_refactored.tools.constants import CpuArch
 from agent_build_refactored.managed_packages.managed_packages_builders import EMBEDDED_OPENSSL_VERSION_NUMBER
 from agent_build_refactored.tools.aws.ami import StockAMIImage
@@ -211,7 +208,6 @@ _DISTROS_LIST = [
 DISTROS = {distro.name: distro for distro in _DISTROS_LIST}
 
 
-
 def run_test_remotely(
     target_distro: TargetDistro,
     remote_machine_type: str,
@@ -266,10 +262,6 @@ def run_test_remotely(
                 ],
                 check=True,
             )
-            # instance.run_ssh_command(
-            #     command=final_command,
-            #     run_as_root=True,
-            # )
         finally:
             logger.info("Terminating EC2 instance.")
             instance.terminate()
