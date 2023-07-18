@@ -732,11 +732,11 @@ class BlockingRateLimiterTest(ScalyrTestCase):
             reported_outcome_generator,
         )
         [t.setDaemon(True) for t in threads]
-        [t.run() for t in threads]
+        [t.start() for t in threads]
 
         # Create and join and advancer thread (which in turn lasts until all client threads die
         advancer = self.__create_fake_clock_advancer_thread(rate_limiter, threads)
-        advancer.run()
+        advancer.start()
         advancer.join()
 
         requests = self._test_state["count"]
