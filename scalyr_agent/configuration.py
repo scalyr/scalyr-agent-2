@@ -1086,6 +1086,10 @@ class Configuration(object):
         return self.__get_config().get_bool("k8s_events_disable")
 
     @property
+    def k8s_fallback_urls_disable(self):
+        return self.__get_config().get_bool("k8s_fallback_urls_disable")
+
+    @property
     def k8s_explorer_enable(self):
         return self.__get_config().get_bool("k8s_explorer_enable")
 
@@ -3038,6 +3042,15 @@ class Configuration(object):
         self.__verify_or_set_optional_bool(
             config,
             "k8s_explorer_enable",
+            False,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+
+        self.__verify_or_set_optional_bool(
+            config,
+            "k8s_fallback_urls_disable",
             False,
             description,
             apply_defaults,

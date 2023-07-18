@@ -1,6 +1,15 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.2.3 "Elloria" - Jun 22, 2023
+<!---
+Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Jun 22, 2023 00:00 -0800
+--->
+
+Kubernetes:
+* Fix a bug with Kubernetes Events monitor not emitting events for `CronJob` objects when using Kubernetes >= 1.25.0. The bug was related to the API endpoint being promoted from `v1beta` to `stable`. The code has been updated to support both locations - old one (beta) and the new one (stable).
+* Update Kubernetes monitor to also log the value of `SCALYR_COMPRESSION_LEVEL` environment variable on start up. Contributed by @MichalKoziorowski-TomTom #1104.
+
 ## 2.2.2 "Pollux" - Apr 26, 2023
 <!---
 Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Apr 26, 2023 00:00 -0800
@@ -63,7 +72,7 @@ Packaged by Joseph Makar <joseph.makar@sentinelone.com> on Oct 17, 2022 12:31 -0
 --->
 
 Kubernetes:
-* Fix a bug / edge case in the Kubernetes caching PodProcessor code which could cause an agent to get stuck in an infinite loop when processing controllers which have a custom Kind which is not supported by the agent defined. Contributed by #xdvpser #998 #999.
+* Fix a bug / edge case in the Kubernetes caching PodProcessor code which could cause an agent to get stuck in an infinite loop when processing controllers which have a custom Kind which is not supported by the agent defined. Contributed by @xdvpser #998 #999.
 * Allows user to configure Docker client library connection timeout and maximum connection pool size when using Docker container enumerator via new `k8s_docker_client_timeout` and `k8s_docker_client_max_pool_size` config option.
 
 Docker Images:

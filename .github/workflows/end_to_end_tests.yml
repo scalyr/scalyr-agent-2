@@ -73,7 +73,7 @@ jobs:
           coverage xml -i -o coverage.xml
 
       - name: Upload Coverage to Codecov.io
-        uses: codecov/codecov-action@40a12dcee2df644d47232dde008099a3e9e4f865 # pin@v3.1.2
+        uses: codecov/codecov-action@eaaf4bedf32dbdc6b720b63067d99c4d77d6047d # pin@v3.1.4
         with:
           files: ./coverage.xml
           fail_ci_if_error: true
@@ -92,13 +92,17 @@ jobs:
       fail-fast: false
       matrix:
         k8s_version:
-          - { "version": "v1.17.17", "driver": "", "runtime": "docker" }
-          - { "version": "v1.20.15", "driver": "", "runtime": "docker" }
-          - { "version": "v1.21.10", "driver": "", "runtime": "docker" }
-          - { "version": "v1.22.7", "driver": "", "runtime": "docker" }
-          # NOTE: Using containerd runtime in minikube on  GHA only works with docker driver
-          - { "version": "v1.23.4", "driver": "docker", "runtime": "containerd" }
-          - { "version": "v1.24.0", "driver": "docker", "runtime": "containerd" }
+          # NOTE: We don't test under very old versions where CronJob was part of v2alpha1 since in
+          # those versions CronJobs are not enabled by default and need to be installed extra
+          - { "version": "v1.17.17", "driver": "", "runtime": "docker", "run_cronjob_checks": false }
+          - { "version": "v1.20.15", "driver": "", "runtime": "docker", "run_cronjob_checks": false }
+          - { "version": "v1.21.10", "driver": "", "runtime": "docker", "run_cronjob_checks": true }
+          - { "version": "v1.22.7", "driver": "", "runtime": "docker", "run_cronjob_checks": true }
+          # NOTE: Using containerd runtime in minikube on GHA only works with docker driver
+          - { "version": "v1.23.17", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true }
+          - { "version": "v1.24.14", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true }
+          - { "version": "v1.25.10", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true }
+          - { "version": "v1.26.5", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true }
 
     steps:
       - name: Checkout Repository
@@ -164,6 +168,18 @@ jobs:
           echo ""
           kubectl logs "${APP_POD_NAME}"
           echo ""
+
+      # We create mock CronJob so we can assert that Kubernetes Events monitor correctly handles 
+      # CronJob and Job Events.
+      - name: Create mock CronJob (v1)
+        if: ${{ matrix.k8s_version.run_cronjob_checks }}
+        run: |
+          # We need to use a different file for different K8s versions due to promotion (removal of
+          # old v1beta alias) from v1beta to v1 in v1.25.0. v1 has been available since v1.21.0
+          kubectl apply -f tests/e2e/k8s_events_monitor/cronjob_v1.yaml
+
+          sleep 10
+          kubectl get cronjob -A
 
       - name: Create scalyr-agent-2 daemonset
         uses: ./.github/actions/install-k8s-agent/
@@ -231,7 +247,8 @@ jobs:
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/kubernetes_events.log" $parser="k8sEvents" "\"kind\":\"Event\""'
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/kubernetes_events.log" $parser="k8sEvents" "\"kind\":\"Pod\""'
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/kubernetes_events.log" $parser="k8sEvents" "involvedObject"'
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/kubernetes_events.log" $parser="k8sEvents" "NodeReady"'
+          # This event is not always available under Kubernetes >= 1.25
+          #./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/kubernetes_events.log" $parser="k8sEvents" "NodeReady"'
 
           agent_status=$(kubectl --namespace=scalyr exec -i ${SCALYR_AGENT_POD_NAME} --container scalyr-agent -- scalyr-agent-2 status -v)
           k8s_event_log_files_number=$(echo "$agent_status" | grep -c 'Path /var/log/scalyr-agent-2/kubernetes_events.log: copied')
@@ -240,6 +257,27 @@ jobs:
             echo "Kubernetes event monitor log has to be handled by the agent 1 time, but it got ${k8s_event_log_files_number}"
             exit 1
           fi
+      
+      # We only assert this under newer Kubernetes versions since in the old ones CronJobs were not
+      # available out of the box
+      - name: Verify Job and CronJob events are ingested
+        if: ${{ matrix.k8s_version.run_cronjob_checks }}
+        timeout-minutes: 5
+        env:
+          # Needed for scalyr-tool
+          scalyr_readlog_token: "${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}"
+          SCALYR_AGENT_POD_NAME: "${{ env.SCALYR_AGENT_POD_NAME }}"
+          K8S_NODE_NAME: "${{ env.K8S_NODE_NAME }}"
+        run: |
+          export RETRY_ATTEMPTS="14"
+          export SLEEP_DELAY="10"
+
+          # Verify agent is running
+          echo "Job events checks"
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/kubernetes_events.log" $parser="k8sEvents" k8s-kind="Job" watchEventType="ADDED" reason="Completed"'
+
+          echo "CronJob events checks"
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/kubernetes_events.log" $parser="k8sEvents" k8s-kind="CronJob" involvedObjectKind="CronJob" involvedObjectName="hello" watchEventType="ADDED" reason="SawCompletedJob"'
 
       - name: Notify Slack on Failure
         if: ${{ failure() && github.ref_name == 'master' }}
@@ -269,8 +307,10 @@ jobs:
           - { "version": "v1.21.10", "driver": "", "runtime": "docker" }
           - { "version": "v1.22.7", "driver": "", "runtime": "docker" }
           # NOTE: Using containerd runtime in minikube on  GHA only works with docker driver
-          - { "version": "v1.23.4", "driver": "docker", "runtime": "containerd" }
-          - { "version": "v1.24.0", "driver": "docker", "runtime": "containerd" }
+          - { "version": "v1.23.17", "driver": "docker", "runtime": "containerd" }
+          - { "version": "v1.24.14", "driver": "docker", "runtime": "containerd" }
+          - { "version": "v1.25.10", "driver": "docker", "runtime": "containerd" }
+          - { "version": "v1.26.5", "driver": "docker", "runtime": "containerd" }
 
     steps:
       - name: Checkout Repository

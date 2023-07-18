@@ -647,6 +647,259 @@ class TestKubernetesApi(ScalyrTestCase):
 
         self.assertRaises(requests.ReadTimeout, lambda: func())
 
+    def test_query_object_fallback_urls_feature_flag_on_default(self):
+        kapi = KubernetesApi(log_api_responses=True)
+        kapi.query_api_with_retries = mock.Mock()
+
+        # 1. Success on first attempt
+        kapi.query_api_with_retries.return_value = {"a": 1}
+
+        result = kapi.query_object(kind="CronJob", namespace="default", name="test-job")
+        self.assertEqual(result, {"a": 1})
+        self.assertEqual(kapi.query_api_with_retries.call_count, 1)
+        kapi.query_api_with_retries.assert_called_with(
+            "/apis/batch/v1beta1/namespaces/default/cronjobs/test-job",
+            query_options=None,
+            retry_error_context="CronJob, default, test-job",
+            retry_error_limit_key="query_object-CronJob",
+        )
+
+        # 2. First attemp throws 500 (should not be retried)
+        kapi.query_api_with_retries.reset_mock()
+        kapi.query_api_with_retries.side_effect = K8sApiTemporaryError("error 1")
+
+        self.assertRaisesRegexp(
+            K8sApiTemporaryError,
+            "error 1",
+            kapi.query_object,
+            kind="CronJob",
+            namespace="default",
+            name="test-job",
+        )
+        self.assertEqual(kapi.query_api_with_retries.call_count, 1)
+        kapi.query_api_with_retries.assert_called_with(
+            "/apis/batch/v1beta1/namespaces/default/cronjobs/test-job",
+            query_options=None,
+            retry_error_context="CronJob, default, test-job",
+            retry_error_limit_key="query_object-CronJob",
+        )
+
+        # 2. First attemp throws 404, second one 200
+        kapi.query_api_with_retries.reset_mock()
+        kapi.query_api_with_retries.side_effect = [
+            K8sApiNotFoundException("/foo", 404),
+            {"a": 2},
+        ]
+
+        result = kapi.query_object(kind="CronJob", namespace="default", name="test-job")
+        self.assertEqual(result, {"a": 2})
+        self.assertEqual(kapi.query_api_with_retries.call_count, 2)
+        kapi.query_api_with_retries.assert_any_call(
+            "/apis/batch/v1beta1/namespaces/default/cronjobs/test-job",
+            query_options=None,
+            retry_error_context="CronJob, default, test-job",
+            retry_error_limit_key="query_object-CronJob",
+        )
+        kapi.query_api_with_retries.assert_called_with(
+            "/apis/batch/v1/namespaces/default/cronjobs/test-job",
+            query_options=None,
+            retry_error_context="CronJob, default, test-job",
+            retry_error_limit_key="query_object-CronJob",
+        )
+
+        # 2. First attemp throws 404, second one 500
+        kapi.query_api_with_retries.reset_mock()
+        kapi.query_api_with_retries.side_effect = [
+            K8sApiNotFoundException("/foo", 404),
+            K8sApiTemporaryError("error 2"),
+        ]
+
+        self.assertRaisesRegexp(
+            K8sApiTemporaryError,
+            "error 2",
+            kapi.query_object,
+            kind="CronJob",
+            namespace="default",
+            name="test-job",
+        )
+        self.assertEqual(kapi.query_api_with_retries.call_count, 2)
+
+    def test_query_object_fallback_urls_feature_flag_off(self):
+        # Feature flag is off so 404 should not be retried
+        kapi = KubernetesApi(log_api_responses=True, enable_fallback_urls=False)
+        kapi.query_api_with_retries = mock.Mock()
+
+        # 1. Success on first attempt
+        kapi.query_api_with_retries.side_effect = K8sApiNotFoundException("/foo0", 404)
+
+        self.assertRaisesRegexp(
+            K8sApiNotFoundException,
+            "The resource at location `/foo0` was not found",
+            kapi.query_object,
+            kind="CronJob",
+            namespace="default",
+            name="test-job",
+        )
+        self.assertEqual(kapi.query_api_with_retries.call_count, 1)
+
+    def test_query_objects_with_namespace_fallback_urls_feature_flag_on_default(self):
+        kapi = KubernetesApi(log_api_responses=True)
+        kapi.query_api_with_retries = mock.Mock()
+
+        # 1. Success on first attempt
+        kapi.query_api_with_retries.return_value = [{"a": 1, "b": 1}]
+
+        result = kapi.query_objects(kind="CronJob", namespace="default")
+        self.assertEqual(result, [{"a": 1, "b": 1}])
+        self.assertEqual(kapi.query_api_with_retries.call_count, 1)
+        kapi.query_api_with_retries.assert_called_with(
+            "/apis/batch/v1beta1/namespaces/default/cronjobs",
+            retry_error_context="CronJob, default",
+            retry_error_limit_key="query_objects-CronJob",
+        )
+
+        # 2. First attempt throws 500 (should not be retried)
+        kapi.query_api_with_retries.reset_mock()
+        kapi.query_api_with_retries.side_effect = K8sApiTemporaryError("error 1")
+
+        self.assertRaisesRegexp(
+            K8sApiTemporaryError,
+            "error 1",
+            kapi.query_objects,
+            kind="CronJob",
+            namespace="default",
+        )
+        self.assertEqual(kapi.query_api_with_retries.call_count, 1)
+        kapi.query_api_with_retries.assert_called_with(
+            "/apis/batch/v1beta1/namespaces/default/cronjobs",
+            retry_error_context="CronJob, default",
+            retry_error_limit_key="query_objects-CronJob",
+        )
+
+        # 2. First attempt throws 404, second one 200
+        kapi.query_api_with_retries.reset_mock()
+        kapi.query_api_with_retries.side_effect = [
+            K8sApiNotFoundException("/foo", 404),
+            [{"a": 2, "b": 2}],
+        ]
+
+        result = kapi.query_objects(kind="CronJob", namespace="default")
+        self.assertEqual(result, [{"a": 2, "b": 2}])
+        self.assertEqual(kapi.query_api_with_retries.call_count, 2)
+        kapi.query_api_with_retries.assert_any_call(
+            "/apis/batch/v1beta1/namespaces/default/cronjobs",
+            retry_error_context="CronJob, default",
+            retry_error_limit_key="query_objects-CronJob",
+        )
+        kapi.query_api_with_retries.assert_any_call(
+            "/apis/batch/v1/namespaces/default/cronjobs",
+            retry_error_context="CronJob, default",
+            retry_error_limit_key="query_objects-CronJob",
+        )
+
+        # 2. First attempt throws 404, second one 500
+        kapi.query_api_with_retries.reset_mock()
+        kapi.query_api_with_retries.side_effect = [
+            K8sApiNotFoundException("/foo", 404),
+            K8sApiTemporaryError("error 2"),
+        ]
+
+        self.assertRaisesRegexp(
+            K8sApiTemporaryError,
+            "error 2",
+            kapi.query_objects,
+            kind="CronJob",
+            namespace="default",
+        )
+        self.assertEqual(kapi.query_api_with_retries.call_count, 2)
+
+    def test_query_objects_without_namespace_fallback_urls_feature_flag_on_default(
+        self,
+    ):
+        kapi = KubernetesApi(log_api_responses=True)
+        kapi.query_api_with_retries = mock.Mock()
+
+        # 1. Success on first attempt
+        kapi.query_api_with_retries.return_value = [{"a": 1, "b": 1}]
+
+        result = kapi.query_objects(kind="CronJob")
+        self.assertEqual(result, [{"a": 1, "b": 1}])
+        self.assertEqual(kapi.query_api_with_retries.call_count, 1)
+        kapi.query_api_with_retries.assert_called_with(
+            "/apis/batch/v1beta1/cronjobs",
+            retry_error_context="CronJob, None",
+            retry_error_limit_key="query_objects-CronJob",
+        )
+
+        # 2. First attempt throws 500 (should not be retried)
+        kapi.query_api_with_retries.reset_mock()
+        kapi.query_api_with_retries.side_effect = K8sApiTemporaryError("error 1")
+
+        self.assertRaisesRegexp(
+            K8sApiTemporaryError,
+            "error 1",
+            kapi.query_objects,
+            kind="CronJob",
+        )
+        self.assertEqual(kapi.query_api_with_retries.call_count, 1)
+
+        # 2. First attempt throws 404, second one 200
+        kapi.query_api_with_retries.reset_mock()
+        kapi.query_api_with_retries.side_effect = [
+            K8sApiNotFoundException("/foo", 404),
+            [{"a": 2, "b": 2}],
+        ]
+
+        result = kapi.query_objects(kind="CronJob")
+        self.assertEqual(result, [{"a": 2, "b": 2}])
+        self.assertEqual(kapi.query_api_with_retries.call_count, 2)
+
+        # 2. First attempt throws 404, second one 500
+        kapi.query_api_with_retries.reset_mock()
+        kapi.query_api_with_retries.side_effect = [
+            K8sApiNotFoundException("/foo", 404),
+            K8sApiTemporaryError("error 2"),
+        ]
+
+        self.assertRaisesRegexp(
+            K8sApiTemporaryError,
+            "error 2",
+            kapi.query_objects,
+            kind="CronJob",
+        )
+        self.assertEqual(kapi.query_api_with_retries.call_count, 2)
+
+    def test_query_objects_with_namespace_fallback_urls_feature_flag_off(self):
+        # Feature flag is off so 404 should not be retried
+        kapi = KubernetesApi(log_api_responses=True, enable_fallback_urls=False)
+        kapi.query_api_with_retries = mock.Mock()
+
+        kapi.query_api_with_retries.side_effect = K8sApiNotFoundException("/foo1", 404)
+
+        self.assertRaisesRegexp(
+            K8sApiNotFoundException,
+            "The resource at location `/foo1` was not found",
+            kapi.query_objects,
+            kind="CronJob",
+            namespace="default",
+        )
+        self.assertEqual(kapi.query_api_with_retries.call_count, 1)
+
+    def test_query_objects_without_namespace_fallback_urls_feature_flag_off(self):
+        # Feature flag is off so 404 should not be retried
+        kapi = KubernetesApi(log_api_responses=True, enable_fallback_urls=False)
+        kapi.query_api_with_retries = mock.Mock()
+
+        kapi.query_api_with_retries.side_effect = K8sApiNotFoundException("/foo1", 404)
+
+        self.assertRaisesRegexp(
+            K8sApiNotFoundException,
+            "The resource at location `/foo1` was not found",
+            kapi.query_objects,
+            kind="CronJob",
+        )
+        self.assertEqual(kapi.query_api_with_retries.call_count, 1)
+
 
 class TestKubernetesApiRateLimited(ScalyrTestCase):
     """

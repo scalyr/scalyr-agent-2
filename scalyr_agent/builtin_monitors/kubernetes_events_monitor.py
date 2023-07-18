@@ -145,6 +145,15 @@ define_config_option(
 
 define_config_option(
     __monitor__,
+    "skip_leader_election",
+    "Optional (defaults to False). Set this to true to skip leader election and assume current process is the leader. This functionality is only meant to be used for testing and not in production.",
+    convert_to=bool,
+    default=False,
+    env_name="SCALYR_K8S_SKIP_LEADER_ELECTION",
+)
+
+define_config_option(
+    __monitor__,
     "leader_check_interval",
     "Optional (defaults to 60). The number of seconds to wait between checks to see if we are still the leader.",
     convert_to=int,
@@ -293,6 +302,7 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
         self._leader_check_interval = self._config.get("leader_check_interval")
         self._check_labels = self._config.get("check_labels")
         self._leader_candidate_label = self._config.get("leader_candidate_label")
+        self._skip_leader_election = self._config.get("skip_leader_election")
 
         self._current_leader = None
         self._owner_selector = None
@@ -616,6 +626,14 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
         """
         Detects if this agent is the `leader` for events in a cluster.  In order to prevent duplicates, only `leader` agents will log events.
         """
+        if self._skip_leader_election:
+            global_log.warn(
+                "Skipping leader election and assuming this process is the leader. This functionality is only meant to be used for local development and testing and not to be used in production.",
+                limit_once_per_x_secs=600,
+                limit_key="k8s-events-skip-leader-election",
+            )
+            return True
+
         if self._pod_name is None:
             return False
 

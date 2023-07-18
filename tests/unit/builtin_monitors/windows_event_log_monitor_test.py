@@ -1,4 +1,4 @@
-# Copyright 2011-2022 Scalyr Inc.
+# Copyright 2011-2023 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,11 +25,22 @@ if sys.platform == "Windows":
     from scalyr_agent.builtin_monitors.windows_event_log_monitor import (
         WindowEventLogMonitor,
     )
+    import win32api  # pylint: disable=import-error
+    import win32con  # pylint: disable=import-error
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
 from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase, ScalyrTestCase
 from scalyr_agent.test_base import skipIf
+
+
+def _get_parameter_msg_fixture_path():
+    # TODO Document how the test dll is created
+    return os.path.join(
+        os.path.dirname(os.path.dirname(__file__)),
+        "fixtures",
+        "parametermsgfixture.dll",
+    )
 
 
 @pytest.mark.windows_platform
@@ -227,6 +238,121 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
             ),
             [{"a": "a", "Text": "t"}],
         )
+
+    @skipIf(sys.platform != "Windows", "Skipping tests under non-Windows platform")
+    @mock.patch(
+        "scalyr_agent.builtin_monitors.windows_event_log_monitor._DLL.dllpath",
+        return_value=_get_parameter_msg_fixture_path(),
+    )
+    def test_replace_param_placeholders(self, *args):
+        # pylint: disable=no-member
+        monitor_config = {
+            "module": "windows_event_log_monitor",
+            "sources": "Application, Security, System",
+            "event_types": "All",
+            "json": True,
+        }
+        scalyr_agent.builtin_monitors.windows_event_log_monitor.windll = mock.Mock()
+        mock_logger = mock.Mock()
+
+        monitor = WindowEventLogMonitor(monitor_config, mock_logger)
+        test_events = [
+            {
+                "Event": {
+                    "System": {
+                        "Channel": "System",
+                        "Provider": {"Name": "SomethingSilly"},
+                    },
+                    "EventData": {"Data": "%%392"},
+                },
+            },
+            {
+                "Event": {
+                    "System": {
+                        "Channel": "System",
+                        "Provider": {"Name": "SomethingSilly"},
+                    },
+                    "EventData": {
+                        "Data": {
+                            "One": "%%553",
+                            "Two": {"Text": "%%990"},
+                            "Three": {"Text": "%%69"},
+                        }
+                    },
+                },
+            },
+        ]
+
+        result = monitor._replace_param_placeholders(test_events[0])
+        self.assertEqual(result["Event"]["EventData"]["Data"], "blarg")
+
+        result = monitor._replace_param_placeholders(test_events[1])
+        self.assertEqual(result["Event"]["EventData"]["Data"]["One"], "honk")
+        self.assertEqual(result["Event"]["EventData"]["Data"]["Two"]["Text"], "rawr")
+        self.assertEqual(result["Event"]["EventData"]["Data"]["Three"]["Text"], "Nice")
+
+    @skipIf(sys.platform != "Windows", "Skipping tests under non-Windows platform")
+    @mock.patch(
+        "scalyr_agent.builtin_monitors.windows_event_log_monitor._DLL.dllpath",
+        return_value=_get_parameter_msg_fixture_path(),
+    )
+    def test_param_placeholder_value_resolution(self, *args):
+        # pylint: disable=no-member
+        monitor_config = {
+            "module": "windows_event_log_monitor",
+            "sources": "Application, Security, System",
+            "event_types": "All",
+            "json": True,
+        }
+        scalyr_agent.builtin_monitors.windows_event_log_monitor.windll = mock.Mock()
+        mock_logger = mock.Mock()
+
+        monitor = WindowEventLogMonitor(monitor_config, mock_logger)
+        value = monitor._param_placeholder_value("MyChannel", "MyProvider", "%%392")
+        self.assertEqual(value, "blarg")
+        value = monitor._param_placeholder_value("MyChannel", "MyProvider", "%%553")
+        self.assertEqual(value, "honk")
+        value = monitor._param_placeholder_value("MyChannel", "MyProvider", "%%990")
+        self.assertEqual(value, "rawr")
+        value = monitor._param_placeholder_value("MyChannel", "MyProvider", "%%69")
+        self.assertEqual(value, "Nice")
+        value = monitor._param_placeholder_value("MyChannel", "MyProvider", "%%1111")
+        self.assertEqual(value, "all your base are belong to us")
+
+    @skipIf(sys.platform != "Windows", "Skipping tests under non-Windows platform")
+    def test_parameter_msg_file_location_lookup(self):
+        msgDLL = _get_parameter_msg_fixture_path()
+        channel = "Application"
+        provider = "Scalyr-Agent-Test"
+
+        # Create registry entry with known value
+        hkey = win32api.RegCreateKey(
+            win32con.HKEY_LOCAL_MACHINE,
+            "SYSTEM\\CurrentControlSet\\Services\\EventLog\\%s\\%s"
+            % (channel, provider),
+        )
+        win32api.RegSetValueEx(
+            hkey,
+            "ParameterMessageFile",  # value name
+            0,  # reserved
+            win32con.REG_EXPAND_SZ,  # value type
+            msgDLL,
+        )
+        win32api.RegCloseKey(hkey)
+
+        try:
+            value = (
+                scalyr_agent.builtin_monitors.windows_event_log_monitor._DLL.dllpath(
+                    channel, provider
+                )
+            )
+            self.assertEqual(value, msgDLL)
+        finally:
+            win32api.RegDeleteKey(
+                win32con.HKEY_LOCAL_MACHINE,
+                "SYSTEM\\CurrentControlSet\\Services\\EventLog\\%s\\%s"
+                % (channel, provider),
+            )
 
 
 @pytest.mark.windows_platform
