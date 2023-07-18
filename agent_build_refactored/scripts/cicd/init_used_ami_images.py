@@ -6,7 +6,7 @@ import pathlib as pl
 # local packages. All such imports also have to be done after that.
 sys.path.append(str(pl.Path(__file__).parent.parent.parent.parent))
 
-from agent_build_refactored.tools.aws.boto3_tools import AWSSettings
+from agent_build_refactored.tools.aws.common import AWSSettings
 from agent_build_refactored.tools.constants import CpuArch
 from agent_build_refactored.tools.common import init_logging
 from agent_build_refactored.tools.docker.buildx.remote_builder.remote_builder_ami_image import REMOTE_DOCKER_ENGINE_IMAGES

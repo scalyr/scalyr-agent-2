@@ -10,9 +10,7 @@ import logging.handlers
 import pytest
 import requests  # NOQA
 import six # NOQA
-import boto3
-
-#from agent_build_refactored.tools.constants import SOURCE_ROOT
+import boto3 # NOQA
 
 if __name__ == "__main__":
     # We use this file as an entry point for the pytest runner.

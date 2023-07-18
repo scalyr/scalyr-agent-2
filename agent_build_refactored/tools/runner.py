@@ -41,7 +41,7 @@ from agent_build_refactored.tools import (
     IN_DOCKER,
 )
 
-from agent_build_refactored.tools.aws.constants import EC2DistroImage
+from agent_build_refactored.tools.aws.common import EC2DistroImage, AWSSettings
 
 logger = logging.getLogger(__name__)
 
@@ -1023,9 +1023,6 @@ class Runner:
             If step is not configured to run in remote docker engine, then return None.
             """
 
-            from agent_build_refactored.tools.aws.boto3_tools import (
-                AWSSettings,
-            )
             from agent_build_refactored.tools.aws.ec2 import create_and_deploy_ec2_instance
 
             if not step.github_actions_settings.run_in_remote_docker:

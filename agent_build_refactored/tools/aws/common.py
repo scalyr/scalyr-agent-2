@@ -1,4 +1,4 @@
-# Copyright 2014-2022 Scalyr Inc.
+# Copyright 2014-2023 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,21 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 import dataclasses
 import os
-import logging
-import datetime
 import pathlib as pl
-from typing import Dict, Optional, List
 
 import boto3
 
-logger = logging.getLogger(__name__)
-
-
-# All the instances created by this script will use this string in the name.
-
-MAX_PREFIX_LIST_UPDATE_ATTEMPTS = 20
+COMMON_TAG_NAME = "automated-agent-ci-cd"
+CURRENT_SESSION_TAG_NAME = "current-ci-cd-session"
 
 
 @dataclasses.dataclass
@@ -73,20 +67,14 @@ class AWSSettings:
         )
 
 
-def get_prefix_list_version(client, prefix_list_id: str):
+@dataclasses.dataclass
+class EC2DistroImage:
     """
-    Get version of the prefix list.
-    :param client: ec2 boto3 client.
-    :param prefix_list_id: ID of the prefix list.
+    Simple specification of the ec2 AMI image.
     """
-    resp = client.describe_managed_prefix_lists(
-        Filters=[
-            {"Name": "prefix-list-id", "Values": [prefix_list_id]},
-        ],
-    )
-    found = resp["PrefixLists"]
-    assert (
-        len(found) == 1
-    ), f"Number of found prefix lists has to be 1, got {len(found)}"
-    prefix_list = found[0]
-    return int(prefix_list["Version"])
+
+    image_id: str
+    image_name: str
+    short_name: str
+    size_id: str
+    ssh_username: str

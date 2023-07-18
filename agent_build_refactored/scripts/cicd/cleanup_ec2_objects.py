@@ -34,11 +34,8 @@ import boto3
 sys.path.append(str(pl.Path(__file__).parent.parent.parent.parent))
 
 from agent_build_refactored.tools.common import init_logging
-from agent_build_refactored.tools.aws.boto3_tools import (
-    AWSSettings,
-)
 from agent_build_refactored.tools.aws.ec2 import INSTANCE_NAME_STRING, terminate_ec2_instances_and_security_groups
-from agent_build_refactored.tools.aws.constants import COMMON_TAG_NAME
+from agent_build_refactored.tools.aws.common import COMMON_TAG_NAME, AWSSettings
 from agent_build_refactored.tools.docker.buildx.remote_builder.remote_builder_ami_image import (
     REMOTE_DOCKER_ENGINE_IMAGES
 )

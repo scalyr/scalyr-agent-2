@@ -100,23 +100,18 @@ import subprocess
 import argparse
 import pathlib as pl
 import re
-from typing import List, Tuple, Optional, Dict, Type, Union
+from typing import List, Dict, Type, Union
 
 
 from agent_build_refactored.tools.builder import Builder
 
 from agent_build_refactored.tools.constants import (
     SOURCE_ROOT,
-    DockerPlatform,
-    Architecture,
     CpuArch,
     REQUIREMENTS_AGENT_COMMON,
     REQUIREMENTS_AGENT_COMMON_PLATFORM_DEPENDENT,
     CURRENT_MACHINE_CPU_ARCHITECTURE,
 )
-
-from agent_build_refactored.tools.docker.common import delete_container
-
 
 from agent_build_refactored.prepare_agent_filesystem import (
     build_linux_fhs_agent_files,
@@ -124,9 +119,12 @@ from agent_build_refactored.prepare_agent_filesystem import (
     create_change_logs,
 )
 
-from agent_build_refactored.tools.toolset_image import build_toolset_image, build_toolset_image_oci_layout
-from agent_build_refactored.tools.docker.buildx.build import BuildOutput, LocalDirectoryBuildOutput, DockerImageBuildOutput, \
+from agent_build_refactored.tools.toolset_image import build_toolset_image_oci_layout
+from agent_build_refactored.tools.docker.buildx.build import (
+    BuildOutput,
+    LocalDirectoryBuildOutput,
     buildx_build
+)
 from agent_build_refactored.tools.constants import AGENT_REQUIREMENTS
 
 logger = logging.getLogger(__name__)
@@ -177,9 +175,6 @@ RUST_VERSION = "1.63.0"
 
 EMBEDDED_PYTHON_PIP_VERSION = "23.0"
 
-#EMBEDDED_OPENSSL_VERSION = BUILD_PYTHON_WITH_OPENSSL_3_STEPS[LibC.GNU][CpuArch.x86_64].openssl_version
-
-
 def _get_openssl_version_number(version: str):
     version_parts = version.split(".")
     major = version_parts[0]
@@ -188,8 +183,6 @@ def _get_openssl_version_number(version: str):
     hex_str = f"0x{major}{minor.zfill(2)}00{patch.zfill(2)}0"
     return int(hex_str, 16)
 
-
-#EMBEDDED_OPENSSL_VERSION_NUMBER = _get_openssl_version_number(version=EMBEDDED_OPENSSL_VERSION)
 
 AGENT_LIBS_REQUIREMENTS_CONTENT = (
     f"{REQUIREMENTS_AGENT_COMMON}\n" f"{REQUIREMENTS_AGENT_COMMON_PLATFORM_DEPENDENT}"
@@ -859,8 +852,6 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
             *self.common_agent_package_build_args,
             # fmt: on
         ]
-
-
 
 
 ALL_PACKAGE_BUILDERS: Dict[str, Union[Type[LinuxAIOPackagesBuilder], Type[LinuxNonAIOPackageBuilder]]] = {}

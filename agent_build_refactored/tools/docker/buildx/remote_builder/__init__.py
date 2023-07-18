@@ -1,3 +1,18 @@
+# Copyright 2014-2023 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
 import atexit
 import dataclasses
 import logging
@@ -7,10 +22,9 @@ from typing import Any, List, Optional, Dict
 
 
 from agent_build_refactored.tools.constants import CpuArch
-from agent_build_refactored.tools.aws.constants import EC2DistroImage
+from agent_build_refactored.tools.aws.common import EC2DistroImage, AWSSettings
 
-from agent_build_refactored.tools.docker.common import delete_container, ContainerWrapper, get_docker_container_host_port
-from agent_build_refactored.tools.aws.boto3_tools import AWSSettings
+from agent_build_refactored.tools.docker.common import delete_container, get_docker_container_host_port
 
 from agent_build_refactored.tools.aws.ec2 import EC2InstanceWrapper
 from agent_build_refactored.tools.docker.buildx.remote_builder.remote_builder_ami_image import REMOTE_DOCKER_ENGINE_IMAGES
