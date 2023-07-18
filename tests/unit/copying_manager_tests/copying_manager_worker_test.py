@@ -110,7 +110,7 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
                 TestableCopyingManagerWorkerSession,
                 TestableCopyingManagerWorkerSessionProxy,
             )
-            self._shared_object_manager.run()
+            self._shared_object_manager.start()
 
     def _create_worker_session(self):
 
