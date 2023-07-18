@@ -15,7 +15,7 @@ runs:
 
     - name: Get cached venv
       id: cache_venv
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: venv
         key: ${{ runner.os }}-requirements-venv-${{ hashFiles('dev-requirements-new.txt') }}-2
