@@ -106,3 +106,62 @@ starting a thread, stopping a thread and asking thread for a status.
   represents data which is sent to the Scalyr API and that's data end user needs to pay for. To
   avoid bad plugins which could result in a lot of data being produced and written to disk, rate
   limits are put in place for each monitor.
+
+## Scalyr Agent Main Commands Workflow
+
+### Start
+```mermaid
+  sequenceDiagram
+      participant ScalyrAgent
+      participant PlatformController
+      participant _check_config_change
+      participant __verify_config
+      participant WorkerThread
+      participant CopyingManager
+      participant MonitorsManager
+  
+      ScalyrAgent->>+PlatformController: start_agent_service
+      PlatformController->>+ScalyrAgent: _run
+  
+      loop Every 0.1s
+          ScalyrAgent->>+_check_config_change: check for config change
+          _check_config_change->>+__verify_config: read configuration
+          alt Config Changed or Not Running
+              alt If Running
+                  _check_config_change->>+WorkerThread: stop
+                  WorkerThread->>+CopyingManager: stop
+                  WorkerThread->>+MonitorsManager: stop
+              end
+  
+              __verify_config->>+CopyingManager: create
+              __verify_config->>+MonitorsManager: create
+          
+              _check_config_change->>+WorkerThread: create
+              _check_config_change->>+WorkerThread: start
+              WorkerThread->>+CopyingManager: start
+              WorkerThread->>+MonitorsManager: start
+          end
+  
+          __verify_config-->>+_check_config_change: new configuration
+      end
+```
+
+### Stop
+
+```mermaid
+sequenceDiagram
+      participant ScalyrAgent
+      participant PlatformController
+      participant RunState
+      
+      loop 50x every 0.1s
+        ScalyrAgent->>+PlatformController: stop_agent_service
+        PlatformController->>+PlatformController: SIGTERM
+        PlatformController->>+ScalyrAgent: __handle_terminate
+        ScalyrAgent->>+RunState: stop
+      end
+
+      alt If still running
+        PlatformController->>+PlatformController: SIGKILL
+      end
+```
