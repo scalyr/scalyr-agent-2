@@ -259,7 +259,6 @@ class ContainerImageBuilder(Runner):
 
         # Build 'FHS-structured' filesystem.
         build_linux_fhs_agent_files(
-            copy_agent_source=True,
             output_path=package_root_path,
         )
 
