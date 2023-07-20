@@ -229,8 +229,6 @@ def build_agent_base_files(
     output_path: pl.Path,
     install_type: str,
     version: str = None,
-    frozen_binary_path: pl.Path = None,
-    copy_agent_source: bool = False,
 ):
     """
     Create directory with agent's core files.
@@ -262,53 +260,46 @@ def build_agent_base_files(
 
     # Create bin directory with executables.
     bin_path = output_path / "bin"
+    bin_path.mkdir()
+    source_code_path = output_path / "py"
 
-    if frozen_binary_path:
-        shutil.copytree(frozen_binary_path / ".", bin_path)
+    shutil.copytree(SOURCE_ROOT / "scalyr_agent", source_code_path / "scalyr_agent")
 
-    elif copy_agent_source:
-        bin_path.mkdir()
-        source_code_path = output_path / "py"
+    agent_main_executable_path = bin_path / "scalyr-agent-2"
+    agent_main_executable_path.symlink_to(
+        pl.Path("..", "py", "scalyr_agent", "agent_main.py")
+    )
 
-        shutil.copytree(SOURCE_ROOT / "scalyr_agent", source_code_path / "scalyr_agent")
+    # Copy wrapper script for removed 'scalyr-agent-2-config' executable for backward compatibility.
+    shutil.copy2(
+        AGENT_BUILD_PATH / "linux/scalyr-agent-2-config",
+        bin_path,
+    )
 
-        agent_main_executable_path = bin_path / "scalyr-agent-2"
-        agent_main_executable_path.symlink_to(
-            pl.Path("..", "py", "scalyr_agent", "agent_main.py")
-        )
+    # Write install_info file inside the "scalyr_agent" package.
+    install_info_path = source_code_path / "scalyr_agent" / "install_info.json"
 
-        # Copy wrapper script for removed 'scalyr-agent-2-config' executable for backward compatibility.
-        shutil.copy2(
-            AGENT_BUILD_PATH / "linux/scalyr-agent-2-config",
-            bin_path,
-        )
+    install_info = get_install_info(install_type=install_type)
+    install_info_path.write_text(json.dumps(install_info))
 
-        # Write install_info file inside the "scalyr_agent" package.
-        install_info_path = source_code_path / "scalyr_agent" / "install_info.json"
-
-        install_info = get_install_info(install_type=install_type)
-        install_info_path.write_text(json.dumps(install_info))
-
-        # Don't include the tests directories.  Also, don't include the .idea directory created by IDE.
-        recursively_delete_dirs_by_name(
-            source_code_path, r"\.idea", "tests", "__pycache__"
-        )
-        recursively_delete_files_by_name(
-            source_code_path,
-            r".*\.pyc",
-            r".*\.pyo",
-            r".*\.pyd",
-            r"all_tests\.py",
-            r".*~",
-        )
+    # Don't include the tests directories.  Also, don't include the .idea directory created by IDE.
+    recursively_delete_dirs_by_name(
+        source_code_path, r"\.idea", "tests", "__pycache__"
+    )
+    recursively_delete_files_by_name(
+        source_code_path,
+        r".*\.pyc",
+        r".*\.pyo",
+        r".*\.pyd",
+        r"all_tests\.py",
+        r".*~",
+    )
 
 
 def build_linux_agent_files(
     output_path: pl.Path,
     install_type: str,
     version: str = None,
-    frozen_binary_path: pl.Path = None,
-    copy_agent_source: bool = False,
 ):
     """
     Extend agent core files with files that are common for all Linux based distributions.
@@ -326,8 +317,6 @@ def build_linux_agent_files(
         output_path=output_path,
         install_type=install_type,
         version=version,
-        frozen_binary_path=frozen_binary_path,
-        copy_agent_source=copy_agent_source,
     )
 
     # Add certificates.
@@ -347,8 +336,6 @@ def build_linux_agent_files(
 def build_linux_fhs_agent_files(
     output_path: pl.Path,
     version: str = None,
-    frozen_binary_path: pl.Path = None,
-    copy_agent_source: bool = False,
 ):
     """
     Adapt agent's Linux based files for FHS based packages such DEB,RPM or for the filesystems for our docker images.
@@ -364,8 +351,6 @@ def build_linux_fhs_agent_files(
         output_path=agent_install_root,
         install_type="package",
         version=version,
-        frozen_binary_path=frozen_binary_path,
-        copy_agent_source=copy_agent_source,
     )
 
     pl.Path(output_path, "var/log/scalyr-agent-2").mkdir(parents=True)
