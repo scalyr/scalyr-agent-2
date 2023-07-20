@@ -36,6 +36,9 @@ max_wait=$2
 # Flag indicating whether to delete pre-existing k8s objects
 delete_existing_objects=$3
 
+# Name of a tested image
+tested_image_name=$4
+
 # We don't have an easy way to update base test docker images which come bundled
 # with the smoketest.py file
 # (.circleci/docker_unified_smoke_unit/smoketest/smoketest.py ->
@@ -111,7 +114,8 @@ perl -pi.bak -e 's/\s*(\S+)/$1\.ci\.k8s/' VERSION
 # Build image by specifying image type through build args.
 # We only build linux/amd64 image since Circle CI machine image has some issues with arm. This is
 # fine since we only test amd64 image on Circle CI.
-python3 build_package_new.py k8s-debian --tag "local_k8s_image" --coverage --platforms linux/amd64
+#python3 build_package_new.py k8s-debian --tag "local_k8s_image" --coverage --platforms linux/amd64
+
 docker image ls
 echo "::endgroup::"
 
@@ -121,7 +125,7 @@ echo "=================================================="
 # Create DaemonSet, referring to local image.  Launch agent.
 # Use YAML from branch
 cp .circleci/scalyr-agent-2-with-extra-config.yaml .
-perl -pi.bak -e 's#image\:\s+(\S+)#image: scalyr-k8s-agent:local_k8s_image#' scalyr-agent-2-with-extra-config.yaml
+perl -pi.bak -e "s#image\:\s+(\S+)#image: ${tested_image_name}#" scalyr-agent-2-with-extra-config.yaml
 perl -pi.bak -e 's/imagePullPolicy\:\s+(\S+)/imagePullPolicy: Never/' scalyr-agent-2-with-extra-config.yaml
 
 kubectl create -f ./scalyr-agent-2-with-extra-config.yaml

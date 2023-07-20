@@ -33,6 +33,14 @@ class Builder:
     ):
         self.name = self.__class__.NAME
 
+        if self.root_dir.exists():
+            shutil.rmtree(self.root_dir)
+
+        self.root_dir.mkdir(parents=True)
+
+        self.work_dir.mkdir(parents=True)
+        self.result_dir.mkdir(parents=True)
+
     @property
     def root_dir(self) -> pl.Path:
         return AGENT_BUILD_OUTPUT_PATH / "builders" / self.name
@@ -45,13 +53,6 @@ class Builder:
     def work_dir(self):
         return self.root_dir / "work"
 
-    @abc.abstractmethod
-    def _build(self):
-        """
-        Main build procedure.
-        """
-        pass
-
     def to_in_docker_path(self, path: pl.Path):
         rel_path = path.relative_to(SOURCE_ROOT)
         in_docker_output_dir_path = pl.Path("/tmp/root")
@@ -59,30 +60,6 @@ class Builder:
 
     def get_new_work_subdir_path(self, subdir_name: str):
         return self.work_dir / subdir_name
-
-    def build(
-        self,
-        output_dir: pl.Path = None,
-    ):
-
-        if self.root_dir.exists():
-            shutil.rmtree(self.root_dir)
-
-        self.root_dir.mkdir(parents=True)
-
-        self.work_dir.mkdir(parents=True)
-        self.result_dir.mkdir(parents=True)
-
-        self._build()
-
-        if output_dir:
-            output_dir.mkdir(parents=True, exist_ok=True)
-            shutil.copytree(
-                self.result_dir,
-                output_dir,
-                symlinks=True,
-                dirs_exist_ok=True,
-            )
 
     def run_command_in_docker(
         self,

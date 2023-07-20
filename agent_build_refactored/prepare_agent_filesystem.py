@@ -236,6 +236,9 @@ def build_agent_base_files(
     :param install_type: String with install type of the future package.
         See 'install_info' in scalyr_agent/__scalyr__.py module.
     :param version: Version string to assign to the future package, uses version from the VERSION file if None.
+    :param frozen_binary_path: Path to frozen binaries, if specified, then those binaries will be used in the
+        'bin' folder. Excludes 'copy_agent_source'.
+    :param copy_agent_source: If True, then agent's source code is also copied into the '<output_path>/py' directory.
         In opposite, it is expected that a frozen binaries will be placed instead of source code later.
     """
     if output_path.exists():
@@ -304,6 +307,10 @@ def build_linux_agent_files(
     :param install_type: String with install type of the future package.
         See 'install_info' in scalyr_agent/__scalyr__.py module.
     :param version: Version string to assign to the future package, uses version from the VERSION file if None.
+    :param frozen_binary_path: Path to frozen binaries, if specified, then those binaries will be used in the
+        'bin' folder. Excludes 'copy_agent_source'.
+    :param copy_agent_source: If True, then agent's source code is also copied into the '<output_path>/py' directory.
+        In opposite, it is expected that a frozen binaries will be placed instead of source code later.
     """
 
     build_agent_base_files(
@@ -335,6 +342,9 @@ def build_linux_fhs_agent_files(
         In opposite, it is expected that a frozen binaries will be placed instead of source code later.
     :param output_path: Output path for the root of the agent's base files.
     :param version: Version string to assign to the future package, uses version from the VERSION file if None.
+    :param frozen_binary_path: Path to frozen binaries, if specified, then those binaries will be used in the
+        'bin' folder. Excludes 'copy_agent_source'.
+    :param copy_agent_source: If True, then agent's source code is also copied into the '<output_path>/py' directory.
     """
     agent_install_root = output_path / "usr/share/scalyr-agent-2"
     build_linux_agent_files(

@@ -4,7 +4,6 @@ build
 .vagrant
 .idea
 .run
-tests
 .tox
 .dockerignore
 __pycache__

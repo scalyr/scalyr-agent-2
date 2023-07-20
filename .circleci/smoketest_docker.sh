@@ -35,6 +35,9 @@ log_mode=$2
 # Max seconds before the test hard fails
 max_wait=$3
 
+# Name of a tested image
+tested_image_name=$4
+
 # We don't have an easy way to update base test docker images which come bundled
 # with the smoketest.py file
 # (.circleci/docker_unified_smoke_unit/smoketest/smoketest.py ->
@@ -106,11 +109,10 @@ echo "::group::Building docker image"
 fakeversion=`cat VERSION`
 fakeversion="${fakeversion}.ci"
 echo $fakeversion > ./VERSION
-agent_image="scalyr-agent-${log_mode}"
 
 # We only build linux/amd64 image since Circle CI machine image has some issues with arm. This is
 # fine since we only test amd64 image on Circle CI.
-python3 build_package_new.py "${log_mode}-debian" --tag "local_image" --coverage --platforms linux/amd64
+#python3 build_package_new.py "${log_mode}-debian" --tag "local_image" --coverage --platforms linux/amd64
 docker image ls
 echo "::endgroup::"
 
@@ -118,10 +120,10 @@ echo "::endgroup::"
 # Launch Agent container (which begins gathering stdout logs)
 echo "::group::Launch Agent container (which begins gathering stdout logs)"
 docker run -d --name ${contname_agent} \
--e SCALYR_API_KEY=${SCALYR_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} \
--v /var/run/docker.sock:/var/scalyr/docker.sock \
-${jsonlog_containers_mount} ${syslog_driver_portmap} \
-"${agent_image}:local_image"
+  -e SCALYR_API_KEY=${SCALYR_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} \
+  -v /var/run/docker.sock:/var/scalyr/docker.sock \
+  ${jsonlog_containers_mount} ${syslog_driver_portmap} \
+  "${tested_image_name}"
 echo "::endgroup::"
 
 # Capture agent short container ID

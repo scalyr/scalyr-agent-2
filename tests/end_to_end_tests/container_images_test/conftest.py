@@ -1,29 +1,48 @@
 import pathlib as pl
-import subprocess
+from typing import Callable
 
 import pytest
 
-from agent_build_refactored.tools.docker.common import delete_container
-from agent_build_refactored.container_images.image_builders import ALL_CONTAINERISED_AGENT_BUILDERS, ImageType, SUPPORTED_ARCHITECTURES
+from agent_build_refactored.utils.constants import CpuArch
+from agent_build_refactored.container_images.image_builders import (
+    ALL_CONTAINERISED_AGENT_BUILDERS,
+    SUPPORTED_ARCHITECTURES,
+    ImageType,
+)
+from tests.end_to_end_tests.container_images_test.tools import build_test_version_of_container_image
 
 
+_PARENT_DIR = pl.Path(__file__).parent
 
-def pytest_addoption(parser):
-    parser.addoption(
+
+def add_command_line_args(add_func: Callable):
+    add_func(
         "--image-builder-name",
         required=True,
         choices=ALL_CONTAINERISED_AGENT_BUILDERS.keys(),
     )
 
-    parser.addoption(
-        "--image-type",
+    add_func(
+        "--image_type",
         required=True,
-        choices=[t.value for t in ImageType],
+        choices=[t.value for t in ImageType]
     )
 
-    parser.addoption(
+    add_func(
+        "--architecture",
+        required=True,
+        choices=[a.value for a in SUPPORTED_ARCHITECTURES]
+    )
+
+    add_func(
         "--image-oci-tarball",
         required=False,
+    )
+
+
+def pytest_addoption(parser):
+    add_command_line_args(
+        add_func=parser.addoption
     )
 
 
@@ -38,80 +57,17 @@ def image_builder_cls(image_builder_name):
 
 
 @pytest.fixture(scope="session")
-def image_type(request):
-    return ImageType(request.config.option.image_type)
+def architecture(request):
+    return CpuArch(request.config.option.architecture)
 
 
 @pytest.fixture(scope="session")
-def registry_with_image():
-
-    container_name = "agent_image_e2e_test_registry"
-
-    delete_container(
-        container_name=container_name
+def test_image_tag(image_builder_cls, request):
+    image_name = build_test_version_of_container_image(
+        image_builder_cls=image_builder_cls,
+        ready_image_oci_tarball=request.config.option.image_oci_tarball,
+        result_image_name="test",
     )
-
-    subprocess.run(
-        [
-            "docker",
-            "run",
-            "-d",
-            "--rm",
-            "-p=5000:5000",
-            f"--name={container_name}",
-            "registry:2",
-        ]
-    )
-
-    yield
-
-    delete_container(
-        container_name=container_name,
-    )
-
-# @pytest.fixture(scope="session")
-# def image_full_name():
-
-
-@pytest.fixture(scope="session")
-def image_oci_tarball(image_builder_cls, tmp_path_factory, image_type, request):
-
-    output = tmp_path_factory.mktemp("builder_output")
-    output = pl.Path("/Users/arthur/PycharmProjects/scalyr-agent-2-final/agent_build_output/IMAGE_OCI")
-    image_builder = image_builder_cls(
-        image_type=image_type,
-    )
-
-    tags = image_builder.generate_final_registry_tags(
-        registry="localhost:5000",
-        user="user",
-        tags=["latest", "test"],
-    )
-
-    image_builder.publish(
-        tags=tags,
-        existing_oci_layout_dir=request.config.option.image_oci_tarball
-    )
-
-    from tests.end_to_end_tests.container_images_test.tools import build_image_test_dependencies
-
-    subprocess.run(
-        [
-            "docker",
-            "pull",
-            tags[0],
-        ],
-        check=True,
-    )
-    a=10
-
-    build_image_test_dependencies(
-        architectures=SUPPORTED_ARCHITECTURES[:],
-        prod_image_name=tags[0],
-        output_dir=dependencies_dir,
-    )
-
-    a=10
-
+    yield image_name
 
 

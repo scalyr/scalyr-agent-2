@@ -1,29 +1,13 @@
-ARG BASE_DISTRO
 ARG IMAGE_TYPE
 
-FROM base_image as base_ubuntu
-# We upgrade current packages in order to keep everything up to date, including security updates.
-RUN DEBIANFRONTEND=noninteractive apt-get update && \
-    apt-get dist-upgrade --yes --no-install-recommends --no-install-suggests && \
-    apt-get install -y \
-    python3 && \
-    apt-get autoremove --yes && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+FROM requirement_libs_${TARGETOS}_${TARGETARCH}_${TARGETVARIANT}_context as requirement_libs
 
-
-FROM base_image as base_alpine
-
-#FROM ${TARGETOS}_${TARGETARCH}_${TARGETVARIANT}_requirements as requirements
-
-FROM base_${BASE_DISTRO} as base
+FROM base_image as base
 ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
-COPY --from=requirements /${TARGETOS}_${TARGETARCH}_${TARGETVARIANT} /
+COPY --from=requirement_libs /requirements /
 COPY --from=agent_filesystem / /
-
-
 
 # Optional stage for docker-json.
 FROM base as build-docker-json

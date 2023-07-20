@@ -94,12 +94,6 @@ def buildx_build(
         fallback_to_remote_builder: bool = False,
         capture_output: bool = False
 ):
-    """
-    Wrapper for the 'docker buildx build' command.
-    Additionally, it also can stop the build if it can not be done locally just by using cache, and fall back
-    to a remote docker engine to speed-up fresh build. That is especially helphul when we compile for a non-native
-    architecture, which can take hours.
-    """
 
     build_args = build_args or {}
     build_contexts = build_contexts or {}
@@ -198,7 +192,6 @@ def buildx_build(
     try:
         stdout, stdee = process.communicate(timeout=fallback_timeout)
     except subprocess.TimeoutExpired:
-        # Timeout occurred, need to abort the build.
         _stop_buildx_build_process(
             process=process
         )
@@ -249,10 +242,6 @@ def buildx_build(
 
 
 def _stop_buildx_build_process(process):
-    """
-    Unfortunately docker buildx build command does not react on a notmal termination or kill signals,
-    so the workaround is to terminate its child processes first.
-    """
     import psutil
 
     def terminate_children_processes(_process: psutil.Process):
