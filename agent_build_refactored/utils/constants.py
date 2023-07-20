@@ -15,6 +15,7 @@ import dataclasses
 import enum
 import os
 import re
+import platform
 import pathlib as pl
 
 SOURCE_ROOT = pl.Path(__file__).parent.parent.parent.absolute()

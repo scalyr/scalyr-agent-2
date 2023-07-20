@@ -130,7 +130,7 @@ echo \
 
 sudo chmod a+r /etc/apt/keyrings/docker.gpg
 sudo apt-get update
-sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin qemu-user-static
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
 sudo usermod -aG docker "$USER"
 
@@ -138,3 +138,5 @@ sudo usermod -aG docker "$USER"
 # keep alive messages to prevent SSH connection from closing.
 echo "ClientAliveInterval 60" | sudo tee -a /etc/ssh/sshd_config
 sudo systemctl restart ssh.service
+
+#5
