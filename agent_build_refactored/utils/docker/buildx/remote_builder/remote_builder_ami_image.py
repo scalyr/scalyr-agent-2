@@ -12,14 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+THis module defines custom AMI images with preinstalled Docker Engine, so we can use it as remote docker builder to
+do to CPU heave compilations of agent dependencies.
+"""
 
-import dataclasses
 import logging
 import pathlib as pl
 from typing import Dict
 
 from agent_build_refactored.utils.constants import CpuArch
 from agent_build_refactored.utils.aws.ami import CustomAMIImage, StockAMIImage
+
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +63,7 @@ for arch, base_image in BASE_IMAGES.items():
         raise Exception(f"Unknown architecture: {arch.value}")
 
     image = CustomAMIImage(
-        name="test",
+        name=f"remote_docker_engine_{arch.value}",
         base_image=base_image,
         base_instance_size_id=size_id,
         deployment_script=_DEPLOYMENT_SCRIPT_PATH,

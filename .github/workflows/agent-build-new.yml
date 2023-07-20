@@ -59,6 +59,7 @@ jobs:
       CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
       CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
 
+  # Invoke workflow that builds all agent container mages.
   build_container_images:
     name: "Build Container Images"
     needs:
@@ -78,46 +79,6 @@ jobs:
       CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
       DOCKERHUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}
       DOCKERHUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD_TEST_ACCOUNT }}
-
-
-  # Runs agent from it source and performs some basic sanity checks.
-  agent-source-tests:
-    runs-on: ${{ matrix.os }}
-    needs: pre_job
-    # NOTE: We always want to run job on master branch
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref_name == 'master' }}
-    container: ${{ matrix.container }}
-    strategy:
-      matrix:
-        os: [ "macos-11", "ubuntu-20.04" ]
-        python-version: [ "3.7.13" ]
-          # Uncomment when windows platform and service related issues are fixed.
-      #        include:
-      #          - os: "windows-2019"
-      #            python-version: "3.7.9"
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
-
-      - name: Install python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Perform the deployment of the test environment
-        uses: ./.github/actions/perform-deployment
-        with:
-          deployment-name: "test_environment"
-
-      - name: Run tests
-        shell: bash
-        run: |
-          python3 -m pytest  tests/end_to_end_tests/test_from_source/test_from_source.py \
-            --scalyr-api-key ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }} \
-            --scalyr-api-read-key ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }} \
-            --test-session-suffix ${{ github.run_id }}-${{ github.run_attempt }}
-
 
 
   build-windows-package:
@@ -181,15 +142,12 @@ jobs:
         with:
           path: /tmp/all_artifacts
 
-
       - name: Prepare artifacts
         run: |
           mkdir -p /tmp/result_artifacts
           cp -a /tmp/all_artifacts/linux-packages-*/. /tmp/result_artifacts
           cp -a /tmp/all_artifacts/tarball-noarch/. /tmp/result_artifacts
           cp -a /tmp/all_artifacts/windows-msi/. /tmp/result_artifacts
-
-
 
       - name: Save result artifact
         uses: actions/upload-artifact@v3
@@ -204,7 +162,7 @@ jobs:
     needs:
       - pre_job
       - build_container_images
-      - build-linux-packages
+      #- build-linux-packages
       - build-windows-package
       - build_tarball
     runs-on: ubuntu-20.04
@@ -229,5 +187,3 @@ jobs:
           echo "${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}" > "${AWS_PRIVATE_KEY_PATH}"
           chmod 600 "${AWS_PRIVATE_KEY_PATH}"
           python3 agent_build_refactored/utils/scripts/cicd/cleanup_ec2_objects.py
-
-

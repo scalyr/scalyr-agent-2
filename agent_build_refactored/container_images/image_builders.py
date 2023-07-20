@@ -110,7 +110,6 @@ class ContainerisedAgentBuilder(Builder):
             self,
             architecture: CpuArch,
             only_cache: bool = False,
-            fallback_to_remote_builder: bool = False,
     ):
         """
         Build a special stage in the dependency Dockerfile, which is responsible for
@@ -135,7 +134,7 @@ class ContainerisedAgentBuilder(Builder):
             cache_name=cache_name,
             architectures=architecture,
             output=output,
-            fallback_to_remote_builder=fallback_to_remote_builder,
+            fallback_to_remote_builder=True,
         )
 
         if not only_cache:

@@ -30,6 +30,7 @@ RUN apk update && apk add --virtual build-dependencies \
     rust \
     cargo
 
+# This stage builds requirement libraries for the agent.
 FROM build_base_${BASE_DISTRO} as build_requirement_libs
 RUN python3 -m pip install --upgrade setuptools pip --root /tmp/requrements_root
 RUN cp -a /tmp/requrements_root/. /
@@ -44,6 +45,9 @@ FROM scratch as requirement_libs
 COPY --from=build_requirement_libs /tmp/requrements_root /requirements
 COPY --from=build_requirement_libs /tmp/test_requrements_root /test_requirements
 
+
+# Those stages prepare the base for images. They must not be cached,
+# because we want to get the most resent distibution updates on each build.
 FROM base_ubuntu as final_image_base_ubuntu
 # We upgrade current packages in order to keep everything up to date, including security updates.
 RUN DEBIANFRONTEND=noninteractive apt-get update && \

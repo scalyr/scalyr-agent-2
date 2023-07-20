@@ -1,3 +1,18 @@
+# Copyright 2014-2023 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
 import pathlib as pl
 import subprocess
 from typing import Type
@@ -21,6 +36,7 @@ def build_test_version_of_container_image(
     result_image_name: str,
     ready_image_oci_tarball: pl.Path = None,
 ):
+    """Get production image create it's testable version."""
 
     image_builder = image_builder_cls()
 
@@ -30,6 +46,7 @@ def build_test_version_of_container_image(
         container_name=registry_container_name
     )
 
+    # Create temporary local registry to push production image there.
     subprocess.run(
         [
             "docker",
@@ -50,6 +67,7 @@ def build_test_version_of_container_image(
             tags=["prod"],
         )
 
+        # Publish image to the local registry
         image_builder.publish(
             image_type=image_type,
             tags=all_image_tags,
@@ -58,10 +76,12 @@ def build_test_version_of_container_image(
 
         prod_image_tag = all_image_tags[0]
 
+        # Build agent image requirements, because it also includes requirements for testing.
         requirement_libs_dir = image_builder.build_requirement_libs(
             architecture=architecture,
         )
 
+        # Build testable image.
         buildx_build(
             dockerfile_path=_PARENT_DIR / "Dockerfile",
             context_path=_PARENT_DIR,

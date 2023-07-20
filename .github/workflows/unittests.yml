@@ -280,6 +280,45 @@ jobs:
           steps: ${{ toJson(steps) }}
           channel: '#eng-dataset-cloud-tech'
 
+  # Runs agent from it source and performs some basic sanity checks.
+  agent-source-tests:
+    runs-on: ${{ matrix.os }}
+    needs: pre_job
+    # NOTE: We always want to run job on master branch
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref_name == 'master' }}
+    container: ${{ matrix.container }}
+    strategy:
+      matrix:
+        os: [ "macos-11", "ubuntu-20.04" ]
+        python-version: [ "3.7.13" ]
+          # Uncomment when windows platform and service related issues are fixed.
+      #        include:
+      #          - os: "windows-2019"
+      #            python-version: "3.7.9"
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Install python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Perform the deployment of the test environment
+        uses: ./.github/actions/perform-deployment
+        with:
+          deployment-name: "test_environment"
+
+      - name: Run tests
+        shell: bash
+        run: |
+          python3 -m pytest  tests/end_to_end_tests/test_from_source/test_from_source.py \
+            --scalyr-api-key ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }} \
+            --scalyr-api-read-key ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }} \
+            --test-session-suffix ${{ github.run_id }}-${{ github.run_attempt }}
+
+
   publish-test-results:
     runs-on: ubuntu-latest
     permissions:
