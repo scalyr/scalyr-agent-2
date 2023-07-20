@@ -1,8 +1,27 @@
+# Copyright 2014-2023 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+This module allows to build a "toolset" images that contains various tools and program that are widely used
+across the whole codebase.
+"""
+
 import pathlib as pl
 import shutil
 
-from agent_build_refactored.tools.constants import SOURCE_ROOT, CpuArch, OCI_LAYOUTS_DIR
-from agent_build_refactored.tools.docker.buildx.build import DockerImageBuildOutput, buildx_build, OCITarballBuildOutput, BuildOutput
+from agent_build_refactored.utils.constants import SOURCE_ROOT, CpuArch, OCI_LAYOUTS_DIR
+from agent_build_refactored.utils.docker.buildx.build import DockerImageBuildOutput, buildx_build, OCITarballBuildOutput, BuildOutput
 
 _PARENT_DIR = pl.Path(__file__).parent
 
@@ -28,6 +47,7 @@ def _build(
 
 
 def build_toolset_image():
+    """Build toolset images and import it directly to docker engine."""
     global _already_built_image
 
     if _already_built_image:
@@ -43,6 +63,9 @@ def build_toolset_image():
 
 
 def build_toolset_image_oci_layout():
+    """
+    Build toolset image and import it as OCI image tarball
+    """
     global _already_built_oci_layout
 
     if _already_built_oci_layout:

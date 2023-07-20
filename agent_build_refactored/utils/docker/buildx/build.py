@@ -14,20 +14,17 @@
 
 import logging
 import os
-import shlex
 import sys
 import io
-import re
 import abc
 import dataclasses
 import pathlib as pl
 import subprocess
 import tarfile
-import time
 from typing import List, Dict, Union
 
 
-from agent_build_refactored.tools.constants import AGENT_BUILD_OUTPUT_PATH, CpuArch
+from agent_build_refactored.utils.constants import AGENT_BUILD_OUTPUT_PATH, CpuArch
 
 logger = logging.getLogger(__name__)
 
@@ -217,7 +214,7 @@ def buildx_build(
         else:
             remote_builder_arch = architecture[0]
 
-        from agent_build_refactored.tools.docker.buildx.remote_builder import get_remote_builder
+        from agent_build_refactored.utils.docker.buildx.remote_builder import get_remote_builder
 
         builder = get_remote_builder(
             architecture=remote_builder_arch,

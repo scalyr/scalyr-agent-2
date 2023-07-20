@@ -16,13 +16,10 @@
 import dataclasses
 import logging
 import pathlib as pl
-import hashlib
 from typing import Dict
 
-from agent_build_refactored.tools.constants import CpuArch
-from agent_build_refactored.tools.aws.common import EC2DistroImage, AWSSettings
-from agent_build_refactored.tools.aws.ami import CICD_AMI_IMAGES_NAME_PREFIX, CustomAMIImage, StockAMIImage
-from agent_build_refactored.tools.aws.ec2 import EC2InstanceWrapper
+from agent_build_refactored.utils.constants import CpuArch
+from agent_build_refactored.utils.aws.ami import CustomAMIImage, StockAMIImage
 
 logger = logging.getLogger(__name__)
 
@@ -34,14 +31,12 @@ _DOCKER_ENGINE_IMAGE_TAG = "dataset-agent-build-docker-engine"
 BASE_IMAGE_AMD64 = StockAMIImage(
     image_id="ami-053b0d53c279acc90",
     name="Ubuntu Server 22.04 LTS (HVM), SSD Volume Type",
-    #size_id="t2.small",
     ssh_username="ubuntu",
 )
 
 BASE_IMAGE_ARM64 = StockAMIImage(
     image_id="ami-0a0c8eebcdd6dcbd0",
     name="Ubuntu Server 22.04 LTS (HVM), SSD Volume Type",
-    #size_id="t4g.small",
     ssh_username="ubuntu",
 )
 

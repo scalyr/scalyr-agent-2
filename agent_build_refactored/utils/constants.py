@@ -11,11 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import dataclasses
+
 import enum
-import os
 import re
-import platform
 import pathlib as pl
 
 SOURCE_ROOT = pl.Path(__file__).parent.parent.parent.absolute()
@@ -38,7 +36,6 @@ class CpuArch(enum.Enum):
 
         if self.value == "armv7":
             return "linux/arm/v7"
-
 
 
 def _parse_requirements_file():

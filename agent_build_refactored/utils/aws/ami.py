@@ -21,7 +21,7 @@ import time
 import pathlib as pl
 from typing import Dict, Optional
 
-from agent_build_refactored.tools.aws.common import COMMON_TAG_NAME, AWSSettings
+from agent_build_refactored.utils.aws.common import COMMON_TAG_NAME, AWSSettings
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ class AMIImage:
             files_to_upload: Dict = None,
             deployment_script: pl.Path = None,
     ):
-        from agent_build_refactored.tools.aws.ec2 import EC2InstanceWrapper
+        from agent_build_refactored.utils.aws.ec2 import EC2InstanceWrapper
 
         aws_settings = AWSSettings.create_from_env()
 

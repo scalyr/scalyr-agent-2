@@ -19,8 +19,8 @@ import shlex
 import shutil
 from typing import List
 
-from agent_build_refactored.tools.constants import SOURCE_ROOT, AGENT_BUILD_OUTPUT_PATH, CpuArch
-from agent_build_refactored.tools.docker.buildx.build import buildx_build, LocalDirectoryBuildOutput
+from agent_build_refactored.utils.constants import SOURCE_ROOT, AGENT_BUILD_OUTPUT_PATH, CpuArch
+from agent_build_refactored.utils.docker.buildx.build import buildx_build, LocalDirectoryBuildOutput
 
 _PARENT_DIR = pl.Path(__file__).parent
 

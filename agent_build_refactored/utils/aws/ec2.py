@@ -25,10 +25,10 @@ from typing import List, Optional, Dict
 import botocore.exceptions
 import requests
 
-from agent_build_refactored.tools.aws.common import COMMON_TAG_NAME, AWSSettings
+from agent_build_refactored.utils.aws.common import COMMON_TAG_NAME, AWSSettings
 
-from agent_build_refactored.tools.docker.common import delete_container, get_docker_container_host_port
-from agent_build_refactored.tools.toolset_image import build_toolset_image
+from agent_build_refactored.utils.docker.common import delete_container, get_docker_container_host_port
+from agent_build_refactored.utils.toolset_image import build_toolset_image
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,10 @@ _existing_security_group_id = None
 
 
 class EC2InstanceWrapper:
+    """
+    Wrapper for AWS EC2 instance. Provides ability to deploy new ec2 instances, and communicate with then by SSH.
+    All SSH connections are established inside containers with OpenSSL client to keep host system clean.
+    """
     def __init__(
         self,
         boto3_instance,
@@ -52,6 +56,8 @@ class EC2InstanceWrapper:
         self._ssh_client_container_in_docker_private_key_path = pl.Path("/tmp/mounts/private_key.pem")
 
         self._ssh_container_names = []
+
+        # Name of the main container with openssh client that we can use to run commands on ec2 instance.
         self._main_ssh_connection_container_name: Optional[str] = None
 
     @property
@@ -63,8 +69,14 @@ class EC2InstanceWrapper:
         name_suffix: str,
         additional_cmd_args: List[str],
         port: str = None,
-
     ):
+        """
+        Create container with ssh client which is capable to connect to the target ec2 instance.
+        :param name_suffix: Suffix to container name.
+        :param additional_cmd_args: Additional command arguments to container run command.
+        :param port: map port to host.
+        :return:
+        """
         container_name = f"agent_build_ec2_instance{self.boto3_instance.id}_ssh_container_{name_suffix}"
 
         toolset_image_name = build_toolset_image()
@@ -123,12 +135,17 @@ class EC2InstanceWrapper:
         ]
 
     def init_ssh_connection_in_container(self):
+        """
+        Init out main ssh connection with ec2 instance inside container.
+        """
         logger.info(f"Establish ssh connection with ec2 instance '{self.boto3_instance.id}'")
         self._main_ssh_connection_container_name = self._create_ssh_container(
             name_suffix="main",
             additional_cmd_args=[
                 "/bin/bash",
                 "-c",
+                # This main container process just has to be idle, and all ssh commands have to be done by
+                # the 'docker exec' command.
                 "while true; do sleep 86400; done"
             ]
         )
@@ -167,9 +184,14 @@ class EC2InstanceWrapper:
         self,
         remote_port: int,
         local_port: int = None
-
     ):
-
+        """
+        Establish SSH tunnel to some port in ec2 instance. Since settings in a security group of an instance
+        may not allow us to use some port, we simply use ssh tunnel to access to any port.
+        Tunnel is established in a separate container with SSH client and does not leave any traces on host.
+        :param remote_port: Remote port for a tunnel
+        :param local_port: Local port for a tunnel
+        """
         local_port = local_port or remote_port
         full_local_port = f"{local_port}/tcp"
 
@@ -194,17 +216,13 @@ class EC2InstanceWrapper:
 
     def ssh_put_files(self, src: pl.Path, dest: pl.Path):
         """
-        Put files to server.
+        Put file to ec2 instance.
         """
 
         if not self._main_ssh_connection_container_name:
             self.init_ssh_connection_in_container()
 
-
-        mode = src.stat().st_mode
-        oct_str = oct(mode)
-        a=10
-
+        # Unfortunately, the 'scp' command can not work from stdin, so we have to use dd to put files.
         cmd = [
             "docker",
             "exec",
@@ -242,6 +260,9 @@ class EC2InstanceWrapper:
                 cmd=cmd,
             )
 
+        # Since dd can not preserve permissions, set them again.
+        mode = src.stat().st_mode
+        oct_str = oct(mode)
         final_mode = "".join(list(oct_str)[-3:])
         subprocess.run(
             [
@@ -260,7 +281,9 @@ class EC2InstanceWrapper:
         )
 
     def terminate(self):
+        """Terminate ec2 instance and all related resources."""
 
+        # Also stop all ssh client containers.
         for container_name in self._ssh_container_names:
             delete_container(
                 container_name=container_name,

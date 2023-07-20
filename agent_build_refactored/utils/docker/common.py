@@ -1,8 +1,7 @@
 import json
 import logging
 import subprocess
-import pathlib as pl
-from typing import List, Dict
+from typing import List
 
 logger = logging.getLogger(__name__)
 
