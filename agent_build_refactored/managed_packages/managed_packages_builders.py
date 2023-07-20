@@ -237,7 +237,7 @@ class LinuxPackageBuilder(Runner, abc.ABC):
         :param package_root_path: Path with package root.
         """
         build_linux_fhs_agent_files(
-            output_path=package_root_path, copy_agent_source=True
+            output_path=package_root_path
         )
 
         # remove Python cache directories from agent's source code.
