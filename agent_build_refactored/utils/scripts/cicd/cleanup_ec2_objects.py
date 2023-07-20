@@ -24,7 +24,7 @@ import pathlib as pl
 
 # This file can be executed as script. Add source root to the PYTHONPATH in order to be able to import
 # local packages. All such imports also have to be done after that.
-sys.path.append(str(pl.Path(__file__).parent.parent.parent.parent))
+sys.path.append(str(pl.Path(__file__).parent.parent.parent.parent.parent))
 
 from agent_build_refactored.utils.common import init_logging
 from agent_build_refactored.utils.aws.ec2 import terminate_ec2_instances_and_security_groups
