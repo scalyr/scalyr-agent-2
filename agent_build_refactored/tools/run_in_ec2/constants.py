@@ -1,4 +1,4 @@
-# Copyright 2014-2023 Scalyr Inc.
+# Copyright 2014-2022 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,16 +13,17 @@
 # limitations under the License.
 
 
-FROM base as build
-ARG COMMAND
-ARG ROOT_DIR
-COPY --from=root_dir / ${ROOT_DIR}
-ARG CWD="/"
-WORKDIR "${CWD}"
-SHELL ["/bin/bash", "-c"]
-RUN /bin/bash -c "$COMMAND"
+import dataclasses
 
 
-FROM scratch
-ARG OUTPUT_DIR
-COPY --from=build ${OUTPUT_DIR}/. /
+@dataclasses.dataclass
+class EC2DistroImage:
+    """
+    Simple specification of the ec2 AMI image.
+    """
+
+    image_id: str
+    image_name: str
+    short_name: str
+    size_id: str
+    ssh_username: str

@@ -15,13 +15,9 @@ import dataclasses
 import enum
 import os
 import re
-import platform
 import pathlib as pl
 
 SOURCE_ROOT = pl.Path(__file__).parent.parent.parent.absolute()
-
-AGENT_BUILD_OUTPUT_PATH = SOURCE_ROOT / "agent_build_output"
-OCI_LAYOUTS_DIR = AGENT_BUILD_OUTPUT_PATH / "oci_layouts"
 
 AGENT_VERSION = (SOURCE_ROOT / "VERSION").read_text().strip()
 
@@ -168,42 +164,6 @@ _ARCHITECTURE_TO_DOCKER_PLATFORM = {
 }
 
 
-class LibC(enum.Enum):
-    GNU = "gnu"
-    MUSL = "musl"
-
-
-class CpuArch(enum.Enum):
-    x86_64 = "x86_64"
-    AARCH64 = "aarch64"
-    ARMV7 = "armv7"
-
-    def as_docker_platform(self):
-        if self.value == "x86_64":
-            return "linux/amd64"
-
-        if self.value == "aarch64":
-            return "linux/arm64"
-
-        if self.value == "armv7":
-            return "linux/arm/v7"
-
-
-def _get_current_machine_architecture():
-    machine_name = platform.machine()
-    if machine_name.lower() in ["x86_64"]:
-        return CpuArch.x86_64
-    elif machine_name.lower() in ["aarch64"]:
-        return CpuArch.AARCH64
-    elif machine_name.lower() in ["armv7l"]:
-        return CpuArch.ARMV7
-    else:
-        raise Exception(f"Unknown uname machine {machine_name}")
-
-
-CURRENT_MACHINE_CPU_ARCHITECTURE = _get_current_machine_architecture()
-
-
 class PackageType(enum.Enum):
     DEB = "deb"
     RPM = "rpm"
@@ -253,13 +213,7 @@ def _parse_requirements_file():
 
 _REQUIREMENT_FILE_COMPONENTS = _parse_requirements_file()
 
-REQUIREMENTS_AGENT_COMMON = _REQUIREMENT_FILE_COMPONENTS["COMMON"]
-REQUIREMENTS_AGENT_COMMON_PLATFORM_DEPENDENT = _REQUIREMENT_FILE_COMPONENTS[
+REQUIREMENTS_COMMON = _REQUIREMENT_FILE_COMPONENTS["COMMON"]
+REQUIREMENTS_COMMON_PLATFORM_DEPENDENT = _REQUIREMENT_FILE_COMPONENTS[
     "COMMON_PLATFORM_DEPENDENT"
 ]
-
-AGENT_REQUIREMENTS = f"{REQUIREMENTS_AGENT_COMMON}\n" \
-                     f"{REQUIREMENTS_AGENT_COMMON_PLATFORM_DEPENDENT}"
-
-
-REQUIREMENTS_DEV_COVERAGE = _REQUIREMENT_FILE_COMPONENTS["DEV_COVERAGE"]
