@@ -6,7 +6,7 @@
 
 # Agent's common requirements. Expected to installed on any type of agent.
 # <COMPONENT:COMMON>
-requests==2.28.1;
+requests==2.28.1
 python-dateutil==2.8.2
 repoze.lru==0.7
 six==1.14.0
@@ -40,12 +40,16 @@ lz4==4.0.2
 # Agent build requirements.
 # <COMPONENT:BUILD>
 PyInstaller==5.6.2
-paramiko==2.12.0
-boto3==1.26.17
+
 
 # Dev and testing requirements.
-# <COMPONENT:DEV>
+# <COMPONENT:DEV_COVERAGE>
+coverage==4.5.4
+
+# <COMPONENT:DEV_COMMON>
 # Testing tools and libraries
+boto3==1.26.17
+paramiko==2.12.0
 mock==3.0.5
 pytest==7.1.2
 pytest-coverage
@@ -54,7 +58,6 @@ requests_mock==1.9.3
 pygal==3.0.0
 pytest-benchmark==4.0.0
 pytest-xdist==1.31.0
-coverage==4.5.4
 decorator==4.4.1
 requests-mock==1.9.3
 docker==6.0.0
