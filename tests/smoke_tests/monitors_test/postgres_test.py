@@ -26,7 +26,7 @@ import shlex
 
 import pytest
 
-from scalyr_agent.third_party import pg8000
+import pg8000
 
 from tests.utils.agent_runner import AgentRunner
 

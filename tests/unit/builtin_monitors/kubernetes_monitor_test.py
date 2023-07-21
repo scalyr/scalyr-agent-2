@@ -37,10 +37,10 @@ from scalyr_agent.monitor_utils.k8s import (
     PodInfo,
 )
 
-from scalyr_agent.third_party.urllib3.exceptions import (  # pylint: disable=import-error
+from urllib3.exceptions import (  # pylint: disable=import-error
     InsecureRequestWarning,
 )
-from scalyr_agent.third_party.six import StringIO
+from six import StringIO
 
 __author__ = "echee@scalyr.com"
 

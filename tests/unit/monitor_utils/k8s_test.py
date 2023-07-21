@@ -36,7 +36,7 @@ from scalyr_agent.monitor_utils.k8s import (
 )
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
-import scalyr_agent.third_party.requests as requests
+import requests
 from scalyr_agent.util import FakeClock, md5_hexdigest
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.configuration import Configuration

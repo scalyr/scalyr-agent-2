@@ -30,7 +30,7 @@ from scalyr_agent.monitor_utils.k8s import (
 )
 import scalyr_agent.monitor_utils.k8s as k8s_utils
 
-from scalyr_agent.third_party.requests.exceptions import ConnectionError
+from requests.exceptions import ConnectionError
 
 import datetime
 import re
