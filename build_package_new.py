@@ -65,6 +65,13 @@ if __name__ == "__main__":
             choices=[t.value for t in ImageType],
         )
 
+    load_image_parser = image_parser_action_subparsers.add_parser("load")
+    _add_image_type_arg(load_image_parser)
+    load_image_parser.add_argument(
+        "--image-name",
+        required=True,
+    )
+
     image_build_parser = image_parser_action_subparsers.add_parser("build-tarball")
     _add_image_type_arg(image_build_parser)
     image_build_parser.add_argument(
@@ -82,7 +89,8 @@ if __name__ == "__main__":
     _add_image_type_arg(image_publish_parser)
     image_publish_parser.add_argument(
         "--registry",
-        required=True,
+        required=False,
+        default="docker.io",
     )
 
     image_publish_parser.add_argument(
@@ -112,7 +120,11 @@ if __name__ == "__main__":
         image_builder_cls = ALL_CONTAINERISED_AGENT_BUILDERS[args.builder_name]
 
         builder = image_builder_cls()
-
+        if args.action == "load":
+            builder.build_and_load_docker_image(
+                image_type=ImageType(args.image_type),
+                result_image_name=args.image_name,
+            )
         if args.action == "build-tarball":
             if args.output_dir:
                 output_dir = pl.Path(args.output_dir)

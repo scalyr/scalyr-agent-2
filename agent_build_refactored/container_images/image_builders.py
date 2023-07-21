@@ -3,12 +3,19 @@ import logging
 import pathlib as pl
 import shutil
 import subprocess
+import platform
 from typing import Dict, Type, List, Union
 
 from agent_build_refactored.utils.constants import SOURCE_ROOT, CpuArch, AGENT_REQUIREMENTS, REQUIREMENTS_DEV_COVERAGE
 from agent_build_refactored.utils.docker.common import delete_container
 from agent_build_refactored.utils.builder import Builder
-from agent_build_refactored.utils.docker.buildx.build import buildx_build, OCITarballBuildOutput, BuildOutput, LocalDirectoryBuildOutput
+from agent_build_refactored.utils.docker.buildx.build import (
+    buildx_build,
+    OCITarballBuildOutput,
+    BuildOutput,
+    LocalDirectoryBuildOutput,
+    DockerImageBuildOutput
+)
 
 from agent_build_refactored.prepare_agent_filesystem import build_linux_fhs_agent_files, add_config
 
@@ -186,9 +193,17 @@ class ContainerisedAgentBuilder(Builder):
 
         agent_package_dir = agent_filesystem_dir / "usr/share/scalyr-agent-2/py/scalyr_agent"
 
-        # Remove unneeded third party requirements code.
-        for third_party_dir in agent_package_dir.glob("third_party*"):
-            shutil.rmtree(third_party_dir)
+        # Remove unneeded third party requirement libs and keep only the tcollector library
+        shutil.rmtree(agent_package_dir / "third_party_python2")
+        shutil.rmtree(agent_package_dir / "third_party_tls")
+        third_party_lis_root = agent_package_dir / "third_party"
+        for third_party_lib in third_party_lis_root.iterdir():
+            if third_party_lib.name == "tcollector":
+                continue
+            if third_party_lib.is_dir():
+                shutil.rmtree(third_party_lib)
+            if third_party_lib.is_file():
+                third_party_lib.unlink()
 
         # Remove caches
         for pycache_dir in self.work_dir.rglob("__pycache__"):
@@ -201,38 +216,41 @@ class ContainerisedAgentBuilder(Builder):
         agent_main_path.write_text(new_agent_main_content)
         return agent_filesystem_dir
 
-    def build_oci_tarball(
+    def _build(
         self,
         image_type: ImageType,
-        output_dir: pl.Path = None,
+        output: BuildOutput,
+        architectures: List[CpuArch],
     ):
         """
-        Build image in the form of the OCI tarball
+        Build final image in the form that is specified in the output argument.
+        :param image_type: Type of the image.
+        :param output: Build output info
+        :param architectures: List of architectures to build.
+        :return:
         """
         final_image_base_oci_layout_dir = self._build_final_image_base_oci_layout()
 
         agent_filesystem_dir = self.create_agent_filesystem(image_type=image_type)
 
         requirements_libs_contexts = {}
-        for architecture in SUPPORTED_ARCHITECTURES:
+        for requirements_architecture in architectures:
             build_target_name = _arch_to_docker_build_target_folder(
-                arch=architecture,
+                arch=requirements_architecture,
             )
 
             context_full_name = f"requirement_libs_{build_target_name}_context"
 
             requirement_libs_dir = self.build_requirement_libs(
-                architecture=architecture,
+                architecture=requirements_architecture,
             )
 
             requirements_libs_contexts[context_full_name] = str(requirement_libs_dir)
 
-        result_tarball = self.result_dir / f"{image_type.value}-{self.__class__.NAME}.tar"
-
         buildx_build(
             dockerfile_path=_PARENT_DIR / "Dockerfile",
             context_path=_PARENT_DIR,
-            architecture=SUPPORTED_ARCHITECTURES[:],
+            architecture=architectures,
             build_args={
                 "BASE_DISTRO": self.__class__.BASE_DISTRO,
                 "IMAGE_TYPE": image_type.value
@@ -242,10 +260,46 @@ class ContainerisedAgentBuilder(Builder):
                 "agent_filesystem": str(agent_filesystem_dir),
                 **requirements_libs_contexts,
             },
+            output=output,
+        )
+
+    def build_and_load_docker_image(
+        self,
+        image_type: ImageType,
+        result_image_name: str,
+    ):
+        """
+        Builds single arch image (architecture matches with system) and load to the current docker images list
+        :param image_type: Type of the image.
+        :param result_image_name: Name of the image.
+        """
+        self._build(
+            image_type=image_type,
+            output=DockerImageBuildOutput(
+                name=result_image_name,
+            ),
+            architectures=[_current_cpu_arch]
+        )
+        return result_image_name
+
+    def build_oci_tarball(
+        self,
+        image_type: ImageType,
+        output_dir: pl.Path = None,
+    ):
+        """
+        Build image in the form of the OCI tarball
+        """
+
+        result_tarball = self.result_dir / f"{image_type.value}-{self.__class__.NAME}.tar"
+
+        self._build(
+            image_type=image_type,
             output=OCITarballBuildOutput(
                 dest=result_tarball,
                 extract=False,
-            )
+            ),
+            architectures=SUPPORTED_ARCHITECTURES[:]
         )
 
         if output_dir:
@@ -358,3 +412,15 @@ for base_distro in ["ubuntu", "alpine"]:
         TAG_SUFFIXES = tag_suffixes[:]
 
     ALL_CONTAINERISED_AGENT_BUILDERS[name] = _ContainerisedAgentBuilder
+
+
+def _get_current_machine_architecture():
+    machine = platform.machine()
+
+    if machine == "x86_64":
+        return CpuArch.x86_64
+    # Add more CPU architectures if needed.
+    raise Exception("unknown CPU")
+
+
+_current_cpu_arch = _get_current_machine_architecture()

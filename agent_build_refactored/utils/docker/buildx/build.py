@@ -85,7 +85,7 @@ class OCITarballBuildOutput(BuildOutput):
 def buildx_build(
         dockerfile_path: pl.Path,
         context_path: pl.Path,
-        architecture: Union[CpuArch, List[CpuArch]],
+        architecture: Union[CpuArch, List[CpuArch]] = None,
         build_args: Dict[str, str] = None,
         build_contexts: Dict[str, str] = None,
         stage: str = None,
@@ -113,11 +113,12 @@ def buildx_build(
     ]
 
     used_architectures = []
-    if isinstance(architecture, list):
-        for arch in architecture:
-            used_architectures.append(arch)
-    else:
-        used_architectures.append(architecture)
+    if architecture:
+        if isinstance(architecture, list):
+            for arch in architecture:
+                used_architectures.append(arch)
+        else:
+            used_architectures.append(architecture)
 
     for arch in used_architectures:
         cmd_args.append(
@@ -166,7 +167,7 @@ def buildx_build(
         str(context_path)
     )
 
-    single_arch = isinstance(architecture, CpuArch) or len(architecture) == 1
+    single_arch = architecture is None or isinstance(architecture, CpuArch) or len(architecture) == 1
     allow_fallback_to_remote_builder = ALLOW_FALLBACK_TO_REMOTE_BUILDER and single_arch
 
     retry = False
@@ -282,3 +283,5 @@ def _get_gha_cache_scope(name: str):
 
 def _get_local_cache_dir(name: str):
     return AGENT_BUILD_OUTPUT_PATH / "docker_cache" / name
+
+
