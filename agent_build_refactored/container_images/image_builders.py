@@ -423,8 +423,13 @@ for base_distro in ["ubuntu", "alpine"]:
 def _get_current_machine_architecture():
     machine = platform.machine()
 
-    if machine == "x86_64":
+    if machine in ["x86_64"]:
         return CpuArch.x86_64
+    if machine in ["aarch64"]:
+        return CpuArch.AARCH64
+    if machine in ["armv7l"]:
+        return CpuArch.ARMV7
+
     # Add more CPU architectures if needed.
     raise Exception("unknown CPU")
 
