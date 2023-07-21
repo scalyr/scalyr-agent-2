@@ -54,64 +54,93 @@ if __name__ == "__main__":
     image_parser.add_argument(
         "builder_name",
         choices=ALL_CONTAINERISED_AGENT_BUILDERS.keys(),
+        help="Name of the builder."
     )
 
-    image_parser_action_subparsers = image_parser.add_subparsers(dest="action", required=True)
+    image_parser_action_subparsers = image_parser.add_subparsers(
+        dest="action", required=True
+    )
 
     def _add_image_type_arg(_parser):
         _parser.add_argument(
             "--image-type",
             required=True,
             choices=[t.value for t in ImageType],
+            help="Type of the agent image to build"
         )
 
-    load_image_parser = image_parser_action_subparsers.add_parser("load")
+    load_image_parser = image_parser_action_subparsers.add_parser(
+        "load",
+        help="Build and load docker image directly in the docker engine. "
+             "This is only a single arch image because docker does not store multi-arch images."
+    )
     _add_image_type_arg(load_image_parser)
     load_image_parser.add_argument(
         "--image-name",
         required=True,
+        help="Name of the image to build",
     )
 
-    image_build_parser = image_parser_action_subparsers.add_parser("build-tarball")
+    image_build_parser = image_parser_action_subparsers.add_parser(
+        "build-tarball",
+        help="Build image if a form of OCI layout tarball."
+    )
     _add_image_type_arg(image_build_parser)
     image_build_parser.add_argument(
         "--output-dir",
         required=True,
+        help="Output directory with tarball"
     )
 
-    cache_requirements_image_parser = image_parser_action_subparsers.add_parser("cache-requirements")
+    cache_requirements_image_parser = image_parser_action_subparsers.add_parser(
+        "cache-requirements",
+        help="Build only the cacheable requirements of the image. Can be used in CI/CD to pre-build and cache them"
+             "in order to speed up builds"
+    )
     cache_requirements_image_parser.add_argument(
         "--architecture",
         required=True,
+        help="Architecture of requirements."
     )
 
-    image_publish_parser = image_parser_action_subparsers.add_parser("publish")
+    image_publish_parser = image_parser_action_subparsers.add_parser(
+        "publish",
+        help="Build and publish agent image."
+    )
     _add_image_type_arg(image_publish_parser)
     image_publish_parser.add_argument(
         "--registry",
         required=False,
         default="docker.io",
+        help="Hostname of the target registry."
     )
 
     image_publish_parser.add_argument(
-        "--user",
-        required=True,
-    )
-    image_publish_parser.add_argument(
         "--tags",
         required=True,
+        help="Comma-separated list of tags to publish."
     )
     image_publish_parser.add_argument(
         "--from-oci-layout-dir",
         required=False,
+        help="OCI tarball with already built image. When provided that image us used instead of building new one",
     )
     image_publish_parser.add_argument(
         "--registry-username",
-        required=False,
+        required=True,
+        help="Username for a target registry."
     )
     image_publish_parser.add_argument(
         "--registry-password",
         required=False,
+        help="Password for a target registry."
+    )
+    image_publish_parser.add_argument(
+        "--no-verify-tls",
+        required=False,
+        action="store_true",
+        help="Disable certificate validation when pushing the image. Inactive by default. "
+             "May be needed, for example, to push to a local registry."
     )
 
     args = parser.parse_args()
@@ -152,7 +181,7 @@ if __name__ == "__main__":
             final_tags = builder.generate_final_registry_tags(
                 image_type=ImageType(args.image_type),
                 registry=args.registry,
-                user=args.user,
+                user=args.registry_username,
                 tags=tags
             )
             builder.publish(
@@ -161,5 +190,6 @@ if __name__ == "__main__":
                 existing_oci_layout_dir=existing_oci_layout_dir,
                 registry_username=args.registry_username,
                 registry_password=args.registry_password,
+                no_verify_tls=args.no_verify_tls,
             )
             exit(0)

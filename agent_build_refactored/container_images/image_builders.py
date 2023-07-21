@@ -318,6 +318,7 @@ class ContainerisedAgentBuilder(Builder):
         existing_oci_layout_dir: pl.Path = None,
         registry_username: str = None,
         registry_password: str = None,
+        no_verify_tls: bool = False,
     ):
         """
         Publish image
@@ -327,6 +328,7 @@ class ContainerisedAgentBuilder(Builder):
             tarball. If not new image will be built inplace.
         :param registry_username: Registry login
         :param registry_password: Registry password
+        :param no_verify_tls: Disable certificate validation when pushing the image.
         :return:
         """
         if existing_oci_layout_dir:
@@ -355,14 +357,18 @@ class ContainerisedAgentBuilder(Builder):
             "--all",
         ]
 
-        if not registry_username and not registry_password:
-            cmd_args.extend([
+        if not registry_password:
+            cmd_args.append(
                 "--dest-no-creds",
-                "--dest-tls-verify=false",
-            ])
+            )
         else:
             cmd_args.append(
                 f"--dest-creds={registry_username}:{registry_password}"
+            )
+
+        if no_verify_tls:
+            cmd_args.append(
+                "--dest-tls-verify=false",
             )
 
         delete_container(

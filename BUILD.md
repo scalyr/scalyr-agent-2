@@ -1,12 +1,36 @@
 # Build Agent docker images
 
-To build agent docker image run command:
+In order to work with images, use the next commands of the build script:
 
-```
-python3 build_package_new.py <build_name>-{debian,alpine} [--tag <tag name>] [--push]
+```bash
+python3 build_package_new.py image <builder_name> <action>
 ```
 
-Available builds:
+where: 
+
+`builder_name` is name of the builder, for now we have `ubuntu` and `alpine` builder, that build images, which are
+based on those respective distibutions.
+
+and ``action`` is the action that has to be done, for now it can be:
+
+* ``publish``: Build and already publish image to a registry
+
+
+* ``build-tarball`` Build image in the for of OCI layout tarball. May be useful when you need to 
+need image in form of the file. For example, we use this tarball in our GitHub Action CI/CD when
+we build our images in the form on tarballs and share those tarballs with others, for example test jobs.
+
+
+* ``load`` Build and loads docker image directly to the current docker engine, so the image has to appear 
+in the result of the ``docker image ls`` command. This is only a single arch image because docker 
+does not store multi-arch images.
+
+## Publish an image
+
+In order to publish agent image, additional options has to be provided to the ``publish`` command
+
+``image-type``: Type of the images. Available image types:
+
 * **[docker-json](https://app.scalyr.com/help/install-agent-docker)** - an image for running on Docker configured to fetch
   logs via the file system (the container log directory is mounted to the agent container.) This is the preferred way
   of running on Docker. This image is published to scalyr/scalyr-agent-docker-json.
@@ -19,46 +43,32 @@ Available builds:
 * **[k8s](https://app.scalyr.com/help/install-agent-kubernetes)** - an image for running the agent on Kubernetes.
     This image is published to scalyr/scalyr-k8s-agent.
 
-This command will build the image, but only for a local use and only for the current architecture. That's because
-image is build by using ``docker buildx`` and it can not pass multi-arch images back to the local docker engine.
+next required options can be looked up by running the command:
 
-To push image to the registry use optional argument ``--push``
+```python3 build_package_new.py image <builder_name> publish --help```
 
-```bash
-python3 build_package_new.py <build_name> --push
-```
-
-That will push a result image to the default (dockerhub) registry. By default, it will use only
-tag ``latest``, but it can be overwritten buy ``--tag`` options.
-
-```bash
-python3 build_package_new.py <build_name> --push --tag preview --tag debug
-```
-
-It is also possible to set other registries, for example, to spin up a container with local docker registry
-and to push an image there. That is also a possible workaround for a local build's architecture limitation.
+As an example you can publish image to a local registry in a container.
 
 ```bash
 docker run -it --rm --name registry -p 5005:5000 registry:2
 
-python3 build_package_new.py <build_name> --push --registry localhost:5000
+python3 build_package_new.py image ubuntu publish --image-type k8s --registry localhost:5000 --tags=latest --registry-username user --no-verify-tls
 ```
 
-Pushing image with username:
+NOTE: This builds a multi-arch image with all supported architecture. 
+Meaning that you will have to wait longer because non-native architecture requirement are build with using emulation.
+If you need image just to run it on your local machine, you can use the ``load`` command instead of ``publish``
 
-```bash
-python3 build_package_new.py <build_name> --push --user my-dockerhub-user
-```
-
-## Using Locally built images with minikube
+## Using locally built images with minikube
 
 If you want to use locally built images with minikube, the easiest way to do that is to load
 local Docker image into minikube using ``minikube image load`` command as shown in the example
 below:
 
 ```bash
-python build_package_new.py k8s-debian --tag local-image --platforms linux/amd64
-minikube image load scalyr-k8s-agent:local-image
+python3 build_package_new.py image ubuntu k8s load --image-type k8s --image-name my-image:latest
+
+minikube image load my-image:latest
 ```
 
 In addition to that, you also need to update ``k8s/no-kustomize/scalyr-agent-2.yaml``  image
@@ -66,7 +76,7 @@ section to look something like this:
 
 ```yaml
 ...
-        image: scalyr-k8s-agent:local-image
+        image: my-image:latest
         imagePullPolicy: Never
 ...
 ```
@@ -80,9 +90,6 @@ Right now we provide Debian bullseye-slim and Alpine linux based images for the 
 
 Alpine based Linux images are around 50% smaller in size than Debian based ones and can be recognized
 using ``-alpine`` tag name suffix (e.g. ``latest-alpine``).
-
-Since cross compilation in emulated environments (QEMU) is very slow and pre-built ARM musl wheels
-are not available, we don't bundle orjson and zstandard dependency in Alpine ARMv7 images.
 
 
 # Build agent Linux packages.
