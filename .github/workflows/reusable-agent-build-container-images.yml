@@ -78,7 +78,7 @@ jobs:
     runs-on: ubuntu-22.04
     strategy:
       matrix:
-        builder_name: ["ubuntu", "alpine"]
+        builder_name: ["ubuntu-fips"]
         architecture: ["x86_64", "aarch64", "armv7"]
 
     steps:
