@@ -27,6 +27,7 @@ SUPPORTED_ARCHITECTURES = [
 
 logger = logging.getLogger(__name__)
 _PARENT_DIR = pl.Path(__file__).parent
+_BASE_IMAGES_DIR = _PARENT_DIR / "base_images"
 
 
 class ImageType(enum.Enum):
@@ -56,62 +57,25 @@ class ContainerisedAgentBuilder(Builder):
     TAG_SUFFIXES: List[str]
 
     @property
-    def dependencies_dir(self) -> pl.Path:
-        return self.work_dir / "dependencies"
+    def _common_cache_name(self):
+        return f"agent_image_build_{self.__class__.BASE_DISTRO}"
 
-    @classmethod
-    def _build_dependencies(
-        cls,
-        stage: str,
-        architectures: Union[CpuArch, List[CpuArch]],
-        output: BuildOutput,
-        cache_name: str = None,
-        fallback_to_remote_builder: bool = False,
+    def _build_base_image_dockerfile(
+            self,
+            stage: str,
+            architectures: List[CpuArch] = None,
+            cache_name: str = None,
+            output: BuildOutput = None
     ):
-        """
-        Perform build of the dependency Dockerfile. This dockerfile is responsible for building
-        multiple dependencies that are used during image build.
-        :param stage: Name of a stage to build in a Dockerfile.
-        :param architectures: List of architectures to build.
-        :param output: Desired output type of the build.
-        :param cache_name: Name of the cache. If specified, then the result of a build will be cached.
-        :param fallback_to_remote_builder: If True, can be build in a remote docker builder.
-        """
-        test_requirements = f"{REQUIREMENTS_DEV_COVERAGE}"
 
         buildx_build(
-            dockerfile_path=_PARENT_DIR / "dependencies.Dockerfile",
-            context_path=_PARENT_DIR,
-            architecture=architectures,
-            build_args={
-                "BASE_DISTRO": cls.BASE_DISTRO,
-                "AGENT_REQUIREMENTS": AGENT_REQUIREMENTS,
-                "TEST_REQUIREMENTS": test_requirements,
-            },
+            dockerfile_path=_BASE_IMAGES_DIR / f"{self.__class__.BASE_DISTRO}.Dockerfile",
+            context_path=_BASE_IMAGES_DIR,
+            architectures=architectures,
             stage=stage,
-            output=output,
             cache_name=cache_name,
-            fallback_to_remote_builder=fallback_to_remote_builder,
+            output=output,
         )
-
-    def _build_final_image_base_oci_layout(self):
-        """
-        Build a special stage in the dependency Dockerfile, which is responsible for building of base image
-        of the result image. MUST NOT be cached.
-        """
-
-        stage_name = "final_image_base"
-        result_image_oci_layout = self.work_dir / stage_name
-
-        self._build_dependencies(
-            stage=stage_name,
-            architectures=SUPPORTED_ARCHITECTURES[:],
-            output=OCITarballBuildOutput(
-                dest=result_image_oci_layout,
-            ),
-        )
-
-        return result_image_oci_layout
 
     def build_requirement_libs(
             self,
@@ -122,12 +86,24 @@ class ContainerisedAgentBuilder(Builder):
         Build a special stage in the dependency Dockerfile, which is responsible for
         building agent requirement libs.
         """
+        work_name = f"requirement_libs_{architecture.value}"
 
-        stage_name = "requirement_libs"
+        base_image_work_name = f"{work_name}_base_image"
+        base_image_oci_layout_dir = self.work_dir / f"{base_image_work_name}"
+        base_image_cache_name = f"{self._common_cache_name}_{base_image_work_name}"
 
-        result_dir = self.work_dir / stage_name / architecture.value
+        self._build_base_image_dockerfile(
+            architectures=[architecture],
+            stage="dependencies_build_base",
+            cache_name=base_image_cache_name,
+            output=OCITarballBuildOutput(
+                dest=base_image_oci_layout_dir
+            )
+        )
 
-        cache_name = f"container-image-build-{self.__class__.BASE_DISTRO}-{stage_name}_{architecture.value}"
+        result_dir = self.work_dir / work_name
+
+        cache_name = f"{self._common_cache_name}_{work_name}"
 
         if only_cache:
             output = None
@@ -136,11 +112,21 @@ class ContainerisedAgentBuilder(Builder):
                 dest=result_dir,
             )
 
-        self._build_dependencies(
-            stage=stage_name,
-            cache_name=cache_name,
-            architectures=architecture,
+        test_requirements = f"{REQUIREMENTS_DEV_COVERAGE}"
+
+        buildx_build(
+            dockerfile_path=_PARENT_DIR / "dependencies.Dockerfile",
+            context_path=_PARENT_DIR,
+            architectures=[architecture],
+            build_args={
+                "AGENT_REQUIREMENTS": AGENT_REQUIREMENTS,
+                "TEST_REQUIREMENTS": test_requirements,
+            },
+            build_contexts={
+                "extended_base": f"oci-layout:///{base_image_oci_layout_dir}",
+            },
             output=output,
+            cache_name=cache_name,
             fallback_to_remote_builder=True,
         )
 
@@ -156,6 +142,7 @@ class ContainerisedAgentBuilder(Builder):
     ) -> List[str]:
         """
         Create list of final tags using permutation of image names, tags and tag suffixes.
+        :param image_type: Type of the image
         :param registry: Registry hostname
         :param user: Registry username
         :param tags: List of tags.
@@ -220,7 +207,7 @@ class ContainerisedAgentBuilder(Builder):
         self,
         image_type: ImageType,
         output: BuildOutput,
-        architectures: List[CpuArch],
+        architectures: List[CpuArch] = None,
     ):
         """
         Build final image in the form that is specified in the output argument.
@@ -229,34 +216,56 @@ class ContainerisedAgentBuilder(Builder):
         :param architectures: List of architectures to build.
         :return:
         """
-        final_image_base_oci_layout_dir = self._build_final_image_base_oci_layout()
+
+        architectures = architectures or SUPPORTED_ARCHITECTURES[:]
 
         agent_filesystem_dir = self.create_agent_filesystem(image_type=image_type)
 
+        runtime_base_image_oci_layer_dir = self.work_dir / "runtime_image_base"
+
+        self._build_base_image_dockerfile(
+            architectures=architectures,
+            stage="runtime_base",
+            output=OCITarballBuildOutput(
+                dest=runtime_base_image_oci_layer_dir
+            )
+        )
+
         requirements_libs_contexts = {}
-        for requirements_architecture in architectures:
-            build_target_name = _arch_to_docker_build_target_folder(
-                arch=requirements_architecture,
+        build_args = {
+            "BASE_DISTRO": self.__class__.BASE_DISTRO,
+            "IMAGE_TYPE": image_type.value
+        }
+
+        for req_arch in architectures:
+            build_target_name = _arch_to_docker_build_target_name(
+                architecture=req_arch,
             )
 
             context_full_name = f"requirement_libs_{build_target_name}_context"
 
             requirement_libs_dir = self.build_requirement_libs(
-                architecture=requirements_architecture,
+                architecture=req_arch,
             )
-
             requirements_libs_contexts[context_full_name] = str(requirement_libs_dir)
+
+        # If there's only one architecture to build, then docker, inconveniently, does not provide
+        # its build-it arguments, so we have to provide them manually.
+        if len(architectures) == 1:
+            target_arch, target_variant = _arch_to_target_arch_and_variant(architectures[0])
+            build_args.update({
+                "TARGETOS": "linux",
+                "TARGETARCH": target_arch,
+                "TARGETVARIANT": target_variant,
+            })
 
         buildx_build(
             dockerfile_path=_PARENT_DIR / "Dockerfile",
             context_path=_PARENT_DIR,
-            architecture=architectures,
-            build_args={
-                "BASE_DISTRO": self.__class__.BASE_DISTRO,
-                "IMAGE_TYPE": image_type.value
-            },
+            architectures=architectures,
+            build_args=build_args,
             build_contexts={
-                "base_image": f"oci-layout:///{final_image_base_oci_layout_dir}",
+                "base": f"oci-layout:///{runtime_base_image_oci_layer_dir}",
                 "agent_filesystem": str(agent_filesystem_dir),
                 **requirements_libs_contexts,
             },
@@ -278,13 +287,14 @@ class ContainerisedAgentBuilder(Builder):
             output=DockerImageBuildOutput(
                 name=result_image_name,
             ),
-            architectures=[_current_cpu_arch]
+            architectures=[_current_cpu_arch],
         )
         return result_image_name
 
     def build_oci_tarball(
         self,
         image_type: ImageType,
+        architectures: List[CpuArch] = None,
         output_dir: pl.Path = None,
     ):
         """
@@ -299,7 +309,7 @@ class ContainerisedAgentBuilder(Builder):
                 dest=result_tarball,
                 extract=False,
             ),
-            architectures=SUPPORTED_ARCHITECTURES[:]
+            architectures=architectures
         )
 
         if output_dir:
@@ -392,13 +402,19 @@ class ContainerisedAgentBuilder(Builder):
         )
 
 
-def _arch_to_docker_build_target_folder(arch: CpuArch):
-    if arch == CpuArch.x86_64:
-        return "linux_amd64_"
-    elif arch == CpuArch.AARCH64:
-        return "linux_arm64_"
-    elif arch == CpuArch.ARMV7:
-        return "linux_arm_v7"
+def _arch_to_docker_build_target_name(architecture: CpuArch):
+
+    target_arch, target_variant = _arch_to_target_arch_and_variant(architecture)
+    return f"linux_{target_arch}_{target_variant}"
+
+
+def _arch_to_target_arch_and_variant(architecture: CpuArch):
+    if architecture == CpuArch.x86_64:
+        return "amd64", ""
+    elif architecture == CpuArch.AARCH64:
+        return "arm64", ""
+    elif architecture == CpuArch.ARMV7:
+        return "arm", "v7"
 
 
 # Create all image builder classes and make them available from this global collection.
@@ -431,7 +447,11 @@ def _get_current_machine_architecture():
         return CpuArch.ARMV7
 
     # Add more CPU architectures if needed.
-    raise Exception("unknown CPU")
+    raise Exception(f"unknown CPU {machine}")
 
 
 _current_cpu_arch = _get_current_machine_architecture()
+
+
+def _concatenate_architectures_in_one_string(architectures: List[CpuArch]):
+    return "_".join(a.value for a in architectures)

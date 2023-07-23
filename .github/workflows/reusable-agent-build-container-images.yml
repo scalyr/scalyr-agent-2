@@ -105,7 +105,7 @@ jobs:
       - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
         uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
 
-      - name: Build package
+      - name: Build requirements
         shell: bash
         id: build
         env:
@@ -115,7 +115,7 @@ jobs:
           AWS_PRIVATE_KEY_PATH: "/tmp/private_key.pem"
           AWS_REGION: ${{ inputs.aws_region }}
           CICD_WORKFLOW: ${{ inputs.cicd_workflow }}
-          CICD_JOB: build_image_requirements-${{ matrix.variant.builder_name }}-${{ matrix.architecture }}
+          CICD_JOB: build_image_requirements-${{ matrix.builder_name }}-${{ matrix.architecture }}
 
           USE_GHA_CACHE: "1"
           ALLOW_FALLBACK_TO_REMOTE_BUILDER: "1"
@@ -131,8 +131,8 @@ jobs:
             --architecture ${{ matrix.architecture }}
 
 
-  build_image:
-    name: Build image ${{  matrix.variant.image_type }}-${{ matrix.variant.builder_name }}
+  build_image_tarball:
+    name: Build image tarball ${{  matrix.variant.image_type }}-${{ matrix.variant.builder_name }}
     runs-on: ubuntu-22.04
     needs:
       - build_image_requirements
@@ -172,7 +172,7 @@ jobs:
       - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
         uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
 
-      - name: Build package
+      - name: Build image tarball
         shell: bash
         id: build
         env:
@@ -180,7 +180,6 @@ jobs:
           CICD_JOB: ${{  matrix.variant.image_type }}-${{ matrix.variant.builder_name }}
 
           USE_GHA_CACHE: "1"
-          ALLOW_FALLBACK_TO_REMOTE_BUILDER: "1"
           CACHE_VERSION: ${{ inputs.cache_version }}
         run: |
           python3 build_package_new.py \
@@ -205,7 +204,7 @@ jobs:
     timeout-minutes: 15
 
     needs:
-      - build_image
+      - build_image_tarball
 
     strategy:
       fail-fast: false
@@ -442,7 +441,7 @@ jobs:
     timeout-minutes: 15
 
     needs:
-      - build_image
+      - build_image_tarball
 
     strategy:
       fail-fast: false
@@ -645,7 +644,7 @@ jobs:
   k8s-smoketest:
     runs-on: ubuntu-20.04
     needs:
-      - build_image
+      - build_image_tarball
     if: github.ref_type != 'tag'
     steps:
       - name: Checkout Repository
@@ -732,7 +731,7 @@ jobs:
     name: Docker Smoketest - ${{ matrix.variant.image_type }}
     if: github.ref_type != 'tag'
     needs:
-      - build_image
+      - build_image_tarball
     runs-on: ubuntu-20.04
     strategy:
       fail-fast: false
@@ -822,7 +821,7 @@ jobs:
     runs-on: ubuntu-20.04
     if: github.ref_type == 'tag' || github.ref_name == 'new-image-builders-test'
     needs:
-      - build_image
+      - build_image_tarball
     strategy:
       matrix:
         variant:

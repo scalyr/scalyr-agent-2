@@ -168,6 +168,7 @@ if __name__ == "__main__":
         elif args.action == "cache-requirements":
             builder.build_requirement_libs(
                 architecture=CpuArch(args.architecture),
+                only_cache=True,
             )
 
         elif args.action == "publish":

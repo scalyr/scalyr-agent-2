@@ -8,7 +8,7 @@ python3 build_package_new.py image <builder_name> <action>
 
 where: 
 
-`builder_name` is name of the builder, for now we have `ubuntu` and `alpine` builder, that build images, which are
+`builder_name` is name of the builder, for now there are `ubuntu` and `alpine` builder, that build images, which are
 based on those respective distibutions.
 
 and ``action`` is the action that has to be done, for now it can be:

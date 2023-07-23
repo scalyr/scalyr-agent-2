@@ -85,7 +85,7 @@ class OCITarballBuildOutput(BuildOutput):
 def buildx_build(
         dockerfile_path: pl.Path,
         context_path: pl.Path,
-        architecture: Union[CpuArch, List[CpuArch]] = None,
+        architectures: List[CpuArch] = None,
         build_args: Dict[str, str] = None,
         build_contexts: Dict[str, str] = None,
         stage: str = None,
@@ -112,15 +112,8 @@ def buildx_build(
         "--progress=plain",
     ]
 
-    used_architectures = []
-    if architecture:
-        if isinstance(architecture, list):
-            for arch in architecture:
-                used_architectures.append(arch)
-        else:
-            used_architectures.append(architecture)
-
-    for arch in used_architectures:
+    architectures = architectures or []
+    for arch in architectures:
         cmd_args.append(
             f"--platform={arch.as_docker_platform()}",
         )
@@ -167,7 +160,7 @@ def buildx_build(
         str(context_path)
     )
 
-    single_arch = architecture is None or isinstance(architecture, CpuArch) or len(architecture) == 1
+    single_arch = len(architectures) <= 1
     allow_fallback_to_remote_builder = ALLOW_FALLBACK_TO_REMOTE_BUILDER and single_arch
 
     retry = False
@@ -217,15 +210,17 @@ def buildx_build(
 
         logger.info("Cache is is not enough to perform a local build, repeat the build in a remote builder")
 
-        if isinstance(architecture, CpuArch):
-            remote_builder_arch = architecture
-        else:
-            remote_builder_arch = architecture[0]
-
         from agent_build_refactored.utils.docker.buildx.remote_builder import get_remote_builder
 
+        if len(architectures) != 1:
+            raise Exception(
+                "It is expected that only single arch builds can fall back to remote builders. "
+                f"Current architectures: {[a.value for a in architectures]}"
+            )
+
         builder = get_remote_builder(
-            architecture=remote_builder_arch,
+
+            architecture=architectures[0],
         )
 
         result = subprocess.run(

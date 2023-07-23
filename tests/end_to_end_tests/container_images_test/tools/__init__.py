@@ -86,7 +86,7 @@ def build_test_version_of_container_image(
         buildx_build(
             dockerfile_path=_PARENT_DIR / "Dockerfile",
             context_path=_PARENT_DIR,
-            architecture=architecture,
+            architectures=[architecture],
             build_contexts={
                 "prod_image": f"docker-image://{prod_image_tag}",
                 "requirement_libs": str(requirement_libs_dir),
