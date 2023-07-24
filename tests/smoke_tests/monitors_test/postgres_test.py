@@ -26,7 +26,7 @@ import shlex
 
 import pytest
 
-import pg8000
+import pg8000  # pylint: disable=import-error
 
 from tests.utils.agent_runner import AgentRunner
 
