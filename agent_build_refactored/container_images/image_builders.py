@@ -441,7 +441,7 @@ def _get_current_machine_architecture():
 
     if machine in ["x86_64"]:
         return CpuArch.x86_64
-    if machine in ["aarch64"]:
+    if machine in ["aarch64", "arm64"]:
         return CpuArch.AARCH64
     if machine in ["armv7l"]:
         return CpuArch.ARMV7
