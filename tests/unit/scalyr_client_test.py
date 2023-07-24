@@ -1015,6 +1015,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
         session.augment_user_agent(frags)
         self.assertEquals(get_user_agent(), base_ua + ";" + ";".join(frags))
 
+    @skipIf(sys.version_info < (3, 7), "Only for Python >= 3.7")
     def test_get_user_agent_includes_requests_version(self):
         scalyr_agent.scalyr_client.ssl.OPENSSL_VERSION_INFO = (1, 0, 2, 13, 13)
 
