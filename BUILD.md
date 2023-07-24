@@ -16,8 +16,8 @@ and ``action`` is the action that has to be done, for now it can be:
 * ``publish``: Build and already publish image to a registry
 
 
-* ``build-tarball`` Build image in the for of OCI layout tarball. May be useful when you need to 
-need image in form of the file. For example, we use this tarball in our GitHub Action CI/CD when
+* ``build-tarball`` Build image in the for of OCI layout tarball. May be useful when you need to image in form of the 
+file. For example, we use this tarball in our GitHub Action CI/CD when
 we build our images in the form on tarballs and share those tarballs with others, for example test jobs.
 
 

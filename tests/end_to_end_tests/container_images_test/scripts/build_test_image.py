@@ -47,16 +47,12 @@ def add_command_line_args(add_func: Callable):
         choices=ALL_CONTAINERISED_AGENT_BUILDERS.keys(),
     )
 
-    add_func(
-        "--image-type",
-        required=True,
-        choices=[t.value for t in ImageType]
-    )
+    add_func("--image-type", required=True, choices=[t.value for t in ImageType])
 
     add_func(
         "--architecture",
         required=True,
-        choices=[a.value for a in SUPPORTED_ARCHITECTURES]
+        choices=[a.value for a in SUPPORTED_ARCHITECTURES],
     )
 
     add_func(
@@ -65,7 +61,7 @@ def add_command_line_args(add_func: Callable):
     )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     add_command_line_args(
         add_func=parser.add_argument,

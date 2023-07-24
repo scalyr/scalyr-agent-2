@@ -97,7 +97,7 @@ def buildx_build(
     """
     Wrapper for the 'docker buildx build' command.
     Additionally, it also can stop the build if it can not be done locally just by using cache, and fall back
-    to a remote docker engine to speed-up fresh build. That is especially helphul when we compile for a non-native
+    to a remote docker engine to speed-up fresh build. That is especially helpful when we compile for a non-native
     architecture, which can take hours.
     """
 
@@ -160,8 +160,7 @@ def buildx_build(
         str(context_path)
     )
 
-    single_arch = len(architectures) <= 1
-    allow_fallback_to_remote_builder = ALLOW_FALLBACK_TO_REMOTE_BUILDER and single_arch
+    allow_fallback_to_remote_builder = ALLOW_FALLBACK_TO_REMOTE_BUILDER and len(architectures) <= 1
 
     retry = False
     if cache_name and fallback_to_remote_builder and allow_fallback_to_remote_builder:

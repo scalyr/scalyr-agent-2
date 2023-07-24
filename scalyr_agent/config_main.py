@@ -728,7 +728,7 @@ def upgrade_windows_install(
                 # NOTE 2: Since we use the same bundle as we use for API requests, we need to make
                 # sure we also use the same cert for app.scalyr.com (which is indeed the case at
                 # this point).
-                import  requests
+                import requests
 
                 response = requests.get(
                     url_path,

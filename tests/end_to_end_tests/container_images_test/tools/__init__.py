@@ -19,7 +19,10 @@ from typing import Type
 
 from agent_build_refactored.utils.constants import CpuArch
 from agent_build_refactored.utils.docker.common import delete_container
-from agent_build_refactored.utils.docker.buildx.build import buildx_build, DockerImageBuildOutput
+from agent_build_refactored.utils.docker.buildx.build import (
+    buildx_build,
+    DockerImageBuildOutput,
+)
 from agent_build_refactored.container_images.image_builders import (
     ALL_CONTAINERISED_AGENT_BUILDERS,
     ContainerisedAgentBuilder,
@@ -36,15 +39,17 @@ def build_test_version_of_container_image(
     result_image_name: str,
     ready_image_oci_tarball: pl.Path = None,
 ):
-    """Get production image create it's testable version."""
+    """
+    Get production image create it's testable version.
+    For now, it adds just a coverage library as additional requirements, so our image
+    tests can enable it in order to obtain coverage information of the docker/k8s related code.
+    """
 
     image_builder = image_builder_cls()
 
     registry_container_name = "agent_image_e2e_test_registry"
 
-    delete_container(
-        container_name=registry_container_name
-    )
+    delete_container(container_name=registry_container_name)
 
     # Create temporary local registry to push production image there.
     subprocess.run(
@@ -57,7 +62,7 @@ def build_test_version_of_container_image(
             f"--name={registry_container_name}",
             "registry:2",
         ],
-        check=True
+        check=True,
     )
     try:
         all_image_tags = image_builder.generate_final_registry_tags(
@@ -77,7 +82,7 @@ def build_test_version_of_container_image(
 
         prod_image_tag = all_image_tags[0]
 
-        # Build agent image requirements, because it also includes requirements for testing.
+        # Build agent image requirements, because it also includes requirements (like coverage) for testing.
         requirement_libs_dir = image_builder.build_requirement_libs(
             architecture=architecture,
         )
@@ -93,12 +98,10 @@ def build_test_version_of_container_image(
             },
             output=DockerImageBuildOutput(
                 name=result_image_name,
-            )
+            ),
         )
     finally:
-        delete_container(
-            container_name=registry_container_name
-        )
+        delete_container(container_name=registry_container_name)
 
     return result_image_name
 

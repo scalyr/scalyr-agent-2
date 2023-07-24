@@ -35,7 +35,7 @@ if sys.version_info < (3, 8, 0):
 # local packages. All such imports also have to be done after that.
 sys.path.append(str(pl.Path(__file__).parent.absolute()))
 
-from agent_build_refactored.utils.constants import SOURCE_ROOT, CpuArch
+from agent_build_refactored.utils.constants import CpuArch
 from agent_build_refactored.utils.common import init_logging
 from agent_build_refactored.container_images.image_builders import (
     ALL_CONTAINERISED_AGENT_BUILDERS,
@@ -54,7 +54,7 @@ if __name__ == "__main__":
     image_parser.add_argument(
         "builder_name",
         choices=ALL_CONTAINERISED_AGENT_BUILDERS.keys(),
-        help="Name of the builder."
+        help="Name of the builder.",
     )
 
     image_parser_action_subparsers = image_parser.add_subparsers(
@@ -66,13 +66,13 @@ if __name__ == "__main__":
             "--image-type",
             required=True,
             choices=[t.value for t in ImageType],
-            help="Type of the agent image to build"
+            help="Type of the agent image to build",
         )
 
     load_image_parser = image_parser_action_subparsers.add_parser(
         "load",
         help="Build and load docker image directly in the docker engine. "
-             "This is only a single arch image because docker does not store multi-arch images."
+        "This is only a single arch image because docker does not store multi-arch images.",
     )
     _add_image_type_arg(load_image_parser)
     load_image_parser.add_argument(
@@ -82,43 +82,35 @@ if __name__ == "__main__":
     )
 
     image_build_parser = image_parser_action_subparsers.add_parser(
-        "build-tarball",
-        help="Build image if a form of OCI layout tarball."
+        "build-tarball", help="Build image if a form of OCI layout tarball."
     )
     _add_image_type_arg(image_build_parser)
     image_build_parser.add_argument(
-        "--output-dir",
-        required=True,
-        help="Output directory with tarball"
+        "--output-dir", required=True, help="Output directory with tarball"
     )
 
     cache_requirements_image_parser = image_parser_action_subparsers.add_parser(
         "cache-requirements",
         help="Build only the cacheable requirements of the image. Can be used in CI/CD to pre-build and cache them"
-             "in order to speed up builds"
+        "in order to speed up builds",
     )
     cache_requirements_image_parser.add_argument(
-        "--architecture",
-        required=True,
-        help="Architecture of requirements."
+        "--architecture", required=True, help="Architecture of requirements."
     )
 
     image_publish_parser = image_parser_action_subparsers.add_parser(
-        "publish",
-        help="Build and publish agent image."
+        "publish", help="Build and publish agent image."
     )
     _add_image_type_arg(image_publish_parser)
     image_publish_parser.add_argument(
         "--registry",
         required=False,
         default="docker.io",
-        help="Hostname of the target registry."
+        help="Hostname of the target registry.",
     )
 
     image_publish_parser.add_argument(
-        "--tags",
-        required=True,
-        help="Comma-separated list of tags to publish."
+        "--tags", required=True, help="Comma-separated list of tags to publish."
     )
     image_publish_parser.add_argument(
         "--from-oci-layout-dir",
@@ -126,21 +118,17 @@ if __name__ == "__main__":
         help="OCI tarball with already built image. When provided that image us used instead of building new one",
     )
     image_publish_parser.add_argument(
-        "--registry-username",
-        required=True,
-        help="Username for a target registry."
+        "--registry-username", required=True, help="Username for a target registry."
     )
     image_publish_parser.add_argument(
-        "--registry-password",
-        required=False,
-        help="Password for a target registry."
+        "--registry-password", required=False, help="Password for a target registry."
     )
     image_publish_parser.add_argument(
         "--no-verify-tls",
         required=False,
         action="store_true",
         help="Disable certificate validation when pushing the image. Inactive by default. "
-             "May be needed, for example, to push to a local registry."
+        "May be needed, for example, to push to a local registry.",
     )
 
     args = parser.parse_args()
@@ -161,8 +149,7 @@ if __name__ == "__main__":
                 output_dir = None
 
             builder.build_oci_tarball(
-                image_type=ImageType(args.image_type),
-                output_dir=output_dir
+                image_type=ImageType(args.image_type), output_dir=output_dir
             )
             exit(0)
         elif args.action == "cache-requirements":
@@ -183,7 +170,7 @@ if __name__ == "__main__":
                 image_type=ImageType(args.image_type),
                 registry=args.registry,
                 user=args.registry_username,
-                tags=tags
+                tags=tags,
             )
             builder.publish(
                 image_type=ImageType(args.image_type),

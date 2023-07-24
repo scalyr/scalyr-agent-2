@@ -331,7 +331,9 @@ class ContainerisedAgentBuilder(Builder):
         no_verify_tls: bool = False,
     ):
         """
-        Publish image
+        Publish an image. Since we can publish image from the OCI layout tarball. We can not use just a normal
+            'docker push' command, and we have to use tools that can also operate with OCI image archives.
+            We use skopeo in this case.
         :param image_type: Type of image
         :param tags: list of tags
         :param existing_oci_layout_dir: Path to existing image OCI tarball. If exists, it will publish image from this
@@ -353,7 +355,7 @@ class ContainerisedAgentBuilder(Builder):
         )
 
         # use skopeo tool to copy image.
-        # also use it from container so we don't have to rly on a local installation.
+        # also use it from container, so we don't have to rly on a local installation.
         cmd_args = [
             "docker",
             "run",
