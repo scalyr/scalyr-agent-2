@@ -85,7 +85,7 @@ class OCITarballBuildOutput(BuildOutput):
 def buildx_build(
         dockerfile_path: pl.Path,
         context_path: pl.Path,
-        architecture: Union[CpuArch, List[CpuArch]],
+        architectures: List[CpuArch] = None,
         build_args: Dict[str, str] = None,
         build_contexts: Dict[str, str] = None,
         stage: str = None,
@@ -97,7 +97,7 @@ def buildx_build(
     """
     Wrapper for the 'docker buildx build' command.
     Additionally, it also can stop the build if it can not be done locally just by using cache, and fall back
-    to a remote docker engine to speed-up fresh build. That is especially helphul when we compile for a non-native
+    to a remote docker engine to speed-up fresh build. That is especially helpful when we compile for a non-native
     architecture, which can take hours.
     """
 
@@ -112,14 +112,8 @@ def buildx_build(
         "--progress=plain",
     ]
 
-    used_architectures = []
-    if isinstance(architecture, list):
-        for arch in architecture:
-            used_architectures.append(arch)
-    else:
-        used_architectures.append(architecture)
-
-    for arch in used_architectures:
+    architectures = architectures or []
+    for arch in architectures:
         cmd_args.append(
             f"--platform={arch.as_docker_platform()}",
         )
@@ -166,8 +160,7 @@ def buildx_build(
         str(context_path)
     )
 
-    single_arch = isinstance(architecture, CpuArch) or len(architecture) == 1
-    allow_fallback_to_remote_builder = ALLOW_FALLBACK_TO_REMOTE_BUILDER and single_arch
+    allow_fallback_to_remote_builder = ALLOW_FALLBACK_TO_REMOTE_BUILDER and len(architectures) <= 1
 
     retry = False
     if cache_name and fallback_to_remote_builder and allow_fallback_to_remote_builder:
@@ -216,15 +209,17 @@ def buildx_build(
 
         logger.info("Cache is is not enough to perform a local build, repeat the build in a remote builder")
 
-        if isinstance(architecture, CpuArch):
-            remote_builder_arch = architecture
-        else:
-            remote_builder_arch = architecture[0]
-
         from agent_build_refactored.utils.docker.buildx.remote_builder import get_remote_builder
 
+        if len(architectures) != 1:
+            raise Exception(
+                "It is expected that only single arch builds can fall back to remote builders. "
+                f"Current architectures: {[a.value for a in architectures]}"
+            )
+
         builder = get_remote_builder(
-            architecture=remote_builder_arch,
+
+            architecture=architectures[0],
         )
 
         result = subprocess.run(
@@ -282,3 +277,5 @@ def _get_gha_cache_scope(name: str):
 
 def _get_local_cache_dir(name: str):
     return AGENT_BUILD_OUTPUT_PATH / "docker_cache" / name
+
+

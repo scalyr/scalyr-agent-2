@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - master
+    tags:
+      - v*.*.*
   pull_request:
     branches:
       - master
@@ -18,7 +20,7 @@ permissions:
 jobs:
   pre_job:
     name: Skip Duplicate Jobs Pre Job
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     permissions:
       actions: write  # Needed for skip-duplicate-jobs job
       contents: read
@@ -56,6 +58,27 @@ jobs:
       CT_AWS_DEV_EC2_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
       CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
       CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
+
+  # Invoke workflow that builds all agent container mages.
+  build_container_images:
+    name: "Build Container Images"
+    needs:
+      - pre_job
+    uses: ./.github/workflows/reusable-agent-build-container-images.yml
+    with:
+      python_version: ${{ needs.pre_job.outputs.python_version }}
+      cache_version: ${{ needs.pre_job.outputs.cache_version }}
+      aws_region: ${{ needs.pre_job.outputs.aws_region }}
+      aws_private_key_name: ${{ needs.pre_job.outputs.aws_private_key_name }}
+      cicd_workflow: ${{ needs.pre_job.outputs.cicd_workflow }}
+    secrets:
+      CT_AWS_DEV_EC2_PRIVATE_KEY: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
+      CT_AWS_DEV_EC2_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
+      CT_AWS_DEV_EC2_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
+      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
+      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}
+      DOCKERHUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD_TEST_ACCOUNT }}
 
 
   build-windows-package:
@@ -119,15 +142,12 @@ jobs:
         with:
           path: /tmp/all_artifacts
 
-
       - name: Prepare artifacts
         run: |
           mkdir -p /tmp/result_artifacts
           cp -a /tmp/all_artifacts/linux-packages-*/. /tmp/result_artifacts
           cp -a /tmp/all_artifacts/tarball-noarch/. /tmp/result_artifacts
           cp -a /tmp/all_artifacts/windows-msi/. /tmp/result_artifacts
-          
-          
 
       - name: Save result artifact
         uses: actions/upload-artifact@v3
@@ -141,7 +161,8 @@ jobs:
     if: ${{ always() }}
     needs:
       - pre_job
-      - build-linux-packages
+      - build_container_images
+      #- build-linux-packages
       - build-windows-package
       - build_tarball
     runs-on: ubuntu-20.04
@@ -166,5 +187,3 @@ jobs:
           echo "${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}" > "${AWS_PRIVATE_KEY_PATH}"
           chmod 600 "${AWS_PRIVATE_KEY_PATH}"
           python3 agent_build_refactored/utils/scripts/cicd/cleanup_ec2_objects.py
-
-

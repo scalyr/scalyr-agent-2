@@ -1,55 +1,49 @@
 name: "Kubernetes End to End Tests"
 
 on:
-  push:
-    branches:
-      - master
-  pull_request:
-    branches:
-      - master
-  schedule:
-    - cron: '0 4 * * *'
+  workflow_call:
+    inputs:
+      python_version:
+        description: "Version of Python to use."
+        type: string
 
-permissions:
-  actions: write  # Needed for skip-duplicate-jobs job
-  contents: read
+      cache_version:
+        description: "Version suffix for the cache key. May be useful when it is needed to invalidate the cache."
+        type: string
+
+      aws_region:
+        description: "AWS region for remote builds."
+        type: string
+
+      aws_private_key_name:
+        description: "Name of a private key that is used to connect to AWS EC2 instances that will be created by this workflow."
+        type: string
+
+      cicd_workflow:
+        description: "Additional string that has to differentiate AWS object from another workflows."
+        type: string
+
+    secrets:
+      CT_AWS_DEV_EC2_PRIVATE_KEY:
+        required: true
+      CT_AWS_DEV_EC2_ACCESS_KEY:
+        required: true
+      CT_AWS_DEV_EC2_SECRET_KEY:
+        required: true
+      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE:
+        required: true
+      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ:
+        required: true
+      DOCKERHUB_USERNAME:
+        required: true
+      DOCKERHUB_PASSWORD:
+        required: true
 
 jobs:
-  # Special job which automatically cancels old runs for the same branch, prevents runs for the
-  # same file set which has already passed, etc.
-  pre_job:
-    name: Skip Duplicate Jobs Pre Job
-    runs-on: ubuntu-latest
-    outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip }}
-    steps:
-        # Since we allow triggering of this workflow with 'push' and 'pull_request' events,
-        # there has to be a duplicated triggering when we push into a branch which has also a PR opened.
-        # This job has to skip duplicates in this case, but it's also important, in case of opened PR,
-        # to not skip the 'pull_request' event because it has to perform more extra tests, rather that regular 'push'
-        # event triggered workflow.
-      - name: "Determine which trigger event can not be skipped."
-        id: get_events_to_not_skip
-        run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo 'events_to_not_skip=["workflow_dispatch", "schedule", "pull_request"]' >> $GITHUB_OUTPUT
-          else
-            echo 'events_to_not_skip=["workflow_dispatch", "schedule"]' >> $GITHUB_OUTPUT
-          fi
-
-      - id: skip_check
-        uses: fkirc/skip-duplicate-actions@12aca0a884f6137d619d6a8a09fcc3406ced5281 # v4.0.0
-        with:
-          cancel_others: 'true'
-          concurrent_skipping: 'same_content'
-          do_not_skip: "${{ steps.get_events_to_not_skip.outputs.events_to_not_skip }}"
-          github_token: ${{ github.token }}
-
   coverage:
     runs-on: ubuntu-latest
     if: success() || failure()
     needs:
-      - pre_job
       - k8s-smoketest
       - docker-smoketest
     steps:
@@ -78,15 +72,139 @@ jobs:
           files: ./coverage.xml
           fail_ci_if_error: true
 
+  # Build cacheable requirements of the images.
+  build_image_requirements:
+    name: requirements-${{ matrix.builder_name }}-${{ matrix.architecture }}
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        builder_name: ["ubuntu", "alpine"]
+        architecture: ["x86_64", "aarch64", "armv7"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: install python and requirements
+        uses: ./.github/actions/install_python_and_requirements
+        with:
+          python_version: ${{ inputs.python_version }}
+
+      - name: Set up QEMU
+        id: qemu
+        uses: docker/setup-qemu-action@2b82ce82d56a2a04d2637cd93a637ae1b359c0a7 # v2
+        with:
+          image: tonistiigi/binfmt:qemu-v6.2.0
+          platforms: all
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@ecf95283f03858871ff00b787d79c419715afc34 # v2.0.0
+        with:
+          driver-opts: network=host
+
+      - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
+        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+
+      - name: Build requirements
+        shell: bash
+        id: build
+        env:
+          AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
+          AWS_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
+          AWS_PRIVATE_KEY_NAME: ${{ inputs.aws_private_key_name }}
+          AWS_PRIVATE_KEY_PATH: "/tmp/private_key.pem"
+          AWS_REGION: ${{ inputs.aws_region }}
+          CICD_WORKFLOW: ${{ inputs.cicd_workflow }}
+          CICD_JOB: build_image_requirements-${{ matrix.builder_name }}-${{ matrix.architecture }}
+
+          USE_GHA_CACHE: "1"
+          ALLOW_FALLBACK_TO_REMOTE_BUILDER: "1"
+          CACHE_VERSION: ${{ inputs.cache_version }}
+        run: |
+          echo "${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}" > "${AWS_PRIVATE_KEY_PATH}"
+          chmod 600 "${AWS_PRIVATE_KEY_PATH}"
+          
+          python3 build_package_new.py \
+            image \
+            ${{ matrix.builder_name }} \
+            cache-requirements \
+            --architecture ${{ matrix.architecture }}
+
+
+  build_image_tarball:
+    name: Build image tarball ${{  matrix.variant.image_type }}-${{ matrix.variant.builder_name }}
+    runs-on: ubuntu-22.04
+    needs:
+      - build_image_requirements
+    strategy:
+      matrix:
+        variant:
+          - { "builder_name": "ubuntu" , "image_type": "k8s" }
+          - { "builder_name": "ubuntu" , "image_type": "docker-json" }
+          - { "builder_name": "ubuntu" , "image_type": "docker-syslog" }
+          - { "builder_name": "ubuntu" , "image_type": "docker-api" }
+          - { "builder_name": "alpine" , "image_type": "k8s" }
+          - { "builder_name": "alpine" , "image_type": "docker-json" }
+          - { "builder_name": "alpine" , "image_type": "docker-syslog" }
+          - { "builder_name": "alpine" , "image_type": "docker-api" }
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: install python and requirements
+        uses: ./.github/actions/install_python_and_requirements
+        with:
+          python_version: ${{ inputs.python_version }}
+
+      - name: Set up QEMU
+        id: qemu
+        uses: docker/setup-qemu-action@2b82ce82d56a2a04d2637cd93a637ae1b359c0a7 # v2
+        with:
+          image: tonistiigi/binfmt:qemu-v6.2.0
+          platforms: all
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@ecf95283f03858871ff00b787d79c419715afc34 # v2.0.0
+        with:
+          driver-opts: network=host
+
+      - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
+        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+
+      - name: Build image tarball
+        shell: bash
+        id: build
+        env:
+          CICD_WORKFLOW: ${{ inputs.cicd_workflow }}
+          CICD_JOB: ${{  matrix.variant.image_type }}-${{ matrix.variant.builder_name }}
+
+          USE_GHA_CACHE: "1"
+          CACHE_VERSION: ${{ inputs.cache_version }}
+        run: |
+          python3 build_package_new.py \
+            image \
+            ${{ matrix.variant.builder_name }} \
+            build-tarball \
+            --image-type ${{  matrix.variant.image_type }} \
+            --output-dir ./build
+
+      - name: Save image OCI tarball as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: container-image-tarball-${{  matrix.variant.image_type }}-${{ matrix.variant.builder_name }}
+          path: build
+          retention-days: 1
+
   # Jobs which performs basic sanity checks for the Kubernetes Monitor and Kubernetes Events Monitor
   k8s_kubernetes_monitor_tests:
     name: Kubernetes Monitors - k8s ${{ matrix.k8s_version.version }}-${{ matrix.k8s_version.runtime}}
     runs-on: ubuntu-20.04
+    if: github.ref_type != 'tag'
     timeout-minutes: 15
 
-    needs: pre_job
-    # NOTE: We always want to run job on master branch
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref_name == 'master' }}
+    needs:
+      - build_image_tarball
 
     strategy:
       fail-fast: false
@@ -110,11 +228,22 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Python 3.8
-        uses: actions/setup-python@v4
-        id: setup-python
+      - name: install python and requirements
+        uses: ./.github/actions/install_python_and_requirements
         with:
-          python-version: 3.8
+          python_version: ${{ inputs.python_version }}
+
+      - name: Set up QEMU
+        id: qemu
+        uses: docker/setup-qemu-action@2b82ce82d56a2a04d2637cd93a637ae1b359c0a7 # v2
+        with:
+          image: tonistiigi/binfmt:qemu-v6.2.0
+          platforms: all
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@ecf95283f03858871ff00b787d79c419715afc34 # v2.0.0
+        with:
+          driver-opts: network=host
 
       - name: Install Scalyr tool
         run: |
@@ -130,19 +259,35 @@ jobs:
           container_runtime: "${{ matrix.k8s_version.runtime }}"
           github_token: "${{ secrets.GITHUB_TOKEN }}"
 
-      # TODO: Build image as a first job in the workflow and then re-use that image for other jobs
-      # to speed up the build and reduce number of redundant builds.
-      - name: Build Agent k8s Docker Image
+      - name: Download OCI tarball of the built image.
+        uses: actions/download-artifact@v3
+        with:
+          name: container-image-tarball-k8s-ubuntu
+          path: /tmp/image_tarball
+
+      - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
+        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+
+      - name: Build Agent k8s Test Docker Image
+        env:
+          USE_GHA_CACHE: "1"
+          CACHE_VERSION: ${{ inputs.cache_version }}
         run: |
-          python3 build_package_new.py k8s-debian --tag "local_k8s_image" --platforms linux/amd64
+          python3 tests/end_to_end_tests/container_images_test/scripts/build_test_image.py \
+            --image-builder-name ubuntu \
+            --architecture x86_64 \
+            --image-oci-tarball /tmp/image_tarball/k8s-ubuntu.tar \
+            --result-image-name k8s-ubuntu:test \
+            --image-type k8s
+
           docker image ls
 
           # Needed for containerd runtime
           if [ "${{ matrix.k8s_version.runtime }}" = "containerd" ]; then
-            minikube image load scalyr-k8s-agent:local_k8s_image
+            minikube image load k8s-ubuntu:test
           fi
 
-      # Here we build the dummy container which continously prints data to stdout and stderr
+      # Here we build the dummy container which continuously prints data to stdout and stderr
       - name: Build Dummy App Docker Image
         run: |
           docker build -f docker/Dockerfile.docker_monitor_testing_config -t std-printer scripts/
@@ -169,7 +314,7 @@ jobs:
           kubectl logs "${APP_POD_NAME}"
           echo ""
 
-      # We create mock CronJob so we can assert that Kubernetes Events monitor correctly handles 
+      # We create mock CronJob so we can assert that Kubernetes Events monitor correctly handles
       # CronJob and Job Events.
       - name: Create mock CronJob (v1)
         if: ${{ matrix.k8s_version.run_cronjob_checks }}
@@ -257,7 +402,7 @@ jobs:
             echo "Kubernetes event monitor log has to be handled by the agent 1 time, but it got ${k8s_event_log_files_number}"
             exit 1
           fi
-      
+
       # We only assert this under newer Kubernetes versions since in the old ones CronJobs were not
       # available out of the box
       - name: Verify Job and CronJob events are ingested
@@ -292,11 +437,11 @@ jobs:
   k8s_open_metrics_monitor_tests:
     name: OpenMetrics Monitor - k8s ${{ matrix.k8s_version.version }}-${{ matrix.k8s_version.runtime}}
     runs-on: ubuntu-20.04
+    if: github.ref_type != 'tag'
     timeout-minutes: 15
 
-    needs: pre_job
-    # NOTE: We always want to run job on master branch
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref_name == 'master' }}
+    needs:
+      - build_image_tarball
 
     strategy:
       fail-fast: false
@@ -318,11 +463,22 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Python 3.8
-        uses: actions/setup-python@v4
-        id: setup-python
+      - name: install python and requirements
+        uses: ./.github/actions/install_python_and_requirements
         with:
-          python-version: 3.8
+          python_version: ${{ inputs.python_version }}
+
+      - name: Set up QEMU
+        id: qemu
+        uses: docker/setup-qemu-action@2b82ce82d56a2a04d2637cd93a637ae1b359c0a7 # v2
+        with:
+          image: tonistiigi/binfmt:qemu-v6.2.0
+          platforms: all
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@ecf95283f03858871ff00b787d79c419715afc34 # v2.0.0
+        with:
+          driver-opts: network=host
 
       - name: Install Scalyr tool
         run: |
@@ -338,14 +494,32 @@ jobs:
           container_runtime: "${{ matrix.k8s_version.runtime }}"
           github_token: "${{ secrets.GITHUB_TOKEN }}"
 
-      - name: Build Agent k8s Docker Image
+      - name: Download OCI tarball of the built image.
+        uses: actions/download-artifact@v3
+        with:
+          name: container-image-tarball-k8s-ubuntu
+          path: /tmp/image_tarball
+
+      - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
+        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+
+      - name: Build Agent k8s Test Docker Image
+        env:
+          USE_GHA_CACHE: "1"
+          CACHE_VERSION: ${{ inputs.cache_version }}
         run: |
-          python3 build_package_new.py k8s-debian --tag "local_k8s_image" --platforms linux/amd64
+          python3 tests/end_to_end_tests/container_images_test/scripts/build_test_image.py \
+            --image-builder-name ubuntu \
+            --architecture x86_64 \
+            --image-oci-tarball /tmp/image_tarball/k8s-ubuntu.tar \
+            --result-image-name k8s-ubuntu:test \
+            --image-type k8s
+
           docker image ls
 
           # Needed for containerd runtime
           if [ "${{ matrix.k8s_version.runtime }}" = "containerd" ]; then
-            minikube image load scalyr-k8s-agent:local_k8s_image
+            minikube image load k8s-ubuntu:test
           fi
 
       # Here we build the dummy Java app image which exposes JMX metrics via exporter
@@ -469,22 +643,32 @@ jobs:
 
   k8s-smoketest:
     runs-on: ubuntu-20.04
-    needs: pre_job
-    # NOTE: We always want to run job on master branch
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref_name == 'master' }}
+    needs:
+      - build_image_tarball
+    if: github.ref_type != 'tag'
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
-      - name: Setup Python 3.8
-        uses: actions/setup-python@v4
-        id: setup-python
+
+      - name: install python and requirements
+        uses: ./.github/actions/install_python_and_requirements
         with:
-          python-version: 3.8
-          cache: 'pip'
-      - name: Install Python Dependencies
-        run: |
-          pip install -r dev-requirements.txt
-          pip install "apache-libcloud==3.4.1"
+          python_version: ${{ inputs.python_version }}
+
+      - name: Set up QEMU
+        id: qemu
+        uses: docker/setup-qemu-action@2b82ce82d56a2a04d2637cd93a637ae1b359c0a7 # v2
+        with:
+          image: tonistiigi/binfmt:qemu-v6.2.0
+          platforms: all
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@ecf95283f03858871ff00b787d79c419715afc34 # v2.0.0
+        with:
+          driver-opts: network=host
+
+      - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
+        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
 
       - name: Setup minikube k8s cluster
         uses: ./.github/actions/setup-minikube-cluster/
@@ -494,6 +678,28 @@ jobs:
           container_runtime: "docker"
           github_token: "${{ secrets.GITHUB_TOKEN }}"
 
+      - name: Download OCI tarball of the built image.
+        uses: actions/download-artifact@v3
+        with:
+          name: container-image-tarball-k8s-ubuntu
+          path: /tmp/image_tarball
+
+      - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
+        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+
+
+      - name: Build test image
+        env:
+          USE_GHA_CACHE: "1"
+          CACHE_VERSION: ${{ inputs.cache_version }}
+        run: |
+          python3 tests/end_to_end_tests/container_images_test/scripts/build_test_image.py \
+            --image-builder-name ubuntu \
+            --architecture x86_64 \
+            --image-oci-tarball /tmp/image_tarball/k8s-ubuntu.tar \
+            --result-image-name k8s-ubuntu:test \
+            --image-type k8s
+
       - name: Run Tests (with coverage)
         env:
           CIRCLE_BUILD_NUM: ${{ github.run_number }}
@@ -501,7 +707,7 @@ jobs:
           SCALYR_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
           READ_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
         run: |
-          source ./.circleci/smoketest_k8s.sh scalyr/scalyr-agent-ci-unittest:4 150 no_delete_existing_k8s_objs
+          source ./.circleci/smoketest_k8s.sh scalyr/scalyr-agent-ci-unittest:4 150 no_delete_existing_k8s_objs k8s-ubuntu:test
 
       - name: Upload test results
         uses: actions/upload-artifact@v3
@@ -522,34 +728,66 @@ jobs:
           channel: '#eng-dataset-cloud-tech'
 
   docker-smoketest:
-    name: Docker Smoketest - ${{ matrix.variant.log_mode }}
-    needs: pre_job
-    # NOTE: We always want to run job on master branch
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref_name == 'master' }}
+    name: Docker Smoketest - ${{ matrix.variant.image_type }}
+    if: github.ref_type != 'tag'
+    needs:
+      - build_image_tarball
     runs-on: ubuntu-20.04
     strategy:
       fail-fast: false
       matrix:
         variant:
-          - log_mode: json
+          - image_type: docker-json
             timeout: 150
-          - log_mode: syslog
+          - image_type: docker-syslog
             timeout: 150
-          - log_mode: api
+          - image_type: docker-api
             timeout: 200
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
-      - name: Setup Python 3.8
-        uses: actions/setup-python@v4
-        id: setup-python
+
+      - name: install python and requirements
+        uses: ./.github/actions/install_python_and_requirements
         with:
-          python-version: 3.8
-          cache: 'pip'
-      - name: Install Python Dependencies
+          python_version: ${{ inputs.python_version }}
+
+      - name: Set up QEMU
+        id: qemu
+        uses: docker/setup-qemu-action@2b82ce82d56a2a04d2637cd93a637ae1b359c0a7 # v2
+        with:
+          image: tonistiigi/binfmt:qemu-v6.2.0
+          platforms: all
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@ecf95283f03858871ff00b787d79c419715afc34 # v2.0.0
+        with:
+          driver-opts: network=host
+
+      - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
+        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+
+      - name: Download OCI tarball of the built image.
+        uses: actions/download-artifact@v3
+        with:
+          name: container-image-tarball-${{ matrix.variant.image_type }}-ubuntu
+          path: /tmp/image_tarball
+
+      - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
+        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+
+      - name: Build test image
+        env:
+          USE_GHA_CACHE: "1"
+          CACHE_VERSION: ${{ inputs.cache_version }}
         run: |
-          pip install -r dev-requirements.txt
-          pip install "apache-libcloud==3.4.1"
+          python3 tests/end_to_end_tests/container_images_test/scripts/build_test_image.py \
+            --image-builder-name ubuntu \
+            --architecture x86_64 \
+            --image-oci-tarball /tmp/image_tarball/${{ matrix.variant.image_type }}-ubuntu.tar \
+            --result-image-name ${{ matrix.variant.image_type }}-ubuntu:test \
+            --image-type ${{ matrix.variant.image_type }}
+
       - name: Run Tests (with coverage)
         env:
           CIRCLE_BUILD_NUM: ${{ github.run_number }}
@@ -557,12 +795,12 @@ jobs:
           SCALYR_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
           READ_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
         run: |
-          source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 docker-${{ matrix.variant.log_mode }} ${{ matrix.variant.timeout }}
+          source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 ${{ matrix.variant.image_type }} ${{ matrix.variant.timeout }} ${{ matrix.variant.image_type }}-ubuntu:test
 
       - name: Upload test results
         uses: actions/upload-artifact@v3
         with:
-          name: docker-smoketest-${{ matrix.variant.log_mode }}
+          name: docker-smoketest-${{ matrix.variant.image_type }}
           path: |
             .coverage
         if: ${{ success() || failure() }}
@@ -577,43 +815,65 @@ jobs:
           steps: ${{ toJson(steps) }}
           channel: '#eng-dataset-cloud-tech'
 
-  # Runs agent from it source and performs some basic sanity checks.
-  agent-source-tests:
-    runs-on: ${{ matrix.os }}
-    needs: pre_job
-    # NOTE: We always want to run job on master branch
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref_name == 'master' }}
-    container: ${{ matrix.container }}
+
+  publish_images:
+    name: Publish image ${{ matrix.variant.image_type }}-${{ matrix.variant.builder_name }}
+    runs-on: ubuntu-20.04
+    if: github.ref_type == 'tag' || github.ref_name == 'new-image-builders-test'
+    needs:
+      - build_image_tarball
     strategy:
       matrix:
-        os: [ "macos-11", "ubuntu-20.04" ]
-        python-version: [ "3.7.13" ]
-        # Uncomment when windows platform and service related issues are fixed.
-    #        include:
-    #          - os: "windows-2019"
-    #            python-version: "3.7.9"
-
-
+        variant:
+          - { "builder_name": "ubuntu", "image_type": "k8s" }
+          - { "builder_name": "ubuntu", "image_type": "docker-json" }
+          - { "builder_name": "ubuntu", "image_type": "docker-syslog" }
+          - { "builder_name": "ubuntu", "image_type": "docker-api" }
+          - { "builder_name": "alpine", "image_type": "k8s" }
+          - { "builder_name": "alpine", "image_type": "docker-json" }
+          - { "builder_name": "alpine", "image_type": "docker-syslog" }
+          - { "builder_name": "alpine", "image_type": "docker-api" }
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Install python
-        uses: actions/setup-python@v4
+      - name: install python and requirements
+        uses: ./.github/actions/install_python_and_requirements
         with:
-          python-version: ${{ matrix.python-version }}
+          python_version: ${{ inputs.python_version }}
 
-      - name: Perform the deployment of the test environment
-        uses: ./.github/actions/perform-deployment
+      - name: Download OCI tarball of the built image.
+        uses: actions/download-artifact@v3
         with:
-          deployment-name: "test_environment"
+          name: container-image-tarball-${{ matrix.variant.image_type }}-${{ matrix.variant.builder_name }}
+          path: /tmp/image_tarball
 
-      - name: Run tests
+
+      - name: Verify and Create Tags
+        id: verify
         shell: bash
         run: |
-          python3 -m pytest  tests/end_to_end_tests/test_from_source/test_from_source.py \
-            --scalyr-api-key ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }} \
-            --scalyr-api-read-key ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }} \
-            --test-session-suffix ${{ github.run_id }}-${{ github.run_attempt }}
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            AGENT_VERSION="$(cat VERSION | tr -d '\n')"
+            if [ "${{ github.ref_name }}" = "v${AGENT_VERSION}" ]; then
+              echo "publish=true" >> "${GITHUB_OUTPUT}"
+              echo "tags=${{ github.ref_name }},latest" >> "${GITHUB_OUTPUT}"
+            fi
+          else
+              echo "publish=true" >> "${GITHUB_OUTPUT}"
+              echo "tags=${{ github.sha }}" >> "${GITHUB_OUTPUT}"
+          fi
 
-
+      - name: Publish image
+        if: steps.verify.outputs.publish == 'true'
+        run: |
+          python3 build_package_new.py \
+            image \
+            ${{ matrix.variant.builder_name }} \
+            publish \
+            --registry docker.io \
+            --tags ${{ steps.verify.outputs.tags }} \
+            --from-oci-layout-dir /tmp/image_tarball/${{ matrix.variant.image_type }}-${{ matrix.variant.builder_name }}.tar \
+            --registry-username ${{ secrets.DOCKERHUB_USERNAME }} \
+            --registry-password ${{ secrets.DOCKERHUB_PASSWORD }} \
+            --image-type ${{ matrix.variant.image_type }}

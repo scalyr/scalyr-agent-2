@@ -352,6 +352,8 @@ class EC2InstanceWrapper:
             )
 
             security_group_id = resp["GroupId"]
+            logger.info(f"Security group {security_group_id} has been created.")
+
             _existing_security_group_id = security_group_id
 
             ip_address = _get_current_ip_address()
@@ -376,7 +378,6 @@ class EC2InstanceWrapper:
 
         else:
             security_group_id = _existing_security_group_id
-
 
         if aws_settings.cicd_workflow:
             additional_tags = {
@@ -618,7 +619,7 @@ def terminate_ec2_instances_and_security_groups(
                         time.sleep(delay)
                         continue
                     elif "InvalidGroup.NotFound" in str(e):
-                        logger.info("    Security group does not exists. Ignore.")
+                        logger.info("    Security group does not exist. Ignore.")
                         break
                     else:
                         raise

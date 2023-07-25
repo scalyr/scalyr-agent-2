@@ -40,7 +40,7 @@ def _build(
     buildx_build(
         dockerfile_path=_PARENT_DIR / "Dockerfile",
         context_path=SOURCE_ROOT,
-        architecture=CpuArch.x86_64,
+        architectures=[CpuArch.x86_64],
         output=output,
         cache_name=_NAME,
     )

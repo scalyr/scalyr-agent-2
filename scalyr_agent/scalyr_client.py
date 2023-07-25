@@ -1015,7 +1015,7 @@ class ScalyrClientSession(object):
             parts.append(sharded_copy_manager_string)
 
         if self.__use_requests:
-            import scalyr_agent.third_party.requests as requests
+            import requests
 
             parts.append("requests-%s" % (requests.__version__))
 

@@ -25,8 +25,7 @@ import os
 import re
 
 import pytest
-
-from scalyr_agent.third_party import pymysql
+import pymysql  # pylint: disable=import-error
 
 from tests.utils.agent_runner import AgentRunner
 
