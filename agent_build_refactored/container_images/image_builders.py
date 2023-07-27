@@ -1,10 +1,25 @@
+# Copyright 2014-2023 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
 import enum
 import logging
 import pathlib as pl
 import shutil
 import subprocess
 import platform
-from typing import Dict, Type, List, Union
+from typing import Dict, Type, List, Set
 
 from agent_build_refactored.utils.constants import SOURCE_ROOT, CpuArch, AGENT_REQUIREMENTS, REQUIREMENTS_DEV_COVERAGE
 from agent_build_refactored.utils.docker.common import delete_container
@@ -19,7 +34,7 @@ from agent_build_refactored.utils.docker.buildx.build import (
 
 from agent_build_refactored.prepare_agent_filesystem import build_linux_fhs_agent_files, add_config
 
-SUPPORTED_ARCHITECTURES = [
+_SUPPORTED_ARCHITECTURES = [
     CpuArch.x86_64,
     CpuArch.AARCH64,
     CpuArch.ARMV7,
@@ -56,6 +71,11 @@ class ContainerisedAgentBuilder(Builder):
     BASE_DISTRO: str
     TAG_SUFFIXES: List[str]
 
+    def __init__(self):
+        super(ContainerisedAgentBuilder, self).__init__()
+
+        self._already_build_requirements: Set[CpuArch] = set()
+
     @property
     def _common_cache_name(self):
         return f"agent_image_build_{self.__class__.BASE_DISTRO}"
@@ -86,7 +106,13 @@ class ContainerisedAgentBuilder(Builder):
         Build a special stage in the dependency Dockerfile, which is responsible for
         building agent requirement libs.
         """
+
         work_name = f"requirement_libs_{architecture.value}"
+        result_dir = self.work_dir / work_name
+
+        # do not build requirements for the same architecture if it is already built.
+        if architecture in self._already_build_requirements:
+            return result_dir
 
         base_image_work_name = f"{work_name}_base_image"
         base_image_oci_layout_dir = self.work_dir / f"{base_image_work_name}"
@@ -100,8 +126,6 @@ class ContainerisedAgentBuilder(Builder):
                 dest=base_image_oci_layout_dir
             )
         )
-
-        result_dir = self.work_dir / work_name
 
         cache_name = f"{self._common_cache_name}_{work_name}"
 
@@ -131,7 +155,15 @@ class ContainerisedAgentBuilder(Builder):
         )
 
         if not only_cache:
+            self._already_build_requirements.add(architecture)
             return result_dir
+
+    def get_image_registry_names(self, image_type: ImageType):
+        """Get list of names that this image has to have in the result registry"""
+        return _IMAGE_REGISTRY_NAMES[image_type]
+
+    def get_supported_architectures(self):
+        return _SUPPORTED_ARCHITECTURES[:]
 
     def generate_final_registry_tags(
         self,
@@ -150,7 +182,7 @@ class ContainerisedAgentBuilder(Builder):
         """
         result_names = []
 
-        for image_name in _IMAGE_REGISTRY_NAMES[image_type]:
+        for image_name in self.get_image_registry_names(image_type=image_type):
             for tag in tags:
                 for tag_suffix in self.__class__.TAG_SUFFIXES:
                     final_name = f"{registry}/{user}/{image_name}:{tag}{tag_suffix}"
@@ -217,7 +249,7 @@ class ContainerisedAgentBuilder(Builder):
         :return:
         """
 
-        architectures = architectures or SUPPORTED_ARCHITECTURES[:]
+        architectures = architectures or self.get_supported_architectures()
 
         agent_filesystem_dir = self.create_agent_filesystem(image_type=image_type)
 
@@ -420,7 +452,7 @@ def _arch_to_target_arch_and_variant(architecture: CpuArch):
 
 
 # Create all image builder classes and make them available from this global collection.
-ALL_CONTAINERISED_AGENT_BUILDERS: Dict[str, Type[ContainerisedAgentBuilder]] = {}
+CONTAINERISED_AGENT_BUILDERS: Dict[str, Type[ContainerisedAgentBuilder]] = {}
 
 
 for base_distro in ["ubuntu", "alpine"]:
@@ -435,7 +467,7 @@ for base_distro in ["ubuntu", "alpine"]:
         BASE_DISTRO = base_distro
         TAG_SUFFIXES = tag_suffixes[:]
 
-    ALL_CONTAINERISED_AGENT_BUILDERS[name] = _ContainerisedAgentBuilder
+    CONTAINERISED_AGENT_BUILDERS[name] = _ContainerisedAgentBuilder
 
 
 def _get_current_machine_architecture():

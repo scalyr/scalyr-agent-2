@@ -15,7 +15,7 @@
 
 import pathlib as pl
 import subprocess
-from typing import Type
+from typing import Type, Callable
 
 from agent_build_refactored.utils.constants import CpuArch
 from agent_build_refactored.utils.docker.common import delete_container
@@ -23,8 +23,8 @@ from agent_build_refactored.utils.docker.buildx.build import (
     buildx_build,
     DockerImageBuildOutput,
 )
+from agent_build_refactored.container_images import ALL_CONTAINERISED_AGENT_BUILDERS
 from agent_build_refactored.container_images.image_builders import (
-    ALL_CONTAINERISED_AGENT_BUILDERS,
     ContainerisedAgentBuilder,
     ImageType,
 )
@@ -38,6 +38,7 @@ def build_test_version_of_container_image(
     architecture: CpuArch,
     result_image_name: str,
     ready_image_oci_tarball: pl.Path = None,
+    install_additional_test_libs: bool = True,
 ):
     """
     Get production image create it's testable version.
@@ -81,25 +82,45 @@ def build_test_version_of_container_image(
         )
 
         prod_image_tag = all_image_tags[0]
+        if install_additional_test_libs:
 
-        # Build agent image requirements, because it also includes requirements (like coverage) for testing.
-        requirement_libs_dir = image_builder.build_requirement_libs(
-            architecture=architecture,
-        )
+            # Build agent image requirements, because it also includes requirements (like coverage) for testing.
+            requirement_libs_dir = image_builder.build_requirement_libs(
+                architecture=architecture,
+            )
 
-        # Build testable image.
-        buildx_build(
-            dockerfile_path=_PARENT_DIR / "Dockerfile",
-            context_path=_PARENT_DIR,
-            architectures=[architecture],
-            build_contexts={
-                "prod_image": f"docker-image://{prod_image_tag}",
-                "requirement_libs": str(requirement_libs_dir),
-            },
-            output=DockerImageBuildOutput(
-                name=result_image_name,
-            ),
-        )
+            # Build testable image.
+            buildx_build(
+                dockerfile_path=_PARENT_DIR / "Dockerfile",
+                context_path=_PARENT_DIR,
+                architectures=[architecture],
+                build_contexts={
+                    "prod_image": f"docker-image://{prod_image_tag}",
+                    "requirement_libs": str(requirement_libs_dir),
+                },
+                output=DockerImageBuildOutput(
+                    name=result_image_name,
+                ),
+            )
+        else:
+            subprocess.run(
+                [
+                    "docker",
+                    "pull",
+                    prod_image_tag,
+                ],
+                check=True,
+            )
+
+            subprocess.run(
+                [
+                    "docker",
+                    "tag",
+                    prod_image_tag,
+                    result_image_name,
+                ],
+                check=True,
+            )
     finally:
         delete_container(container_name=registry_container_name)
 
@@ -108,3 +129,24 @@ def build_test_version_of_container_image(
 
 def get_image_builder_by_name(name: str):
     return ALL_CONTAINERISED_AGENT_BUILDERS[name]
+
+
+def add_command_line_args(add_func: Callable):
+    add_func(
+        "--image-builder-name",
+        required=True,
+        choices=ALL_CONTAINERISED_AGENT_BUILDERS.keys(),
+    )
+
+    add_func("--image-type", required=True, choices=[t.value for t in ImageType])
+
+    add_func(
+        "--architecture",
+        required=True,
+        choices=[a.value for a in CpuArch],
+    )
+
+    add_func(
+        "--image-oci-tarball",
+        required=False,
+    )

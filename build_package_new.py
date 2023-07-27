@@ -37,8 +37,8 @@ sys.path.append(str(pl.Path(__file__).parent.absolute()))
 
 from agent_build_refactored.utils.constants import CpuArch
 from agent_build_refactored.utils.common import init_logging
+from agent_build_refactored.container_images import ALL_CONTAINERISED_AGENT_BUILDERS
 from agent_build_refactored.container_images.image_builders import (
-    ALL_CONTAINERISED_AGENT_BUILDERS,
     ImageType,
 )
 

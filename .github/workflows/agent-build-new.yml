@@ -162,7 +162,7 @@ jobs:
     needs:
       - pre_job
       - build_container_images
-      #- build-linux-packages
+      - build-linux-packages
       - build-windows-package
       - build_tarball
     runs-on: ubuntu-20.04

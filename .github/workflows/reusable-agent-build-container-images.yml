@@ -819,7 +819,7 @@ jobs:
   publish_images:
     name: Publish image ${{ matrix.variant.image_type }}-${{ matrix.variant.builder_name }}
     runs-on: ubuntu-20.04
-    if: github.ref_type == 'tag' || github.ref_name == 'new-image-builders-test'
+    if: github.ref_type == 'tag' || github.ref_name == 'master'
     needs:
       - build_image_tarball
     strategy:
