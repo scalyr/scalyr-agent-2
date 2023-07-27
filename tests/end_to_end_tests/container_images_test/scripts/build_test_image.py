@@ -48,13 +48,6 @@ if __name__ == "__main__":
         required=True,
     )
 
-    parser.add_argument(
-        "--do-not-install-additional-test-libs",
-        required=False,
-        action="store_true",
-        help="Do not install additional libraries to a tested images.",
-    )
-
     args = parser.parse_args()
 
     image_builder_cls = get_image_builder_by_name(name=args.image_builder_name)

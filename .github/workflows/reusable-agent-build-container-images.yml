@@ -822,6 +822,10 @@ jobs:
     if: github.ref_type == 'tag' || github.ref_name == 'master'
     needs:
       - build_image_tarball
+      - k8s_kubernetes_monitor_tests
+      - k8s_open_metrics_monitor_tests
+      - k8s-smoketest
+      - docker-smoketest
     strategy:
       matrix:
         variant:

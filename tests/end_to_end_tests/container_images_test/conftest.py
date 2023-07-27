@@ -70,6 +70,7 @@ def test_image_name(
         architecture=CpuArch(request.config.option.architecture),
         result_image_name=image_name,
         ready_image_oci_tarball=ready_image_oci_tarball,
+        install_additional_test_libs=not request.config.option.do_not_install_additional_test_libs
     )
 
     return image_name
