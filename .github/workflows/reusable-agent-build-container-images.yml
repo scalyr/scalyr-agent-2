@@ -42,7 +42,7 @@ on:
 jobs:
   coverage:
     runs-on: ubuntu-latest
-    if: success() || failure()
+    if: ( success() || failure() ) && github.ref_name != '_release_build'
     needs:
       - k8s-smoketest
       - docker-smoketest
@@ -200,7 +200,7 @@ jobs:
   k8s_kubernetes_monitor_tests:
     name: Kubernetes Monitors - k8s ${{ matrix.k8s_version.version }}-${{ matrix.k8s_version.runtime}}
     runs-on: ubuntu-20.04
-    if: github.ref_type != 'tag'
+    if: github.ref_name != '_release_build'
     timeout-minutes: 15
 
     needs:
@@ -437,7 +437,7 @@ jobs:
   k8s_open_metrics_monitor_tests:
     name: OpenMetrics Monitor - k8s ${{ matrix.k8s_version.version }}-${{ matrix.k8s_version.runtime}}
     runs-on: ubuntu-20.04
-    if: github.ref_type != 'tag'
+    if: github.ref_name != '_release_build'
     timeout-minutes: 15
 
     needs:
@@ -645,7 +645,7 @@ jobs:
     runs-on: ubuntu-20.04
     needs:
       - build_image_tarball
-    if: github.ref_type != 'tag'
+    if: github.ref_name != '_release_build'
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
@@ -729,7 +729,7 @@ jobs:
 
   docker-smoketest:
     name: Docker Smoketest - ${{ matrix.variant.image_type }}
-    if: github.ref_type != 'tag'
+    if: github.ref_name != '_release_build'
     needs:
       - build_image_tarball
     runs-on: ubuntu-20.04
