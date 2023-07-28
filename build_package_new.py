@@ -119,7 +119,7 @@ if __name__ == "__main__":
         "--tags", required=True, help="Comma-separated list of tags to publish."
     )
     image_publish_parser.add_argument(
-        "--from-oci-layout-dir",
+        "--from-oci-layout",
         required=False,
         help="OCI tarball with already built image. When provided that image us used instead of building new one",
     )
@@ -168,9 +168,9 @@ if __name__ == "__main__":
             tags = args.tags.split(",")
 
             if args.from_oci_layout_dir:
-                existing_oci_layout_dir = pl.Path(args.from_oci_layout_dir)
+                existing_oci_layout_tarball = pl.Path(args.from_oci_layout_dir)
             else:
-                existing_oci_layout_dir = None
+                existing_oci_layout_tarball = None
 
             final_tags = builder.generate_final_registry_tags(
                 image_type=ImageType(args.image_type),
@@ -181,7 +181,7 @@ if __name__ == "__main__":
             builder.publish(
                 image_type=ImageType(args.image_type),
                 tags=final_tags,
-                existing_oci_layout_dir=existing_oci_layout_dir,
+                existing_oci_layout_tarball=existing_oci_layout_tarball,
                 registry_username=args.registry_username,
                 registry_password=args.registry_password,
                 no_verify_tls=args.no_verify_tls,

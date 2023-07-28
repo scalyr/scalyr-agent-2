@@ -357,7 +357,7 @@ class ContainerisedAgentBuilder(Builder):
         self,
         image_type: ImageType,
         tags: List[str],
-        existing_oci_layout_dir: pl.Path = None,
+        existing_oci_layout_tarball: pl.Path = None,
         registry_username: str = None,
         registry_password: str = None,
         no_verify_tls: bool = False,
@@ -368,19 +368,22 @@ class ContainerisedAgentBuilder(Builder):
             We use skopeo in this case.
         :param image_type: Type of image
         :param tags: list of tags
-        :param existing_oci_layout_dir: Path to existing image OCI tarball. If exists, it will publish image from this
+        :param existing_oci_layout_tarball: Path to existing image OCI tarball. If exists, it will publish image from this
             tarball. If not new image will be built inplace.
         :param registry_username: Registry login
         :param registry_password: Registry password
         :param no_verify_tls: Disable certificate validation when pushing the image.
         :return:
         """
-        if existing_oci_layout_dir:
-            oci_layer = existing_oci_layout_dir
+        if existing_oci_layout_tarball:
+            oci_layout_tarball = existing_oci_layout_tarball
         else:
-            oci_layer = self.build_oci_tarball(image_type=image_type)
+            oci_layout_tarball = self.build_oci_tarball(image_type=image_type)
 
-        container_name = "agent_image_publish_skopeo"
+        if not oci_layout_tarball.exists():
+            raise Exception("OCI layout tarball does not exists.")
+
+        container_name = f"agent_image_publish_skopeo_{self.name}_{image_type.value}"
 
         delete_container(
             container_name=container_name,
@@ -388,14 +391,14 @@ class ContainerisedAgentBuilder(Builder):
 
         # use skopeo tool to copy image.
         # also use it from container, so we don't have to rly on a local installation.
+        # We also do not use mounting because on some docker environments, this feature may be unavailable,
+        # so we just create a container first and then copy the tarball.
         cmd_args = [
             "docker",
-            "run",
-            "-i",
+            "create",
             "--rm",
             f"--name={container_name}",
             "--net=host",
-            f"-v={oci_layer}:/tmp/oci_layout.tar",
             "quay.io/skopeo/stable:latest",
             "copy",
             "--all",
@@ -421,19 +424,39 @@ class ContainerisedAgentBuilder(Builder):
 
         for tag in tags:
             logger.info(f"Publish image '{tag}'")
-            subprocess.run(
-                [
-                    *cmd_args,
-                    "oci-archive:/tmp/oci_layout.tar",
-                    f"docker://{tag}",
-                ],
-                check=True,
 
-            )
+            try:
+                # Create the container, copy tarball into it and start.
+                subprocess.run(
+                    [
+                        *cmd_args,
+                        f"oci-archive:/tmp/{oci_layout_tarball.name}",
+                        f"docker://{tag}",
+                    ],
+                    check=True,
+                )
 
-        delete_container(
-            container_name=container_name,
-        )
+                subprocess.run(
+                    [
+                        "docker",
+                        "cp",
+                        str(oci_layout_tarball),
+                        f"{container_name}:/tmp/{oci_layout_tarball.name}"
+                    ]
+                )
+                subprocess.run(
+                    [
+                        "docker",
+                        "start",
+                        "-i",
+                        container_name,
+                    ],
+                    check=True,
+                )
+            finally:
+                delete_container(
+                    container_name=container_name,
+                )
 
 
 def _arch_to_docker_build_target_name(architecture: CpuArch):

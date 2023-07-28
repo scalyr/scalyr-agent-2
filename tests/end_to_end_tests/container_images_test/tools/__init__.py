@@ -77,7 +77,7 @@ def build_test_version_of_container_image(
         image_builder.publish(
             image_type=image_type,
             tags=all_image_tags,
-            existing_oci_layout_dir=ready_image_oci_tarball,
+            existing_oci_layout_tarball=ready_image_oci_tarball,
             no_verify_tls=True,
         )
 

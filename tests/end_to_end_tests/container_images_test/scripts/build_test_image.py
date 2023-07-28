@@ -52,11 +52,16 @@ if __name__ == "__main__":
 
     image_builder_cls = get_image_builder_by_name(name=args.image_builder_name)
 
+    if args.image_oci_tarball:
+        image_oci_tarball = pl.Path(args.image_oci_tarball)
+    else:
+        image_oci_tarball = None
+
     build_test_version_of_container_image(
         image_type=ImageType(args.image_type),
         image_builder_cls=image_builder_cls,
         architecture=CpuArch(args.architecture),
         result_image_name=args.result_image_name,
-        ready_image_oci_tarball=args.image_oci_tarball,
+        ready_image_oci_tarball=image_oci_tarball,
         install_additional_test_libs=not args.do_not_install_additional_test_libs,
     )
