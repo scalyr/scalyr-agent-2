@@ -399,7 +399,7 @@ class ContainerisedAgentBuilder(Builder):
             "--rm",
             f"--name={container_name}",
             "--net=host",
-            "quay.io/skopeo/stable:latest",
+            "quay.io/skopeo/stable:v1.13.0",
             "copy",
             "--all",
         ]
