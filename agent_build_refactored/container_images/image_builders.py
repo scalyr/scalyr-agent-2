@@ -169,14 +169,14 @@ class ContainerisedAgentBuilder(Builder):
         self,
         image_type: ImageType,
         registry: str,
-        user: str,
+        name_prefix: str,
         tags: List[str],
     ) -> List[str]:
         """
         Create list of final tags using permutation of image names, tags and tag suffixes.
         :param image_type: Type of the image
         :param registry: Registry hostname
-        :param user: Registry username
+        :param name_prefix: Prefix to the image name.
         :param tags: List of tags.
         :return: List of final tags
         """
@@ -185,7 +185,7 @@ class ContainerisedAgentBuilder(Builder):
         for image_name in self.get_image_registry_names(image_type=image_type):
             for tag in tags:
                 for tag_suffix in self.__class__.TAG_SUFFIXES:
-                    final_name = f"{registry}/{user}/{image_name}:{tag}{tag_suffix}"
+                    final_name = f"{registry}/{name_prefix}/{image_name}:{tag}{tag_suffix}"
                     result_names.append(final_name)
 
         return result_names

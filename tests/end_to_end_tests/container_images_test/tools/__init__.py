@@ -69,7 +69,7 @@ def build_test_version_of_container_image(
         all_image_tags = image_builder.generate_final_registry_tags(
             image_type=image_type,
             registry="localhost:5000",
-            user="user",
+            name_prefix="user",
             tags=["prod"],
         )
 

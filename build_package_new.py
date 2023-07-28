@@ -110,6 +110,12 @@ if __name__ == "__main__":
     )
 
     image_publish_parser.add_argument(
+        "--name-prefix",
+        required=True,
+        help="Prefix for the image name."
+    )
+
+    image_publish_parser.add_argument(
         "--tags", required=True, help="Comma-separated list of tags to publish."
     )
     image_publish_parser.add_argument(
@@ -169,7 +175,7 @@ if __name__ == "__main__":
             final_tags = builder.generate_final_registry_tags(
                 image_type=ImageType(args.image_type),
                 registry=args.registry,
-                user=args.registry_username,
+                name_prefix=args.name_prefix,
                 tags=tags,
             )
             builder.publish(
