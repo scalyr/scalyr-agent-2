@@ -110,9 +110,7 @@ if __name__ == "__main__":
     )
 
     image_publish_parser.add_argument(
-        "--name-prefix",
-        required=True,
-        help="Prefix for the image name."
+        "--name-prefix", required=True, help="Prefix for the image name."
     )
 
     image_publish_parser.add_argument(

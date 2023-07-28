@@ -149,7 +149,7 @@ def add_command_line_args(add_func: Callable):
     add_func(
         "--image-oci-tarball",
         required=False,
-        help="Instead of building an image. Use existing oce from the given OCI image."
+        help="Instead of building an image. Use existing oce from the given OCI image.",
     )
 
     add_func(
