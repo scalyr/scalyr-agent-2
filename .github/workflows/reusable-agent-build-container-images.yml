@@ -34,9 +34,9 @@ on:
         required: true
       CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ:
         required: true
-      DOCKERHUB_USERNAME:
+      PUBLISH_REGISTRY_USERNAME:
         required: true
-      DOCKERHUB_PASSWORD:
+      PUBLISH_REGISTRY_PASSWORD:
         required: true
 
 jobs:
@@ -876,9 +876,9 @@ jobs:
             ${{ matrix.variant.builder_name }} \
             publish \
             --registry docker.io \
-            --name-prefix ${{ secrets.DOCKERHUB_USERNAME }} \
+            --name-prefix ${{ secrets.PUBLISH_REGISTRY_USERNAME }} \
             --tags ${{ steps.verify.outputs.tags }} \
             --from-oci-layout /tmp/image_tarball/${{ matrix.variant.image_type }}-${{ matrix.variant.builder_name }}.tar \
-            --registry-username ${{ secrets.DOCKERHUB_USERNAME }} \
-            --registry-password ${{ secrets.DOCKERHUB_PASSWORD }} \
+            --registry-username ${{ secrets.PUBLISH_REGISTRY_USERNAME }} \
+            --registry-password ${{ secrets.PUBLISH_REGISTRY_PASSWORD }} \
             --image-type ${{ matrix.variant.image_type }}
