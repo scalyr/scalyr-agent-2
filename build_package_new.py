@@ -165,7 +165,7 @@ if __name__ == "__main__":
         elif args.action == "publish":
             tags = args.tags.split(",")
 
-            if args.from_oci_layout_dir:
+            if args.from_oci_layout:
                 existing_oci_layout_tarball = pl.Path(args.from_oci_layout)
             else:
                 existing_oci_layout_tarball = None
