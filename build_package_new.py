@@ -166,7 +166,7 @@ if __name__ == "__main__":
             tags = args.tags.split(",")
 
             if args.from_oci_layout_dir:
-                existing_oci_layout_tarball = pl.Path(args.from_oci_layout_dir)
+                existing_oci_layout_tarball = pl.Path(args.from_oci_layout)
             else:
                 existing_oci_layout_tarball = None
 
