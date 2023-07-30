@@ -205,7 +205,7 @@ class AgentRunner(object):
                 cmd = "/sbin/service scalyr-agent-2 --no-fork --no-change-user start"
 
             self._agent_process = subprocess.Popen(
-                cmd, shell=True, env=compat.os_environ_unicode.copy()
+                cmd, shell=True, env=compat.os_environ_unicode.copy(),
             )
         else:
             base_args = [
@@ -237,6 +237,7 @@ class AgentRunner(object):
                 stderr=subprocess.PIPE,
                 shell=True,
                 close_fds=True,
+                env=os.environ.copy(),
             )
 
         print("Agent started.")

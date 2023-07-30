@@ -21,7 +21,7 @@ import sys
 import pathlib as pl
 import site
 
-from agent_build_refactored.tools.constants import SOURCE_ROOT
+from agent_build_refactored.utils.constants import SOURCE_ROOT
 from agent_build_refactored.managed_packages.managed_packages_builders import (
     AGENT_SUBDIR_NAME as SUBDIR,
 )

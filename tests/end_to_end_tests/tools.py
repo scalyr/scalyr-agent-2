@@ -89,7 +89,11 @@ class AgentCommander:
 
         self._check_call_command(cmd, env=env)
 
-    def start_and_wait(self, logger, env: Dict = None):
+    def start_and_wait(
+        self,
+        logger=None,
+        env: Dict = None
+    ):
         """
         Start the Agent and wait for a successful status.
         :param logger: Logger instance.
@@ -105,13 +109,15 @@ class AgentCommander:
             try:
                 self.get_status_json()
             except subprocess.CalledProcessError as e:
-                logger.warning(f"Can not get agent status. Error: {e}\nRetry")
+                if logger:
+                    logger.warning(f"Can not get agent status. Error: {e}\nRetry")
                 if attempts >= 10:
                     agent_log = self.agent_paths.agent_log_path.read_text()
                     agent_log_tail = "".join(agent_log.splitlines()[:20])
-                    logger.error(
-                        f"Can not start agent and get it status. Give up.\nAgent log: {agent_log_tail}"
-                    )
+                    if logger:
+                        logger.error(
+                            f"Can not start agent and get it status. Give up.\nAgent log: {agent_log_tail}"
+                        )
                     raise e
                 time.sleep(1)
                 attempts += 1
@@ -146,6 +152,10 @@ class AgentCommander:
 
     def stop(self):
         self._check_call_command(["stop"])
+
+    def restart(self):
+        self.stop()
+        self.start_and_wait()
 
 
 class TimeoutTracker:

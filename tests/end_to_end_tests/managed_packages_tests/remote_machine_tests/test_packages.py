@@ -31,7 +31,7 @@ from typing import List, Dict
 
 import pytest
 
-from agent_build_refactored.tools.constants import SOURCE_ROOT
+from agent_build_refactored.utils.constants import SOURCE_ROOT
 from agent_build_refactored.managed_packages.managed_packages_builders import (
     AGENT_SUBDIR_NAME,
     AGENT_AIO_PACKAGE_NAME,

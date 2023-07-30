@@ -27,7 +27,7 @@ import requests
 from tests.end_to_end_tests.tools import AgentCommander, TimeoutTracker
 
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 AGENT_LOG_LINE_TIMESTAMP = r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+Z"
@@ -104,11 +104,11 @@ def check_agent_log_for_errors(
             for predicate in ignore_predicates:
                 if predicate(message, additional_lines):
                     to_fail = False
-                    log.info(f"Ignored error: {whole_error}")
+                    logger.info(f"Ignored error: {whole_error}")
                     break
 
             if to_fail:
-                log.info(content)
+                logger.info(content)
                 raise AssertionError(f"Agent log error: {whole_error}")
 
 
@@ -138,73 +138,95 @@ def check_requests_stats_in_agent_log(content: str) -> bool:
                 requests_sent > 0
             ), "Agent log says that during the run the agent has sent zero requests."
 
-            log.info("Agent requests stats have been found and they are valid.")
+            logger.info("Agent requests stats have been found and they are valid.")
             return True
     else:
         return False
 
 
-class ScalyrQueryRequest:
+def get_events_page_from_scalyr(
+    scalyr_server,
+    read_api_key,
+    start_time,
+    filters,
+    timeout_tracker: TimeoutTracker,
+    continuation_token: str = None
+):
     """
-    Abstraction to create scalyr API requests.
+    Query logs from Scalyr servers.
     """
+    common_params = {
+        "maxCount": 5000,
+        "startTime": start_time,
+        "token": read_api_key,
+    }
+    while True:
 
-    def __init__(
-        self,
-        server_address,
-        read_api_key,
-        max_count=1000,
-        start_time=None,
-        end_time=None,
-        filters=None,
-        logger=log,
-    ):
-        self._server_address = server_address
-        self._read_api_key = read_api_key
-        self._max_count = max_count
-        self._start_time = start_time
-        self._end_time = end_time
-        self._filters = filters or []
+        params = common_params.copy()
 
-        self._logger = logger
-
-    def build(self):
-        params = {
-            "maxCount": self._max_count,
-            "startTime": self._start_time or time.time(),
-            "token": self._read_api_key,
-        }
+        if continuation_token:
+            params["continuationToken"] = continuation_token
 
         params_str = urlencode(params)
 
-        quoted_filters = [quote_plus(f) for f in self._filters]
+        quoted_filters = [quote_plus(f) for f in filters]
         filter_fragments_str = "+and+".join(quoted_filters)
 
         query = "{0}&filter={1}".format(params_str, filter_fragments_str)
 
-        return query
-
-    def send(self):
-        query = self.build()
-
-        protocol = "https://" if not self._server_address.startswith("http") else ""
+        protocol = "https://" if not scalyr_server.startswith("http") else ""
 
         full_query = "{0}{1}/api/query?queryType=log&{2}".format(
-            protocol, self._server_address, query
+            protocol, scalyr_server, query
         )
 
-        self._logger.info("Query server: {0}".format(full_query))
+        logger.info("Query server: {0}".format(full_query))
 
         with requests.Session() as session:
             resp = session.get(full_query)
 
-        if resp.status_code != 200:
-            self._logger.info(f"Query failed with {resp.text}.")
-            return None
+        if resp.status_code == 200:
+            break
 
-        data = resp.json()
+        logger.info(f"Query failed with status '{resp.status_code}' and test '{resp.text}'.")
+        logger.info(f"Retry in {_QUERY_RETRY_DELAY} sec.")
+        timeout_tracker.sleep(1, "Can not get all events.")
 
-        return data
+    data = resp.json()
+
+    return data
+
+
+def get_all_events_from_scalyr(
+    scalyr_server,
+    read_api_key,
+    start_time,
+    filters,
+    timeout_tracker: TimeoutTracker,
+) -> List:
+    """
+    Query all pages with logs from Scalyr servers.
+    """
+    events = []
+    continuation_token = None
+    while True:
+        data = get_events_page_from_scalyr(
+            scalyr_server=scalyr_server,
+            read_api_key=read_api_key,
+            start_time=start_time,
+            filters=filters,
+            timeout_tracker=timeout_tracker,
+            continuation_token=continuation_token,
+        )
+
+        page_events = data["matches"]
+        events.extend(page_events)
+
+        continuation_token = data.get("continuationToken")
+        if not continuation_token:
+            break
+
+    return events
 
 
 TEST_LOG_MESSAGE_COUNT = 1000
@@ -213,18 +235,28 @@ TEST_LOG_MESSAGE_COUNT = 1000
 _QUERY_RETRY_DELAY = 10
 
 
-def write_counter_messages_to_test_log(upload_test_log_path: pl.Path):
+def write_counter_messages_to_test_log(
+        upload_test_log_path: pl.Path,
+        messages_count: int = None,
+        logger: logging.Logger = None
+):
     """
     Write special counter messages to a test log file. Those messages then will be queried from Scalyr to verify
     that they all were successfully ingested.
     """
+
+    messages_count = messages_count or TEST_LOG_MESSAGE_COUNT
+    if logger:
+        logger.info(f"Write {messages_count} lines to the file {upload_test_log_path}")
     with upload_test_log_path.open("a") as test_log_write_file:
-        for i in range(TEST_LOG_MESSAGE_COUNT):
+        for i in range(messages_count):
             data = {"count": i}
             data_json = json.dumps(data)
             test_log_write_file.write(data_json)
             test_log_write_file.write("\n")
             test_log_write_file.flush()
+
+    return messages_count
 
 
 def verify_logs(
@@ -234,7 +266,7 @@ def verify_logs(
     counters_verification_query_filters: List[str],
     counter_getter: Callable[[Any], int],
     timeout_tracker: TimeoutTracker,
-    write_counter_messages: Callable[[], None] = None,
+    write_counter_messages: Callable[[], int],
     verify_ssl: bool = True,
     ignore_agent_errors_predicates: List[Callable[[str, List[str]], bool]] = None,
 ):
@@ -255,9 +287,9 @@ def verify_logs(
     :param ignore_agent_errors_predicates: List of callables where each accepts error message line and following traceback
         (if exists) and returns True whether this message has to be ignored, so the overall check will not fail.
     """
-    if write_counter_messages:
-        log.info("Write test log file messages.")
-        write_counter_messages()
+
+    logger.info("Write test log file messages.")
+    messages_count = write_counter_messages()
 
     agent_log_content = get_agent_log_content()
 
@@ -281,61 +313,48 @@ def verify_logs(
         ignore_predicates=ignore_agent_errors_predicates,
     )
 
-    log.info("Wait for agent log requests stats...")
+    logger.info("Wait for agent log requests stats...")
 
     with timeout_tracker(80, "Can not wait more for requests stats."):
         while not check_requests_stats_in_agent_log(content=get_agent_log_content()):
-            log.info("   Request stats haven't been found yet, retry...")
+            logger.info("   Request stats haven't been found yet, retry...")
             timeout_tracker.sleep(10)
 
-    log.info(
+    logger.info(
         "Verify that previously written counter messages have been uploaded to server."
     )
+
+    timeout_tracker.sleep(_QUERY_RETRY_DELAY, "Could not fetch data from Scalyr.")
+    start_time = time.time() - 60 * 5
     while True:
-        timeout_tracker.sleep(_QUERY_RETRY_DELAY, "Could not fetch data from Scalyr.")
-        resp = ScalyrQueryRequest(
-            server_address=scalyr_server,
+        events = get_all_events_from_scalyr(
+            scalyr_server=scalyr_server,
             read_api_key=scalyr_api_read_key,
-            # We max count more than the actual written counter message to be sure that
-            # no more messages were left hidden in the next search page.
-            max_count=TEST_LOG_MESSAGE_COUNT * 2,
-            start_time=time.time() - 60 * 5,
+            start_time=start_time,
             filters=counters_verification_query_filters,
-        ).send()
+            timeout_tracker=timeout_tracker,
+        )
 
-        if not resp:
-            log.info(f"Retry in {_QUERY_RETRY_DELAY} sec.")
-            continue
-
-        events = resp["matches"]
-
-        if not events:
-            log.info(
-                f"No events have been uploaded yet, retry in {_QUERY_RETRY_DELAY} sec."
-            )
-            time.sleep(_QUERY_RETRY_DELAY)
-            continue
-
-        if len(events) < TEST_LOG_MESSAGE_COUNT:
-            log.info(
+        if len(events) < messages_count:
+            logger.info(
                 f"Not all events have been uploaded. "
-                f"Expected: {TEST_LOG_MESSAGE_COUNT}. "
+                f"Expected: {messages_count}. "
                 f"Actual: {len(events)}"
             )
             time.sleep(_QUERY_RETRY_DELAY)
             continue
 
         assert (
-            len(events) == TEST_LOG_MESSAGE_COUNT
-        ), f"Expected number of events: {TEST_LOG_MESSAGE_COUNT}, got {len(events)}."
+            len(events) == messages_count
+        ), f"Expected number of events: {messages_count}, got {len(events)}."
 
         event_counts = [counter_getter(e) for e in events]
 
         assert event_counts == list(
-            range(TEST_LOG_MESSAGE_COUNT)
+            range(messages_count)
         ), "Counters in the uploaded event not in the right order."
 
-        log.info(f"All {TEST_LOG_MESSAGE_COUNT} events have been uploaded.")
+        logger.info(f"All {messages_count} events have been uploaded.")
         break
 
     # Do a final error check for agent log.
@@ -356,7 +375,7 @@ def verify_agent_status(
     Perform basic verification of the agent output.
     """
 
-    log.info("Verifying agent status output")
+    logger.info("Verifying agent status output")
     while True:
         json_status = agent_commander.get_status_json()
         copying_manager_status = json_status.get("copying_manager_status")

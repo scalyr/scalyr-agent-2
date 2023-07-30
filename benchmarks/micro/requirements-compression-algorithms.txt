@@ -1,2 +1,2 @@
--r ../../agent_build/requirement-files/compression-requirements.txt
+-r ../../dev-requirements-new.txt
 brotli

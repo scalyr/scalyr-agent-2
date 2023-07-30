@@ -8,27 +8,41 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Install python
+    - name: Setup Python
       uses: actions/setup-python@v4
+      id: setup-python
       with:
-        python-version: ${{ inputs.python_version }}
+        python-version: ${{ matrix.python_version }}
+        cache: 'pip' # caching pip dependencies
+        cache-dependency-path: |
+          dev-requirements-new.txt
 
-    - name: Cache wheels
-      id: cache_wheels
-      uses: actions/cache@v3
-      with:
-        path: wheels
-        key: ${{ runner.os }}-requirements-wheels-${{ hashFiles('dev-requirements-new.txt') }}-6
-
-    - name: Create wheels
-      if: steps.cache_wheels.outputs.cache-hit != 'true'
+    - name: Install requirements
       shell: bash
-      working-directory: ${{ github.workspace }}
       run: |
-        python3 -m pip wheel -r dev-requirements-new.txt --wheel-dir wheels
+        python3 -m pip install -r dev-requirements-new.txt
 
-    - name: Install wheels
-      shell: bash
-      working-directory: ${{ github.workspace }}
-      run: |
-        python3 -m pip install -r dev-requirements-new.txt --no-index --find-links wheels
+#    - name: Install python
+#      uses: actions/setup-python@v4
+#      with:
+#        python-version: ${{ inputs.python_version }}
+#
+#    - name: Cache wheels
+#      id: cache_wheels
+#      uses: actions/cache@v3
+#      with:
+#        path: wheels
+#        key: ${{ runner.os }}-requirements-wheels-${{ hashFiles('dev-requirements-new.txt') }}-6
+#
+#    - name: Create wheels
+#      if: steps.cache_wheels.outputs.cache-hit != 'true'
+#      shell: bash
+#      working-directory: ${{ github.workspace }}
+#      run: |
+#        python3 -m pip wheel -r dev-requirements-new.txt --wheel-dir wheels
+#
+#    - name: Install wheels
+#      shell: bash
+#      working-directory: ${{ github.workspace }}
+#      run: |
+#        python3 -m pip install -r dev-requirements-new.txt --no-index --find-links wheels

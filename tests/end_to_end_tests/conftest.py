@@ -21,6 +21,7 @@ some common options and fixtures such as Scalyr credentials etc.
 import json
 import os
 import pathlib as pl
+import time
 
 import pytest
 from _pytest.runner import pytest_runtest_protocol as orig_pytest_runtest_protocol
@@ -45,82 +46,36 @@ def pytest_runtest_protocol(item, nextitem):
     return True
 
 
-def pytest_addoption(parser):
-    parser.addoption(
-        "--scalyr-api-key",
-        dest="scalyr_api_key",
-    )
+def _get_env_var(name: str, default=None):
+    value = os.environ.get(name)
 
-    parser.addoption(
-        "--scalyr-api-read-key",
-        dest="scalyr_api_read_key",
-    )
-
-    parser.addoption(
-        "--scalyr-server", dest="scalyr_server", default="agent.scalyr.com"
-    )
-
-    parser.addoption(
-        "--test-session-suffix",
-        dest="test_session_suffix",
-        required=False,
-        default=None,
-        help="Additional suffix option to make server host or cluster name unique and "
-        "to be able to navigate and search through Scalyr logs.",
-    )
-
-
-@pytest.fixture(scope="session")
-def config_file():
-    """
-    Config dist which is read from the 'credentials.json' file.
-    """
-    config_path = pl.Path(__file__).parent.parent / "credentials.json"
-    if not config_path.exists():
-        return {}
-
-    return json.loads(config_path.read_text())
-
-
-def _get_option_value(name: str, config: dict, arg_options, default=None):
-    """
-    Search for the value with some name in different sources such as command line arguments and config file.
-    """
-
-    # First search in command line arguments.
-    arg_value = getattr(arg_options, name, None)
-    if arg_value:
-        return arg_value
-
-    # Then in config file.
-    config_value = config.get(name)
-    if config_value:
-        return config_value
-
-    if default:
+    if value is None:
+        if default is None:
+            raise Exception(f"The environment variable '{name}' has to be specified.")
         return default
 
-    raise ValueError(f"The option value with name {name} is not set.")
+    return value
 
 
 @pytest.fixture(scope="session")
-def scalyr_api_key(config_file, request):
-    return request.config.option.scalyr_api_key
+def scalyr_api_key():
+    return _get_env_var(name="SCALYR_API_KEY")
 
 
 @pytest.fixture(scope="session")
-def scalyr_api_read_key(request):
-    return request.config.option.scalyr_api_read_key
+def scalyr_api_read_key():
+    return _get_env_var(name="READ_API_KEY")
 
 
 @pytest.fixture(scope="session")
-def scalyr_server(request):
-    return request.config.option.scalyr_server
+def scalyr_server():
+    return _get_env_var(name="SCALYR_SERVER", default="agent.scalyr.com")
 
 
 @pytest.fixture(scope="session")
-def test_session_suffix(request):
-    return request.config.option.test_session_suffix
+def test_session_suffix():
+    value = _get_env_var(name="TEST_SESSION_SUFFIX", default="")
+    return f"{value}-{int(time.time())}"
 
 
 @pytest.fixture(scope="session")

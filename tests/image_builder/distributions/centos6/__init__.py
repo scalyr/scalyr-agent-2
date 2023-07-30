@@ -32,9 +32,8 @@ class CentOSBuilderBase(AgentImageBuilder):
     IMAGE_TAG = create_distribution_base_image_name(DISTRIBUTION_NAME)
     DOCKERFILE = Path(__file__).parent / "Dockerfile.base"
     INCLUDE_PATHS = [
-        Path(get_install_root(), "dev-requirements.txt"),
+        Path(get_install_root(), "dev-requirements-new.txt"),
         Path(get_install_root(), "py26-unit-tests-requirements.txt"),
-        Path(get_install_root(), "agent_build"),
     ]
 
 

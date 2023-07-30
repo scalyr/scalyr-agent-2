@@ -18,14 +18,12 @@ RUN apt install -y python3-pip python3-dev
 
 RUN apt install -y nginx
 
-ADD requirement-files /scalyr-agent-2/agent_build/requirement-files
+COPY dev-requirements-new.txt /scalyr-agent-2/dev-requirements-new.txt
 
-COPY dev-requirements.txt /scalyr-agent-2/dev-requirements.txt
-
-RUN python2 -m pip install -r /scalyr-agent-2/dev-requirements.txt
+RUN python2 -m pip install -r /scalyr-agent-2/dev-requirements-new.txt
 # We need newer version of pip since old version don't support manylinux wheels
 RUN python3 -m pip install --upgrade "pip==21.0"
 RUN python3 -m pip --version
-RUN python3 -m pip install -r /scalyr-agent-2/dev-requirements.txt
+RUN python3 -m pip install -r /scalyr-agent-2/dev-requirements-new.txt
 
 WORKDIR /

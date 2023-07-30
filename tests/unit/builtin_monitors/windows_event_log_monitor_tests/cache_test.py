@@ -24,6 +24,7 @@ import time
 
 
 @skipIf(sys.version_info < (3, 0, 0), "Skipping under Python 2")
+@skipIf(sys.platform != "Windows", "Skipping on non-Windows platforms")
 class CacheTest(BaseScalyrLogCaptureTestCase):
     def test_fixed_size(self):
         cache = Cache(3, 3600)
