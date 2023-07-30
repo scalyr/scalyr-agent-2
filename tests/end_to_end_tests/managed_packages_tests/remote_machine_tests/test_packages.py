@@ -34,8 +34,8 @@ import pytest
 from agent_build_refactored.tools.constants import SOURCE_ROOT
 from agent_build_refactored.managed_packages.managed_packages_builders import (
     AGENT_SUBDIR_NAME,
-    DEFAULT_PYTHON_PACKAGE_OPENSSL_VERSION,
     AGENT_AIO_PACKAGE_NAME,
+    OPENSSL_3_VERSION,
 )
 from tests.end_to_end_tests.tools import AgentPaths, AgentCommander, TimeoutTracker
 from tests.end_to_end_tests.verify import (
@@ -50,91 +50,18 @@ logger = logging.getLogger(__name__)
 DISTROS_WITH_PYTHON_2 = {"centos7", "ubuntu1404", "ubuntu1604"}
 
 
-def _verify_package_paths(
-    package_path: pl.Path,
-    package_type: str,
-    package_name: str,
-    output_dir: pl.Path,
-    expected_paths: List[str],
-):
-    """
-    Verify structure if the agent's dependency packages.
-    First,  we have to ensure that all package files are located inside special subdirectory and nothing has leaked
-    outside.
-    :param package_type: Type of the package, e.g. deb, rpm.
-    :param package_name: Name of the package.
-    :param output_dir: Directory where to extract a package.
-    :param expected_paths: List of paths that are expected to be in this package.
-    """
-
-    package_root = output_dir / package_name
-    package_root.mkdir()
-
-    _extract_package(
-        package_type=package_type,
-        package_path=package_path,
-        output_path=package_root,
-    )
-
-    remaining_paths = set(package_root.glob("**/*"))
-
-    for expected in expected_paths:
-        expected_path = package_root / expected
-        for path in list(remaining_paths):
-            if str(path).startswith(str(expected_path)) or str(path) in str(
-                expected_path
-            ):
-                remaining_paths.remove(path)
-
-    assert (
-        len(remaining_paths) == 0
-    ), "Something remains outside if the expected package structure."
-
-
-def test_dependency_packages(
-    package_builder, tmp_path, target_distro, agent_package_path, use_aio_package
-):
-    if not use_aio_package:
-        pytest.skip("Only AIO packages are tested.")
-
-    if target_distro.name not in ["ubuntu2204", "amazonlinux2"]:
-        pytest.skip("No need to check on all distros.")
-
-    package_type = package_builder.PACKAGE_TYPE
-    _verify_package_paths(
-        package_path=agent_package_path,
-        package_type=package_builder.PACKAGE_TYPE,
-        package_name=AGENT_AIO_PACKAGE_NAME,
-        output_dir=tmp_path,
-        expected_paths=[
-            f"opt/{AGENT_SUBDIR_NAME}/",
-            f"etc/{AGENT_SUBDIR_NAME}/",
-            "etc/init.d/scalyr-agent-2",
-            f"usr/share/{AGENT_SUBDIR_NAME}/",
-            "usr/sbin/scalyr-agent-2",
-            "usr/sbin/scalyr-agent-2-config",
-            f"var/lib/{AGENT_SUBDIR_NAME}/",
-            f"var/log/{AGENT_SUBDIR_NAME}/",
-            f"var/opt/{AGENT_SUBDIR_NAME}/",
-            # Depending on its type, a package also may install its own "metadata", so we have to take it into
-            # account too.
-            f"usr/share/doc/{AGENT_SUBDIR_NAME}/"
-            if package_type == "deb"
-            else "usr/lib/.build-id/",
-        ],
-    )
-
-
 LINUX_PACKAGE_AGENT_PATHS = AgentPaths(
     configs_dir=pl.Path(f"/etc/{AGENT_SUBDIR_NAME}"),
     logs_dir=pl.Path(f"/var/log/{AGENT_SUBDIR_NAME}"),
     install_root=pl.Path(f"/usr/share/{AGENT_SUBDIR_NAME}"),
 )
 
+_PARENT_DIR = pl.Path(__file__).parent
+
 
 def test_packages(
     package_builder_name,
-    package_builder,
+    package_type,
     remote_machine_type,
     convenience_script_path,
     target_distro,
@@ -154,7 +81,7 @@ def test_packages(
 
     _print_system_information()
     _prepare_environment(
-        package_type=package_builder.PACKAGE_TYPE,
+        package_type=package_type,
         remote_machine_type=remote_machine_type,
         target_distro=target_distro,
         timeout_tracker=timeout_tracker,
@@ -270,21 +197,108 @@ def test_packages(
 
     logger.info("Cleanup")
     _remove_all_agent_files(
-        package_name=agent_package_name, package_type=package_builder.PACKAGE_TYPE
+        package_name=agent_package_name, package_type=package_type
     )
 
     assert monitor_file_path.exists()
     assert monitor_file_path.read_text() == "test"
 
 
-def test_agent_package_config_ownership(package_builder, agent_package_path, tmp_path):
+def test_aio_package_paths(
+    #package_builder,
+    package_type,
+    tmp_path,
+    target_distro,
+    agent_package_path,
+    use_aio_package,
+):
+
+    if not use_aio_package:
+        pytest.skip("Only AIO packages are tested.")
+
+    if target_distro.name not in ["ubuntu2204", "amazonlinux2"]:
+        pytest.skip("No need to check on all distros.")
+
+    package_type = package_type
+    package_root = tmp_path / AGENT_AIO_PACKAGE_NAME
+    package_root.mkdir()
+
+    _extract_package(
+        package_type=package_type,
+        package_path=agent_package_path,
+        output_path=package_root,
+    )
+
+    remaining_paths = set(package_root.glob("**/*"))
+
+    expected_paths = [
+        f"opt/{AGENT_SUBDIR_NAME}/",
+        f"etc/{AGENT_SUBDIR_NAME}/",
+        "etc/init.d/scalyr-agent-2",
+        f"usr/share/{AGENT_SUBDIR_NAME}/",
+        "usr/sbin/scalyr-agent-2",
+        "usr/sbin/scalyr-agent-2-config",
+        f"var/lib/{AGENT_SUBDIR_NAME}/",
+        f"var/log/{AGENT_SUBDIR_NAME}/",
+        f"var/opt/{AGENT_SUBDIR_NAME}/",
+    ]
+
+    # Depending on its type, a package also may install its own "metadata", so we have to take it into
+    # account too.
+    if package_type == "deb":
+        expected_paths.append(f"usr/share/doc/{AGENT_SUBDIR_NAME}/")
+    elif package_type == "rpm":
+        expected_paths.append("usr/lib/.build-id/")
+
+    for expected in expected_paths:
+        expected_path = package_root / expected
+        for path in list(remaining_paths):
+            if str(path).startswith(str(expected_path)) or str(path) in str(
+                expected_path
+            ):
+                remaining_paths.remove(path)
+
+    assert (
+        len(remaining_paths) == 0
+    ), "Something remains outside if the expected package structure."
+
+
+
+    # _verify_package_paths(
+    #     package_path=agent_package_path,
+    #     package_type=package_builder.PACKAGE_TYPE,
+    #     package_name=AGENT_AIO_PACKAGE_NAME,
+    #     root_dir=tmp_path,
+    #     expected_paths=[
+    #         f"opt/{AGENT_SUBDIR_NAME}/",
+    #         f"etc/{AGENT_SUBDIR_NAME}/",
+    #         "etc/init.d/scalyr-agent-2",
+    #         f"usr/share/{AGENT_SUBDIR_NAME}/",
+    #         "usr/sbin/scalyr-agent-2",
+    #         "usr/sbin/scalyr-agent-2-config",
+    #         f"var/lib/{AGENT_SUBDIR_NAME}/",
+    #         f"var/log/{AGENT_SUBDIR_NAME}/",
+    #         f"var/opt/{AGENT_SUBDIR_NAME}/",
+    #         # Depending on its type, a package also may install its own "metadata", so we have to take it into
+    #         # account too.
+    #         f"usr/share/doc/{AGENT_SUBDIR_NAME}/"
+    #         if package_type == "deb"
+    #         else "usr/lib/.build-id/",
+    #     ],
+    # )
+
+def test_agent_package_config_ownership(
+    package_type,
+    agent_package_path,
+    tmp_path
+):
     """
     Test ownership and permissions of the config files.
     """
 
     logger.info("Verifying agent.json and agent.d permissions")
     _extract_package(
-        package_type=package_builder.PACKAGE_TYPE,
+        package_type=package_type,
         package_path=agent_package_path,
         output_path=tmp_path,
     )
@@ -331,13 +345,14 @@ def test_agent_package_config_ownership(package_builder, agent_package_path, tmp
 
 
 def test_upgrade(
-    package_builder,
+    #package_builder,
     package_builder_name,
+    package_type,
     repo_url,
     repo_public_key_url,
     remote_machine_type,
     distro_name,
-    stable_agent_package_version,
+    stable_packages_version,
     scalyr_api_key,
     test_session_suffix,
     agent_version,
@@ -371,7 +386,7 @@ def test_upgrade(
     else:
         system_python_package_name = "python3"
 
-    if package_builder.PACKAGE_TYPE == "deb":
+    if package_type == "deb":
         repo_source_list_path = pl.Path("/etc/apt/sources.list.d/scalyr.list")
         repo_source_list_path.write_text(
             f"deb [allow-insecure=yes] {repo_url} scalyr main"
@@ -384,10 +399,10 @@ def test_upgrade(
                 "install",
                 "-y",
                 "--allow-unauthenticated",
-                f"{agent_package_name}={stable_agent_package_version}",
+                f"{agent_package_name}={stable_packages_version}",
             ]
         )
-    elif package_builder.PACKAGE_TYPE == "rpm":
+    elif package_type == "rpm":
         yum_repo_file_path = pl.Path("/etc/yum.repos.d/scalyr.repo")
         yum_repo_file_content = f"""
 [scalyr]
@@ -400,10 +415,10 @@ repo_gpgcheck=0
         yum_repo_file_path.write_text(yum_repo_file_content)
         _call_yum(["install", "-y", system_python_package_name])
         _call_yum(
-            ["install", "-y", f"{agent_package_name}-{stable_agent_package_version}-1"]
+            ["install", "-y", f"{agent_package_name}-{stable_packages_version}-1"]
         )
     else:
-        raise Exception(f"Unknown package type: {package_builder.PACKAGE_TYPE}")
+        raise Exception(f"Unknown package type: {package_type}")
 
     # Write config
     server_host = (
@@ -422,7 +437,7 @@ repo_gpgcheck=0
     agent_commander.agent_paths.agent_config_path.write_text(json.dumps(config))
 
     logger.info("Upgrade agent")
-    if package_builder.PACKAGE_TYPE == "deb":
+    if package_type == "deb":
         _call_apt(
             [
                 "install",
@@ -432,10 +447,10 @@ repo_gpgcheck=0
                 f"{agent_package_name}",
             ]
         )
-    elif package_builder.PACKAGE_TYPE == "rpm":
+    elif package_type == "rpm":
         _call_yum(["install", "-y", f"{agent_package_name}"])
     else:
-        raise Exception(f"Unknown package type: {package_builder.PACKAGE_TYPE}")
+        raise Exception(f"Unknown package type: {package_type}")
 
     logger.info("Verify that agent config remains after upgrade.")
     assert LINUX_PACKAGE_AGENT_PATHS.agent_config_path.exists()
@@ -453,7 +468,7 @@ repo_gpgcheck=0
 
     logger.info("Cleanup")
     _remove_all_agent_files(
-        package_name=agent_package_name, package_type=package_builder.PACKAGE_TYPE
+        package_name=agent_package_name, package_type=package_type
     )
 
 
@@ -508,7 +523,7 @@ def _perform_ssl_checks(
         raise Exception("No system CA bundle found")
 
     # NOTE: We create a symlink so we can re-use config with a fixed value for ca_cert_path
-    logger.info(f"Using system ca bundle: ${system_ca_bundle_path}")
+    logger.info(f"Using system ca bundle: {system_ca_bundle_path}")
 
     system_ca_bundle_path_symlink_path = pl.Path("/etc/ssl/system-ca-bundle.crt")
     system_ca_bundle_path_symlink_path.symlink_to(system_ca_bundle_path)
@@ -575,10 +590,7 @@ def _perform_ssl_checks(
     # doesn't trust that cert.
     # Long term we could spawn test HTTP server locally and use that, but that's more
     # involved.
-    bad_ca_cert_path = (
-        SOURCE_ROOT
-        / "tests/end_to_end_tests/managed_packages_tests/fixtures/bad_ca_certs.crt"
-    )
+    bad_ca_cert_path = _PARENT_DIR / "fixtures/bad_ca_certs.crt"
     invalid_bad_cert_config["ca_cert_path"] = str(bad_ca_cert_path)
     _add_config(invalid_bad_cert_config)
     agent_commander.start()
@@ -641,7 +653,7 @@ def _verify_python_and_libraries():
     subprocess.check_call(
         [
             str(venv_python_executable),
-            "tests/end_to_end_tests/managed_packages_tests/verify_python_interpreter.py",
+            "tests/end_to_end_tests/managed_packages_tests/remote_machine_tests/verify_python_interpreter.py",
         ],
         env={
             # It's important to override the 'LD_LIBRARY_PATH' to be sure that libraries paths from the test runner
@@ -700,7 +712,7 @@ def _install_from_convenience_script(
             assert "Looking for system OpenSSL >= 3: Not found" in output
             assert "Looking for system OpenSSL >= 1.1.1: Not found" in output
             assert (
-                f"Using embedded OpenSSL == OpenSSL {DEFAULT_PYTHON_PACKAGE_OPENSSL_VERSION}"
+                f"Using embedded OpenSSL == OpenSSL {OPENSSL_3_VERSION}"
                 in output
             )
 

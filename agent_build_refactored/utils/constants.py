@@ -18,6 +18,8 @@ import pathlib as pl
 
 SOURCE_ROOT = pl.Path(__file__).parent.parent.parent.absolute()
 
+AGENT_VERSION = (SOURCE_ROOT / "VERSION").read_text().strip()
+
 AGENT_BUILD_OUTPUT_PATH = SOURCE_ROOT / "agent_build_output"
 OCI_LAYOUTS_DIR = AGENT_BUILD_OUTPUT_PATH / "oci_layouts"
 

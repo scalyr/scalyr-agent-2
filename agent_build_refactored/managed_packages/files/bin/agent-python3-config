@@ -23,11 +23,6 @@ import subprocess
 import sys
 from typing import Tuple
 
-OPENSSL_1_1_1_VERSION = "1_1_1"
-OPENSSL_3_VERSION = "3"
-
-DEFAULT_FALLBACK_OPENSSL_VERSION = OPENSSL_1_1_1_VERSION
-
 PACKAGE_OPT_DIR = pl.Path("/opt/scalyr-agent-2")
 OPENSSL_LIBS_PATH = PACKAGE_OPT_DIR / "lib/openssl"
 PYTHON_DIR = PACKAGE_OPT_DIR / "python3"
@@ -67,7 +62,7 @@ def initialize():
         try:
             print("Looking for system OpenSSL >= 3: ", file=sys.stderr, end='')
             CURRENT_OPENSSL_LIBS_PATH.unlink()
-            CURRENT_OPENSSL_LIBS_PATH.symlink_to(f"./{OPENSSL_3_VERSION}")
+            CURRENT_OPENSSL_LIBS_PATH.symlink_to(f"./3")
 
             is_found, version_or_error = get_current_openssl_version()
             if is_found:
@@ -78,7 +73,7 @@ def initialize():
 
             print("Looking for system OpenSSL >= 1.1.1: ", file=sys.stderr, end='')
             CURRENT_OPENSSL_LIBS_PATH.unlink()
-            CURRENT_OPENSSL_LIBS_PATH.symlink_to(f"./{OPENSSL_1_1_1_VERSION}")
+            CURRENT_OPENSSL_LIBS_PATH.symlink_to(f"./1")
 
             is_found, version_or_error = get_current_openssl_version()
             if is_found:

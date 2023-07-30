@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - to_master
     tags:
       - v*.*.*
   pull_request:
@@ -49,9 +50,17 @@ jobs:
           echo "aws_private_key_name=CT_SCALYR_AGENT_GHA" >> "${GITHUB_OUTPUT}"
           echo "cicd_workflow=${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}" >> "${GITHUB_OUTPUT}"
 
-  build-linux-packages:
+  build_linux_packages:
     name: "Build Linux packages"
+    needs:
+      - pre_job
     uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
+    with:
+      python_version: ${{ needs.pre_job.outputs.python_version }}
+      cache_version: ${{ needs.pre_job.outputs.cache_version }}
+      aws_region: ${{ needs.pre_job.outputs.aws_region }}
+      aws_private_key_name: ${{ needs.pre_job.outputs.aws_private_key_name }}
+      cicd_workflow: ${{ needs.pre_job.outputs.cicd_workflow }}
     secrets:
       CT_AWS_DEV_EC2_PRIVATE_KEY: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
       CT_AWS_DEV_EC2_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
@@ -129,7 +138,7 @@ jobs:
   prepare-artifacts:
     runs-on: ubuntu-20.04
     needs:
-      - build-linux-packages
+      - build_linux_packages
       - build-windows-package
       - build_tarball
 
@@ -157,12 +166,12 @@ jobs:
           retention-days: 1
 
   clean-ec2-tests-objects:
-    name: Remove ec2 test workflow prefix list entries
+    name: Remove ec2 object that were created by this workflow
     if: ${{ always() }}
     needs:
       - pre_job
       - build_container_images
-      - build-linux-packages
+      - build_linux_packages
       - build-windows-package
       - build_tarball
     runs-on: ubuntu-20.04

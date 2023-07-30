@@ -38,8 +38,8 @@ init_logging()
 logger = logging.getLogger(__name__)
 
 # We delete any old automated test nodes which are older than 4 hours
-DELETE_OLD_NODES_TIMEDELTA = timedelta(hours=4)
-DELETE_OLD_NODES_THRESHOLD_DT = datetime.utcnow() - DELETE_OLD_NODES_TIMEDELTA
+DELETE_OLD_INSTANCES_TIMEDELTA = timedelta(hours=4)
+DELETE_OLD_NODES_THRESHOLD_DT = datetime.utcnow() - DELETE_OLD_INSTANCES_TIMEDELTA
 
 DELETE_OLD_AMI_IMAGES_TIMEDELTA = timedelta(days=2)
 DELETE_OLD_AMI_IMAGES_THRESHOLD_DT = datetime.utcnow() - DELETE_OLD_AMI_IMAGES_TIMEDELTA
@@ -53,7 +53,7 @@ def cleanup_old_ec2_instances_and_related_objects(
     """
     Cleanup old ec2 instances.
     """
-
+    logger.info("Looking for and deleting old running automated ci/cd instances...")
     instances = list(ec2_resource.instances.filter(
         Filters=[
             {
@@ -63,7 +63,11 @@ def cleanup_old_ec2_instances_and_related_objects(
         ],
     ))
 
-    logger.info("Looking for and deleting old running automated ci/cd instances...")
+    if not instances:
+        logger.info("No instances to cleanup.")
+        return
+
+    logger.info(f"The following instances are found {[i.id for i in instances]}")
 
     instances_to_remove = []
 
@@ -95,10 +99,11 @@ def cleanup_old_ec2_instances_and_related_objects(
     )
 
 
-def cleanup_old_volumes(
+def cleanup_stray_volumes(
     ec2_resource,
-
+    aws_settings: AWSSettings,
 ):
+    logger.info("Remove stray volumes.")
     volumes = list(ec2_resource.volumes.filter(
         Filters=[
             {
@@ -108,15 +113,33 @@ def cleanup_old_volumes(
         ],
     ))
 
+    if not volumes:
+        logger.info("    No volumes to cleanup.")
+        return
+
+    logger.info(f"    The following volumes are found {[i.id for i in volumes]}")
+
+    volumes_to_remove = []
+
     for volume in volumes:
         if volume.state == "in-use":
             continue
+
+        tags = {t["Key"]: t["Value"] for t in volume.tags}
+
+        if aws_settings.cicd_workflow:
+            if tags["cicd_workflow"] == aws_settings.cicd_workflow:
+                volumes_to_remove.append(volume)
+                continue
 
         tzinfo = volume.create_time.tzinfo
         if volume.create_time >= DELETE_OLD_NODES_THRESHOLD_DT.replace(tzinfo=tzinfo):
             continue
 
-        logger.info(f"Deleting volume with name: {volume.id}")
+        volumes_to_remove.append(volume)
+
+    for volume in volumes_to_remove:
+        logger.info(f"    Deleting volume with name: {volume.id}")
         volume.delete()
 
 
@@ -156,10 +179,12 @@ def cleanup_old_ami_images(
             logger.info(f"AMI image {image.id} has been de-registered.")
 
 
-def cleanup_old_security_groups(
+def cleanup_stray_security_groups(
     ec2_resource,
+    aws_settings: AWSSettings,
 
 ):
+    logger.info("Remove stray security groups.")
     security_groups = list(ec2_resource.security_groups.filter(
         Filters=[
             {
@@ -169,9 +194,20 @@ def cleanup_old_security_groups(
         ],
     ))
 
+    if not security_groups:
+        logger.info("    No security groups to cleanup.")
+        return
+
+    logger.info(f"    The following security groups are found {[i.id for i in security_groups]}")
+
     security_groups_to_remove = []
     for security_group in security_groups:
         tags = {t["Key"]: t["Value"] for t in security_group.tags}
+
+        if aws_settings.cicd_workflow:
+            if tags["cicd_workflow"] == aws_settings.cicd_workflow:
+                security_groups_to_remove.append(security_group)
+                continue
 
         creation_time_str = tags.get("CreationTime")
 
@@ -191,7 +227,7 @@ def cleanup_old_security_groups(
         security_groups_to_remove.append(security_group)
 
     for security_group in security_groups_to_remove:
-        logger.info(f"Delete security group: '{security_group.id}'")
+        logger.info(f"    Delete security group: '{security_group.id}'")
         security_group.delete()
 
 
@@ -208,12 +244,14 @@ def main():
         aws_settings=aws_settings,
     )
 
-    cleanup_old_security_groups(
+    cleanup_stray_security_groups(
         ec2_resource=ec2_resource,
+        aws_settings=aws_settings,
     )
 
-    cleanup_old_volumes(
+    cleanup_stray_volumes(
         ec2_resource=ec2_resource,
+        aws_settings=aws_settings,
     )
 
     cleanup_old_ami_images(

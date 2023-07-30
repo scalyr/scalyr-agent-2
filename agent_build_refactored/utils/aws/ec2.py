@@ -324,6 +324,12 @@ class EC2InstanceWrapper:
 
         name = f"cicd(disposable)-dataset-agent-{aws_settings.cicd_workflow}"
 
+        additional_tags = {}
+        if aws_settings.cicd_workflow:
+            additional_tags = {
+                "cicd_workflow": aws_settings.cicd_workflow
+            }
+
         if aws_settings.cicd_job:
             name = f"{name}-{aws_settings.cicd_job}"
 
@@ -345,7 +351,8 @@ class EC2InstanceWrapper:
                             {
                                 "Key": "CreationTime",
                                 "Value": datetime.datetime.utcnow().isoformat()
-                            }
+                            },
+                            *[{"Key": key, "Value": value} for key, value in additional_tags.items()]
                         ],
                     },
                 ],
@@ -379,12 +386,6 @@ class EC2InstanceWrapper:
         else:
             security_group_id = _existing_security_group_id
 
-        if aws_settings.cicd_workflow:
-            additional_tags = {
-                "cicd_workflow": aws_settings.cicd_workflow
-            }
-        else:
-            additional_tags = None
         try:
             boto3_instance = _create_ec2_instance(
                 ec2_resource=ec2_resource,
@@ -497,6 +498,8 @@ def _create_ec2_instance(
 
     for key, value in additional_tags.items():
         _add_tag(key=key, value=value, resource_type="instance")
+        _add_tag(key=key, value=value, resource_type="volume")
+        _add_tag(key=key, value=value, resource_type="network-interface")
 
     tag_specifications = []
     for resource_type, tags in resource_tags.items():
@@ -582,9 +585,9 @@ def _get_current_ip_address():
 def terminate_ec2_instances_and_security_groups(
     instances: List,
     ec2_client,
-
 ):
     security_groups_ids_to_remove = set()
+    volumes_to_remove = set()
 
     for instance in instances:
         for security_group in instance.security_groups:
@@ -592,34 +595,51 @@ def terminate_ec2_instances_and_security_groups(
                 security_group["GroupId"]
             )
 
+        for volume in list(instance.volumes.all()):
+            volumes_to_remove.add(volume)
+
         logger.info(f"Terminate ec2 instance {instance.id}")
         instance.terminate()
 
     for instance in instances:
         instance.wait_until_terminated()
 
-        for security_group_id in security_groups_ids_to_remove:
-            logger.info(f"Delete Security group '{security_group_id}'.")
-            attempts = 5
-            delay = 20
-            while True:
-                try:
-                    ec2_client.delete_security_group(
-                        GroupId=security_group_id,
-                    )
-                except botocore.exceptions.ClientError as e:
-                    if "has a dependent object" in str(e):
-                        logger.info("    Security group still has dependent objects.")
-                        if attempts == 0:
-                            logger.exception("    Give up")
-                            raise
-
-                        logger.info(f"    Retry in {delay} sec.")
-                        attempts -= 1
-                        time.sleep(delay)
-                        continue
-                    elif "InvalidGroup.NotFound" in str(e):
-                        logger.info("    Security group does not exist. Ignore.")
-                        break
-                    else:
+    logger.info(f"Remove security groups: {security_groups_ids_to_remove}")
+    for security_group_id in security_groups_ids_to_remove:
+        logger.info(f"Delete Security group '{security_group_id}'.")
+        attempts = 5
+        delay = 20
+        while True:
+            try:
+                ec2_client.delete_security_group(
+                    GroupId=security_group_id,
+                )
+            except botocore.exceptions.ClientError as e:
+                if "has a dependent object" in str(e):
+                    logger.info("    Security group still has dependent objects.")
+                    if attempts == 0:
+                        logger.exception("    Give up")
                         raise
+
+                    logger.info(f"    Retry in {delay} sec.")
+                    attempts -= 1
+                    time.sleep(delay)
+                    continue
+                elif "InvalidGroup.NotFound" in str(e):
+                    logger.info("    Security group does not exist. Ignore.")
+                    break
+                else:
+                    raise
+
+    for volume in volumes_to_remove:
+        logger.info(f"Delete volume {volume.id}")
+        try:
+            while volume.state == "in-use":
+                volume.reload()
+                time.sleep(10)
+
+            volume.delete()
+        except botocore.exceptions.ClientError as e:
+            if "(InvalidVolume.NotFound)" in str(e):
+                logger.info("    Volume does not exist. Ignore.")
+                continue

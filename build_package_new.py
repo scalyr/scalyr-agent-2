@@ -35,19 +35,18 @@ if sys.version_info < (3, 8, 0):
 # local packages. All such imports also have to be done after that.
 sys.path.append(str(pl.Path(__file__).parent.absolute()))
 
-from agent_build_refactored.utils.constants import CpuArch
+from agent_build_refactored.utils.constants import CpuArch, SOURCE_ROOT
 from agent_build_refactored.utils.common import init_logging
 from agent_build_refactored.container_images import ALL_CONTAINERISED_AGENT_BUILDERS
 from agent_build_refactored.container_images.image_builders import (
     ImageType,
 )
+from agent_build_refactored.managed_packages.managed_packages_builders import ALL_PACKAGE_BUILDERS
 
 init_logging()
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
 
-    subparsers = parser.add_subparsers(dest="command", required=True)
+def _add_image_parsers():
 
     image_parser = subparsers.add_parser("image")
 
@@ -72,7 +71,7 @@ if __name__ == "__main__":
     load_image_parser = image_parser_action_subparsers.add_parser(
         "load",
         help="Build and load docker image directly in the docker engine. "
-        "This is only a single arch image because docker does not store multi-arch images.",
+             "This is only a single arch image because docker does not store multi-arch images.",
     )
     _add_image_type_arg(load_image_parser)
     load_image_parser.add_argument(
@@ -92,7 +91,7 @@ if __name__ == "__main__":
     cache_requirements_image_parser = image_parser_action_subparsers.add_parser(
         "cache-requirements",
         help="Build only the cacheable requirements of the image. Can be used in CI/CD to pre-build and cache them"
-        "in order to speed up builds",
+             "in order to speed up builds",
     )
     cache_requirements_image_parser.add_argument(
         "--architecture", required=True, help="Architecture of requirements."
@@ -132,8 +131,43 @@ if __name__ == "__main__":
         required=False,
         action="store_true",
         help="Disable certificate validation when pushing the image. Inactive by default. "
-        "May be needed, for example, to push to a local registry.",
+             "May be needed, for example, to push to a local registry.",
     )
+
+
+def _add_package_parsers():
+    package_parser = subparsers.add_parser("package")
+
+    package_parser.add_argument(
+        "package_builder_name",
+        choices=ALL_PACKAGE_BUILDERS.keys(),
+    )
+
+    package_action_subparsers = package_parser.add_subparsers(dest="action")
+
+    package_action_subparsers.add_parser("build-dependencies")
+
+    build_parser = package_action_subparsers.add_parser("build")
+
+    build_parser.add_argument(
+        "--package-type",
+        required=True,
+        choices=["deb", "rpm"],
+    )
+
+    build_parser.add_argument(
+        "--output-dir",
+        default=str(SOURCE_ROOT / "build")
+    )
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    _add_image_parsers()
+    _add_package_parsers()
 
     args = parser.parse_args()
 
@@ -183,5 +217,22 @@ if __name__ == "__main__":
                 registry_username=args.registry_username,
                 registry_password=args.registry_password,
                 no_verify_tls=args.no_verify_tls,
+            )
+            exit(0)
+    elif args.command == "package":
+        package_builder_cls = ALL_PACKAGE_BUILDERS[args.package_builder_name]
+
+        if args.action == "build-dependencies":
+            builder = package_builder_cls()
+            builder.build_dependencies(
+                cache_only=True,
+            )
+            exit(0)
+
+        elif args.action == "build":
+            builder = package_builder_cls()
+            builder.build(
+                package_type=args.package_type,
+                output_dir=pl.Path(args.output_dir),
             )
             exit(0)
