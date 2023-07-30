@@ -32,7 +32,7 @@ from tests.end_to_end_tests.verify import (
     write_counter_messages_to_test_log,
     verify_agent_status,
 )
-from agent_build.tools.constants import SOURCE_ROOT
+from agent_build_refactored.utils.constants import SOURCE_ROOT
 
 log = logging.getLogger(__name__)
 

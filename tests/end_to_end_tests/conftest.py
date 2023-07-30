@@ -25,7 +25,7 @@ import pathlib as pl
 import pytest
 from _pytest.runner import pytest_runtest_protocol as orig_pytest_runtest_protocol
 
-from agent_build.tools.constants import SOURCE_ROOT
+from agent_build_refactored.utils.constants import SOURCE_ROOT
 
 IN_CICD = os.environ.get("AGENT_BUILD_IN_CICD", False)
 

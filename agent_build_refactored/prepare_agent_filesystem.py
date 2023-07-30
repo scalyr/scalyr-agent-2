@@ -26,7 +26,9 @@ import subprocess
 import time
 from typing import Union, List
 
-from agent_build_refactored.tools.constants import SOURCE_ROOT, AGENT_BUILD_PATH
+from agent_build_refactored.utils.constants import SOURCE_ROOT
+
+_PARENT_DIR = pl.Path(__file__).parent
 
 
 def recursively_delete_dirs_by_name(root_dir: Union[str, pl.Path], *dir_names: str):
@@ -269,7 +271,7 @@ def build_agent_base_files(
 
     # Copy wrapper script for removed 'scalyr-agent-2-config' executable for backward compatibility.
     shutil.copy2(
-        AGENT_BUILD_PATH / "linux/scalyr-agent-2-config",
+        _PARENT_DIR / "files/linux/scalyr-agent-2-config",
         bin_path,
     )
 

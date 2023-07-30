@@ -1,2 +1,0 @@
-# NOTE: This is a part of the explanatory example of how Deployments work and it is not used in the real code.
-pytest
