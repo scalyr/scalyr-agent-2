@@ -96,6 +96,7 @@ from jinja2 import FileSystemLoader
 from jinja2 import Environment
 import requests
 
+# pylint: disable=import-error
 from libcloud.compute.types import Provider
 from libcloud.compute.base import NodeDriver
 from libcloud.compute.base import NodeImage
@@ -108,6 +109,8 @@ from libcloud.compute.deployment import (
     FileDeployment,
     MultiStepDeployment,
 )
+
+# pylint: enable=import-error
 
 from scalyr_agent import compat
 
@@ -345,7 +348,9 @@ def main(
 
     if paramiko_debug_log:
         import paramiko
-        from libcloud.utils.logging import ExtraLogFormatter
+        from libcloud.utils.logging import (  # pylint: disable=import-error
+            ExtraLogFormatter,
+        )
 
         print(
             "Will store paramiko and libcloud ssh debug log to file: %s"

@@ -25,7 +25,7 @@ from __future__ import print_function
 
 import datetime
 
-from libcloud.utils.iso8601 import parse_date
+from libcloud.utils.iso8601 import parse_date  # pylint: disable=import-error
 
 # pylint: disable=import-error
 from packages_sanity_tests import INSTANCE_NAME_STRING

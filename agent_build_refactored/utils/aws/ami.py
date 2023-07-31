@@ -108,7 +108,7 @@ class CustomAMIImage(AMIImage):
     """
     base_image: AMIImage
     base_instance_size_id: str
-    deployment_script: pl.Path = None,
+    deployment_script: pl.Path = None
     base_instance_root_volume_size: int = None
     base_instance_additional_ec2_instances_tags: Dict[str, Optional[str]] = None
 

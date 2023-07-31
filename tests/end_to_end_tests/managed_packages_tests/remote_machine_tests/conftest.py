@@ -67,7 +67,7 @@ def add_cmd_args(parser, is_pytest_parser: bool):
         dest="packages_source",
         required=False,
         help="Depending on the '--packages-source-type' option, directory or repo tarball with packages to test. "
-             "If not specified, packages will be built inplace.",
+        "If not specified, packages will be built inplace.",
     )
 
     add_func(
@@ -83,7 +83,7 @@ def add_cmd_args(parser, is_pytest_parser: bool):
         required=True,
         choices=["ec2", "docker"],
         help="Type of the remote machine for the test. For 'ec2' - run in AWS ec2 instance,"
-             "'docker' - run in docker container, 'local', run locally.",
+        "'docker' - run in docker container, 'local', run locally.",
     )
 
     add_func(
@@ -106,7 +106,9 @@ def pytest_collection_modifyitems(config, items):
     if IN_REMOTE_MACHINE:
         return
 
-    skip = pytest.mark.skip(reason="This test is only supposed to be run in a remote machine(docker or ec2)")
+    skip = pytest.mark.skip(
+        reason="This test is only supposed to be run in a remote machine(docker or ec2)"
+    )
     for item in items:
         item.add_marker(skip)
 
@@ -173,7 +175,9 @@ def stable_packages_version(request):
 
 
 @pytest.fixture(scope="session")
-def packages_repo_root(request, tmp_path_factory, package_builder, stable_packages_version, package_type):
+def packages_repo_root(
+    request, tmp_path_factory, package_builder, stable_packages_version, package_type
+):
     """
     Root directory which is served by the mock web server.
     The mock repo is located in ./repo folder, the public key is located in ./repo_public_key.gpg
@@ -186,7 +190,7 @@ def packages_repo_root(request, tmp_path_factory, package_builder, stable_packag
         package_builder=package_builder,
         package_type=package_type,
         stable_packages_version=stable_packages_version,
-        output_dir=tmp_path_factory.mktemp("packages_repo_root")
+        output_dir=tmp_path_factory.mktemp("packages_repo_root"),
     )
 
 
@@ -323,9 +327,13 @@ def agent_package_path(
         )
 
     if package_type == "deb":
-        package_filename_glob = f"{agent_package_name}_{AGENT_VERSION}_{package_arch}.{package_type}"
+        package_filename_glob = (
+            f"{agent_package_name}_{AGENT_VERSION}_{package_arch}.{package_type}"
+        )
     elif package_type == "rpm":
-        package_filename_glob = f"{agent_package_name}-{AGENT_VERSION}-1.{package_arch}.{package_type}"
+        package_filename_glob = (
+            f"{agent_package_name}-{AGENT_VERSION}-1.{package_arch}.{package_type}"
+        )
     else:
         raise Exception(f"Unknown package type: {package_type}")
 

@@ -16,8 +16,13 @@
 import pathlib as pl
 
 from agent_build_refactored.utils.constants import SOURCE_ROOT, CpuArch
-from agent_build_refactored.utils.toolset_image import build_toolset_image, build_toolset_image_oci_layout
-from agent_build_refactored.utils.docker.buildx.build import LocalDirectoryBuildOutput, buildx_build
+from agent_build_refactored.utils.toolset_image import (
+    build_toolset_image_oci_layout,
+)
+from agent_build_refactored.utils.docker.buildx.build import (
+    LocalDirectoryBuildOutput,
+    buildx_build,
+)
 
 _PARENT_DIR = pl.Path(__file__).parent
 
@@ -37,10 +42,6 @@ def prepare_agent_source_tarball(
         build_args={
             "AGENT_SOURCE_TARBALL_FILENAME": AGENT_SOURCE_TARBALL_FILENAME,
         },
-        build_contexts={
-            "toolset": f"oci-layout://{toolset_oci_layout_path}"
-        },
-        output=LocalDirectoryBuildOutput(
-            dest=output_dir
-        ),
+        build_contexts={"toolset": f"oci-layout://{toolset_oci_layout_path}"},
+        output=LocalDirectoryBuildOutput(dest=output_dir),
     )

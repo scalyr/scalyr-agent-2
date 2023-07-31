@@ -19,39 +19,34 @@ for example ec2 instance or docker container.
 import argparse
 import pathlib as pl
 import logging
-import shutil
 import sys
 import tarfile
-from typing import List, Type, Dict, Optional
+from typing import List, Type, Dict
 
-sys.path.append(
-    str(pl.Path(__file__).parent.parent.parent.parent.parent)
-)
+sys.path.append(str(pl.Path(__file__).parent.parent.parent.parent.parent))
 
-from agent_build_refactored.utils.builder import Builder
 from agent_build_refactored.managed_packages.managed_packages_builders import (
-    get_package_builder_by_name,
     LinuxAIOPackagesBuilder,
     ALL_PACKAGE_BUILDERS,
-    ALL_AIO_PACKAGE_BUILDERS,
-    PORTABLE_PYTEST_RUNNER_NAME,
 )
 from agent_build_refactored.utils.constants import CpuArch
 from agent_build_refactored.utils.common import init_logging
-from tests.end_to_end_tests.run_in_remote_machine import run_test_remotely
+from tests.end_to_end_tests.run_in_remote_machine import (
+    run_test_in_docker,
+    run_tests_in_ec2,
+)
 
 from tests.end_to_end_tests.run_in_remote_machine import DISTROS
 
 from tests.end_to_end_tests.managed_packages_tests.remote_machine_tests.tools import (
     create_packages_repo_root,
     get_packages_stable_version,
-    is_builder_creates_aio_package
+    is_builder_creates_aio_package,
 )
-from tests.end_to_end_tests.managed_packages_tests.remote_machine_tests.conftest import add_cmd_args
-from tests.end_to_end_tests.run_in_remote_machine.prepare_agent_source import (
-    prepare_agent_source_tarball,
-    AGENT_SOURCE_TARBALL_FILENAME,
+from tests.end_to_end_tests.managed_packages_tests.remote_machine_tests.conftest import (
+    add_cmd_args,
 )
+from tests.end_to_end_tests.run_in_remote_machine import RemoteTestDependenciesBuilder
 
 init_logging()
 
@@ -60,7 +55,7 @@ logger = logging.getLogger(__name__)
 PACKAGES_ROOT_TARBALL_NAME = "packages_repo_root.tar"
 
 
-class RemoteTestDependenciesBuilder(Builder):
+class RemotePackageTestDependenciesBuilder(RemoteTestDependenciesBuilder):
     PACKAGE_BUILDER: Type[LinuxAIOPackagesBuilder]
 
     def __init__(
@@ -68,7 +63,7 @@ class RemoteTestDependenciesBuilder(Builder):
         package_type: str,
         packages_source_type: str,
         packages_source: str,
-        package_builder_name: str
+        package_builder_name: str,
     ):
 
         super(RemoteTestDependenciesBuilder, self).__init__()
@@ -78,45 +73,21 @@ class RemoteTestDependenciesBuilder(Builder):
         self.packages_source = packages_source
         self.package_builder_name = package_builder_name
 
-    @property
-    def portable_pytest_runner_path(self):
-        return self.result_dir / PORTABLE_PYTEST_RUNNER_NAME
-
-    @property
-    def agent_source_tarball_path(self) -> pl.Path:
-        return self.result_dir / AGENT_SOURCE_TARBALL_FILENAME
-
     def build(self):
 
         is_aio = is_builder_creates_aio_package(
             package_builder_name=self.package_builder_name
         )
 
-        # In order to run tests in remote machine we need a frozen binary with the pytest .
-        # This binary is part of the dependencies of the AIO package builders, so we have toget appropriate
-        # AIO package builder and build this pytest binary.
         if is_aio:
             # If it's already AIO package, then just use itself
-            aio_package_builder_cls = self.__class__.PACKAGE_BUILDER
+            dependencies_arch = self.__class__.PACKAGE_BUILDER.ARCHITECTURE
         else:
             # If it's non-aio, then we use x86_64 builder.
-            aio_package_builder_cls = ALL_AIO_PACKAGE_BUILDERS[f"aio-{CpuArch.x86_64.value}"]
+            dependencies_arch = CpuArch.x86_64
 
-        python_dependency_dir = self.work_dir / "python_dependency"
-
-        aio_package_builder = aio_package_builder_cls()
-
-        aio_package_builder.build_dependencies(
-            output_dir=python_dependency_dir,
-        )
-
-        shutil.copy(
-            python_dependency_dir / PORTABLE_PYTEST_RUNNER_NAME,
-            self.result_dir,
-        )
-
-        prepare_agent_source_tarball(
-            output_dir=self.result_dir
+        self._build_dependencies(
+            architecture=dependencies_arch,
         )
 
         stable_version_package_version = get_packages_stable_version()
@@ -134,14 +105,19 @@ class RemoteTestDependenciesBuilder(Builder):
             tf.add(packages_root, arcname="/")
 
 
-remote_test_dependency_builders: Dict[str, Type[RemoteTestDependenciesBuilder]] = {}
+remote_test_dependency_builders: Dict[
+    str, Type[RemotePackageTestDependenciesBuilder]
+] = {}
 
 for package_builder in ALL_PACKAGE_BUILDERS.values():
-    class _RemoteTestDependenciesBuilder(RemoteTestDependenciesBuilder):
+
+    class _RemotePackageTestDependenciesBuilder(RemotePackageTestDependenciesBuilder):
         NAME = "remote_test_dependency_builder"
         PACKAGE_BUILDER = package_builder
 
-    remote_test_dependency_builders[package_builder.NAME] = _RemoteTestDependenciesBuilder
+    remote_test_dependency_builders[
+        package_builder.NAME
+    ] = _RemotePackageTestDependenciesBuilder
 
 
 def main(
@@ -178,40 +154,53 @@ def main(
     packages_root_tarball = dependencies_builder.result_dir / PACKAGES_ROOT_TARBALL_NAME
     in_docker_packages_root_tarball = f"/tmp/{PACKAGES_ROOT_TARBALL_NAME}"
 
-    try:
-        run_test_remotely(
-            target_distro=distro,
-            remote_machine_type=remote_machine_type,
+    command = [
+        "tests/end_to_end_tests/managed_packages_tests/remote_machine_tests",
+        "--builder-name",
+        package_builder_name,
+        "--package-type",
+        package_type,
+        "--distro-name",
+        distro_name,
+        "--remote-machine-type",
+        remote_machine_type,
+        "--packages-source-type",
+        "repo-tarball",
+        "--packages-source",
+        in_docker_packages_root_tarball,
+        *other_cmd_args,
+    ]
 
-            command=[
-                "tests/end_to_end_tests/managed_packages_tests/remote_machine_tests",
-                "--builder-name",
-                package_builder_name,
-                "--package-type",
-                package_type,
-                "--distro-name",
-                distro_name,
-                "--remote-machine-type",
-                remote_machine_type,
-                "--packages-source-type",
-                "repo-tarball",
-                "--packages-source",
-                in_docker_packages_root_tarball,
-                *other_cmd_args,
-            ],
-            architecture=arch,
-            pytest_runner_path=dependencies_builder.portable_pytest_runner_path,
-            source_tarball_path=dependencies_builder.agent_source_tarball_path,
-            file_mappings={
-                packages_root_tarball: in_docker_packages_root_tarball
-            },
-        )
+    try:
+        if remote_machine_type == "ec2":
+
+            run_tests_in_ec2(
+                ec2_image=distro.ec2_images[arch],
+                ec2_instance_size_id=distro.ec2_instance_size_id,
+                command=command,
+                pytest_runner_path=dependencies_builder.portable_pytest_runner_path,
+                source_tarball_path=dependencies_builder.agent_source_tarball_path,
+                file_mappings={
+                    packages_root_tarball: in_docker_packages_root_tarball,
+                },
+            )
+        else:
+            run_test_in_docker(
+                docker_image=distro.docker_image,
+                command=command,
+                architecture=arch,
+                pytest_runner_path=dependencies_builder.portable_pytest_runner_path,
+                source_tarball_path=dependencies_builder.agent_source_tarball_path,
+                file_mappings={
+                    packages_root_tarball: in_docker_packages_root_tarball,
+                },
+            )
     except Exception as e:
         logger.error(f"Remote test failed. Error: {str(e)}")
         raise
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     add_cmd_args(parser=parser, is_pytest_parser=False)

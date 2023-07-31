@@ -25,7 +25,7 @@ import threading
 import time
 
 import six
-import xmltodict
+import xmltodict  # pylint: disable=import-error
 
 try:
     import win32api

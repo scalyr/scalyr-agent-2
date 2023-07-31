@@ -25,8 +25,8 @@ import sys
 import time
 import random
 
-from libcloud.storage.types import Provider
-from libcloud.storage.providers import get_driver
+from libcloud.storage.types import Provider  # pylint: disable=import-error
+from libcloud.storage.providers import get_driver  # pylint: disable=import-error
 from scalyr_agent import compat
 
 BUCKET_NAME = compat.os_getenv_unicode(

@@ -150,7 +150,7 @@ def get_events_page_from_scalyr(
     start_time,
     filters,
     timeout_tracker: TimeoutTracker,
-    continuation_token: str = None
+    continuation_token: str = None,
 ):
     """
     Query logs from Scalyr servers.
@@ -188,7 +188,9 @@ def get_events_page_from_scalyr(
         if resp.status_code == 200:
             break
 
-        logger.info(f"Query failed with status '{resp.status_code}' and test '{resp.text}'.")
+        logger.info(
+            f"Query failed with status '{resp.status_code}' and test '{resp.text}'."
+        )
         logger.info(f"Retry in {_QUERY_RETRY_DELAY} sec.")
         timeout_tracker.sleep(1, "Can not get all events.")
 
@@ -236,9 +238,9 @@ _QUERY_RETRY_DELAY = 10
 
 
 def write_counter_messages_to_test_log(
-        upload_test_log_path: pl.Path,
-        messages_count: int = None,
-        logger: logging.Logger = None
+    upload_test_log_path: pl.Path,
+    messages_count: int = None,
+    logger: logging.Logger = None,
 ):
     """
     Write special counter messages to a test log file. Those messages then will be queried from Scalyr to verify

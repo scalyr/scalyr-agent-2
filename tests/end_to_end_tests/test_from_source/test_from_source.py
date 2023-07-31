@@ -14,23 +14,20 @@
 
 import functools
 import logging
-import os
 import pathlib as pl
 import json
-import shutil
-import signal
-import subprocess
-import sys
 import time
 import datetime
 import re
 import platform
-from typing import List, Dict,Tuple
+from typing import List, Dict, Tuple
 
 import pytest
 import psutil
 
-from tests.end_to_end_tests.tools import AgentPaths, TimeoutTracker
+
+from agent_build_refactored.utils.constants import AGENT_VERSION
+from tests.end_to_end_tests.tools import TimeoutTracker
 from tests.end_to_end_tests.verify import (
     verify_logs,
     write_counter_messages_to_test_log,
@@ -39,7 +36,6 @@ from tests.end_to_end_tests.verify import (
     get_events_page_from_scalyr,
     AgentCommander,
 )
-from agent_build_refactored.utils.constants import SOURCE_ROOT
 
 logger = logging.getLogger(__name__)
 
@@ -50,124 +46,6 @@ pytestmark = [
 ]
 
 
-@pytest.fixture(scope="session")
-def agent_paths():
-    install_root_path = pl.Path("~/scalyr-agent-dev").expanduser()
-    return AgentPaths(
-        install_root=install_root_path,
-        configs_dir=install_root_path / "config",
-        logs_dir=install_root_path / "log",
-    )
-
-
-@pytest.fixture
-def server_host(test_session_suffix, request):
-    # Make server host unique for each test case
-    return f"{request.node.name}-{test_session_suffix}"
-
-
-def _call_agent(cmd_args: List[str]):
-    agent_main_path = SOURCE_ROOT / "scalyr_agent/agent_main.py"
-    subprocess.check_call([sys.executable, str(agent_main_path), *cmd_args])
-
-
-def _shutdown_previous_agent_if_exists(pid_file_path: pl.Path):
-    """
-    Tries to detect running agent process from the previously run test and shutdown it.
-    :param pid_file_path: Path to the pid file.
-    """
-    # if no pid file, just return
-    if not pid_file_path.exists():
-        return
-
-    prev_agent_pid = pid_file_path.read_text().strip()
-
-    # first try stopping it with regular command.
-    logger.info("Stopping remaining agent process...")
-    _call_agent(["stop"])
-
-    def pid_exists():
-        try:
-            os.kill(int(prev_agent_pid), 0)
-        except OSError:
-            return False
-        else:
-            return True
-
-    if pid_exists():
-        logger.info("Stop command didn't help, terminating...")
-        os.kill(int(prev_agent_pid), signal.SIGINT)
-        time.sleep(3)
-
-    if pid_exists():
-        logger.info("Terminating also didn't help. Killing.")
-        os.kill(int(prev_agent_pid), signal.SIGKILL)
-        time.sleep(1)
-
-    if pid_file_path.exists():
-        pid_file_path.unlink()
-
-
-@pytest.fixture
-def default_config(scalyr_api_key, server_host):
-    return {
-        "api_key": scalyr_api_key,
-        "server_attributes": {"serverHost": server_host},
-        "verify_server_certificate": False,
-    }.copy()
-
-
-@pytest.fixture(scope="session")
-def agent_commander(agent_paths):
-    from tests.end_to_end_tests.tools import AgentCommander
-
-    agent_main_path = SOURCE_ROOT / "scalyr_agent/agent_main.py"
-    commander = AgentCommander(
-        executable_args=[sys.executable, str(agent_main_path)], agent_paths=agent_paths
-    )
-    return commander
-
-
-@pytest.fixture
-def shutdown_old_agent_processes(agent_paths, agent_commander):
-    """
-    Fixture function which start agent.
-    """
-
-    # shut down previous test agent (if exists) before recreating the agent's root.
-    # We have to do it before the previous agent root and pid file are cleared.
-    _shutdown_previous_agent_if_exists(pid_file_path=agent_paths.pid_file)
-
-    if agent_paths.install_root.exists():
-        shutil.rmtree(agent_paths.install_root)
-
-    agent_paths.install_root.mkdir(parents=True)
-    agent_paths.configs_dir.mkdir()
-    agent_paths.logs_dir.mkdir()
-
-    # clear old logs if exists
-    for p in agent_paths.logs_dir.glob("*.log"):
-        p.unlink()
-
-    yield
-
-    _shutdown_previous_agent_if_exists(pid_file_path=agent_paths.pid_file)
-
-
-@pytest.fixture
-def dump_log(agent_paths, server_host):
-    """
-    Supporter fixture which dumps agent log after each test.
-    """
-
-    logger.info(f"TEST INFO: hostname: {server_host}")
-
-    yield
-    if agent_paths.agent_log_path.exists():
-        logger.info("WHOLE LOG:")
-        logger.info(agent_paths.agent_log_path.read_text())
-
-
 def test_basic(
     scalyr_api_key,
     scalyr_server,
@@ -176,7 +54,6 @@ def test_basic(
     agent_paths,
     agent_commander,
     default_config,
-    agent_version,
 ):
     """
     Perform some basic checks to running agent.
@@ -196,7 +73,7 @@ def test_basic(
     agent_commander.start_and_wait()
 
     verify_agent_status(
-        agent_version=agent_version,
+        agent_version=AGENT_VERSION,
         agent_commander=agent_commander,
         timeout_tracker=timeout_tracker,
     )
@@ -231,7 +108,6 @@ def test_rate_limited(
     agent_paths,
     agent_commander,
     default_config,
-    agent_version,
 ):
     """
     Writes 5000 large lines to data.log, then waits until it detects at least one such message in
@@ -262,7 +138,7 @@ def test_rate_limited(
             "SCALYR_MAX_ALLOWED_REQUEST_SIZE": "500000",
             "SCALYR_MIN_REQUEST_SPACING_INTERVAL": "0.0",
             "SCALYR_MAX_REQUEST_SPACING_INTERVAL": "0.5",
-        }
+        },
     )
 
     lines_count = 5000
@@ -272,7 +148,7 @@ def test_rate_limited(
     logger.info("Write test log file messages.")
 
     verify_agent_status(
-        agent_version=agent_version,
+        agent_version=AGENT_VERSION,
         agent_commander=agent_commander,
         timeout_tracker=timeout_tracker,
     )
@@ -281,7 +157,8 @@ def test_rate_limited(
     message = {
         "count": 0,
         "stream_id": timestamp,
-        "filler": "aaajhghjgfijhgfhhjvcfgujhxfgdtyubn vcgfgyuhbnvcgfytuhvbcftyuhjgftyugftyuyygty7u7y8f8ufgfg8fgf8f" * 69,
+        "filler": "aaajhghjgfijhgfhhjvcfgujhxfgdtyubn vcgfgyuhbnvcgfytuhvbcftyuhjgftyugftyuyygty7u7y8f8ufgfg8fgf8f"
+        * 69,
     }
 
     with upload_test_log_path.open("a") as f:
@@ -295,7 +172,9 @@ def test_rate_limited(
     upload_wait_time = 30
     line_size = len(json.dumps(message))
 
-    expected_lines_uploaded = (rate_limit_bytes_per_second * (upload_wait_time + 4)) / line_size
+    expected_lines_uploaded = (
+        rate_limit_bytes_per_second * (upload_wait_time + 4)
+    ) / line_size
 
     retry_delay = 2
 
@@ -337,9 +216,7 @@ def test_rate_limited(
         )
 
         events_count = len(events)
-        if events_count < expected_lines_uploaded - (
-            expected_lines_uploaded * 0.1
-        ):
+        if events_count < expected_lines_uploaded - (expected_lines_uploaded * 0.1):
             logger.info(
                 f"Not enough log lines were found (found {events_count}, "
                 f"expected {expected_lines_uploaded} +- 10%%)."
@@ -347,10 +224,14 @@ def test_rate_limited(
             timeout_tracker.sleep(retry_delay, "Can not get enough lines, Give up.")
             continue
 
-        too_many_lines = events_count > expected_lines_uploaded + (expected_lines_uploaded * 0.1)
+        too_many_lines = events_count > expected_lines_uploaded + (
+            expected_lines_uploaded * 0.1
+        )
 
-        assert not too_many_lines, f"Too many log lines were found (found {events_count}, " \
-                                   f"expected {expected_lines_uploaded} +- 10%%)."
+        assert not too_many_lines, (
+            f"Too many log lines were found (found {events_count}, "
+            f"expected {expected_lines_uploaded} +- 10%%)."
+        )
 
         logger.info(
             f"Enough log lines found (found {events_count}, expected {expected_lines_uploaded} +- 10%%)."
@@ -396,7 +277,9 @@ def test_with_failing_essential_monitor(
 
     assert agent_commander.is_running
 
-    logger.info('Wait until agent crashes because of the fail of the "essential" monitor.')
+    logger.info(
+        'Wait until agent crashes because of the fail of the "essential" monitor.'
+    )
     while agent_commander.is_running:
         time.sleep(0.1)
 
@@ -512,7 +395,7 @@ def test_with_failing_non_essential_monitors(
 
 
 def _perform_workers_check(
-        agent_commander: AgentCommander
+    agent_commander: AgentCommander,
 ) -> Tuple[psutil.Process, Dict, List[psutil.Process], List[psutil.Process]]:
     worker_session_pids = {}
     agent_children_processes = []  # type: ignore
@@ -601,7 +484,9 @@ def _check_workers_gracefull_stop(
     logging.info("All workers are finished gracefully.")
 
 
-@pytest.mark.skipif(platform.system() == "Darwin", reason="Process workers can be enabled only on Linux")
+@pytest.mark.skipif(
+    platform.system() == "Darwin", reason="Process workers can be enabled only on Linux"
+)
 @pytest.mark.parametrize(
     ["workers_session_count", "workers_type"],
     [[2, "process"], [1, "process"]],
@@ -614,11 +499,13 @@ def test_standalone_agent_kill(
     workers_type,
 ):
 
-    default_config.update({
-        "default_sessions_per_worker": workers_session_count,
-        "use_multiprocess_workers": workers_type == "process",
-        "disable_send_requests": True,
-    })
+    default_config.update(
+        {
+            "default_sessions_per_worker": workers_session_count,
+            "use_multiprocess_workers": workers_type == "process",
+            "disable_send_requests": True,
+        }
+    )
 
     agent_paths.agent_config_path.write_text(json.dumps(default_config))
 
@@ -663,28 +550,31 @@ def test_standalone_agent_kill(
     logging.info("All children are terminated.")
 
     _check_workers_gracefull_stop(
-        agent_commander=agent_commander,
-        worker_pids=worker_pids
+        agent_commander=agent_commander, worker_pids=worker_pids
     )
 
 
-@pytest.mark.skipif(platform.system() == "Darwin", reason="Process workers can be enabled only on Linux")
+@pytest.mark.skipif(
+    platform.system() == "Darwin", reason="Process workers can be enabled only on Linux"
+)
 @pytest.mark.parametrize(
     ["workers_session_count", "workers_type"],
     [[2, "process"], [1, "process"]],
 )
 def test_standalone_agent_stop(
-        agent_paths,
-        agent_commander,
-        default_config,
-        workers_session_count,
-        workers_type,
+    agent_paths,
+    agent_commander,
+    default_config,
+    workers_session_count,
+    workers_type,
 ):
-    default_config.update({
-        "default_sessions_per_worker": workers_session_count,
-        "use_multiprocess_workers": workers_type == "process",
-        "disable_send_requests": True,
-    })
+    default_config.update(
+        {
+            "default_sessions_per_worker": workers_session_count,
+            "use_multiprocess_workers": workers_type == "process",
+            "disable_send_requests": True,
+        }
+    )
 
     agent_paths.agent_config_path.write_text(json.dumps(default_config))
 
@@ -697,37 +587,37 @@ def test_standalone_agent_stop(
     )
 
     _check_workers_gracefull_stop(
-        agent_commander=agent_commander,
-        worker_pids=worker_pids,
-        occurrences=0
+        agent_commander=agent_commander, worker_pids=worker_pids, occurrences=0
     )
 
     _stop_and_perform_checks(agent_commander=agent_commander)
 
     _check_workers_gracefull_stop(
-        agent_commander=agent_commander,
-        worker_pids=worker_pids,
-        occurrences=1
+        agent_commander=agent_commander, worker_pids=worker_pids, occurrences=1
     )
 
 
-@pytest.mark.skipif(platform.system() == "Darwin", reason="Process workers can be enabled only on Linux")
+@pytest.mark.skipif(
+    platform.system() == "Darwin", reason="Process workers can be enabled only on Linux"
+)
 @pytest.mark.parametrize(
     ["workers_session_count", "workers_type"],
     [[2, "process"], [1, "process"]],
 )
 def test_standalone_agent_restart(
-        agent_paths,
-        agent_commander,
-        default_config,
-        workers_session_count,
-        workers_type,
+    agent_paths,
+    agent_commander,
+    default_config,
+    workers_session_count,
+    workers_type,
 ):
-    default_config.update({
-        "default_sessions_per_worker": workers_session_count,
-        "use_multiprocess_workers": workers_type == "process",
-        "disable_send_requests": True,
-    })
+    default_config.update(
+        {
+            "default_sessions_per_worker": workers_session_count,
+            "use_multiprocess_workers": workers_type == "process",
+            "disable_send_requests": True,
+        }
+    )
 
     agent_paths.agent_config_path.write_text(json.dumps(default_config))
 
@@ -740,9 +630,7 @@ def test_standalone_agent_restart(
     )
 
     _check_workers_gracefull_stop(
-        agent_commander=agent_commander,
-        worker_pids=worker_pids,
-        occurrences=0
+        agent_commander=agent_commander, worker_pids=worker_pids, occurrences=0
     )
 
     agent_commander.restart()
@@ -768,9 +656,7 @@ def test_standalone_agent_restart(
     assert process.pid != process2.pid
 
     _check_workers_gracefull_stop(
-        agent_commander=agent_commander,
-        worker_pids=worker_pids,
-        occurrences=1
+        agent_commander=agent_commander, worker_pids=worker_pids, occurrences=1
     )
 
     _stop_and_perform_checks(
@@ -778,28 +664,31 @@ def test_standalone_agent_restart(
     )
 
     _check_workers_gracefull_stop(
-        agent_commander=agent_commander,
-        worker_pids=worker_pids2,
-        occurrences=2
+        agent_commander=agent_commander, worker_pids=worker_pids2, occurrences=2
     )
 
 
-@pytest.mark.skipif(platform.system() == "Darwin", reason="Process workers can be enabled only on Linux")
+@pytest.mark.skipif(
+    platform.system() == "Darwin", reason="Process workers can be enabled only on Linux"
+)
 @pytest.mark.parametrize(
     ["workers_session_count", "workers_type"],
     [[2, "process"]],
 )
-def test_standalone_agent_config_reload(agent_paths,
-        agent_commander,
-        default_config,
-        workers_session_count,
-        workers_type,
+def test_standalone_agent_config_reload(
+    agent_paths,
+    agent_commander,
+    default_config,
+    workers_session_count,
+    workers_type,
 ):
-    default_config.update({
-        "default_sessions_per_worker": workers_session_count,
-        "use_multiprocess_workers": workers_type == "process",
-        "disable_send_requests": True,
-    })
+    default_config.update(
+        {
+            "default_sessions_per_worker": workers_session_count,
+            "use_multiprocess_workers": workers_type == "process",
+            "disable_send_requests": True,
+        }
+    )
 
     agent_paths.agent_config_path.write_text(json.dumps(default_config))
 
@@ -812,9 +701,7 @@ def test_standalone_agent_config_reload(agent_paths,
     )
 
     _check_workers_gracefull_stop(
-        agent_commander=agent_commander,
-        worker_pids=worker_pids,
-        occurrences=0
+        agent_commander=agent_commander, worker_pids=worker_pids, occurrences=0
     )
 
     logging.info(
@@ -867,19 +754,13 @@ def test_standalone_agent_config_reload(agent_paths,
             break
 
     _check_workers_gracefull_stop(
-        agent_commander=agent_commander,
-        worker_pids=old_worker_pids,
-        occurrences=1
+        agent_commander=agent_commander, worker_pids=old_worker_pids, occurrences=1
     )
 
-    _stop_and_perform_checks(
-        agent_commander=agent_commander
-    )
+    _stop_and_perform_checks(agent_commander=agent_commander)
 
     _check_workers_gracefull_stop(
-        agent_commander=agent_commander,
-        worker_pids=old_worker_pids,
-        occurrences=2
+        agent_commander=agent_commander, worker_pids=old_worker_pids, occurrences=2
     )
 
     new_workers = {}
@@ -888,8 +769,5 @@ def test_standalone_agent_config_reload(agent_paths,
             new_workers[worker_id] = worker_pid
 
     _check_workers_gracefull_stop(
-        agent_commander=agent_commander,
-        worker_pids=new_workers,
-        occurrences=1
+        agent_commander=agent_commander, worker_pids=new_workers, occurrences=1
     )
-

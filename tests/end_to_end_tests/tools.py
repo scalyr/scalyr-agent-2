@@ -89,11 +89,7 @@ class AgentCommander:
 
         self._check_call_command(cmd, env=env)
 
-    def start_and_wait(
-        self,
-        logger=None,
-        env: Dict = None
-    ):
+    def start_and_wait(self, logger=None, env: Dict = None):
         """
         Start the Agent and wait for a successful status.
         :param logger: Logger instance.

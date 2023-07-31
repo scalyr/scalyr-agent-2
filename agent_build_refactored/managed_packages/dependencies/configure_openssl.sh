@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Copyright 2014-2023 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -51,7 +52,5 @@ fi
 
 pwd
 
-../Configure "${OPENSSL_TARGET}" shared \
-    ${ADDITIONAL_ARGS} \
-    --libdir=lib \
-    "$@"
+# shellcheck disable=SC2086
+../Configure "${OPENSSL_TARGET}" shared ${ADDITIONAL_ARGS} --libdir=lib "$@"

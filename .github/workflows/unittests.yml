@@ -106,8 +106,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: 'pip' # caching pip dependencies
           cache-dependency-path: |
-            dev-requirements.txt
-            windows-unit-tests-requirements.txt
+            dev-requirements-new.txt
             benchmarks/micro/requirements-compression-algorithms.txt
       - name: Install tox
         env:
@@ -238,11 +237,6 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-#      - name: install python and requirements
-#        uses: ./.github/actions/install_python_and_requirements
-#        with:
-#          python_version: ${{ matrix.python-version }}
-
       - name: Setup Python
         uses: actions/setup-python@v4
         id: setup-python
@@ -250,7 +244,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: 'pip' # caching pip dependencies
           cache-dependency-path: |
-            dev-requirements.txt
+            dev-requirements-new.txt
             benchmarks/micro/requirements-compression-algorithms.txt
 
       - name: Install tox
@@ -268,17 +262,6 @@ jobs:
           READ_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
           TEST_SESSION_SUFFIX: ${{ matrix.python-version  }}-${{ matrix.os }}-${{ github.run_id }}-${{ github.run_attempt }}
           KIND: end2end
-#
-#      - name: Run tests
-#        shell: bash
-#        env:
-#          SCALYR_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
-#          READ_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
-#          TEST_SESSION_SUFFIX: ${{ matrix.python_version  }}-${{ matrix.os }}-${{ github.run_id }}-${{ github.run_attempt }}
-#        run: |
-#          python3 -m pytest  tests/end_to_end_tests/test_from_source/test_from_source.py \
-#            --scalyr-api-key ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }} \
-#            --scalyr-api-read-key ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }} \
 
       - name: Upload pytest test results
         uses: actions/upload-artifact@v3
@@ -297,7 +280,6 @@ jobs:
     needs:
       - pre_job
       - unittests
-
       - monitor-smoketests
     steps:
       - name: Download test results

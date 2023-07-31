@@ -41,7 +41,9 @@ from agent_build_refactored.container_images import ALL_CONTAINERISED_AGENT_BUIL
 from agent_build_refactored.container_images.image_builders import (
     ImageType,
 )
-from agent_build_refactored.managed_packages.managed_packages_builders import ALL_PACKAGE_BUILDERS
+from agent_build_refactored.managed_packages.managed_packages_builders import (
+    ALL_PACKAGE_BUILDERS,
+)
 
 init_logging()
 
@@ -71,7 +73,7 @@ def _add_image_parsers():
     load_image_parser = image_parser_action_subparsers.add_parser(
         "load",
         help="Build and load docker image directly in the docker engine. "
-             "This is only a single arch image because docker does not store multi-arch images.",
+        "This is only a single arch image because docker does not store multi-arch images.",
     )
     _add_image_type_arg(load_image_parser)
     load_image_parser.add_argument(
@@ -91,7 +93,7 @@ def _add_image_parsers():
     cache_requirements_image_parser = image_parser_action_subparsers.add_parser(
         "cache-requirements",
         help="Build only the cacheable requirements of the image. Can be used in CI/CD to pre-build and cache them"
-             "in order to speed up builds",
+        "in order to speed up builds",
     )
     cache_requirements_image_parser.add_argument(
         "--architecture", required=True, help="Architecture of requirements."
@@ -131,7 +133,7 @@ def _add_image_parsers():
         required=False,
         action="store_true",
         help="Disable certificate validation when pushing the image. Inactive by default. "
-             "May be needed, for example, to push to a local registry.",
+        "May be needed, for example, to push to a local registry.",
     )
 
 
@@ -155,10 +157,7 @@ def _add_package_parsers():
         choices=["deb", "rpm"],
     )
 
-    build_parser.add_argument(
-        "--output-dir",
-        default=str(SOURCE_ROOT / "build")
-    )
+    build_parser.add_argument("--output-dir", default=str(SOURCE_ROOT / "build"))
 
 
 if __name__ == "__main__":

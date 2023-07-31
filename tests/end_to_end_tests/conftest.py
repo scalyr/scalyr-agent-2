@@ -17,16 +17,12 @@
 This is a root conftest for all pytest-based end-to-end tests. And it is mostly responsible for
 some common options and fixtures such as Scalyr credentials etc.
 """
-
-import json
+import enum
 import os
-import pathlib as pl
 import time
 
 import pytest
 from _pytest.runner import pytest_runtest_protocol as orig_pytest_runtest_protocol
-
-from agent_build_refactored.utils.constants import SOURCE_ROOT
 
 IN_CICD = os.environ.get("AGENT_BUILD_IN_CICD", False)
 
@@ -57,28 +53,45 @@ def _get_env_var(name: str, default=None):
     return value
 
 
-@pytest.fixture(scope="session")
-def scalyr_api_key():
+def _get_scalyr_api_key():
     return _get_env_var(name="SCALYR_API_KEY")
 
 
-@pytest.fixture(scope="session")
-def scalyr_api_read_key():
+def _get_scalyr_api_read_key():
     return _get_env_var(name="READ_API_KEY")
 
 
-@pytest.fixture(scope="session")
-def scalyr_server():
+def _get_scalyr_server():
     return _get_env_var(name="SCALYR_SERVER", default="agent.scalyr.com")
 
 
-@pytest.fixture(scope="session")
-def test_session_suffix():
+def _get_test_session_suffix():
     value = _get_env_var(name="TEST_SESSION_SUFFIX", default="")
     return f"{value}-{int(time.time())}"
 
 
+class TestSettings(enum.Enum):
+    SCALYR_API_KEY = _get_scalyr_api_key()
+    READ_API_KEY = _get_scalyr_api_read_key()
+    SCALYR_SERVER = _get_scalyr_server()
+    TEST_SESSION_SUFFIX = _get_test_session_suffix()
+
+
 @pytest.fixture(scope="session")
-def agent_version():
-    version_file = SOURCE_ROOT / "VERSION"
-    return version_file.read_text().strip()
+def scalyr_api_key():
+    return TestSettings.SCALYR_API_KEY.value
+
+
+@pytest.fixture(scope="session")
+def scalyr_api_read_key():
+    return TestSettings.READ_API_KEY.value
+
+
+@pytest.fixture(scope="session")
+def scalyr_server():
+    return TestSettings.SCALYR_SERVER.value
+
+
+@pytest.fixture(scope="session")
+def test_session_suffix():
+    return TestSettings.TEST_SESSION_SUFFIX.value

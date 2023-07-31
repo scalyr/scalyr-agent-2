@@ -21,7 +21,10 @@ from typing import Union, Type
 import requests
 
 from agent_build_refactored.utils.constants import CpuArch
-from agent_build_refactored.utils.docker.buildx.build import buildx_build, LocalDirectoryBuildOutput
+from agent_build_refactored.utils.docker.buildx.build import (
+    buildx_build,
+    LocalDirectoryBuildOutput,
+)
 from agent_build_refactored.utils.toolset_image import build_toolset_image_oci_layout
 from agent_build_refactored.managed_packages.managed_packages_builders import (
     LinuxAIOPackagesBuilder,
@@ -78,12 +81,14 @@ def download_stable_packages(
 
 
 def create_packages_repo_root(
-        packages_source_type: str,
-        packages_source: str,
-        package_builder: Union[Type[LinuxAIOPackagesBuilder], Type[LinuxNonAIOPackageBuilder]],
-        package_type: str,
-        stable_packages_version: str,
-        output_dir: pl.Path
+    packages_source_type: str,
+    packages_source: str,
+    package_builder: Union[
+        Type[LinuxAIOPackagesBuilder], Type[LinuxNonAIOPackageBuilder]
+    ],
+    package_type: str,
+    stable_packages_version: str,
+    output_dir: pl.Path,
 ):
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -128,7 +133,7 @@ def create_packages_repo_root(
         build_repo(
             repo_type=repo_type,
             packages_dir=all_packages_dir,
-            output_dir=packages_repo_root
+            output_dir=packages_repo_root,
         )
 
     return packages_repo_root
@@ -165,5 +170,5 @@ def build_repo(
         },
         output=LocalDirectoryBuildOutput(
             dest=output_dir,
-        )
+        ),
     )

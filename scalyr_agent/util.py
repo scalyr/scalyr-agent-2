@@ -2105,7 +2105,7 @@ def get_compress_and_decompress_func(compression_algorithm, compression_level=9)
         compress_func = snappy.compress  # type: ignore
         decompress_func = snappy.decompress  # type: ignore
     elif compression_algorithm == "brotli":
-        import brotli
+        import brotli  # pylint: disable=import-error
 
         compress_func = functools.partial(brotli.compress, quality=compression_level)  # type: ignore
         decompress_func = brotli.decompress  # type: ignore

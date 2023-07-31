@@ -17,7 +17,7 @@ import dataclasses
 import os
 import pathlib as pl
 
-import boto3
+import boto3  # pylint: disable=import-error
 
 COMMON_TAG_NAME = "automated-agent-ci-cd"
 CURRENT_SESSION_TAG_NAME = "current-ci-cd-session"

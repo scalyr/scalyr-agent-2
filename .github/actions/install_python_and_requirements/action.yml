@@ -12,7 +12,7 @@ runs:
       uses: actions/setup-python@v4
       id: setup-python
       with:
-        python-version: ${{ matrix.python_version }}
+        python-version: ${{ inputs.python_version }}
         cache: 'pip' # caching pip dependencies
         cache-dependency-path: |
           dev-requirements-new.txt

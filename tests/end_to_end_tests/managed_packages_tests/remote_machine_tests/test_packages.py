@@ -31,7 +31,7 @@ from typing import List, Dict
 
 import pytest
 
-from agent_build_refactored.utils.constants import SOURCE_ROOT
+from agent_build_refactored.utils.constants import SOURCE_ROOT, AGENT_VERSION
 from agent_build_refactored.managed_packages.managed_packages_builders import (
     AGENT_SUBDIR_NAME,
     AGENT_AIO_PACKAGE_NAME,
@@ -69,7 +69,6 @@ def test_packages(
     scalyr_api_read_key,
     scalyr_server,
     test_session_suffix,
-    agent_version,
     tmp_path,
     use_aio_package,
     agent_package_name,
@@ -129,7 +128,7 @@ def test_packages(
     agent_commander.start_and_wait(env=_ADDITIONAL_ENVIRONMENT, logger=logger)
 
     verify_agent_status(
-        agent_version=agent_version,
+        agent_version=AGENT_VERSION,
         agent_commander=agent_commander,
         timeout_tracker=timeout_tracker,
     )
@@ -196,16 +195,13 @@ def test_packages(
     monitor_file_path.write_text("test")
 
     logger.info("Cleanup")
-    _remove_all_agent_files(
-        package_name=agent_package_name, package_type=package_type
-    )
+    _remove_all_agent_files(package_name=agent_package_name, package_type=package_type)
 
     assert monitor_file_path.exists()
     assert monitor_file_path.read_text() == "test"
 
 
 def test_aio_package_paths(
-    #package_builder,
     package_type,
     tmp_path,
     target_distro,
@@ -262,8 +258,6 @@ def test_aio_package_paths(
         len(remaining_paths) == 0
     ), "Something remains outside if the expected package structure."
 
-
-
     # _verify_package_paths(
     #     package_path=agent_package_path,
     #     package_type=package_builder.PACKAGE_TYPE,
@@ -287,11 +281,8 @@ def test_aio_package_paths(
     #     ],
     # )
 
-def test_agent_package_config_ownership(
-    package_type,
-    agent_package_path,
-    tmp_path
-):
+
+def test_agent_package_config_ownership(package_type, agent_package_path, tmp_path):
     """
     Test ownership and permissions of the config files.
     """
@@ -345,7 +336,6 @@ def test_agent_package_config_ownership(
 
 
 def test_upgrade(
-    #package_builder,
     package_builder_name,
     package_type,
     repo_url,
@@ -355,7 +345,6 @@ def test_upgrade(
     stable_packages_version,
     scalyr_api_key,
     test_session_suffix,
-    agent_version,
     use_aio_package,
     agent_package_name,
 ):
@@ -459,7 +448,7 @@ repo_gpgcheck=0
     agent_commander.start_and_wait(logger=logger)
 
     verify_agent_status(
-        agent_version=agent_version,
+        agent_version=AGENT_VERSION,
         agent_commander=agent_commander,
         timeout_tracker=timeout_tracker,
     )
@@ -467,9 +456,7 @@ repo_gpgcheck=0
     agent_commander.stop()
 
     logger.info("Cleanup")
-    _remove_all_agent_files(
-        package_name=agent_package_name, package_type=package_type
-    )
+    _remove_all_agent_files(package_name=agent_package_name, package_type=package_type)
 
 
 def _perform_ssl_checks(
@@ -711,10 +698,7 @@ def _install_from_convenience_script(
         elif target_distro.name in ["ubuntu1404", "centos6"]:
             assert "Looking for system OpenSSL >= 3: Not found" in output
             assert "Looking for system OpenSSL >= 1.1.1: Not found" in output
-            assert (
-                f"Using embedded OpenSSL == OpenSSL {OPENSSL_3_VERSION}"
-                in output
-            )
+            assert f"Using embedded OpenSSL == OpenSSL {OPENSSL_3_VERSION}" in output
 
 
 def _prepare_environment(

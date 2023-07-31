@@ -1,5 +1,0 @@
-apache-libcloud==3.7.0
-paramiko==2.11.0
-Jinja2==3.0.3
-xmltodict==0.13.0
-syslogmp==0.3; python_version >= '3.6'
