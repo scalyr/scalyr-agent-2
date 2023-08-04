@@ -105,7 +105,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: 'pip' # caching pip dependencies
           cache-dependency-path: |
-            dev-requirements-new.txt
+            dev-requirements.txt
+            windows-unit-tests-requirements.txt
             benchmarks/micro/requirements-compression-algorithms.txt
       - name: Install tox
         env:
@@ -140,6 +141,78 @@ jobs:
           steps: ${{ toJson(steps) }}
           channel: '#eng-dataset-cloud-tech'
 
+  standalone-smoketests:
+    name: Standalone Smoketests - Python ${{ matrix.python-version }} - ${{ matrix.variant }}
+    runs-on: ubuntu-20.04
+
+    needs: pre_job
+    # NOTE: We always want to run job on master branch
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref_name == 'master' }}
+
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+          - "3.6"
+          - "3.7"
+          - "3.8"
+          - "3.9"
+          - "3.10"
+        variant:
+          - std
+        include:
+          - variant: ratelimit
+            python-version: "3.10"
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        id: setup-python
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip' # caching pip dependencies
+      - name: Install tox
+        env:
+          TOX_VERSION: 3.20.1
+          TOX_GH_ACTIONS_VERSION: 2.9.1
+        run: |
+          python -m pip install --upgrade pip
+          pip install "tox==$TOX_VERSION" "tox-gh-actions==$TOX_GH_ACTIONS_VERSION"
+
+      - name: Run Standalone Smoketests
+        run: tox
+        env:
+          VARIANT: ${{ matrix.variant }}
+          KIND: smoketests
+          SCALYR_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
+          READ_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
+          SCALYR_SERVER: https://agent.scalyr.com
+          AGENT_HOST_NAME: agent-smoke-standalone-${{ matrix.python-version }}-${{ github.run_number }}
+
+      - name: Upload pytest test results
+        uses: actions/upload-artifact@v3
+        with:
+          name: pytest-results-${{ matrix.python-version }}-${{ matrix.variant }}
+          path: |
+            test-results/junit*.xml
+        if: ${{ success() || failure() }}
+
+      - name: Notify Slack on Failure
+        if: ${{ failure() && github.ref_name == 'master' }}
+        uses: act10ns/slack@ed1309ab9862e57e9e583e51c7889486b9a00b0f # v2.0.0
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          status: ${{ job.status }}
+          steps: ${{ toJson(steps) }}
+          channel: '#eng-dataset-cloud-tech'
+
   monitor-smoketests:
     name: Monitor Smoketests - Python ${{ matrix.python-version }}
     runs-on: ubuntu-20.04
@@ -157,6 +230,19 @@ jobs:
       matrix:
         python-version:
           - "3.6"
+          - "3.7"
+          - "3.8"
+          - "3.9"
+          - "3.10"
+        os:
+          - ubuntu-20.04
+        platform:
+          - ubuntu
+        include:
+          - os: macos-11
+            platform: macos
+            python-version: "3.10"
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
@@ -208,67 +294,42 @@ jobs:
 
   # Runs agent from it source and performs some basic sanity checks.
   agent-source-tests:
-    name: Python ${{ matrix.python-version  }} ${{ matrix.platform }} Agent Source End to End Test
     runs-on: ${{ matrix.os }}
     needs: pre_job
     # NOTE: We always want to run job on master branch
     if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref_name == 'master' }}
     container: ${{ matrix.container }}
     strategy:
-      fail-fast: false
       matrix:
-        python-version:
-          - "3.6"
-          - "3.7"
-          - "3.8"
-          - "3.9"
-          - "3.10"
-        os:
-          - ubuntu-20.04
-        platform:
-          - ubuntu
-        include:
-          - os: macos-11
-            platform: macos
-            python-version: "3.10"
+        os: [ "macos-11", "ubuntu-20.04" ]
+        python-version: [ "3.7.13" ]
+          # Uncomment when windows platform and service related issues are fixed.
+      #        include:
+      #          - os: "windows-2019"
+      #            python-version: "3.7.9"
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Setup Python
+      - name: Install python
         uses: actions/setup-python@v4
-        id: setup-python
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'pip' # caching pip dependencies
-          cache-dependency-path: |
-            dev-requirements-new.txt
-            benchmarks/micro/requirements-compression-algorithms.txt
 
-      - name: Install tox
-        env:
-          TOX_VERSION: 3.20.1
-          TOX_GH_ACTIONS_VERSION: 2.9.1
-        run: |
-          python -m pip install --upgrade pip
-          pip install "tox==$TOX_VERSION" "tox-gh-actions==$TOX_GH_ACTIONS_VERSION"
-
-      - name: Run End to End Tests
-        run: tox
-        env:
-          SCALYR_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
-          READ_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
-          TEST_SESSION_SUFFIX: ${{ matrix.python-version  }}-${{ matrix.os }}-${{ github.run_id }}-${{ github.run_attempt }}
-          KIND: end2end
-
-      - name: Upload pytest test results
-        uses: actions/upload-artifact@v3
+      - name: Perform the deployment of the test environment
+        uses: ./.github/actions/perform-deployment
         with:
-          name: pytest-results-${{ matrix.python-version }}-${{ matrix.variant }}
-          path: |
-            test-results/junit*.xml
-        if: ${{ success() || failure() }}
+          deployment-name: "test_environment"
+
+      - name: Run tests
+        shell: bash
+        run: |
+          python3 -m pytest  tests/end_to_end_tests/test_from_source/test_from_source.py \
+            --scalyr-api-key ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }} \
+            --scalyr-api-read-key ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }} \
+            --test-session-suffix ${{ github.run_id }}-${{ github.run_attempt }}
+
 
   publish-test-results:
     runs-on: ubuntu-latest
@@ -279,6 +340,7 @@ jobs:
     needs:
       - pre_job
       - unittests
+      - standalone-smoketests
       - monitor-smoketests
     steps:
       - name: Download test results

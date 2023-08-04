@@ -1,0 +1,61 @@
+name: 'Execute runner.'
+description: |
+  Prepares current machine by performing the set of the runner steps, which are defined in the 'agent_build/tools/runner.py' module.
+inputs:
+  runner-fqdn:
+    description: "FQDN of the runner"
+    required: true
+
+  cache-key-runner-part:
+    description: | 
+      Part of a cache key that represents system and architecture of the current runner. This is needed to provide 
+      prevent cache collisions for the same step which runs on different environments.
+
+    default: ${{ matrix.os }}-${{ runner.os }}-${{ runner.arch }}
+    required: true
+
+  cache-version-suffix:
+    description: "Cache key suffix. Can be changed when it is needed to invalidate the cache."
+    required: false
+    default: v22
+
+  aws_access_key:
+    description: "Access key of AWS account to run (if needed) some steps in docker that is in EC2."
+    required: false
+
+  aws_secret_key:
+    description: "Secret key of AWS account to run (if needed) some steps in docker that is in EC2."
+    required: false
+
+  aws_private_key_name:
+    description: "EC2 private key name to run (if needed) some steps in docker that is in EC2."
+    required: false
+
+  aws_private_key_path:
+    description: "EC2 private key path to run (if needed) some steps in docker that is in EC2."
+    required: false
+
+  aws_security_group:
+    description: "EC2 security group name to run (if needed) some steps in docker that is in EC2."
+    required: false
+
+  aws_security_groups_prefix_list_id:
+    description: "Id of prefix list that is used by security group."
+    required: false
+
+  aws_public_key_name:
+    description: "EC2 public key name to run (if needed) some steps in docker that is in EC2."
+    required: false
+
+  aws_region:
+    description: "AWS region to run EC2 instances."
+    required: false
+
+  aws_objects_name_prefix:
+    description: "Mane prefix for the EC2 objects that are created during execution, so they can be deleted later by using this prefix."
+    required: false
+
+
+runs:
+  using: 'node16'
+  main: 'dist/index.js'
