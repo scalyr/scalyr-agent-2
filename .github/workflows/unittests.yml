@@ -265,7 +265,7 @@ jobs:
         run: |
           rm -rf artifacts test-results .coverage
           mkdir -p artifacts test-results
-          tox -e agent_monitors_ubuntu-py${{matrix.python-version//.//}} -- --artifacts-path artifacts -n 2 --junitxml=test-results/junit-1.xml
+          tox -e agent_monitors_ubuntu -- --artifacts-path artifacts -n 2 --junitxml=test-results/junit-1.xml
         env:
           SCALYR_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
           READ_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
