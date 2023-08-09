@@ -13,8 +13,7 @@ repoze.lru==0.7
 six==1.14.0
 
 # Required for redis monitor.
-redis==2.10.5; python_version == '3.6'
-redis==4.6.0; python_version >= '3.7'
+redis==2.10.5
 
 
 
@@ -25,7 +24,7 @@ PyMySQL==0.9.3
 pg8000==1.10.6
 
 # Required for snmp monitor
-pysnmp==4.4.12; platform_system != 'Windows' and platform_system != 'Darwin'
+pysnmp==4.3.0; platform_system != 'Windows' and platform_system != 'Darwin'
 
 # Required for syslog monitor
 syslogmp==0.3; python_version >= '3.6'
