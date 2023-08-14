@@ -22,6 +22,16 @@ jobs:
   snyk:
     runs-on: ubuntu-latest
     steps:
+    - name: Check for Secret availability
+      id: secret-check
+      # perform secret check & put boolean result as an output
+      shell: bash
+      run: |
+        if [ "${{ secrets.SNYK_TOKEN }}" != '' ]; then
+          echo "Empty"
+        else
+          echo "Available
+        fi
     - name: Run Snyk to check Docker image for vulnerabilities
       # Snyk can be used to break the build when it detects vulnerabilities.
       # In this case we want to upload the issues to GitHub Code Scanning
