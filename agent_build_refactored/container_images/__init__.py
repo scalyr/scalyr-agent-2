@@ -14,8 +14,10 @@
 
 
 from agent_build_refactored.container_images.image_builders import CONTAINERISED_AGENT_BUILDERS
+from agent_build_refactored.container_images.fips_image_builders import FIPS_CONTAINERISED_AGENT_BUILDERS
 
 
 ALL_CONTAINERISED_AGENT_BUILDERS = {
-    **CONTAINERISED_AGENT_BUILDERS
+    **CONTAINERISED_AGENT_BUILDERS,
+    **FIPS_CONTAINERISED_AGENT_BUILDERS,
 }

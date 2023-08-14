@@ -1,14 +1,16 @@
 name: Lint
 
 on:
-  push:
-    branches:
-      - master
-  pull_request:
-    branches:
-      - master
-  schedule:
-    - cron: '0 4 * * *'
+  # Disable, since it is not required (for now) for the internal repo.
+  workflow_dispatch:
+#  push:
+#    branches:
+#      - master
+#  pull_request:
+#    branches:
+#      - master
+#  schedule:
+#    - cron: '0 4 * * *'
 
 permissions:
   actions: write  # Needed for skip-duplicate-jobs job

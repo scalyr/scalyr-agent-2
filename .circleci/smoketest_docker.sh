@@ -196,7 +196,8 @@ echo "Stopping agent."
 echo ""
 docker stop ${contname_agent}
 
-echo ""
-echo "Agent stopped, copying .coverage results."
-echo ""
-docker cp ${contname_agent}:/.coverage .
+# do not use coverage for this repo.
+#echo ""
+#echo "Agent stopped, copying .coverage results."
+#echo ""
+#docker cp ${contname_agent}:/.coverage .
