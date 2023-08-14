@@ -1,0 +1,201 @@
+name: Agent Build Refactored
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - v*.*.*
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+  schedule:
+    - cron: '0 4 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  pre_job:
+    name: Skip Duplicate Jobs Pre Job
+    runs-on: self-hosted
+    permissions:
+      actions: write  # Needed for skip-duplicate-jobs job
+      contents: read
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+      python_version: ${{ steps.define_constants.outputs.python_version }}
+      cache_version: ${{ steps.define_constants.outputs.cache_version }}
+      aws_region: ${{ steps.define_constants.outputs.aws_region }}
+      aws_private_key_name: ${{ steps.define_constants.outputs.aws_private_key_name }}
+      cicd_workflow: ${{ steps.define_constants.outputs.cicd_workflow }}
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@12aca0a884f6137d619d6a8a09fcc3406ced5281 # v4.0.0
+        with:
+          cancel_others: 'true'
+          github_token: ${{ github.token }}
+
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - id: define_constants
+        run: |
+          echo "python_version=3.8" >> "${GITHUB_OUTPUT}"
+          echo "cache_version=6" >> "${GITHUB_OUTPUT}"
+          echo "aws_region=us-east-1" >> "${GITHUB_OUTPUT}"
+          echo "aws_private_key_name=CT_SCALYR_AGENT_GHA" >> "${GITHUB_OUTPUT}"
+          echo "cicd_workflow=${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}" >> "${GITHUB_OUTPUT}"
+
+  build-linux-packages:
+    # Disable, since it is not required (for now) for the internal repo.
+    if: ${{ false }}
+    name: "Build Linux packages"
+    uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
+    secrets:
+      CT_AWS_DEV_EC2_PRIVATE_KEY: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
+      CT_AWS_DEV_EC2_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
+      CT_AWS_DEV_EC2_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
+      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
+      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
+
+  # Invoke workflow that builds all agent container mages.
+  build_container_images:
+    name: "Build Container Images"
+    needs:
+      - pre_job
+    uses: ./.github/workflows/reusable-agent-build-container-images.yml
+    with:
+      python_version: ${{ needs.pre_job.outputs.python_version }}
+      cache_version: ${{ needs.pre_job.outputs.cache_version }}
+      aws_region: ${{ needs.pre_job.outputs.aws_region }}
+      aws_private_key_name: ${{ needs.pre_job.outputs.aws_private_key_name }}
+      cicd_workflow: ${{ needs.pre_job.outputs.cicd_workflow }}
+    secrets:
+      CT_AWS_DEV_EC2_PRIVATE_KEY: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
+      CT_AWS_DEV_EC2_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
+      CT_AWS_DEV_EC2_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
+      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
+      CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
+      PUBLISH_REGISTRY_USERNAME: dataset-push-svc
+      PUBLISH_REGISTRY_PASSWORD: ${{ secrets.HA_ART_DATASET_PUSH_SVC_PW }}
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+
+  build-windows-package:
+    # Disable, since it is not required (for now) for the internal repo.
+    if: ${{ false }}
+    name: "Build Windows package"
+    uses: ./.github/workflows/reusable-agent-build-windows.yml
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  build_tarball:
+    # Disable, since it is not required (for now) for the internal repo.
+    if: ${{ false }}
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.8.13"
+
+      - name: Build tarball
+        run: |
+          mkdir -p build/tarball/noarch
+          pushd build/tarball/noarch
+          python3 ../../../build_package.py tarball
+          popd
+
+      - name: Save tarball as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: tarball-noarch
+          path: build
+          retention-days: 1
+
+      - name: Notify Slack on Failure
+        if: ${{ failure() && github.ref_name == 'master' }}
+        uses: act10ns/slack@ed1309ab9862e57e9e583e51c7889486b9a00b0f # v2.0.0
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          status: ${{ job.status }}
+          steps: ${{ toJson(steps) }}
+          channel: '#eng-dataset-cloud-tech'
+
+
+  # Aggregate all agent build artifacts that we build by this workflow and put in a single artifact,
+  # so it's just need to download only one artifact, for example during a release process.
+  prepare-artifacts:
+    # Disable, since it is not required (for now) for the internal repo.
+    if: ${{ false }}
+    runs-on: ubuntu-20.04
+    needs:
+      - build-linux-packages
+      - build-windows-package
+      - build_tarball
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: /tmp/all_artifacts
+
+      - name: Prepare artifacts
+        run: |
+          mkdir -p /tmp/result_artifacts
+          cp -a /tmp/all_artifacts/linux-packages-*/. /tmp/result_artifacts
+          cp -a /tmp/all_artifacts/tarball-noarch/. /tmp/result_artifacts
+          cp -a /tmp/all_artifacts/windows-msi/. /tmp/result_artifacts
+
+      - name: Save result artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: result-artifacts
+          path: /tmp/result_artifacts
+          retention-days: 1
+
+  clean-ec2-tests-objects:
+    name: Remove ec2 test workflow prefix list entries
+    # Disable, since we do not use AWS ec2 instances to speed up build as we do
+    # in the upstream repo.
+    if: ${{ false }}
+    needs:
+      - pre_job
+      - build_container_images
+      - build-linux-packages
+      - build-windows-package
+      - build_tarball
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: install python and requirements
+        uses: ./.github/actions/install_python_and_requirements
+        with:
+          python_version: ${{ needs.pre_job.outputs.python_version }}
+
+      - name: Cleanup old prefix lists for ec2 test security group.
+        env:
+          AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
+          AWS_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
+          AWS_PRIVATE_KEY_NAME: ${{ needs.pre_job.outputs.aws_private_key_name }}
+          AWS_PRIVATE_KEY_PATH: "/tmp/private_key.pem"
+          AWS_REGION: ${{ needs.pre_job.outputs.aws_region }}
+          CICD_WORKFLOW: ${{ needs.pre_job.outputs.cicd_workflow }}
+        run: |
+          echo "${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}" > "${AWS_PRIVATE_KEY_PATH}"
+          chmod 600 "${AWS_PRIVATE_KEY_PATH}"
+          python3 agent_build_refactored/utils/scripts/cicd/cleanup_ec2_objects.py
