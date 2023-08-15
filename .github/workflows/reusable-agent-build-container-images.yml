@@ -859,18 +859,22 @@ jobs:
         run: |
           if [ "${{ github.ref_type }}" = "tag" ]; then
             AGENT_VERSION="$(cat VERSION | tr -d '\n')"
+            TAG="${{ github.ref_name }}"
+            DOCKER_VERSION_TAG="${TAG#v}"
             if [ "${{ github.ref_name }}" = "v${AGENT_VERSION}" ]; then
               echo "publish=true" >> "${GITHUB_OUTPUT}"
-              echo "tags=${{ github.ref_name }},latest" >> "${GITHUB_OUTPUT}"
+              echo "tags=${DOCKER_VERSION_TAG},latest" >> "${GITHUB_OUTPUT}"
             fi
           else
               echo "publish=true" >> "${GITHUB_OUTPUT}"
               echo "tags=${{ github.sha }}" >> "${GITHUB_OUTPUT}"
           fi
+          exit 1
 
       - name: Publish image
         if: steps.verify.outputs.publish == 'true'
         run: |
+          exit 1
           python3 build_package_new.py \
             image \
             ${{ matrix.variant.builder_name }} \
