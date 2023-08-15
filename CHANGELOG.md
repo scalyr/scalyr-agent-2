@@ -1,12 +1,13 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.2.4 "TBD" - Jun 22, 2023
+## 2.2.4 "Trillian" - Aug 14, 2023
 <!---
-Packaged by Arthur Kamalov <arthurk@sentinelone.com> on Jun 22, 2023 00:00 -0800
+Packaged by Ales Novak <ales.novak@sentinelone.com> on Aug 14, 2023 00:00 -0800
 --->
 Container images:
 * Kubernetes and Docker images switched from Debian to Ubuntu. Python version used in those images now matches Python in this distribution.
+* Upgraded bundled Python dependencies to the latest stable versions to include all the latest security fixes (requests==2.28,1, pysnmp==4.4.12, docker==6.1.3)
 
 ## 2.2.3 "Elloria" - Jun 22, 2023
 <!---
