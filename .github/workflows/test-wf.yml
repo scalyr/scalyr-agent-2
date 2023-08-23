@@ -1,0 +1,43 @@
+name: Agent Build Refactored
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - v*.*.*
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+  schedule:
+    - cron: '0 4 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  publish_images:
+    name: Test Version
+    runs-on: ubuntu-20.04
+    if: github.ref_type == 'tag' || github.ref_name == 'master'
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Verify and Create Tags
+        id: verify
+        shell: bash
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            AGENT_VERSION="$(cat VERSION | tr -d '\n')"
+            TAG="${{ github.ref_name }}"
+            DOCKER_VERSION_TAG="${TAG#v}"
+            echo $DOCKER_VERSION
+            if [ "${{ github.ref_name }}" = "v${AGENT_VERSION}" ]; then
+              echo "publish=true" >> "${GITHUB_OUTPUT}"
+              echo "tags=${DOCKER_VERSION_TAG},latest" >> "${GITHUB_OUTPUT}"
+            fi
+          else
+            
