@@ -44,4 +44,8 @@ jobs:
               echo "tags=${{ github.sha }}" >> "${GITHUB_OUTPUT}"
           fi
           echo "publish=false" >> "${GITHUB_OUTPUT}"
+      - name: Debug
+        run: |
+          echo ${{ steps.verify.outputs.publish }}
+          echo ${{ steps.verify.outputs.tags }}
             
