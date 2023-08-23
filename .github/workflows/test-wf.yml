@@ -40,4 +40,8 @@ jobs:
               echo "tags=${DOCKER_VERSION_TAG},latest" >> "${GITHUB_OUTPUT}"
             fi
           else
+              echo "publish=true" >> "${GITHUB_OUTPUT}"
+              echo "tags=${{ github.sha }}" >> "${GITHUB_OUTPUT}"
+          fi
+          echo "publish=false" >> "${GITHUB_OUTPUT}"
             
