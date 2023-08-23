@@ -861,6 +861,7 @@ jobs:
             AGENT_VERSION="$(cat VERSION | tr -d '\n')"
             TAG="${{ github.ref_name }}"
             DOCKER_VERSION_TAG="${TAG#v}"
+            echo $DOCKER_VERSION
             if [ "${{ github.ref_name }}" = "v${AGENT_VERSION}" ]; then
               echo "publish=true" >> "${GITHUB_OUTPUT}"
               echo "tags=${DOCKER_VERSION_TAG},latest" >> "${GITHUB_OUTPUT}"
@@ -869,7 +870,7 @@ jobs:
               echo "publish=true" >> "${GITHUB_OUTPUT}"
               echo "tags=${{ github.sha }}" >> "${GITHUB_OUTPUT}"
           fi
-          exit 1
+          echo "publish=false" >> "${GITHUB_OUTPUT}"
 
       - name: Publish image
         if: steps.verify.outputs.publish == 'true'
