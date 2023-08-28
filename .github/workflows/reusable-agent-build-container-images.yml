@@ -868,11 +868,11 @@ jobs:
               echo "tags=${{ github.sha }}" >> "${GITHUB_OUTPUT}"
           elif [ "${{ github.head_ref }} == 'release" ]; then
               echo "tags=pr-${{ github.event.number}}-${{ github.event.pull_request.commits}}-${{ github.sha }},\
-              pr-${{ github.event.number}}-latest-${{ github.sha }} \
+              pr-${{ github.event.number}}-latest-${{ github.sha }},\
               $AGENT_VERSION,latest" >> "${GITHUB_OUTPUT}"
           elif [ "${{ github.event_name }}" = "pull_request"; then
               echo "tags=pr-${{ github.event.number}}-${{ github.event.pull_request.commits}}-${{ github.sha }},\
-              pr-${{ github.event.number}}-latest-${{ github.sha }}
+              pr-${{ github.event.number}}-latest-${{ github.sha }}"
           else
             echo "tags=empty" >> "${GITHUB_OUTPUT}"
           fi
