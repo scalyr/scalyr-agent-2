@@ -818,7 +818,7 @@ jobs:
   publish_images:
     name: Publish image ${{ matrix.variant.image_type }}-${{ matrix.variant.builder_name }}
     runs-on: ubuntu-20.04
-    if: github.ref_type == 'tag' || github.ref_name == 'master' || github.head_ref == 'release' || contains(github.event.pull_request.labels.*.name, 'docker_push_test')
+    if: github.ref_type == 'tag' || github.ref_name == 'master' || github.head_ref == 'release' || github.event_name == 'pull_request'
     needs:
       - build_image_tarball
       - k8s_kubernetes_monitor_tests
@@ -863,13 +863,16 @@ jobs:
               echo "tags=$AGENT_VERSION,latest" >> "${GITHUB_OUTPUT}"
             else
               echo "tags=empty" >> "${GITHUB_OUTPUT}"
-            fi
+            fi        
           elif [ "${{ github.ref_name }}" = "master" ]; then
               echo "tags=${{ github.sha }}" >> "${GITHUB_OUTPUT}"
+          elif [ "${{ github.head_ref }} == 'release" ]; then
+              echo "tags=pr-${{ github.event.number}}-${{ github.event.pull_request.commits}}-${{ github.sha }},\
+              pr-${{ github.event.number}}-latest-${{ github.sha }} \
+              $AGENT_VERSION,latest" >> "${GITHUB_OUTPUT}"
           elif [ "${{ github.event_name }}" = "pull_request"; then
               echo "tags=pr-${{ github.event.number}}-${{ github.event.pull_request.commits}}-${{ github.sha }},\
-              pr-${{ github.event.number}}-latest-${{ github.sha }},\
-              $AGENT_VERSION,latest" >> "${GITHUB_OUTPUT}"
+              pr-${{ github.event.number}}-latest-${{ github.sha }}
           else
             echo "tags=empty" >> "${GITHUB_OUTPUT}"
           fi
