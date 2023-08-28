@@ -18,6 +18,7 @@ https://github.com/scalyr/scalyr-agent-2/blob/master/CHANGELOG.md.
   
   When upgraded to a new version of the package, add required libraries to the file `/opt/scalyr-agent-2/etc/additional-requirements.txt` 
   and run command `/opt/scalyr-agent-2/bin/agent-libs-config initialize` to re-initialize requirements.
+  See [CREATING_MONITORS](docs/CREATING_MONITORS.md#installing-additional-requirements-for-plugin) for more details.
 
 ## 2.1.38 "Zaotune" - Dec 1, 2022
 
