@@ -75,7 +75,7 @@ jobs:
   # Build cacheable requirements of the images.
   build_image_requirements:
     name: requirements-${{ matrix.builder_name }}-${{ matrix.architecture }}
-    runs-on: ubuntu-22.04
+    runs-on: self-hosted
     strategy:
       matrix:
         builder_name: ["ubuntu", "alpine", "ubuntu-fips"]
@@ -135,7 +135,7 @@ jobs:
 
   build_image_tarball:
     name: Build image tarball ${{  matrix.variant.image_type }}-${{ matrix.variant.builder_name }}
-    runs-on: ubuntu-22.04
+    runs-on: self-hosted
     needs:
       - build_image_requirements
     strategy:
