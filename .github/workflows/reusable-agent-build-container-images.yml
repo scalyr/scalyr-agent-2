@@ -866,11 +866,11 @@ jobs:
             fi        
           elif [ "${{ github.ref_name }}" = "master" ]; then
               echo "tags=${{ github.sha }}" >> "${GITHUB_OUTPUT}"
-          elif [ "${{ github.head_ref }} == 'release" ]; then
+          elif [ "${{ github.head_ref }}" = "release" ]; then
               echo "tags=pr-${{ github.event.number}}-${{ github.event.pull_request.commits}}-${{ github.sha }},\
               pr-${{ github.event.number}}-latest-${{ github.sha }},\
               $AGENT_VERSION,latest" >> "${GITHUB_OUTPUT}"
-          elif [ "${{ github.event_name }}" = "pull_request"; then
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
               echo "tags=pr-${{ github.event.number}}-${{ github.event.pull_request.commits}}-${{ github.sha }},\
               pr-${{ github.event.number}}-latest-${{ github.sha }}"
           else
@@ -886,7 +886,7 @@ jobs:
             publish \
             --registry docker.io \
             --name-prefix "${{ secrets.PUBLISH_REGISTRY_USERNAME }}" \
-            --tags ${{ steps.verify.outputs.tags }} \
+            --tags "${{ steps.verify.outputs.tags }}" \
             --from-oci-layout /tmp/image_tarball/${{ matrix.variant.image_type }}-${{ matrix.variant.builder_name }}.tar \
             --registry-username "${{ secrets.PUBLISH_REGISTRY_USERNAME }}" \
             --registry-password "${{ secrets.PUBLISH_REGISTRY_PASSWORD }}" \
