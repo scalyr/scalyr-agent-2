@@ -11,13 +11,14 @@ https://github.com/scalyr/scalyr-agent-2/blob/master/CHANGELOG.md.
 
 ## 2.2.1 "Frosty"
 
-* This release significantly changes the Agent's `deb` and `rpm` packages. Agent now is shipped with its own, independent 
-  version of the Python interpreter and does not rely on system Python. The upgrade process to the new packages has to be 
+* This release adds new Agent's `deb` and `rpm` packages - scalyr-agent-2-aio. This package is shipped with its own, independent 
+  version of the Python interpreter and does not rely on system Python. The upgrade process to the new packages is 
   seamless for the majority of cases, but if you use custom monitors that require additional libraries, you will need to
   specify those requirements in new agent's configuration.
   
   When upgraded to a new version of the package, add required libraries to the file `/opt/scalyr-agent-2/etc/additional-requirements.txt` 
   and run command `/opt/scalyr-agent-2/bin/agent-libs-config initialize` to re-initialize requirements.
+  See [CREATING_MONITORS](docs/CREATING_MONITORS.md#installing-additional-requirements-for-plugin) for more details.
 
 ## 2.1.38 "Zaotune" - Dec 1, 2022
 
