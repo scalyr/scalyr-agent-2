@@ -59,4 +59,7 @@ def test_fips(test_image_name, image_builder_name):
 
     stdout = result.stdout.decode()
 
-    assert "SHA256(stdin)= 6d78392a5886177fe5b86e585a0b695a2bcd01a05504b3c4e38bc8eeb21e8326" in stdout
+    assert (
+        "SHA256(stdin)= 6d78392a5886177fe5b86e585a0b695a2bcd01a05504b3c4e38bc8eeb21e8326"
+        in stdout
+    )
