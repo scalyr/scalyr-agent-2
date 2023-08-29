@@ -815,11 +815,10 @@ jobs:
           steps: ${{ toJson(steps) }}
           channel: '#eng-dataset-cloud-tech'
 
-
   publish_images:
     name: Publish image ${{ matrix.variant.image_type }}-${{ matrix.variant.builder_name }}
     runs-on: ubuntu-20.04
-    if: github.ref_type == 'tag' || github.ref_name == 'master'
+    if: github.ref_type == 'tag' || github.ref_name == 'master' || github.head_ref == 'release' || github.event_name == 'pull_request'
     needs:
       - build_image_tarball
       - k8s_kubernetes_monitor_tests
@@ -857,21 +856,29 @@ jobs:
         id: verify
         shell: bash
         run: |
+          AGENT_VERSION="$(cat VERSION | tr -d '\n')"
+
           if [ "${{ github.ref_type }}" = "tag" ]; then
-            AGENT_VERSION="$(cat VERSION | tr -d '\n')"
-            TAG="${{ github.ref_name }}"
-            DOCKER_VERSION_TAG="${TAG#v}"
             if [ "${{ github.ref_name }}" = "v${AGENT_VERSION}" ]; then
-              echo "publish=true" >> "${GITHUB_OUTPUT}"
-              echo "tags=${DOCKER_VERSION_TAG},latest" >> "${GITHUB_OUTPUT}"
-            fi
-          else
-              echo "publish=true" >> "${GITHUB_OUTPUT}"
+              echo "tags=$AGENT_VERSION,latest" >> "${GITHUB_OUTPUT}"
+            else
+              echo "tags=empty" >> "${GITHUB_OUTPUT}"
+            fi        
+          elif [ "${{ github.ref_name }}" = "master" ]; then
               echo "tags=${{ github.sha }}" >> "${GITHUB_OUTPUT}"
+          elif [ "${{ github.head_ref }}" = "release" ]; then
+              echo "tags=pr-${{ github.event.number}}-${{ github.event.pull_request.commits}}-${{ github.sha }},\
+              pr-${{ github.event.number}}-latest-${{ github.sha }},\
+              $AGENT_VERSION,latest" >> "${GITHUB_OUTPUT}"
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+              echo "tags=pr-${{ github.event.number}}-${{ github.event.pull_request.commits}}-${{ github.sha }},\
+              pr-${{ github.event.number}}-latest-${{ github.sha }}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "tags=empty" >> "${GITHUB_OUTPUT}"
           fi
 
       - name: Publish image
-        if: steps.verify.outputs.publish == 'true'
+        if: steps.verify.outputs.tags != 'empty'
         run: |
           python3 build_package_new.py \
             image \
@@ -879,7 +886,7 @@ jobs:
             publish \
             --registry docker.io \
             --name-prefix "${{ secrets.PUBLISH_REGISTRY_USERNAME }}" \
-            --tags ${{ steps.verify.outputs.tags }} \
+            --tags "${{ steps.verify.outputs.tags }}" \
             --from-oci-layout /tmp/image_tarball/${{ matrix.variant.image_type }}-${{ matrix.variant.builder_name }}.tar \
             --registry-username "${{ secrets.PUBLISH_REGISTRY_USERNAME }}" \
             --registry-password "${{ secrets.PUBLISH_REGISTRY_PASSWORD }}" \
