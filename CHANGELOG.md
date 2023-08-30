@@ -2,9 +2,15 @@ Scalyr Agent 2 Changes By Release
 =================================
 
 ## 2.2.5 "TBD" - TBD
+<!---
+Packaged by Ales Novak <ales.novak@sentinelone.com> on Aug 14, 2023 00:00 -0800
+--->
 
 Windows:
 * Support execution as any administrator account
+
+Other:
+* Add missing CA root certificates for FedRAMP environments (DigiCert Global CA root, DigiCert Global G2 CA root, GoDaddy CA root).
 
 ## 2.2.4 "Trillian" - Aug 14, 2023
 <!---
