@@ -1,4 +1,4 @@
-# Copyright 2014 Scalyr Inc.
+# Copyright 2014-2023 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,9 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# ------------------------------------------------------------------------
-#
-# author: Scott Sullivan <guy.hoozdis@gmail.com>
+
 from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import absolute_import
@@ -21,14 +19,11 @@ from __future__ import absolute_import
 import argparse
 import atexit
 import errno
+import os
+import random
+import sys
 
 from scalyr_agent import compat
-
-__author__ = "guy.hoozdis@gmail.com"
-
-import sys
-import random
-import os
 
 if not sys.platform.startswith("win"):
     raise Exception(
@@ -36,44 +31,21 @@ if not sys.platform.startswith("win"):
     )
 
 # pylint: disable=import-error
-# noinspection PyUnresolvedReferences
-import servicemanager
-
-# noinspection PyUnresolvedReferences
-import win32serviceutil
-
-# noinspection PyUnresolvedReferences
-import win32service
-
-# noinspection PyUnresolvedReferences
-import win32event
-
-# noinspection PyUnresolvedReferences
-import win32file
-
-# noinspection PyUnresolvedReferences
-import win32api
-
-# noinspection PyUnresolvedReferences
-import win32security
-
-# noinspection PyUnresolvedReferences
-import win32process
-
-# noinspection PyUnresolvedReferences
-import six.moves.winreg
-
-# noinspection PyUnresolvedReferences
-import win32pipe
-
-# noinspection PyUnresolvedReferences
-import winerror
-
-# noinspection PyUnresolvedReferences
 import pywintypes
-
-# noinspection PyUnresolvedReferences
+import servicemanager
+import six.moves.winreg
+import win32api
 import win32com.shell.shell
+import win32event
+import win32file
+import win32net
+import win32netcon
+import win32pipe
+import win32process
+import win32security
+import win32service
+import win32serviceutil
+import winerror
 
 try:
     import psutil
@@ -271,8 +243,33 @@ class WindowsPlatformController(PlatformController):
         # The file path to the configuration.  We need to stash this so it is available when start is invoked.
         self.__config_file_path = None
 
+        def all_admin_names():
+            '''
+            All administrator account names
+
+            Refs: https://mhammond.github.io/pywin32/win32net__NetUserEnum_meth.html
+                  https://learn.microsoft.com/en-us/windows/win32/api/lmaccess/nf-lmaccess-netuserenum
+                  https://mhammond.github.io/pywin32/PyUSER_INFO_1.html
+                  https://learn.microsoft.com/en-us/windows/win32/api/lmaccess/ns-lmaccess-user_info_1
+            '''
+
+            admin_names = []
+            admin_filter = lambda users: [u['name'] for u in users if u['priv'] == win32netcon.USER_PRIV_ADMIN]
+            netuserenum_args = [None, 1]
+
+            users, _, resume_handle = win32net.NetUserEnum(*netuserenum_args)
+            admin_names += admin_filter(users)
+            while resume_handle != 0:
+                users, _, resume_handle = win32net.NetUserEnum(*netuserenum_args, resumeHandle=resume_handle)
+                admin_names += admin_filter(users)
+
+            domain = win32api.GetComputerName()
+            return ["%s\\%s" % (domain, n) for n in admin_names]
+
         # The local domain Administrators name.
         self.__local_administrators = "%s\\Administrators" % win32api.GetComputerName()
+        # All the local domain Administrator names.
+        self.__all_local_administrator_names = all_admin_names()
 
         self.__no_change_user = False
 
@@ -446,7 +443,7 @@ class WindowsPlatformController(PlatformController):
         @raise CannotExecuteAsUser: Indicates that the current process could not change the specified user for
             some reason to execute the script.
         """
-        if user_name != self.__local_administrators:
+        if user_name != self.__local_administrators and user_name not in self.__all_local_administrator_names:
             raise CannotExecuteAsUser(
                 "The current Scalyr Agent implementation only supports running the agent as %s"
                 % self.__local_administrators

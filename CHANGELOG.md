@@ -1,6 +1,11 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.2.5 "TBD" - TBD
+
+Windows:
+* Support execution as any administrator account
+
 ## 2.2.4 "Trillian" - Aug 14, 2023
 <!---
 Packaged by Ales Novak <ales.novak@sentinelone.com> on Aug 14, 2023 00:00 -0800
