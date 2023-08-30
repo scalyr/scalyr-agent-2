@@ -253,10 +253,12 @@ class WindowsPlatformController(PlatformController):
                   https://learn.microsoft.com/en-us/windows/win32/api/lmaccess/ns-lmaccess-user_info_1
             """
 
+            def admin_filter(users):
+                return [
+                    u["name"] for u in users if u["priv"] == win32netcon.USER_PRIV_ADMIN
+                ]
+
             admin_names = []
-            admin_filter = lambda users: [
-                u["name"] for u in users if u["priv"] == win32netcon.USER_PRIV_ADMIN
-            ]
             netuserenum_args = [None, 1]
 
             users, _, resume_handle = win32net.NetUserEnum(*netuserenum_args)
