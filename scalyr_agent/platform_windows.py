@@ -254,13 +254,17 @@ class WindowsPlatformController(PlatformController):
             """
 
             admin_names = []
-            admin_filter = lambda users: [u["name"] for u in users if u["priv"] == win32netcon.USER_PRIV_ADMIN]
+            admin_filter = lambda users: [
+                u["name"] for u in users if u["priv"] == win32netcon.USER_PRIV_ADMIN
+            ]
             netuserenum_args = [None, 1]
 
             users, _, resume_handle = win32net.NetUserEnum(*netuserenum_args)
             admin_names += admin_filter(users)
             while resume_handle != 0:
-                users, _, resume_handle = win32net.NetUserEnum(*netuserenum_args, resumeHandle=resume_handle)
+                users, _, resume_handle = win32net.NetUserEnum(
+                    *netuserenum_args, resumeHandle=resume_handle
+                )
                 admin_names += admin_filter(users)
 
             domain = win32api.GetComputerName()
@@ -443,7 +447,10 @@ class WindowsPlatformController(PlatformController):
         @raise CannotExecuteAsUser: Indicates that the current process could not change the specified user for
             some reason to execute the script.
         """
-        if user_name != self.__local_administrators and user_name not in self.__all_local_administrator_names:
+        if (
+            user_name != self.__local_administrators
+            and user_name not in self.__all_local_administrator_names
+        ):
             raise CannotExecuteAsUser(
                 "The current Scalyr Agent implementation only supports running the agent as an Administrator account"
             )
