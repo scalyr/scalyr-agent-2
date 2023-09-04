@@ -103,7 +103,7 @@ jobs:
           driver-opts: network=host
 
       - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
-        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+        uses: crazy-max/ghaction-github-runtime@d5768b33f6ef10db75f47c33cd98dadaab769cd8
 
       - name: Build requirements
         shell: bash
@@ -170,7 +170,7 @@ jobs:
           driver-opts: network=host
 
       - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
-        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+        uses: crazy-max/ghaction-github-runtime@d5768b33f6ef10db75f47c33cd98dadaab769cd8
 
       - name: Build image tarball
         shell: bash
@@ -266,7 +266,7 @@ jobs:
           path: /tmp/image_tarball
 
       - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
-        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+        uses: crazy-max/ghaction-github-runtime@d5768b33f6ef10db75f47c33cd98dadaab769cd8
 
       - name: Build Agent k8s Test Docker Image
         env:
@@ -501,7 +501,7 @@ jobs:
           path: /tmp/image_tarball
 
       - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
-        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+        uses: crazy-max/ghaction-github-runtime@d5768b33f6ef10db75f47c33cd98dadaab769cd8
 
       - name: Build Agent k8s Test Docker Image
         env:
@@ -668,7 +668,7 @@ jobs:
           driver-opts: network=host
 
       - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
-        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+        uses: crazy-max/ghaction-github-runtime@d5768b33f6ef10db75f47c33cd98dadaab769cd8
 
       - name: Setup minikube k8s cluster
         uses: ./.github/actions/setup-minikube-cluster/
@@ -685,7 +685,7 @@ jobs:
           path: /tmp/image_tarball
 
       - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
-        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+        uses: crazy-max/ghaction-github-runtime@d5768b33f6ef10db75f47c33cd98dadaab769cd8
 
 
       - name: Build test image
@@ -765,7 +765,7 @@ jobs:
           driver-opts: network=host
 
       - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
-        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+        uses: crazy-max/ghaction-github-runtime@d5768b33f6ef10db75f47c33cd98dadaab769cd8
 
       - name: Download OCI tarball of the built image.
         uses: actions/download-artifact@v3
@@ -774,7 +774,7 @@ jobs:
           path: /tmp/image_tarball
 
       - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
-        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+        uses: crazy-max/ghaction-github-runtime@d5768b33f6ef10db75f47c33cd98dadaab769cd8
 
       - name: Build test image
         env:
