@@ -48,7 +48,7 @@ jobs:
       - docker-smoketest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Setup Python
         uses: actions/setup-python@v4
         id: setup-python
@@ -83,7 +83,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: install python and requirements
         uses: ./.github/actions/install_python_and_requirements
@@ -150,7 +150,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: install python and requirements
         uses: ./.github/actions/install_python_and_requirements
@@ -224,7 +224,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -459,7 +459,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -648,7 +648,7 @@ jobs:
     if: github.ref_name != '_release_build'
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: install python and requirements
         uses: ./.github/actions/install_python_and_requirements
@@ -745,7 +745,7 @@ jobs:
             timeout: 200
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: install python and requirements
         uses: ./.github/actions/install_python_and_requirements
@@ -838,7 +838,7 @@ jobs:
           - { "builder_name": "alpine", "image_type": "docker-api" }
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: install python and requirements
         uses: ./.github/actions/install_python_and_requirements

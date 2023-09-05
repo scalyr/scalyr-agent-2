@@ -39,7 +39,7 @@ jobs:
           github_token: ${{ github.token }}
 
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - id: define_constants
         run: |
@@ -100,7 +100,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install python
         uses: actions/setup-python@v4
@@ -143,7 +143,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Download artifacts
         uses: actions/download-artifact@v3
@@ -176,7 +176,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: install python and requirements
         uses: ./.github/actions/install_python_and_requirements
