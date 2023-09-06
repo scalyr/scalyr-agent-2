@@ -243,39 +243,12 @@ class WindowsPlatformController(PlatformController):
         # The file path to the configuration.  We need to stash this so it is available when start is invoked.
         self.__config_file_path = None
 
-        def all_admin_names():
-            """
-            All administrator account names
-
-            Refs: https://mhammond.github.io/pywin32/win32net__NetUserEnum_meth.html
-                  https://learn.microsoft.com/en-us/windows/win32/api/lmaccess/nf-lmaccess-netuserenum
-                  https://mhammond.github.io/pywin32/PyUSER_INFO_1.html
-                  https://learn.microsoft.com/en-us/windows/win32/api/lmaccess/ns-lmaccess-user_info_1
-            """
-
-            def admin_filter(users):
-                return [
-                    u["name"] for u in users if u["priv"] == win32netcon.USER_PRIV_ADMIN
-                ]
-
-            admin_names = []
-            netuserenum_args = [None, 1]
-
-            users, _, resume_handle = win32net.NetUserEnum(*netuserenum_args)
-            admin_names += admin_filter(users)
-            while resume_handle != 0:
-                users, _, resume_handle = win32net.NetUserEnum(
-                    *netuserenum_args, resumeHandle=resume_handle
-                )
-                admin_names += admin_filter(users)
-
-            domain = win32api.GetComputerName()
-            return ["%s\\%s" % (domain, n) for n in admin_names]
-
         # The local domain Administrators name.
         self.__local_administrators = "%s\\Administrators" % win32api.GetComputerName()
         # All the local domain Administrator names.
-        self.__all_local_administrator_names = all_admin_names()
+        self.__all_local_administrator_names = (
+            WindowsPlatformController._all_admin_names()
+        )
 
         self.__no_change_user = False
 
@@ -283,6 +256,36 @@ class WindowsPlatformController(PlatformController):
         self.__no_escalation_warning = False
 
         PlatformController.__init__(self)
+
+    @staticmethod
+    def _all_admin_names():
+        """
+        All administrator account names
+
+        Refs: https://mhammond.github.io/pywin32/win32net__NetUserEnum_meth.html
+              https://learn.microsoft.com/en-us/windows/win32/api/lmaccess/nf-lmaccess-netuserenum
+              https://mhammond.github.io/pywin32/PyUSER_INFO_1.html
+              https://learn.microsoft.com/en-us/windows/win32/api/lmaccess/ns-lmaccess-user_info_1
+        """
+
+        def admin_filter(users):
+            return [
+                u["name"] for u in users if u["priv"] == win32netcon.USER_PRIV_ADMIN
+            ]
+
+        admin_names = []
+        netuserenum_args = [None, 1]
+
+        users, _, resume_handle = win32net.NetUserEnum(*netuserenum_args)
+        admin_names += admin_filter(users)
+        while resume_handle != 0:
+            users, _, resume_handle = win32net.NetUserEnum(
+                *netuserenum_args, resumeHandle=resume_handle
+            )
+            admin_names += admin_filter(users)
+
+        domain = win32api.GetComputerName()
+        return ["%s\\%s" % (domain, n) for n in admin_names]
 
     def invoke_termination_handler(self):
         if self.__termination_handler:
@@ -455,6 +458,7 @@ class WindowsPlatformController(PlatformController):
         ):
             raise CannotExecuteAsUser(
                 "The current Scalyr Agent implementation only supports running the agent as an Administrator account"
+                " (%s)" % ", ".join(self.__all_local_administrator_names)
             )
         if script_binary is None:
             raise CannotExecuteAsUser(
