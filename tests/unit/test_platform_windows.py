@@ -20,8 +20,10 @@ import platform
 import mock
 import pytest
 
+if platform.system() == "Windows":
+    from scalyr_agent.platform_windows import WindowsPlatformController
+
 from scalyr_agent.platform_controller import CannotExecuteAsUser
-from scalyr_agent.platform_windows import WindowsPlatformController
 from scalyr_agent.test_base import ScalyrTestCase, skipIf
 
 
