@@ -63,6 +63,8 @@ class WindowsPlatformControllerTestCase(ScalyrTestCase):
 
     @skipIf(platform.system() != "Windows", "Skipping tests under non-Windows platform")
     def test_run_as_user_as_any_administrator(self):
+        # pylint: disable=no-member,not-context-manager,no-value-for-parameter
+
         with mock.patch("win32api.GetComputerName", return_value="Domain"), mock.patch(
             "scalyr_agent.platform_windows.WindowsPlatformController._all_admin_names",
             return_value=["Domain\\Admin1", "Domain\\Admin2"],
