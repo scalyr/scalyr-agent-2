@@ -26,6 +26,9 @@ on:
       builder_name:
         type: string
 
+      base_image:
+        type: string
+
     secrets:
       CT_AWS_DEV_EC2_PRIVATE_KEY:
         required: true
@@ -130,7 +133,8 @@ jobs:
             image \
             ${{ inputs.builder_name }} \
             cache-requirements \
-            --architecture ${{ matrix.architecture }}
+            --architecture ${{ matrix.architecture }} \
+            --base-image ${{ inputs.base_image }}
 
 
   build_image_tarball:
@@ -200,6 +204,7 @@ jobs:
             build-tarball \
             --image-type ${{  matrix.variant.image_type }} \
             --output-dir ./build
+            --base-image ${{ inputs.base_image }}
       
       - name: Save image OCI tarball as artifact
         uses: actions/upload-artifact@v3
@@ -903,3 +908,4 @@ jobs:
             --registry-username "${{ secrets.PUBLISH_REGISTRY_USERNAME }}" \
             --registry-password "${{ secrets.PUBLISH_REGISTRY_PASSWORD }}" \
             --image-type ${{ matrix.variant.image_type }}
+            --base-image ${{ inputs.base_image }}

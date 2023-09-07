@@ -69,20 +69,21 @@ jobs:
 
   # Invoke workflow that builds all agent container mages.
   build_container_images:
-    name: "Build Container Images ${{matrix.builder-name}}"
+    name: "Build Container Images ${{matrix.builder.builder-name}}"
     needs:
       - pre_job
     uses: ./.github/workflows/reusable-agent-build-container-images.yml
     strategy:
       matrix:
-        builder-name: ${{ fromJson(vars.ENABLED_BUILDERS) }}
+        builder: ${{ fromJson(vars.ENABLED_BUILDERS) }}
     with:
       python_version: ${{ needs.pre_job.outputs.python_version }}
       cache_version: ${{ needs.pre_job.outputs.cache_version }}
       aws_region: ${{ needs.pre_job.outputs.aws_region }}
       aws_private_key_name: ${{ needs.pre_job.outputs.aws_private_key_name }}
       cicd_workflow: ${{ needs.pre_job.outputs.cicd_workflow }}
-      builder_name: ${{ matrix.builder-name }}
+      builder_name: ${{ matrix.builder.builder_name }}
+      base_image: ${{ matrix.builder.base_image }}
     secrets:
       CT_AWS_DEV_EC2_PRIVATE_KEY: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
       CT_AWS_DEV_EC2_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}

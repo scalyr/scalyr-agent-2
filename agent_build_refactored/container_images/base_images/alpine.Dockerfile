@@ -1,4 +1,4 @@
-FROM alpine:3.18.2 as base
+FROM ${BASE_IMAGE} as base
 
 FROM base as dependencies_build_base
 RUN apk update && apk add --no-cache \

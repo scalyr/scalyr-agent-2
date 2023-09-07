@@ -58,6 +58,12 @@ def _add_image_parsers():
         help="Name of the builder.",
     )
 
+    image_parser.add_argument(
+        "--base-image",
+        required=True,
+        help="Name of the image to build"
+    )
+
     image_parser_action_subparsers = image_parser.add_subparsers(
         dest="action", required=True
     )
@@ -173,7 +179,7 @@ if __name__ == "__main__":
     if args.command == "image":
         image_builder_cls = ALL_CONTAINERISED_AGENT_BUILDERS[args.builder_name]
 
-        builder = image_builder_cls()
+        builder = image_builder_cls(base_image=args.base_image)
         if args.action == "load":
             builder.build_and_load_docker_image(
                 image_type=ImageType(args.image_type),

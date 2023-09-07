@@ -71,10 +71,19 @@ class ContainerisedAgentBuilder(Builder):
     BASE_DISTRO: str
     TAG_SUFFIXES: List[str]
 
-    def __init__(self):
+    def __init__(self, base_image):
         super(ContainerisedAgentBuilder, self).__init__()
 
         self._already_build_requirements: Set[CpuArch] = set()
+        self.__base_image = base_image
+
+    @property
+    def __build_args(self) -> Dict[str, str]:
+        build_args = {
+            "BASE_IMAGE": self.__base_image
+        }
+
+        return build_args
 
     @property
     def _common_cache_name(self):
@@ -95,7 +104,8 @@ class ContainerisedAgentBuilder(Builder):
             stage=stage,
             cache_name=cache_name,
             output=output,
-            capture_output=True
+            capture_output=True,
+            build_args=self.__build_args
         )
 
     def build_requirement_libs(
