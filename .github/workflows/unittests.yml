@@ -11,9 +11,11 @@ on:
     - cron: '0 4 * * *'
 
 jobs:
+  if: vars.UNIT_TESTS_ENABLED || 'true' == 'true'
   # Special job which automatically cancels old runs for the same branch, prevents runs for the
   # same file set which has already passed, etc.
   pre_job:
+    if: github.ref_name != '_release_build'
     name: Skip Duplicate Jobs Pre Job
     runs-on: ubuntu-latest
     permissions:
@@ -78,11 +80,10 @@ jobs:
       fail-fast: false
       matrix:
         python-version:
-          - "3.6"
-          - "3.7"
           - "3.8"
           - "3.9"
           - "3.10"
+          - "3.11"
         os:
           - ubuntu-20.04
         platform:
@@ -156,7 +157,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version:
-          - "3.6"
+          - "3.8"
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -218,11 +219,10 @@ jobs:
       fail-fast: false
       matrix:
         python-version:
-          - "3.6"
-          - "3.7"
           - "3.8"
           - "3.9"
           - "3.10"
+          - "3.11"
         os:
           - ubuntu-20.04
         platform:

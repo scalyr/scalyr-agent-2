@@ -22,6 +22,9 @@ on:
       cicd_workflow:
         description: "Additional string that has to differentiate AWS object from another workflows."
         type: string
+      
+      builder_name:
+        type: string
 
     secrets:
       CT_AWS_DEV_EC2_PRIVATE_KEY:
@@ -74,11 +77,10 @@ jobs:
 
   # Build cacheable requirements of the images.
   build_image_requirements:
-    name: requirements-${{ matrix.builder_name }}-${{ matrix.architecture }}
+    name: requirements-${{ inputs.builder_name }}-${{ matrix.architecture }}
     runs-on: ubuntu-22.04
     strategy:
       matrix:
-        builder_name: ["ubuntu", "alpine"]
         architecture: ["x86_64", "aarch64", "armv7"]
 
     steps:
@@ -115,7 +117,7 @@ jobs:
           AWS_PRIVATE_KEY_PATH: "/tmp/private_key.pem"
           AWS_REGION: ${{ inputs.aws_region }}
           CICD_WORKFLOW: ${{ inputs.cicd_workflow }}
-          CICD_JOB: build_image_requirements-${{ matrix.builder_name }}-${{ matrix.architecture }}
+          CICD_JOB: build_image_requirements-${{ inputs.builder_name }}-${{ matrix.architecture }}
 
           USE_GHA_CACHE: "1"
           ALLOW_FALLBACK_TO_REMOTE_BUILDER: "1"
@@ -126,27 +128,23 @@ jobs:
           
           python3 build_package_new.py \
             image \
-            ${{ matrix.builder_name }} \
+            ${{ inputs.builder_name }} \
             cache-requirements \
             --architecture ${{ matrix.architecture }}
 
 
   build_image_tarball:
-    name: Build image tarball ${{  matrix.variant.image_type }}-${{ matrix.variant.builder_name }}
+    name: Build image tarball ${{  matrix.variant.image_type }}-${{ inputs.builder_name }}
     runs-on: ubuntu-22.04
     needs:
       - build_image_requirements
     strategy:
       matrix:
         variant:
-          - { "builder_name": "ubuntu" , "image_type": "k8s" }
-          - { "builder_name": "ubuntu" , "image_type": "docker-json" }
-          - { "builder_name": "ubuntu" , "image_type": "docker-syslog" }
-          - { "builder_name": "ubuntu" , "image_type": "docker-api" }
-          - { "builder_name": "alpine" , "image_type": "k8s" }
-          - { "builder_name": "alpine" , "image_type": "docker-json" }
-          - { "builder_name": "alpine" , "image_type": "docker-syslog" }
-          - { "builder_name": "alpine" , "image_type": "docker-api" }
+          - { "image_type": "k8s" }
+          - { "image_type": "docker-json" }
+          - { "image_type": "docker-syslog" }
+          - { "image_type": "docker-api" }
 
     steps:
       - name: Checkout repository
@@ -156,6 +154,20 @@ jobs:
         uses: ./.github/actions/install_python_and_requirements
         with:
           python_version: ${{ inputs.python_version }}
+
+      - name: Login to DockerHub
+        uses: docker/login-action@a5609cb39f57be157c39b77359abfaa43aeaeb8f # v2
+        with:
+          username: ${{ secrets.PUBLISH_REGISTRY_USERNAME }}
+          password: ${{ secrets.PUBLISH_REGISTRY_PASSWORD }}
+
+      - name: Login to a custom build registry
+        uses: docker/login-action@a5609cb39f57be157c39b77359abfaa43aeaeb8f # v2
+        continue-on-error: true
+        with:
+          registry: ${{ vars.BUILD_REGISTRY }}
+          username: ${{ secrets.BUILD_REGISTRY_USERNAME }}
+          password: ${{ secrets.BUILD_REGISTRY_PASSWORD }}
 
       - name: Set up QEMU
         id: qemu
@@ -177,30 +189,29 @@ jobs:
         id: build
         env:
           CICD_WORKFLOW: ${{ inputs.cicd_workflow }}
-          CICD_JOB: ${{  matrix.variant.image_type }}-${{ matrix.variant.builder_name }}
+          CICD_JOB: ${{  matrix.variant.image_type }}-${{ inputs.builder_name }}
 
           USE_GHA_CACHE: "1"
           CACHE_VERSION: ${{ inputs.cache_version }}
         run: |
           python3 build_package_new.py \
             image \
-            ${{ matrix.variant.builder_name }} \
+            ${{ inputs.builder_name }} \
             build-tarball \
             --image-type ${{  matrix.variant.image_type }} \
             --output-dir ./build
-
+      
       - name: Save image OCI tarball as artifact
         uses: actions/upload-artifact@v3
         with:
-          name: container-image-tarball-${{  matrix.variant.image_type }}-${{ matrix.variant.builder_name }}
+          name: container-image-tarball-${{  matrix.variant.image_type }}-${{ inputs.builder_name }}
           path: build
           retention-days: 1
 
   # Jobs which performs basic sanity checks for the Kubernetes Monitor and Kubernetes Events Monitor
   k8s_kubernetes_monitor_tests:
-    name: Kubernetes Monitors - k8s ${{ matrix.k8s_version.version }}-${{ matrix.k8s_version.runtime}}
+    name: Kubernetes Monitors - k8s ${{ inputs.builder_name }} ${{ matrix.k8s_version.version }}-${{ matrix.k8s_version.runtime}}
     runs-on: ubuntu-20.04
-    if: github.ref_name != '_release_build'
     timeout-minutes: 15
 
     needs:
@@ -262,7 +273,7 @@ jobs:
       - name: Download OCI tarball of the built image.
         uses: actions/download-artifact@v3
         with:
-          name: container-image-tarball-k8s-ubuntu
+          name: container-image-tarball-k8s-${{ inputs.builder_name }}
           path: /tmp/image_tarball
 
       - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
@@ -274,17 +285,17 @@ jobs:
           CACHE_VERSION: ${{ inputs.cache_version }}
         run: |
           python3 tests/end_to_end_tests/container_images_test/scripts/build_test_image.py \
-            --image-builder-name ubuntu \
+            --image-builder-name ${{ inputs.builder_name }} \
             --architecture x86_64 \
-            --image-oci-tarball /tmp/image_tarball/k8s-ubuntu.tar \
-            --result-image-name k8s-ubuntu:test \
+            --image-oci-tarball /tmp/image_tarball/k8s-${{ inputs.builder_name }}.tar \
+            --result-image-name k8s-image:test \
             --image-type k8s
 
           docker image ls
 
           # Needed for containerd runtime
           if [ "${{ matrix.k8s_version.runtime }}" = "containerd" ]; then
-            minikube image load k8s-ubuntu:test
+            minikube image load k8s-image:test
           fi
 
       # Here we build the dummy container which continuously prints data to stdout and stderr
@@ -435,9 +446,9 @@ jobs:
           channel: '#eng-dataset-cloud-tech'
 
   k8s_open_metrics_monitor_tests:
-    name: OpenMetrics Monitor - k8s ${{ matrix.k8s_version.version }}-${{ matrix.k8s_version.runtime}}
+    name: OpenMetrics Monitor - k8s ${{ inputs.builder_name }} ${{ matrix.k8s_version.version }}-${{ matrix.k8s_version.runtime}}
     runs-on: ubuntu-20.04
-    if: github.ref_name != '_release_build'
+    if: github.ref_name != '_release_build' && inputs.builder_name != 'alpine'
     timeout-minutes: 15
 
     needs:
@@ -497,7 +508,7 @@ jobs:
       - name: Download OCI tarball of the built image.
         uses: actions/download-artifact@v3
         with:
-          name: container-image-tarball-k8s-ubuntu
+          name: container-image-tarball-k8s-${{ inputs.builder_name }}
           path: /tmp/image_tarball
 
       - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
@@ -511,15 +522,15 @@ jobs:
           python3 tests/end_to_end_tests/container_images_test/scripts/build_test_image.py \
             --image-builder-name ubuntu \
             --architecture x86_64 \
-            --image-oci-tarball /tmp/image_tarball/k8s-ubuntu.tar \
-            --result-image-name k8s-ubuntu:test \
+            --image-oci-tarball /tmp/image_tarball/k8s-${{ inputs.builder_name }}.tar \
+            --result-image-name k8s-image:test \
             --image-type k8s
 
           docker image ls
 
           # Needed for containerd runtime
           if [ "${{ matrix.k8s_version.runtime }}" = "containerd" ]; then
-            minikube image load k8s-ubuntu:test
+            minikube image load k8s-image:test
           fi
 
       # Here we build the dummy Java app image which exposes JMX metrics via exporter
@@ -645,7 +656,8 @@ jobs:
     runs-on: ubuntu-20.04
     needs:
       - build_image_tarball
-    if: github.ref_name != '_release_build'
+    name: K8s Smoketest - ${{ inputs.builder_name }}
+    if: github.ref_name != '_release_build' && (github.event_name != 'pull_request' || ! github.event.pull_request.draft)
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -681,7 +693,7 @@ jobs:
       - name: Download OCI tarball of the built image.
         uses: actions/download-artifact@v3
         with:
-          name: container-image-tarball-k8s-ubuntu
+          name: container-image-tarball-k8s-${{ inputs.builder_name }}
           path: /tmp/image_tarball
 
       - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
@@ -694,10 +706,10 @@ jobs:
           CACHE_VERSION: ${{ inputs.cache_version }}
         run: |
           python3 tests/end_to_end_tests/container_images_test/scripts/build_test_image.py \
-            --image-builder-name ubuntu \
+            --image-builder-name ${{ inputs.builder_name }} \
             --architecture x86_64 \
-            --image-oci-tarball /tmp/image_tarball/k8s-ubuntu.tar \
-            --result-image-name k8s-ubuntu:test \
+            --image-oci-tarball /tmp/image_tarball/k8s-${{ inputs.builder_name }}.tar \
+            --result-image-name k8s-image:test \
             --image-type k8s
 
       - name: Run Tests (with coverage)
@@ -707,7 +719,7 @@ jobs:
           SCALYR_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
           READ_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
         run: |
-          source ./.circleci/smoketest_k8s.sh scalyr/scalyr-agent-ci-unittest:4 150 no_delete_existing_k8s_objs k8s-ubuntu:test
+          source ./.circleci/smoketest_k8s.sh scalyr/scalyr-agent-ci-unittest:4 150 no_delete_existing_k8s_objs k8s-image:test
 
       - name: Upload test results
         uses: actions/upload-artifact@v3
@@ -728,8 +740,8 @@ jobs:
           channel: '#eng-dataset-cloud-tech'
 
   docker-smoketest:
-    name: Docker Smoketest - ${{ matrix.variant.image_type }}
-    if: github.ref_name != '_release_build'
+    name: Docker Smoketest - ${{ inputs.builder_name }} ${{ matrix.variant.image_type }}
+    if: github.ref_name != '_release_build' && inputs.builder_name != 'alpine'
     needs:
       - build_image_tarball
     runs-on: ubuntu-20.04
@@ -770,7 +782,7 @@ jobs:
       - name: Download OCI tarball of the built image.
         uses: actions/download-artifact@v3
         with:
-          name: container-image-tarball-${{ matrix.variant.image_type }}-ubuntu
+          name: container-image-tarball-${{ matrix.variant.image_type }}-${{ inputs.builder_name }}
           path: /tmp/image_tarball
 
       - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
@@ -784,8 +796,8 @@ jobs:
           python3 tests/end_to_end_tests/container_images_test/scripts/build_test_image.py \
             --image-builder-name ubuntu \
             --architecture x86_64 \
-            --image-oci-tarball /tmp/image_tarball/${{ matrix.variant.image_type }}-ubuntu.tar \
-            --result-image-name ${{ matrix.variant.image_type }}-ubuntu:test \
+            --image-oci-tarball /tmp/image_tarball/${{ matrix.variant.image_type }}-${{ inputs.builder_name }}.tar \
+            --result-image-name ${{ matrix.variant.image_type }}-${{ inputs.builder_name }}:test \
             --image-type ${{ matrix.variant.image_type }}
 
       - name: Run Tests (with coverage)
@@ -795,12 +807,12 @@ jobs:
           SCALYR_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
           READ_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
         run: |
-          source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 ${{ matrix.variant.image_type }} ${{ matrix.variant.timeout }} ${{ matrix.variant.image_type }}-ubuntu:test
+          source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 ${{ matrix.variant.image_type }} ${{ matrix.variant.timeout }} ${{ matrix.variant.image_type }}-${{ inputs.builder_name }}:test
 
       - name: Upload test results
         uses: actions/upload-artifact@v3
         with:
-          name: docker-smoketest-${{ matrix.variant.image_type }}
+          name: docker-smoketest-${{ matrix.variant.image_type }}-${{ inputs.builder_name }}
           path: |
             .coverage
         if: ${{ success() || failure() }}
@@ -828,14 +840,14 @@ jobs:
     strategy:
       matrix:
         variant:
-          - { "builder_name": "ubuntu", "image_type": "k8s" }
-          - { "builder_name": "ubuntu", "image_type": "docker-json" }
-          - { "builder_name": "ubuntu", "image_type": "docker-syslog" }
-          - { "builder_name": "ubuntu", "image_type": "docker-api" }
-          - { "builder_name": "alpine", "image_type": "k8s" }
-          - { "builder_name": "alpine", "image_type": "docker-json" }
-          - { "builder_name": "alpine", "image_type": "docker-syslog" }
-          - { "builder_name": "alpine", "image_type": "docker-api" }
+          - { "image_type": "k8s" }
+          - { "image_type": "docker-json" }
+          - { "image_type": "docker-syslog" }
+          - { "image_type": "docker-api" }
+          - { "image_type": "k8s" }
+          - { "image_type": "docker-json" }
+          - { "image_type": "docker-syslog" }
+          - { "image_type": "docker-api" }
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -848,7 +860,7 @@ jobs:
       - name: Download OCI tarball of the built image.
         uses: actions/download-artifact@v3
         with:
-          name: container-image-tarball-${{ matrix.variant.image_type }}-${{ matrix.variant.builder_name }}
+          name: container-image-tarball-${{ matrix.variant.image_type }}-${{ inputs.builder_name }}
           path: /tmp/image_tarball
 
 
@@ -882,12 +894,12 @@ jobs:
         run: |
           python3 build_package_new.py \
             image \
-            ${{ matrix.variant.builder_name }} \
+            ${{ inputs.builder_name }} \
             publish \
             --registry docker.io \
             --name-prefix "${{ secrets.PUBLISH_REGISTRY_USERNAME }}" \
             --tags "${{ steps.verify.outputs.tags }}" \
-            --from-oci-layout /tmp/image_tarball/${{ matrix.variant.image_type }}-${{ matrix.variant.builder_name }}.tar \
+            --from-oci-layout /tmp/image_tarball/${{ matrix.variant.image_type }}-${{ inputs.builder_name }}.tar \
             --registry-username "${{ secrets.PUBLISH_REGISTRY_USERNAME }}" \
             --registry-password "${{ secrets.PUBLISH_REGISTRY_PASSWORD }}" \
             --image-type ${{ matrix.variant.image_type }}

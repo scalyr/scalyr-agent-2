@@ -95,6 +95,7 @@ class ContainerisedAgentBuilder(Builder):
             stage=stage,
             cache_name=cache_name,
             output=output,
+            capture_output=True
         )
 
     def build_requirement_libs(

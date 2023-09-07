@@ -203,7 +203,7 @@ def buildx_build(
     if not retry and process.returncode != 0:
         if capture_output:
             sys.stderr.buffer.write(output_buffer.getvalue())
-        raise Exception("Build command has failed.")
+        raise Exception("Build command has failed: " + str(stdout))
 
     if retry:
 
