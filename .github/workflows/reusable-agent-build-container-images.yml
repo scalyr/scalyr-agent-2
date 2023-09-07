@@ -132,9 +132,9 @@ jobs:
           python3 build_package_new.py \
             image \
             ${{ inputs.builder_name }} \
+            --base-image ${{ inputs.base_image }} \
             cache-requirements \
-            --architecture ${{ matrix.architecture }} \
-            --base-image ${{ inputs.base_image }}
+            --architecture ${{ matrix.architecture }}
 
 
   build_image_tarball:
