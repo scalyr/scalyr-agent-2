@@ -43,6 +43,8 @@ if __name__ == "__main__":
         add_func=parser.add_argument,
     )
 
+    
+
     parser.add_argument(
         "--result-image-name",
         required=True,
@@ -52,6 +54,8 @@ if __name__ == "__main__":
 
     image_builder_cls = get_image_builder_by_name(name=args.image_builder_name)
 
+    image_builder = image_builder_cls(base_image=args.base_image)
+
     if args.image_oci_tarball:
         image_oci_tarball = pl.Path(args.image_oci_tarball)
     else:
@@ -59,7 +63,7 @@ if __name__ == "__main__":
 
     build_test_version_of_container_image(
         image_type=ImageType(args.image_type),
-        image_builder_cls=image_builder_cls,
+        image_builder=image_builder,
         architecture=CpuArch(args.architecture),
         result_image_name=args.result_image_name,
         ready_image_oci_tarball=image_oci_tarball,
