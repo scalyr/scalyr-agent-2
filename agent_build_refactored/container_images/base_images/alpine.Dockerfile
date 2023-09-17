@@ -1,3 +1,4 @@
+ARG BASE_IMAGE
 FROM ${BASE_IMAGE} as base
 
 FROM base as dependencies_build_base
