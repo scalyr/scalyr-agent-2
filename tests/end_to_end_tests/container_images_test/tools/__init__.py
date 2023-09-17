@@ -34,7 +34,7 @@ _PARENT_DIR = pl.Path(__file__).parent
 
 def build_test_version_of_container_image(
     image_type: ImageType,
-    image_builder_cls: Type[ContainerisedAgentBuilder],
+    image_builder: ContainerisedAgentBuilder,
     architecture: CpuArch,
     result_image_name: str,
     ready_image_oci_tarball: pl.Path = None,
@@ -45,8 +45,6 @@ def build_test_version_of_container_image(
     For now, it adds just a coverage library as additional requirements, so our image
     tests can enable it in order to obtain coverage information of the docker/k8s related code.
     """
-
-    image_builder = image_builder_cls()
 
     registry_container_name = "agent_image_e2e_test_registry"
 
@@ -136,6 +134,10 @@ def add_command_line_args(add_func: Callable):
         "--image-builder-name",
         required=True,
         choices=ALL_CONTAINERISED_AGENT_BUILDERS.keys(),
+    )
+
+    add_func(
+        "--base-image", required=True, help="Name of the image to build"
     )
 
     add_func("--image-type", required=True, choices=[t.value for t in ImageType])
