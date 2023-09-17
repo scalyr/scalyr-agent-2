@@ -136,9 +136,7 @@ def add_command_line_args(add_func: Callable):
         choices=ALL_CONTAINERISED_AGENT_BUILDERS.keys(),
     )
 
-    add_func(
-        "--base-image", required=True, help="Name of the image to build"
-    )
+    add_func("--base-image", required=True, help="Name of the image to build")
 
     add_func("--image-type", required=True, choices=[t.value for t in ImageType])
 

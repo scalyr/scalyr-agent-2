@@ -43,8 +43,6 @@ if __name__ == "__main__":
         add_func=parser.add_argument,
     )
 
-    
-
     parser.add_argument(
         "--result-image-name",
         required=True,
