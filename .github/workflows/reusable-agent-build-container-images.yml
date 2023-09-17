@@ -201,10 +201,10 @@ jobs:
           python3 build_package_new.py \
             image \
             ${{ inputs.builder_name }} \
+            --base-image ${{ inputs.base_image }} \
             build-tarball \
             --image-type ${{  matrix.variant.image_type }} \
             --output-dir ./build
-            --base-image ${{ inputs.base_image }}
       
       - name: Save image OCI tarball as artifact
         uses: actions/upload-artifact@v3
@@ -901,6 +901,7 @@ jobs:
             image \
             ${{ inputs.builder_name }} \
             publish \
+            --base-image ${{ inputs.base_image }} \
             --registry docker.io \
             --name-prefix "${{ secrets.PUBLISH_REGISTRY_USERNAME }}" \
             --tags "${{ steps.verify.outputs.tags }}" \
@@ -908,4 +909,3 @@ jobs:
             --registry-username "${{ secrets.PUBLISH_REGISTRY_USERNAME }}" \
             --registry-password "${{ secrets.PUBLISH_REGISTRY_PASSWORD }}" \
             --image-type ${{ matrix.variant.image_type }}
-            --base-image ${{ inputs.base_image }}
