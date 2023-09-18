@@ -46,7 +46,7 @@ jobs:
           echo "python_version=3.8" >> "${GITHUB_OUTPUT}"
           echo "cache_version=6" >> "${GITHUB_OUTPUT}"
           echo "aws_region=us-east-1" >> "${GITHUB_OUTPUT}"
-          echo "aws_private_key_name=CT_SCALYR_AGENT_GHA" >> "${GITHUB_OUTPUT}"
+          echo "aws_private_key_name=${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY_NAME }}" >> "${GITHUB_OUTPUT}"
           echo "cicd_workflow=${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}" >> "${GITHUB_OUTPUT}"
 
   build_linux_packages:
