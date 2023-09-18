@@ -11,11 +11,10 @@ on:
     - cron: '0 4 * * *'
 
 jobs:
-  if: ${{ vars.UNIT_TESTS_ENABLED }} || 'true' == 'true'
   # Special job which automatically cancels old runs for the same branch, prevents runs for the
   # same file set which has already passed, etc.
   pre_job:
-    if: github.ref_name != '_release_build'
+    if: github.ref_name != '_release_build' && vars.UNIT_TESTS_DISABLED != 'true'
     name: Skip Duplicate Jobs Pre Job
     runs-on: ubuntu-latest
     permissions:
