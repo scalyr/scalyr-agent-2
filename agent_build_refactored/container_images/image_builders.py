@@ -466,7 +466,7 @@ class ContainerisedAgentBuilder(Builder):
                 )
             except subprocess.CalledProcessError as e:
                 logger.exception(
-                    f"Subprocess call failed. Stderr: {e.stderr.decode()}"
+                    f"Subprocess call failed. Stderr: {(e.stderr or b'').decode()}"
                 )
                 raise
             finally:
