@@ -120,6 +120,7 @@ jobs:
           image: tonistiigi/binfmt:qemu-v6.2.0
           platforms: all
 
+        # Context need to be created for a self-hosted runner
       - name: Set up Docker Context for Buildx
         id: buildx-context
         run: |
@@ -203,7 +204,8 @@ jobs:
         with:
           image: tonistiigi/binfmt:qemu-v6.2.0
           platforms: all
-
+        
+        # Context need to be created for a self-hosted runner
       - name: Set up Docker Context for Buildx
         id: buildx-context
         run: |
@@ -831,6 +833,7 @@ jobs:
           username: ${{ secrets.INTERNAL_BUILD_REGISTRY_USERNAME }}
           password: ${{ secrets.INTERNAL_BUILD_REGISTRY_PASSWORD }}
 
+        # Context need to be created for a self-hosted runner
       - name: Set up Docker Context for Buildx
         id: buildx-context
         run: |
@@ -899,6 +902,8 @@ jobs:
     runs-on: ubuntu-20.04
     if: github.ref_type == 'tag' || github.ref_name == 'master' || github.head_ref == 'release' || github.event_name == 'pull_request'
     needs:
+      # k8s_kubernetes_monitor_tests, k8s_open_metrics_monitor_tests checks are not neede before pushing a test version to dockerhub.
+      # They need to pass to allow PR merge.
       - build_image_tarball
       - k8s-smoketest
       - docker-smoketest

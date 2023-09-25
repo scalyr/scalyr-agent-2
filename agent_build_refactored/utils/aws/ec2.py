@@ -21,6 +21,7 @@ import pathlib as pl
 import time
 import logging
 from typing import List, Optional, Dict
+import os
 
 import botocore.exceptions  # pylint:disable=import-error
 import requests
@@ -97,7 +98,8 @@ class EC2InstanceWrapper:
             toolset_image_name
         )
 
-        import os
+        # The AWS_PRIVATE_KEY must be saved inside the running container using an echo command with a pipe.
+        # Using a volume mount is not possible when docker is installed via snap and leaves a key file in the filesystem.
         cmd_args.extend(
             [     
                 "/bin/bash",
@@ -114,6 +116,7 @@ class EC2InstanceWrapper:
             )
         )
 
+        # Since the docker is run in the background, we need to wait for the bash command to be really excuted.
         cmd = [
                     "docker",
                     "exec",
@@ -166,7 +169,6 @@ class EC2InstanceWrapper:
         Init out main ssh connection with ec2 instance inside container.
         """
         logger.info(f"Establish ssh connection with ec2 instance '{self.boto3_instance.id}'")
-        logger.info("Creating the container, listing the private key file:")
 
         self._main_ssh_connection_container_name = self._create_ssh_container(
             name_suffix="main",
@@ -231,8 +233,6 @@ class EC2InstanceWrapper:
             ]),
             port=full_local_port,
         )
-        
-        logger.info("1")
         
         host_port = get_docker_container_host_port(
             container_name=container_name,

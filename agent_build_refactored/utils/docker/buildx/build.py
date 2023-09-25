@@ -187,12 +187,18 @@ def buildx_build(
     )
 
     output_buffer = io.BytesIO()
-    stdout = None
+
     try:
         logger.info(f"Running {' '.join(cmd_args)}")
-        logger.info("stdout, stdee = process.communicate(timeout=fallback_timeout)")
         stdout, stdee = process.communicate(timeout=fallback_timeout)
-        logger.info(stdout)
+        
+        logger.info("-----------")
+        logger.info("DONE")
+        if stdout:
+            logger.info(stdout.decode())
+        logger.info(f"Return code: {process.returncode}")
+        logger.info("-----------")
+
     except subprocess.TimeoutExpired:
         logger.warning(f"Timeout")
         # Timeout occurred, need to abort the build.
@@ -204,17 +210,10 @@ def buildx_build(
     if capture_output:
         output_buffer.write(stdout)
 
-    logger.info("-----------")
-    logger.info("DONE")
-    if stdout:
-        logger.info(stdout.decode())
-    logger.info(f"Return code: {process.returncode}")
-    logger.info("-----------")
-
     if not retry and process.returncode != 0:
         if capture_output:
             sys.stderr.buffer.write(output_buffer.getvalue())
-        raise Exception("Build command has failed: " + str(stdout))
+        raise Exception("Build command has failed")
 
     if retry:
 
@@ -232,8 +231,6 @@ def buildx_build(
             architecture=architectures[0],
         )
 
-        logger.info("4")
-
         logger.info(
             f"Running {cmd_args}"
         )
@@ -246,8 +243,6 @@ def buildx_build(
             check=True,
             **kwargs,
         )
-
-        logger.info("5")
 
         logger.info(result.stdout)
 

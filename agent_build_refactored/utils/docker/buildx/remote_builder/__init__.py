@@ -145,8 +145,6 @@ class EC2BackedRemoteBuildxBuilderWrapper:
             remote_port=buildkit_container_host_port,
         )
 
-        logger.info("2")
-
         return buildkit_tunneled_local_port
 
     def close(self):

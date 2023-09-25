@@ -50,7 +50,6 @@ jobs:
 
   build_linux_packages:
     name: "Build Linux packages"
-    if: 1 == 2
     needs:
       - pre_job
     uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
@@ -98,7 +97,6 @@ jobs:
 
   build-windows-package:
     name: "Build Windows package"
-    if: 1 == 2
     uses: ./.github/workflows/reusable-agent-build-windows.yml
     secrets:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
