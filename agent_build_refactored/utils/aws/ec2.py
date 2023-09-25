@@ -44,14 +44,12 @@ class EC2InstanceWrapper:
     def __init__(
         self,
         boto3_instance,
-        private_key_path: pl.Path,
         username: str,
         ec2_client,
     ):
         self.ec2_client = ec2_client
         self.id = boto3_instance.id.lower()
         self.boto3_instance = boto3_instance
-        self.private_key_path = private_key_path
         self.username = username
 
         self._ssh_client_container_in_docker_private_key_path = pl.Path("/tmp/mounts/private_key.pem")
@@ -432,7 +430,6 @@ class EC2InstanceWrapper:
         try:
             instance = cls(
                 boto3_instance=boto3_instance,
-                private_key_path=aws_settings.private_key_path,
                 username=ssh_username,
                 ec2_client=ec2_client,
             )

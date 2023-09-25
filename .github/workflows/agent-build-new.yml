@@ -194,13 +194,8 @@ jobs:
           AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
           AWS_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
           AWS_PRIVATE_KEY_NAME: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY_NAME }}
+          AWS_PRIVATE_KEY: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
           AWS_REGION: ${{ needs.pre_job.outputs.aws_region }}
           CICD_WORKFLOW: ${{ needs.pre_job.outputs.cicd_workflow }}
         run: |
-          export AWS_PRIVATE_KEY_PATH=`mktemp`
-          echo "${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}" > "${AWS_PRIVATE_KEY_PATH}"
-          chmod 600 "${AWS_PRIVATE_KEY_PATH}"
-
-          trap "rm ${AWS_PRIVATE_KEY_PATH}" EXIT
-
           python3 agent_build_refactored/utils/scripts/cicd/cleanup_ec2_objects.py

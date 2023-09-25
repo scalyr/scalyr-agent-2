@@ -141,6 +141,8 @@ jobs:
         env:
           AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
           AWS_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
+          AWS_PRIVATE_KEY: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
+          AWS_PRIVATE_KEY_PATH: not_used
           AWS_PRIVATE_KEY_NAME: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY_NAME }}
           AWS_REGION: ${{ inputs.aws_region }}
           CICD_WORKFLOW: ${{ inputs.cicd_workflow }}
@@ -150,9 +152,6 @@ jobs:
           ALLOW_FALLBACK_TO_REMOTE_BUILDER: "1"
           CACHE_VERSION: ${{ inputs.cache_version }}
         run: |
-          export AWS_PRIVATE_KEY="${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}"
-          export AWS_PRIVATE_KEY_PATH=xx
-
           python3 build_package_new.py \
             image \
             ${{ inputs.builder_name }} \
