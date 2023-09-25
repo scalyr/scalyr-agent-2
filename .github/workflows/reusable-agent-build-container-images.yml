@@ -59,7 +59,7 @@ jobs:
       - docker-smoketest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
       - name: Setup Python
         uses: actions/setup-python@v4
         id: setup-python
@@ -68,7 +68,7 @@ jobs:
       - name: Install pycoverage
         run: pip install coverage==4.5.4
       - name: Download coverage reports
-        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3
         with:
           path: reports
 
@@ -92,7 +92,7 @@ jobs:
         architecture: ${{ fromJson(inputs.architectures) }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
 
       - name: install python and requirements
         uses: ./.github/actions/install_python_and_requirements
@@ -100,13 +100,13 @@ jobs:
           python_version: ${{ inputs.python_version }}
 
       - name: Login to DockerHub
-        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3
         with:
           username: ${{ secrets.PUBLISH_REGISTRY_USERNAME }}
           password: ${{ secrets.PUBLISH_REGISTRY_PASSWORD }}
 
       - name: Login to an internal build registry
-        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3
         continue-on-error: true
         with:
           registry: ${{ vars.INTERNAL_BUILD_REGISTRY }}
@@ -175,7 +175,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
 
       - name: install python and requirements
         uses: ./.github/actions/install_python_and_requirements
@@ -183,13 +183,13 @@ jobs:
           python_version: ${{ inputs.python_version }}
 
       - name: Login to DockerHub
-        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3
         with:
           username: ${{ secrets.PUBLISH_REGISTRY_USERNAME }}
           password: ${{ secrets.PUBLISH_REGISTRY_PASSWORD }}
       
       - name: Login to an internal build registry
-        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3
         continue-on-error: true
         with:
           registry: ${{ vars.INTERNAL_BUILD_REGISTRY }}
@@ -272,7 +272,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
         with:
           fetch-depth: 0
 
@@ -308,7 +308,7 @@ jobs:
           github_token: "${{ secrets.GITHUB_TOKEN }}"
 
       - name: Download OCI tarball of the built image.
-        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3
         with:
           name: container-image-tarball-k8s-${{ inputs.builder_name }}
           path: /tmp/image_tarball
@@ -508,7 +508,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
         with:
           fetch-depth: 0
 
@@ -544,7 +544,7 @@ jobs:
           github_token: "${{ secrets.GITHUB_TOKEN }}"
 
       - name: Download OCI tarball of the built image.
-        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3
         with:
           name: container-image-tarball-k8s-${{ inputs.builder_name }}
           path: /tmp/image_tarball
@@ -699,7 +699,7 @@ jobs:
     if: vars.K8S_TESTS_DISABLED != 'true' && github.ref_name != '_release_build' && (github.event_name != 'pull_request' || ! github.event.pull_request.draft)
     steps: 
       - name: Checkout Repository
-        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
 
       - name: install python and requirements
         uses: ./.github/actions/install_python_and_requirements
@@ -714,7 +714,7 @@ jobs:
           platforms: all
 
       - name: Login to DockerHub
-        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3
         with:
           username: ${{ secrets.PUBLISH_REGISTRY_USERNAME }}
           password: ${{ secrets.PUBLISH_REGISTRY_PASSWORD }}
@@ -736,7 +736,7 @@ jobs:
           github_token: "${{ secrets.GITHUB_TOKEN }}"
 
       - name: Download OCI tarball of the built image.
-        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3
         with:
           name: container-image-tarball-k8s-${{ inputs.builder_name }}
           path: /tmp/image_tarball
@@ -803,7 +803,7 @@ jobs:
             timeout: 200
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
 
       - name: install python and requirements
         uses: ./.github/actions/install_python_and_requirements
@@ -818,13 +818,13 @@ jobs:
           platforms: all
 
       - name: Login to DockerHub
-        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3
         with:
           username: ${{ secrets.PUBLISH_REGISTRY_USERNAME }}
           password: ${{ secrets.PUBLISH_REGISTRY_PASSWORD }}
       
       - name: Login to an internal build registry
-        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3
         continue-on-error: true
         with:
           registry: ${{ vars.INTERNAL_BUILD_REGISTRY }}
@@ -846,7 +846,7 @@ jobs:
         uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
 
       - name: Download OCI tarball of the built image.
-        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3
         with:
           name: container-image-tarball-${{ matrix.variant.image_type }}-${{ inputs.builder_name }}
           path: /tmp/image_tarball
@@ -915,7 +915,7 @@ jobs:
           - { "image_type": "docker-api" }
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
 
       - name: install python and requirements
         uses: ./.github/actions/install_python_and_requirements
@@ -923,7 +923,7 @@ jobs:
           python_version: ${{ inputs.python_version }}
 
       - name: Download OCI tarball of the built image.
-        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3
         with:
           name: container-image-tarball-${{ matrix.variant.image_type }}-${{ inputs.builder_name }}
           path: /tmp/image_tarball
