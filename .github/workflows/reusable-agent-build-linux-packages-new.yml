@@ -88,6 +88,7 @@ jobs:
           AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
           AWS_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
           AWS_PRIVATE_KEY_NAME: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY_NAME }}
+          AWS_PRIVATE_KEY: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
           AWS_REGION: ${{ inputs.aws_region }}
           USE_GHA_CACHE: "1"
           ALLOW_FALLBACK_TO_REMOTE_BUILDER: "1"
@@ -95,12 +96,6 @@ jobs:
           CICD_WORKFLOW: ${{ inputs.cicd_workflow }}
           CICD_JOB: ${{ matrix.builder.name }}
         run: |
-          export AWS_PRIVATE_KEY_PATH=`mktemp`
-          echo "${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}" > "${AWS_PRIVATE_KEY_PATH}"
-          chmod 600 "${AWS_PRIVATE_KEY_PATH}"
-
-          trap "rm ${AWS_PRIVATE_KEY_PATH}" EXIT
-          
           python3 build_package_new.py package ${{ matrix.builder.name }} build-dependencies
 
   build_packages:
