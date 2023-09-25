@@ -174,46 +174,6 @@ class EC2InstanceWrapper:
             # This main container process just has to be idle, and all ssh commands have to be done by
             # the 'docker exec' command.
         )
-        
-        
-       
-
-     
-
-        out=subprocess.check_output(
-            [
-                "docker",
-                "exec",
-                "-i",
-                self._main_ssh_connection_container_name,
-                "chmod",
-                "600",
-                str(self._ssh_client_container_in_docker_private_key_path)
-            ]
-        )
-        logger.info(out)
-        out=subprocess.check_output(
-            [
-                "docker",
-                "exec",
-                "-i",
-                self._main_ssh_connection_container_name,
-                "ls",
-                "-l",
-                "/tmp/mounts"
-            ]
-        )
-        logger.info(out)
-        out=subprocess.check_output(
-            [
-                "docker",
-                "exec",
-                "-i",
-                self._main_ssh_connection_container_name,
-                "find",
-                "/tmp/mounts"
-            ]
-        )
 
         retry_counts = 10
         retry_delay = 5
