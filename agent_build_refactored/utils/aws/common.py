@@ -31,7 +31,6 @@ class AWSSettings:
 
     access_key: str
     secret_key: str
-    private_key: pl.Path
     private_key_name: str
     region: str
     cicd_workflow: str = None
@@ -52,7 +51,6 @@ class AWSSettings:
         return AWSSettings(
             access_key=_validate_setting("AWS_ACCESS_KEY"),
             secret_key=_validate_setting("AWS_SECRET_KEY"),
-            private_key=pl.Path(_validate_setting("AWS_PRIVATE_KEY")),
             private_key_name=_validate_setting("AWS_PRIVATE_KEY_NAME"),
             region=_validate_setting("AWS_REGION"),
             cicd_workflow=_validate_setting("CICD_WORKFLOW", required=False),
