@@ -67,13 +67,13 @@ class EC2InstanceWrapper:
     def _create_ssh_container(
         self,
         name_suffix: str,
-        additional_cmd_args: List[str],
+        command: str,
         port: str = None,
     ):
         """
         Create container with ssh client which is capable to connect to the target ec2 instance.
         :param name_suffix: Suffix to container name.
-        :param additional_cmd_args: Additional command arguments to container run command.
+        :param command: Additional command arguments to container run command.
         :param port: map port to host.
         :return:
         """
@@ -85,8 +85,7 @@ class EC2InstanceWrapper:
             "docker",
             "run",
             "-d",
-            f"--name={container_name}",
-            f"--volume={self.private_key_path}:{self._ssh_client_container_in_docker_private_key_path}",
+            f"--name={container_name}"
         ]
 
         if port:
@@ -98,14 +97,42 @@ class EC2InstanceWrapper:
             toolset_image_name
         )
 
+        import os
         cmd_args.extend(
-            additional_cmd_args
+            [     
+                "/bin/bash",
+                "-c",
+                f"mkdir /tmp/mounts; echo \"{os.environ['AWS_PRIVATE_KEY']}\" > {self._ssh_client_container_in_docker_private_key_path}; chmod 600 {self._ssh_client_container_in_docker_private_key_path}; cat {self._ssh_client_container_in_docker_private_key_path}; " +
+                command
+            ] 
         )
 
-        subprocess.run(
-            cmd_args,
-            check=True
+        logger.info(f"Running _{cmd_args}")
+        logger.info(
+            subprocess.check_output(
+                cmd_args
+            )
         )
+
+        cmd = [
+                    "docker",
+                    "exec",
+                    "-i",
+                    container_name,
+                    "bash",
+                    "-c",
+                    f"while [ ! -f {self._ssh_client_container_in_docker_private_key_path} ]; do sleep 1; echo Waiting for the key file ...; done"
+                ]
+
+        logger.info(f"Running {' '.join(cmd)}")
+
+        logger.info(
+            subprocess.check_output(
+                cmd
+            )
+        )
+
+        logger.info("DONE")
 
         self._ssh_container_names.append(container_name)
         return container_name
@@ -139,14 +166,52 @@ class EC2InstanceWrapper:
         Init out main ssh connection with ec2 instance inside container.
         """
         logger.info(f"Establish ssh connection with ec2 instance '{self.boto3_instance.id}'")
+        logger.info("Creating the container, listing the private key file:")
+
         self._main_ssh_connection_container_name = self._create_ssh_container(
             name_suffix="main",
-            additional_cmd_args=[
-                "/bin/bash",
-                "-c",
-                # This main container process just has to be idle, and all ssh commands have to be done by
-                # the 'docker exec' command.
-                "while true; do sleep 86400; done"
+            command= "while true; do sleep 86400; done"
+            # This main container process just has to be idle, and all ssh commands have to be done by
+            # the 'docker exec' command.
+        )
+        
+        
+       
+
+     
+
+        out=subprocess.check_output(
+            [
+                "docker",
+                "exec",
+                "-i",
+                self._main_ssh_connection_container_name,
+                "chmod",
+                "600",
+                str(self._ssh_client_container_in_docker_private_key_path)
+            ]
+        )
+        logger.info(out)
+        out=subprocess.check_output(
+            [
+                "docker",
+                "exec",
+                "-i",
+                self._main_ssh_connection_container_name,
+                "ls",
+                "-l",
+                "/tmp/mounts"
+            ]
+        )
+        logger.info(out)
+        out=subprocess.check_output(
+            [
+                "docker",
+                "exec",
+                "-i",
+                self._main_ssh_connection_container_name,
+                "find",
+                "/tmp/mounts"
             ]
         )
 
@@ -197,16 +262,18 @@ class EC2InstanceWrapper:
 
         container_name = self._create_ssh_container(
             name_suffix=f"tunnel_port_{local_port}",
-            additional_cmd_args=[
+            command=" ".join([
                 "ssh",
                 *self._common_ssh_options,
                 "-N",
                 "-L",
                 f"0.0.0.0:{local_port}:localhost:{remote_port}",
-            ],
+            ]),
             port=full_local_port,
         )
-
+        
+        logger.info("1")
+        
         host_port = get_docker_container_host_port(
             container_name=container_name,
             container_port=full_local_port,

@@ -93,6 +93,9 @@ def cleanup_old_ec2_instances_and_related_objects(
 
         instances_to_remove.append(instance)
 
+    logger.info(f"cicd_workflow: {aws_settings.cicd_workflow}")
+    logger.info(f"Instances ready to be removed: {instances_to_remove}")
+
     terminate_ec2_instances_and_security_groups(
         instances=instances_to_remove,
         ec2_client=ec2_client,

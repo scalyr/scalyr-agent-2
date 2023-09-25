@@ -39,18 +39,18 @@ jobs:
           github_token: ${{ github.token }}
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
 
       - id: define_constants
         run: |
           echo "python_version=3.8" >> "${GITHUB_OUTPUT}"
-          echo "cache_version=6" >> "${GITHUB_OUTPUT}"
+          echo "cache_version=$GITHUB_REF_NAME" >> "${GITHUB_OUTPUT}"
           echo "aws_region=us-east-1" >> "${GITHUB_OUTPUT}"
-          echo "aws_private_key_name=CT_SCALYR_AGENT_GHA" >> "${GITHUB_OUTPUT}"
           echo "cicd_workflow=${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}" >> "${GITHUB_OUTPUT}"
 
   build_linux_packages:
     name: "Build Linux packages"
+    if: 1 == 2
     needs:
       - pre_job
     uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
@@ -58,10 +58,10 @@ jobs:
       python_version: ${{ needs.pre_job.outputs.python_version }}
       cache_version: ${{ needs.pre_job.outputs.cache_version }}
       aws_region: ${{ needs.pre_job.outputs.aws_region }}
-      aws_private_key_name: ${{ needs.pre_job.outputs.aws_private_key_name }}
       cicd_workflow: ${{ needs.pre_job.outputs.cicd_workflow }}
     secrets:
       CT_AWS_DEV_EC2_PRIVATE_KEY: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
+      CT_AWS_DEV_EC2_PRIVATE_KEY_NAME: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY_NAME }}
       CT_AWS_DEV_EC2_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
       CT_AWS_DEV_EC2_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
       CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
@@ -69,28 +69,36 @@ jobs:
 
   # Invoke workflow that builds all agent container mages.
   build_container_images:
-    name: "Build Container Images"
+    name: "Build Container Images ${{matrix.builder.builder-name}}"
     needs:
       - pre_job
     uses: ./.github/workflows/reusable-agent-build-container-images.yml
+    strategy:
+      matrix:
+        builder: ${{ fromJson(vars.ENABLED_BUILDERS) }}
     with:
       python_version: ${{ needs.pre_job.outputs.python_version }}
       cache_version: ${{ needs.pre_job.outputs.cache_version }}
       aws_region: ${{ needs.pre_job.outputs.aws_region }}
-      aws_private_key_name: ${{ needs.pre_job.outputs.aws_private_key_name }}
       cicd_workflow: ${{ needs.pre_job.outputs.cicd_workflow }}
+      builder_name: ${{ matrix.builder.builder_name }}
+      base_image: ${{ matrix.builder.base_image }}
+      architectures: ${{ toJson(matrix.builder.architectures) }}
     secrets:
       CT_AWS_DEV_EC2_PRIVATE_KEY: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
+      CT_AWS_DEV_EC2_PRIVATE_KEY_NAME: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY_NAME }}
       CT_AWS_DEV_EC2_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
       CT_AWS_DEV_EC2_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
       CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
       CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
       PUBLISH_REGISTRY_USERNAME: ${{ (github.ref_type == 'tag' || github.ref_name == 'master') && secrets.DOCKER_HUB_USERNAME_PROD_ACCOUNT || secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}
       PUBLISH_REGISTRY_PASSWORD: ${{ (github.ref_type == 'tag' || github.ref_name == 'master') && secrets.DOCKER_HUB_PASSWORD_PROD_ACCOUNT || secrets.DOCKER_HUB_PASSWORD_TEST_ACCOUNT }}
-
+      INTERNAL_BUILD_REGISTRY_USERNAME: ${{ secrets.INTERNAL_BUILD_REGISTRY_USERNAME }}
+      INTERNAL_BUILD_REGISTRY_PASSWORD: ${{ secrets.INTERNAL_BUILD_REGISTRY_PASSWORD }}
 
   build-windows-package:
     name: "Build Windows package"
+    if: 1 == 2
     uses: ./.github/workflows/reusable-agent-build-windows.yml
     secrets:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -100,7 +108,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
 
       - name: Install python
         uses: actions/setup-python@v4
@@ -143,10 +151,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
 
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
         with:
           path: /tmp/all_artifacts
 
@@ -176,7 +184,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
 
       - name: install python and requirements
         uses: ./.github/actions/install_python_and_requirements
@@ -187,11 +195,14 @@ jobs:
         env:
           AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
           AWS_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
-          AWS_PRIVATE_KEY_NAME: ${{ needs.pre_job.outputs.aws_private_key_name }}
-          AWS_PRIVATE_KEY_PATH: "/tmp/private_key.pem"
+          AWS_PRIVATE_KEY_NAME: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY_NAME }}
           AWS_REGION: ${{ needs.pre_job.outputs.aws_region }}
           CICD_WORKFLOW: ${{ needs.pre_job.outputs.cicd_workflow }}
         run: |
+          export AWS_PRIVATE_KEY_PATH=`mktemp`
           echo "${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}" > "${AWS_PRIVATE_KEY_PATH}"
           chmod 600 "${AWS_PRIVATE_KEY_PATH}"
+
+          trap "rm ${AWS_PRIVATE_KEY_PATH}" EXIT
+
           python3 agent_build_refactored/utils/scripts/cicd/cleanup_ec2_objects.py

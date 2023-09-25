@@ -16,6 +16,7 @@
 import atexit
 import logging
 import subprocess
+from subprocess import TimeoutExpired
 from typing import Optional, Dict
 
 
@@ -79,10 +80,22 @@ class EC2BackedRemoteBuildxBuilderWrapper:
             f"tcp://localhost:{buildkit_tunneled_local_port}",
         ]
 
-        subprocess.run(
-            create_builder_args,
-            check=True
+        logger.info(
+            f"Running {create_builder_args}"
         )
+
+        try:
+            logger.info(
+                subprocess.check_output(
+                    create_builder_args,
+                    timeout=120*60
+                )
+            )
+        except TimeoutExpired as e:
+            logger.error("Timeout")
+            logger.error(e.stderr)
+            logger.error(e.stdout)
+            raise
 
     def start_ec2_instance(
         self,
@@ -131,6 +144,8 @@ class EC2BackedRemoteBuildxBuilderWrapper:
         buildkit_tunneled_local_port = self.ec2_instance.open_ssh_tunnel(
             remote_port=buildkit_container_host_port,
         )
+
+        logger.info("2")
 
         return buildkit_tunneled_local_port
 
