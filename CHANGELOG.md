@@ -6,6 +6,9 @@ Scalyr Agent 2 Changes By Release
 Packaged by Ales Novak <ales.novak@sentinelone.com> on Aug 14, 2023 00:00 -0800
 --->
 
+Windows:
+* Support execution as any administrator account
+
 Other:
 * Add missing CA root certificates for FedRAMP environments (DigiCert Global CA root, DigiCert Global G2 CA root, GoDaddy CA root).
 

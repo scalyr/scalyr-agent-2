@@ -1,4 +1,4 @@
-# Copyright 2021 Scalyr Inc.
+# Copyright 2021-2023 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,23 +14,22 @@
 
 from __future__ import absolute_import
 
+import argparse
 import platform
 
 import mock
 import pytest
 
-from scalyr_agent.test_base import ScalyrTestCase
-from scalyr_agent.test_base import skipIf
-
 if platform.system() == "Windows":
-    WINDOWS = True
-else:
-    WINDOWS = False
+    from scalyr_agent.platform_windows import WindowsPlatformController
+
+from scalyr_agent.platform_controller import CannotExecuteAsUser
+from scalyr_agent.test_base import ScalyrTestCase, skipIf
 
 
 @pytest.mark.windows_platform
 class WindowsPlatformControllerTestCase(ScalyrTestCase):
-    @skipIf(not WINDOWS or False, "Skipping tests under non-Windows platform")
+    @skipIf(platform.system() != "Windows", "Skipping tests under non-Windows platform")
     @mock.patch("scalyr_agent.platform_windows._set_config_path_registry_entry")
     def test_start_agent_service_friendly_error_on_insufficient_permissions(
         self, mock_set_config_path_registry_entry
@@ -48,7 +47,7 @@ class WindowsPlatformControllerTestCase(ScalyrTestCase):
             Exception, expected_msg, controller.start_agent_service, noop, None
         )
 
-    @skipIf(not WINDOWS or False, "Skipping tests under non-Windows platform")
+    @skipIf(platform.system() != "Windows", "Skipping tests under non-Windows platform")
     @mock.patch("win32serviceutil.StopService")
     def test_stop_agent_service_friendly_error_on_insufficient_permissions(
         self, mock_StopService
@@ -61,3 +60,36 @@ class WindowsPlatformControllerTestCase(ScalyrTestCase):
         self.assertRaisesRegexp(
             Exception, expected_msg, controller.stop_agent_service, False
         )
+
+    @skipIf(platform.system() != "Windows", "Skipping tests under non-Windows platform")
+    def test_run_as_user_as_any_administrator(self):
+        # pylint: disable=no-member,not-context-manager,no-value-for-parameter
+
+        with mock.patch("win32api.GetComputerName", return_value="Domain"), mock.patch(
+            "scalyr_agent.platform_windows.WindowsPlatformController._all_admin_names",
+            return_value=["Domain\\Admin1", "Domain\\Admin2"],
+        ), mock.patch(
+            "scalyr_agent.platform_windows.WindowsPlatformController._run_as_administrators"
+        ):
+
+            platform_controller = WindowsPlatformController()
+            parser = argparse.ArgumentParser()
+            platform_controller.add_options(parser)
+            platform_controller.consume_options(
+                parser.parse_args(["--no-warn-escalation"])
+            )
+
+            run_as_user_args = ["script", "python", []]
+            platform_controller.run_as_user("Domain\\Administrators", *run_as_user_args)
+            self.assertEqual(platform_controller._run_as_administrators.call_count, 1)
+
+            platform_controller.run_as_user("Domain\\Admin1", *run_as_user_args)
+            self.assertEqual(platform_controller._run_as_administrators.call_count, 2)
+
+            platform_controller.run_as_user("Domain\\Admin2", *run_as_user_args)
+            self.assertEqual(platform_controller._run_as_administrators.call_count, 3)
+
+            with self.assertRaisesRegexp(
+                CannotExecuteAsUser, "as an Administrator account"
+            ):
+                platform_controller.run_as_user("Domain\\User", *run_as_user_args)
