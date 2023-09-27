@@ -102,7 +102,7 @@ class EC2InstanceWrapper:
             [     
                 "/bin/bash",
                 "-c",
-                f"mkdir /tmp/mounts; echo \"{os.environ['AWS_PRIVATE_KEY']}\" > {self._ssh_client_container_in_docker_private_key_path}; chmod 600 {self._ssh_client_container_in_docker_private_key_path}; cat {self._ssh_client_container_in_docker_private_key_path}; " +
+                f"mkdir /tmp/mounts; echo \"{os.environ['AWS_PRIVATE_KEY']}\" > {self._ssh_client_container_in_docker_private_key_path}; chmod 600 {self._ssh_client_container_in_docker_private_key_path}; " +
                 command
             ] 
         )
