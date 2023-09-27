@@ -20,12 +20,15 @@ on:
         type: string
       
       builder_name:
+        description: "Builder name used to build docker images. Accepted values: ubuntu, alpine, ubuntu-fips."
         type: string
 
       base_image:
+        description: "Base image to be used when bulding the docker image, i.e. ubuntu:22.04, alpine:latest."
         type: string
 
       architectures:
+        description: "JSON representation of a list of architectures used in a stragety matrix in some jobs. Accepted values: x86_64, aarch64, armv7."
         type: string
 
     secrets:
