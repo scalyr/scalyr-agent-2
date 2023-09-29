@@ -122,7 +122,7 @@ class EC2InstanceWrapper:
                     container_name,
                     "bash",
                     "-c",
-                    f"while [ ! -f {self._ssh_client_container_in_docker_private_key_path} ]; do sleep 1; echo Waiting for the key file ...; done"
+                    f"SECONDS=0; until [ -f {self._ssh_client_container_in_docker_private_key_path} ] || (( SECONDS >= 30 )); do sleep 1; done; [ -f {self._ssh_client_container_in_docker_private_key_path} ] || exit 1"
                 ]
 
         logger.info(f"Running {' '.join(cmd)}")
