@@ -1,4 +1,5 @@
-FROM ubuntu:22.04 as base
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE} as base
 
 FROM base as dependencies_build_base
 ENV DEBIANFRONTEND=noninteractive

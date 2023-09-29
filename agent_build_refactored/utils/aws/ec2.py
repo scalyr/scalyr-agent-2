@@ -21,6 +21,7 @@ import pathlib as pl
 import time
 import logging
 from typing import List, Optional, Dict
+import os
 
 import botocore.exceptions  # pylint:disable=import-error
 import requests
@@ -43,14 +44,12 @@ class EC2InstanceWrapper:
     def __init__(
         self,
         boto3_instance,
-        private_key_path: pl.Path,
         username: str,
         ec2_client,
     ):
         self.ec2_client = ec2_client
         self.id = boto3_instance.id.lower()
         self.boto3_instance = boto3_instance
-        self.private_key_path = private_key_path
         self.username = username
 
         self._ssh_client_container_in_docker_private_key_path = pl.Path("/tmp/mounts/private_key.pem")
@@ -67,13 +66,13 @@ class EC2InstanceWrapper:
     def _create_ssh_container(
         self,
         name_suffix: str,
-        additional_cmd_args: List[str],
+        command: str,
         port: str = None,
     ):
         """
         Create container with ssh client which is capable to connect to the target ec2 instance.
         :param name_suffix: Suffix to container name.
-        :param additional_cmd_args: Additional command arguments to container run command.
+        :param command: Additional command arguments to container run command.
         :param port: map port to host.
         :return:
         """
@@ -85,8 +84,7 @@ class EC2InstanceWrapper:
             "docker",
             "run",
             "-d",
-            f"--name={container_name}",
-            f"--volume={self.private_key_path}:{self._ssh_client_container_in_docker_private_key_path}",
+            f"--name={container_name}"
         ]
 
         if port:
@@ -98,14 +96,44 @@ class EC2InstanceWrapper:
             toolset_image_name
         )
 
+        # The AWS_PRIVATE_KEY must be saved inside the running container using an echo command with a pipe.
+        # Using a volume mount is not possible when docker is installed via snap and leaves a key file in the filesystem.
         cmd_args.extend(
-            additional_cmd_args
+            [     
+                "/bin/bash",
+                "-c",
+                f"mkdir /tmp/mounts; echo \"{os.environ['AWS_PRIVATE_KEY']}\" > {self._ssh_client_container_in_docker_private_key_path}; chmod 600 {self._ssh_client_container_in_docker_private_key_path}; " +
+                command
+            ] 
         )
 
-        subprocess.run(
-            cmd_args,
-            check=True
+        logger.info(f"Running _{cmd_args}")
+        logger.info(
+            subprocess.check_output(
+                cmd_args
+            )
         )
+
+        # Since the docker is run in the background, we need to wait for the bash command to be really excuted.
+        cmd = [
+                    "docker",
+                    "exec",
+                    "-i",
+                    container_name,
+                    "bash",
+                    "-c",
+                    f"SECONDS=0; until [ -f {self._ssh_client_container_in_docker_private_key_path} ] || (( SECONDS >= 30 )); do sleep 1; done; [ -f {self._ssh_client_container_in_docker_private_key_path} ] || exit 1"
+                ]
+
+        logger.info(f"Running {' '.join(cmd)}")
+
+        logger.info(
+            subprocess.check_output(
+                cmd
+            )
+        )
+
+        logger.info("DONE")
 
         self._ssh_container_names.append(container_name)
         return container_name
@@ -139,15 +167,12 @@ class EC2InstanceWrapper:
         Init out main ssh connection with ec2 instance inside container.
         """
         logger.info(f"Establish ssh connection with ec2 instance '{self.boto3_instance.id}'")
+
         self._main_ssh_connection_container_name = self._create_ssh_container(
             name_suffix="main",
-            additional_cmd_args=[
-                "/bin/bash",
-                "-c",
-                # This main container process just has to be idle, and all ssh commands have to be done by
-                # the 'docker exec' command.
-                "while true; do sleep 86400; done"
-            ]
+            command= "while true; do sleep 86400; done"
+            # This main container process just has to be idle, and all ssh commands have to be done by
+            # the 'docker exec' command.
         )
 
         retry_counts = 10
@@ -197,16 +222,16 @@ class EC2InstanceWrapper:
 
         container_name = self._create_ssh_container(
             name_suffix=f"tunnel_port_{local_port}",
-            additional_cmd_args=[
+            command=" ".join([
                 "ssh",
                 *self._common_ssh_options,
                 "-N",
                 "-L",
                 f"0.0.0.0:{local_port}:localhost:{remote_port}",
-            ],
+            ]),
             port=full_local_port,
         )
-
+        
         host_port = get_docker_container_host_port(
             container_name=container_name,
             container_port=full_local_port,
@@ -405,7 +430,6 @@ class EC2InstanceWrapper:
         try:
             instance = cls(
                 boto3_instance=boto3_instance,
-                private_key_path=aws_settings.private_key_path,
                 username=ssh_username,
                 ec2_client=ec2_client,
             )

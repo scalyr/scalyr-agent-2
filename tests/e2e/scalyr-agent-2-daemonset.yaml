@@ -50,7 +50,7 @@ spec:
         envFrom:
         - configMapRef:
             name: scalyr-config
-        image: k8s-ubuntu:test
+        image: k8s-image:test
         imagePullPolicy: Never
         name: scalyr-agent
         securityContext:

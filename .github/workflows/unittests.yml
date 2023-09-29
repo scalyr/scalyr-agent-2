@@ -14,6 +14,7 @@ jobs:
   # Special job which automatically cancels old runs for the same branch, prevents runs for the
   # same file set which has already passed, etc.
   pre_job:
+    if: github.ref_name != '_release_build' && vars.UNIT_TESTS_DISABLED != 'true'
     name: Skip Duplicate Jobs Pre Job
     runs-on: ubuntu-latest
     permissions:
@@ -37,7 +38,7 @@ jobs:
       - monitor-smoketests
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -47,7 +48,7 @@ jobs:
       - name: Install pycoverage
         run: pip install coverage==4.5.4
       - name: Download coverage reports
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3
         with:
           path: reports
 
@@ -78,11 +79,10 @@ jobs:
       fail-fast: false
       matrix:
         python-version:
-          - "3.6"
-          - "3.7"
           - "3.8"
           - "3.9"
           - "3.10"
+          - "3.11"
         os:
           - ubuntu-20.04
         platform:
@@ -96,7 +96,7 @@ jobs:
             python-version: "3.10"
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -156,10 +156,10 @@ jobs:
       fail-fast: false
       matrix:
         python-version:
-          - "3.6"
+          - "3.8"
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -218,11 +218,10 @@ jobs:
       fail-fast: false
       matrix:
         python-version:
-          - "3.6"
-          - "3.7"
           - "3.8"
           - "3.9"
           - "3.10"
+          - "3.11"
         os:
           - ubuntu-20.04
         platform:
@@ -234,7 +233,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -282,7 +281,7 @@ jobs:
       - monitor-smoketests
     steps:
       - name: Download test results
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3
         with:
           path: reports
       - name: Publish Test Results

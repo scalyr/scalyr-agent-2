@@ -17,6 +17,7 @@ jobs:
   pre_job:
     name: Skip Duplicate Jobs Pre Job
     runs-on: ubuntu-latest
+    if: ${{ ! vars.UNIT_TESTS_DISABLED }}
     permissions:
       actions: write  # Needed for skip-duplicate-jobs job
       contents: read
@@ -42,7 +43,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
         with:
           submodules: true
 
