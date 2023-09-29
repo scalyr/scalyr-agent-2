@@ -59,7 +59,7 @@ def _add_image_parsers():
     )
 
     image_parser.add_argument(
-        "--base-image", required=True, help="Name of the image to build"
+        "--base-image", required=True, help="Base image to be used for docker build."
     )
 
     image_parser_action_subparsers = image_parser.add_subparsers(
