@@ -48,16 +48,23 @@ jobs:
           echo "aws_region=us-east-1" >> "${GITHUB_OUTPUT}"
           echo "cicd_workflow=${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}" >> "${GITHUB_OUTPUT}"
 
-  build_linux_packages:
-    name: "Build Linux packages"
+    # Invoke workflow that builds all agent container mages.
+  build_container_images:
+    name: "Build Container Images ${{matrix.builder.builder-name}}"
     needs:
       - pre_job
-    uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
+    uses: ./.github/workflows/reusable-agent-build-container-images.yml
+    strategy:
+      matrix:
+        builder: ${{ fromJson(vars.ENABLED_BUILDERS) }}
     with:
       python_version: ${{ needs.pre_job.outputs.python_version }}
       cache_version: ${{ needs.pre_job.outputs.cache_version }}
       aws_region: ${{ needs.pre_job.outputs.aws_region }}
       cicd_workflow: ${{ needs.pre_job.outputs.cicd_workflow }}
+      builder_name: ${{ matrix.builder.builder_name }}
+      base_image: ${{ matrix.builder.base_image }}
+      architectures: ${{ toJson(matrix.builder.architectures) }}
     secrets:
       CT_AWS_DEV_EC2_PRIVATE_KEY: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
       CT_AWS_DEV_EC2_PRIVATE_KEY_NAME: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY_NAME }}
@@ -65,90 +72,17 @@ jobs:
       CT_AWS_DEV_EC2_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
       CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
       CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
-
-  build-windows-package:
-    name: "Build Windows package"
-    uses: ./.github/workflows/reusable-agent-build-windows.yml
-    secrets:
-      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
-  build_tarball:
-    runs-on: ubuntu-20.04
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
-
-      - name: Install python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.8.13"
-
-      - name: Build tarball
-        run: |
-          mkdir -p build/tarball/noarch
-          pushd build/tarball/noarch
-          python3 ../../../build_package.py tarball
-          popd
-
-      - name: Save tarball as artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: tarball-noarch
-          path: build
-          retention-days: 1
-
-      - name: Notify Slack on Failure
-        if: ${{ failure() && github.ref_name == 'master' }}
-        uses: act10ns/slack@ed1309ab9862e57e9e583e51c7889486b9a00b0f # v2.0.0
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        with:
-          status: ${{ job.status }}
-          steps: ${{ toJson(steps) }}
-          channel: '#eng-dataset-cloud-tech'
-
-
-  # Aggregate all agent build artifacts that we build by this workflow and put in a single artifact,
-  # so it's just need to download only one artifact, for example during a release process.
-  prepare-artifacts:
-    runs-on: ubuntu-20.04
-    needs:
-      - build_linux_packages
-      - build-windows-package
-      - build_tarball
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
-
-      - name: Download artifacts
-        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3
-        with:
-          path: /tmp/all_artifacts
-
-      - name: Prepare artifacts
-        run: |
-          mkdir -p /tmp/result_artifacts
-          cp -a /tmp/all_artifacts/linux-packages-*/. /tmp/result_artifacts
-          cp -a /tmp/all_artifacts/tarball-noarch/. /tmp/result_artifacts
-          cp -a /tmp/all_artifacts/windows-msi/. /tmp/result_artifacts
-
-      - name: Save result artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: result-artifacts
-          path: /tmp/result_artifacts
-          retention-days: 1
+      PUBLISH_REGISTRY_USERNAME: ${{ (github.ref_type == 'tag' || github.ref_name == 'master') && secrets.DOCKER_HUB_USERNAME_PROD_ACCOUNT || secrets.DOCKER_HUB_USERNAME_TEST_ACCOUNT }}
+      PUBLISH_REGISTRY_PASSWORD: ${{ (github.ref_type == 'tag' || github.ref_name == 'master') && secrets.DOCKER_HUB_PASSWORD_PROD_ACCOUNT || secrets.DOCKER_HUB_PASSWORD_TEST_ACCOUNT }}
+      INTERNAL_BUILD_REGISTRY_USERNAME: ${{ secrets.INTERNAL_BUILD_REGISTRY_USERNAME }}
+      INTERNAL_BUILD_REGISTRY_PASSWORD: ${{ secrets.INTERNAL_BUILD_REGISTRY_PASSWORD }}
 
   clean-ec2-tests-objects:
     name: Remove ec2 object that were created by this workflow
     if: ${{ always() }}
     needs:
       - pre_job
-      - build_linux_packages
-      - build-windows-package
-      - build_tarball
+      - build_container_images
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout repository
