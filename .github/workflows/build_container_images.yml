@@ -1,4 +1,4 @@
-name: Agent Build Refactored
+name: Build Container Images
 
 on:
   push:
