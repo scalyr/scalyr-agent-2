@@ -610,7 +610,7 @@ def _verify_python_and_libraries():
     )
 
     additional_requirements_content = additional_requirements_path.read_text()
-    additional_requirements_content += "\nflask==2.2.2"
+    additional_requirements_content += "\nflask==2.2.5"
 
     additional_requirements_path.write_text(additional_requirements_content)
 
@@ -632,7 +632,7 @@ def _verify_python_and_libraries():
         check=True,
     )
 
-    assert "Flask==2.2.2" in result.stdout.decode()
+    assert "Flask==2.2.5" in result.stdout.decode()
 
     logger.info(
         "Execute simple sanity test script for the python interpreter and its libraries."
