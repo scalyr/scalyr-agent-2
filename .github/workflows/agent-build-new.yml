@@ -69,7 +69,6 @@ jobs:
   # Invoke workflow that builds all agent container mages.
   build_container_images:
     name: "Build Container Images ${{matrix.builder.builder-name}}"
-    if: 1 == 2
     needs:
       - pre_job
     uses: ./.github/workflows/reusable-agent-build-container-images.yml
