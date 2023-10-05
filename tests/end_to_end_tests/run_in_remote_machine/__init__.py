@@ -282,8 +282,7 @@ def run_test_in_docker(
     for source, dst in file_mappings.items():
         mount_options.extend(["-v", f"{source}:{dst}"])
 
-    subprocess.run(
-        [
+    cmd = [
             "docker",
             "run",
             "-i",
@@ -293,7 +292,12 @@ def run_test_in_docker(
             docker_image,
             *_COMMON_CMD_ARGS,
             *command,
-        ],
+        ]
+    
+    logger.info(f"Running test in docker: {cmd}")
+
+    subprocess.run(
+        cmd,
         check=True,
     )
 

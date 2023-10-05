@@ -518,7 +518,14 @@ def _perform_ssl_checks(
 
     def _wait_for_string_in_log(text):
         while text not in agent_paths.agent_log_path.read_text():
-            timeout_tracker.sleep(1, f"Can't wait for a text '{text}' in the agent log")
+            try:
+                timeout_tracker.sleep(1, f"Can't wait for a text '{text}' in the agent log")
+            except TimeoutError:
+                logger.error("TimeoutError")
+                logger.error("Agent Log:")
+                logger.error(agent_paths.agent_log_path.read_text())
+                raise
+     
 
     _wait_for_string_in_log("HttpConnection uses native os ssl")
     agent_log = agent_paths.agent_log_path.read_text()
@@ -610,7 +617,7 @@ def _verify_python_and_libraries():
     )
 
     additional_requirements_content = additional_requirements_path.read_text()
-    additional_requirements_content += "\nflask==2.2.2"
+    additional_requirements_content += "\nflask==2.2.5"
 
     additional_requirements_path.write_text(additional_requirements_content)
 
@@ -632,7 +639,7 @@ def _verify_python_and_libraries():
         check=True,
     )
 
-    assert "Flask==2.2.2" in result.stdout.decode()
+    assert "Flask==2.2.5" in result.stdout.decode()
 
     logger.info(
         "Execute simple sanity test script for the python interpreter and its libraries."

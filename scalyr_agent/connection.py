@@ -589,7 +589,7 @@ class HTTPSConnectionWithTimeoutAndVerification(six.moves.http_client.HTTPSConne
                     log_server_ssl_certificate(
                         py_post_equal_279=False, log_level=logging.WARN
                     )
-                    raise e
+                    raise Exception(f"Error wrapping a ssl socket. ca_file: {self.__ca_file}") from e
                 else:
                     log_server_ssl_certificate(
                         py_post_equal_279=True, log_level=logging.DEBUG
