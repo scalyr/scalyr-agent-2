@@ -728,10 +728,16 @@ jobs:
           username: ${{ secrets.PULL_REGISTRY_USERNAME }}
           password: ${{ secrets.PULL_REGISTRY_PASSWORD }}
 
+      - name: Set up Docker Context for Buildx
+        id: buildx-context
+        run: |
+          docker context create builders || echo Already exists  
+      
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226 # v3
         with:
           driver-opts: network=host
+          endpoint: builders
 
       - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
         uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
@@ -910,10 +916,9 @@ jobs:
     runs-on: ubuntu-20.04
     if: github.ref_type == 'tag' || github.ref_name == 'master' || github.head_ref == 'release' || github.event_name == 'pull_request'
     needs:
-      # k8s_kubernetes_monitor_tests, k8s_open_metrics_monitor_tests checks are not neede before pushing a test version to dockerhub.
+      # k8s_kubernetes_monitor_tests, k8s_open_metrics_monitor_tests, k8s-smoketest checks are not needed before pushing a test version to dockerhub.
       # They need to pass to allow PR merge.
       - build_image_tarball
-      - k8s-smoketest
       - docker-smoketest
     strategy:
       matrix:
