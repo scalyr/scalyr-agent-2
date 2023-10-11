@@ -962,10 +962,10 @@ jobs:
           elif [ "${{ github.ref_name }}" = "master" ]; then
               echo "tags=${{ github.sha }}" >> "${GITHUB_OUTPUT}"
           elif [ "${{ github.head_ref }}" = "release" ]; then
-              echo "tags=pr-${{ github.event.number}}-${{ github.event.pull_request.commits}}-${{ github.sha }},\
+              echo "tags=latest-release,pr-${{ github.event.number}}-${{ github.event.pull_request.commits}}-${{ github.sha }},\
               $AGENT_VERSION,latest" >> "${GITHUB_OUTPUT}"
           elif [ "${{ github.event_name }}" = "pull_request" ]; then
-              echo "tags=pr-${{ github.event.number}}-${{ github.event.pull_request.commits}}-${{ github.sha }}" >> "${GITHUB_OUTPUT}"
+              echo "tags=latest-pr,pr-${{ github.event.number}}-${{ github.event.pull_request.commits}}-${{ github.sha }}" >> "${GITHUB_OUTPUT}"
           else
             echo "tags=empty" >> "${GITHUB_OUTPUT}"
           fi
