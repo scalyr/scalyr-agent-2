@@ -177,9 +177,9 @@ jobs:
           - { "package_type": "rpm", "builder": "aio-x86_64",  "arch": "x86_64", "distro-name": "amazonlinux2",  "remote-machine-type": "ec2"    }
           - { "package_type": "deb", "builder": "aio-aarch64", "arch": "arm64",  "distro-name": "ubuntu1404",    "remote-machine-type": "docker" }
           - { "package_type": "rpm", "builder": "aio-aarch64", "arch": "arm64",  "distro-name": "centos7",       "remote-machine-type": "docker" }
-          - { "package_type": "deb", "builder": "non-aio",     "arch": "x86_64", "distro-name": "ubuntu1404",    "remote-machine-type": "docker" }
+            # - { "package_type": "deb", "builder": "non-aio",     "arch": "x86_64", "distro-name": "ubuntu1404",    "remote-machine-type": "docker" }
           - { "package_type": "deb", "builder": "non-aio",     "arch": "x86_64", "distro-name": "ubuntu2204",    "remote-machine-type": "docker" }
-          - { "package_type": "rpm", "builder": "non-aio",     "arch": "x86_64", "distro-name": "centos7",       "remote-machine-type": "docker" }
+            # - { "package_type": "rpm", "builder": "non-aio",     "arch": "x86_64", "distro-name": "centos7",       "remote-machine-type": "docker" }
           - { "package_type": "rpm", "builder": "non-aio",     "arch": "x86_64", "distro-name": "amazonlinux2",  "remote-machine-type": "docker" }
     steps:
       - name: Checkout repository
