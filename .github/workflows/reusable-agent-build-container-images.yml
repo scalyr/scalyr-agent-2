@@ -802,7 +802,7 @@ jobs:
 
   docker-smoketest:
     name: Docker Smoketest - ${{ inputs.builder_name }} ${{ matrix.variant.image_type }}
-    if: github.ref_name != '_release_build' && inputs.builder_name != 'alpine'
+    if: github.ref_name != '_release_build'
     needs:
       - build_image_tarball
     runs-on: ${{ vars.RUNNER }}
@@ -923,10 +923,6 @@ jobs:
     strategy:
       matrix:
         variant:
-          - { "image_type": "k8s" }
-          - { "image_type": "docker-json" }
-          - { "image_type": "docker-syslog" }
-          - { "image_type": "docker-api" }
           - { "image_type": "k8s" }
           - { "image_type": "docker-json" }
           - { "image_type": "docker-syslog" }

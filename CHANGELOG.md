@@ -1,9 +1,9 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.2.5 "TBD" - TBD
+## 2.2.6 "Trégor"
 <!---
-Packaged by Ales Novak <ales.novak@sentinelone.com> on Aug 14, 2023 00:00 -0800
+Packaged by Ales Novak <ales.novak@sentinelone.com> on Oct 11, 2023 00:00 -0800
 --->
 
 Windows:
@@ -11,6 +11,7 @@ Windows:
 
 Other:
 * Add missing CA root certificates for FedRAMP environments (DigiCert Global CA root, DigiCert Global G2 CA root, GoDaddy CA root).
+* Alpine base image upgraded to 3.8.13
 
 ## 2.2.4 "Trillian" - Aug 14, 2023
 <!---
