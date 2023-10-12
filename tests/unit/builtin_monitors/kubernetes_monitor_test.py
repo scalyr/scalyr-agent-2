@@ -34,7 +34,7 @@ from scalyr_agent.monitor_utils.k8s import (
     KubeletApiException,
     K8sConfigBuilder,
     K8sNamespaceFilter,
-    PodInfo,
+    PodInfo, K8sApiException,
 )
 
 from urllib3.exceptions import (  # pylint: disable=import-error
@@ -1172,8 +1172,68 @@ class KubernetesContainerMetricsTest(ScalyrTestCase):
             },
         )
 
-
 class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
+    def test_get_container_not_found_by_k8s_api(self):
+        """
+        Mocking based test case which verifies that CRIEnumerator._get_container() correctly
+        handles the case when the Kubernetes API server returns a 404 error.
+        """
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+          }
+        """
+        )
+
+        global_config = self._create_test_configuration_instance()
+        global_config.parse()
+
+        POD_NAME = "loggen-58c5486566-fdmzf"
+        NAMESPACE = "default"
+
+        def mock_get_containers_from_filesystem(k8s_namespaces_to_include=None):
+            result = [(POD_NAME, NAMESPACE, "random-logger", "cont-1")]
+            return result
+
+        def mock_k8s_cache_pod(
+                namespace,
+                name,
+                current_time=None,
+                allow_expired=True,
+                query_options=None,
+                ignore_k8s_api_exception=True,
+        ):
+            raise K8sApiException("Pod not found", 404)
+
+        k8s_cache = mock.Mock()
+        k8s_cache.pod.side_effect = mock_k8s_cache_pod
+
+        cri = CRIEnumerator(
+            global_config=global_config,
+            agent_pod=mock.Mock,
+            k8s_api_url="mock",
+            query_filesystem=True,
+            node_name="node-1",
+            kubelet_api_host_ip="localhost",
+            kubelet_api_url_template="https://${host_ip}:10250",
+        )
+
+        cri._get_containers_from_filesystem = mock_get_containers_from_filesystem
+
+        assert cri.get_containers(
+            k8s_cache=k8s_cache,
+            k8s_include_by_default=False
+        ) == {}
+
+        assert k8s_cache.pod.call_args_list[0] == mock.call(
+            NAMESPACE,
+            POD_NAME,
+            mock.ANY,
+            allow_expired=False,
+            ignore_k8s_api_exception=False
+        )
+
+
     def test_get_containers_with_caching_and_dynamic_pod_metadata_update(self):
         """
         Mocking based test case which verifies that CRIEnumerator._get_containers() correctly
