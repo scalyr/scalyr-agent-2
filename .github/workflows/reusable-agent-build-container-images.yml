@@ -44,6 +44,10 @@ on:
         required: true
       CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ:
         required: true
+      PULL_REGISTRY_USERNAME:
+        required: true
+      PULL_REGISTRY_PASSWORD:
+        required: true
       PUBLISH_REGISTRY_USERNAME:
         required: true
       PUBLISH_REGISTRY_PASSWORD:
@@ -105,8 +109,8 @@ jobs:
       - name: Login to DockerHub
         uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3
         with:
-          username: ${{ secrets.PUBLISH_REGISTRY_USERNAME }}
-          password: ${{ secrets.PUBLISH_REGISTRY_PASSWORD }}
+          username: ${{ secrets.PULL_REGISTRY_USERNAME }}
+          password: ${{ secrets.PULL_REGISTRY_PASSWORD }}
 
       - name: Login to an internal build registry
         if: vars.INTERNAL_BUILD_REGISTRY
@@ -188,8 +192,8 @@ jobs:
       - name: Login to DockerHub
         uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3
         with:
-          username: ${{ secrets.PUBLISH_REGISTRY_USERNAME }}
-          password: ${{ secrets.PUBLISH_REGISTRY_PASSWORD }}
+          username: ${{ secrets.PULL_REGISTRY_USERNAME }}
+          password: ${{ secrets.PULL_REGISTRY_PASSWORD }}
       
       - name: Login to an internal build registry
         if: vars.INTERNAL_BUILD_REGISTRY
@@ -721,13 +725,19 @@ jobs:
       - name: Login to DockerHub
         uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3
         with:
-          username: ${{ secrets.PUBLISH_REGISTRY_USERNAME }}
-          password: ${{ secrets.PUBLISH_REGISTRY_PASSWORD }}
+          username: ${{ secrets.PULL_REGISTRY_USERNAME }}
+          password: ${{ secrets.PULL_REGISTRY_PASSWORD }}
 
+      - name: Set up Docker Context for Buildx
+        id: buildx-context
+        run: |
+          docker context create builders || echo Already exists  
+      
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226 # v3
         with:
           driver-opts: network=host
+          endpoint: builders
 
       - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
         uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
@@ -825,8 +835,8 @@ jobs:
       - name: Login to DockerHub
         uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3
         with:
-          username: ${{ secrets.PUBLISH_REGISTRY_USERNAME }}
-          password: ${{ secrets.PUBLISH_REGISTRY_PASSWORD }}
+          username: ${{ secrets.PULL_REGISTRY_USERNAME }}
+          password: ${{ secrets.PULL_REGISTRY_PASSWORD }}
       
       - name: Login to an internal build registry
         if: vars.INTERNAL_BUILD_REGISTRY
@@ -906,10 +916,9 @@ jobs:
     runs-on: ubuntu-20.04
     if: github.ref_type == 'tag' || github.ref_name == 'master' || github.head_ref == 'release' || github.event_name == 'pull_request'
     needs:
-      # k8s_kubernetes_monitor_tests, k8s_open_metrics_monitor_tests checks are not neede before pushing a test version to dockerhub.
+      # k8s_kubernetes_monitor_tests, k8s_open_metrics_monitor_tests, k8s-smoketest checks are not needed before pushing a test version to dockerhub.
       # They need to pass to allow PR merge.
       - build_image_tarball
-      - k8s-smoketest
       - docker-smoketest
     strategy:
       matrix:
@@ -953,10 +962,10 @@ jobs:
           elif [ "${{ github.ref_name }}" = "master" ]; then
               echo "tags=${{ github.sha }}" >> "${GITHUB_OUTPUT}"
           elif [ "${{ github.head_ref }}" = "release" ]; then
-              echo "tags=pr-${{ github.event.number}}-${{ github.event.pull_request.commits}}-${{ github.sha }},\
+              echo "tags=latest-release,pr-${{ github.event.number}}-${{ github.event.pull_request.commits}}-${{ github.sha }},\
               $AGENT_VERSION,latest" >> "${GITHUB_OUTPUT}"
           elif [ "${{ github.event_name }}" = "pull_request" ]; then
-              echo "tags=pr-${{ github.event.number}}-${{ github.event.pull_request.commits}}-${{ github.sha }}" >> "${GITHUB_OUTPUT}"
+              echo "tags=latest-pr,pr-${{ github.event.number}}-${{ github.event.pull_request.commits}}-${{ github.sha }}" >> "${GITHUB_OUTPUT}"
           else
             echo "tags=empty" >> "${GITHUB_OUTPUT}"
           fi
