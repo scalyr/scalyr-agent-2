@@ -2263,6 +2263,7 @@ class CRIEnumerator(ContainerEnumerator):
                     # we use allow_expired=False here otherwise we will always read cached entry
                     # even if it's stale
 
+                    pod = None
                     try:
                         pod = k8s_cache.pod(
                             pod_namespace,
@@ -2272,9 +2273,11 @@ class CRIEnumerator(ContainerEnumerator):
                             ignore_k8s_api_exception=False,
                         )
                     except k8s_utils.K8sApiException as e:
-                        # If the pod details cannot be retrieved from the K8s API, log the error and continue to the next pod.
+                        # If the pod details cannot be retrieved from the K8s API, log the error
+                        # and include only if k8s_include_by_default is True
                         global_log.error(e)
-                        continue
+                        if not k8s_include_by_default:
+                            continue
 
                     if pod:
                         # check to see if we should exclude this container

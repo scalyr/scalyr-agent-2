@@ -1177,6 +1177,8 @@ class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
         """
         Mocking based test case which verifies that CRIEnumerator._get_container() correctly
         handles the case when the Kubernetes API server returns a 404 error.
+        When k8s_include_by_default is set to True, it should be included.
+        When k8s_include_by_default is set to False, it should not be excluded.
         """
         self._write_file_with_separator_conversion(
             """ {
@@ -1190,9 +1192,12 @@ class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
 
         POD_NAME = "loggen-58c5486566-fdmzf"
         NAMESPACE = "default"
+        CONTAINER_NAME = "random-logger"
+        CONTAINER_ID = "cont-1"
 
         def mock_get_containers_from_filesystem(k8s_namespaces_to_include=None):
-            result = [(POD_NAME, NAMESPACE, "random-logger", "cont-1")]
+            result = [(POD_NAME, NAMESPACE, CONTAINER_NAME, CONTAINER_ID)]
+
             return result
 
         def mock_k8s_cache_pod(
@@ -1225,7 +1230,25 @@ class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
             k8s_include_by_default=False
         ) == {}
 
-        assert k8s_cache.pod.call_args_list[0] == mock.call(
+        assert k8s_cache.pod.call_args_list[-1] == mock.call(
+            NAMESPACE,
+            POD_NAME,
+            mock.ANY,
+            allow_expired=False,
+            ignore_k8s_api_exception=False
+        )
+
+        containers = cri.get_containers(
+            k8s_cache=k8s_cache,
+            k8s_include_by_default=True
+        )
+
+        assert CONTAINER_ID in containers
+        assert containers[CONTAINER_ID]["name"] == CONTAINER_NAME
+        assert containers[CONTAINER_ID]["k8s_info"]["pod_name"] == POD_NAME
+        assert containers[CONTAINER_ID]["k8s_info"]["pod_namespace"] == NAMESPACE
+
+        assert k8s_cache.pod.call_args_list[-1] == mock.call(
             NAMESPACE,
             POD_NAME,
             mock.ANY,
