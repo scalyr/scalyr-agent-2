@@ -208,3 +208,14 @@ def parse_scalyr_request(payload):
     rewritten_payload = rewritten_payload.replace(b'"c":\\', b"c:\\")
 
     return scalyr_util.json_decode(rewritten_payload.decode("utf-8", "replace"))
+
+
+def assert_has_calls_non_consecutive(mock, calls):
+    for mock_call in mock.mock_calls:
+        if not calls:
+            break
+        if mock_call == calls[0]:
+            calls = calls[1:]
+
+    if calls:
+        raise AssertionError("Not all calls were made. Remaining calls: %s" % calls)

@@ -519,13 +519,14 @@ def _perform_ssl_checks(
     def _wait_for_string_in_log(text):
         while text not in agent_paths.agent_log_path.read_text():
             try:
-                timeout_tracker.sleep(1, f"Can't wait for a text '{text}' in the agent log")
+                timeout_tracker.sleep(
+                    1, f"Can't wait for a text '{text}' in the agent log"
+                )
             except TimeoutError:
                 logger.error("TimeoutError")
                 logger.error("Agent Log:")
                 logger.error(agent_paths.agent_log_path.read_text())
                 raise
-     
 
     _wait_for_string_in_log("HttpConnection uses native os ssl")
     agent_log = agent_paths.agent_log_path.read_text()

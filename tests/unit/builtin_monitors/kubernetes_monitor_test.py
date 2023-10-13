@@ -35,6 +35,7 @@ from scalyr_agent.monitor_utils.k8s import (
     K8sConfigBuilder,
     K8sNamespaceFilter,
     PodInfo,
+    K8sApiException,
 )
 
 from urllib3.exceptions import (  # pylint: disable=import-error
@@ -56,7 +57,7 @@ from scalyr_agent.builtin_monitors.kubernetes_monitor import (
 from scalyr_agent.copying_manager import CopyingManager
 from scalyr_agent.util import FakeClock, FakeClockCounter
 from scalyr_agent.test_base import ScalyrTestCase, BaseScalyrLogCaptureTestCase
-from scalyr_agent.test_util import ScalyrTestUtils
+from scalyr_agent.test_util import ScalyrTestUtils, assert_has_calls_non_consecutive
 
 from tests.unit.monitor_utils.k8s_test import FakeCache
 from tests.unit.monitor_utils.k8s_test import KubernetesApi
@@ -1174,6 +1175,94 @@ class KubernetesContainerMetricsTest(ScalyrTestCase):
 
 
 class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
+    class K8sApiExceptionMatcher:
+        def __init__(self, status_code):
+            self.status_code = status_code
+
+        def __eq__(self, other):
+            return (
+                isinstance(other, K8sApiException)
+                and other.status_code == self.status_code
+            )
+
+    @patch("scalyr_agent.builtin_monitors.kubernetes_monitor.global_log")
+    def test_get_container_k8s_api_invalid_status(self, logger):
+        """
+        Mocking based test case which verifies that CRIEnumerator._get_container() correctly
+        Handles the case when the Kubernetes API server returns an invalid status code.
+        404 => Pod not found, Log Warning, excluded
+        401 => Unauthorized, Log Error, excluded
+        """
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+          }
+        """
+        )
+
+        global_config = self._create_test_configuration_instance()
+        global_config.parse()
+
+        POD_NAME = "loggen-58c5486566-fdmzf"
+        NAMESPACE = "default"
+        CONTAINER_NAME = "random-logger"
+        CONTAINER_ID = "cont-1"
+
+        def mock_get_containers_from_filesystem(k8s_namespaces_to_include=None):
+            return [(POD_NAME, NAMESPACE, CONTAINER_NAME, CONTAINER_ID)] * 2
+
+        k8s_cache = mock.Mock()
+        k8s_cache.pod.side_effect = [
+            K8sApiException("Not Found", 404),
+            K8sApiException("Unauthorized", 401),
+            K8sApiException("Not Found", 404),
+            K8sApiException("Unauthorized", 401),
+        ]
+
+        cri = CRIEnumerator(
+            global_config=global_config,
+            agent_pod=mock.Mock,
+            k8s_api_url="mock",
+            query_filesystem=True,
+            node_name="node-1",
+            kubelet_api_host_ip="localhost",
+            kubelet_api_url_template="https://${host_ip}:10250",
+        )
+
+        cri._get_containers_from_filesystem = mock_get_containers_from_filesystem
+
+        assert (
+            cri.get_containers(k8s_cache=k8s_cache, k8s_include_by_default=False) == {}
+        )
+
+        assert (
+            cri.get_containers(k8s_cache=k8s_cache, k8s_include_by_default=True) == {}
+        )
+
+        assert (
+            k8s_cache.pod.call_args_list
+            == [
+                mock.call(
+                    NAMESPACE,
+                    POD_NAME,
+                    mock.ANY,
+                    allow_expired=False,
+                    ignore_k8s_api_exception=False,
+                )
+            ]
+            * 4
+        )
+
+        assert_has_calls_non_consecutive(
+            logger,
+            [
+                mock.call.warning(mock.ANY, exc_info=self.K8sApiExceptionMatcher(404)),
+                mock.call.error(mock.ANY, exc_info=self.K8sApiExceptionMatcher(401)),
+                mock.call.warning(mock.ANY, exc_info=self.K8sApiExceptionMatcher(404)),
+                mock.call.error(mock.ANY, exc_info=self.K8sApiExceptionMatcher(401)),
+            ],
+        )
+
     def test_get_containers_with_caching_and_dynamic_pod_metadata_update(self):
         """
         Mocking based test case which verifies that CRIEnumerator._get_containers() correctly

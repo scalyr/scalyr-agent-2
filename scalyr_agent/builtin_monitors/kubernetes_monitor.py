@@ -2262,13 +2262,36 @@ class CRIEnumerator(ContainerEnumerator):
                     # NOTE: CRIEnumerator doesn't utilize ControlledCacheWarmer so it's important
                     # we use allow_expired=False here otherwise we will always read cached entry
                     # even if it's stale
-                    pod = k8s_cache.pod(
-                        pod_namespace,
-                        pod_name,
-                        current_time,
-                        allow_expired=False,
-                        ignore_k8s_api_exception=True,
-                    )
+
+                    pod = None
+                    try:
+                        pod = k8s_cache.pod(
+                            pod_namespace,
+                            pod_name,
+                            current_time,
+                            allow_expired=False,
+                            ignore_k8s_api_exception=False,
+                        )
+                    except k8s_utils.K8sApiException as e:
+                        # If the pod details cannot be retrieved from the K8s API:
+                        # 404 - log warning
+                        # Otherwise (401 as per K8s Api documentation) - log error
+                        # Exclude the pod
+                        if e.status_code == 404:
+                            global_log.warning(
+                                "Pod %s/%s not found in K8s API. Excluding pod from collection."
+                                % (pod_namespace, pod_name),
+                                exc_info=e,
+                            )
+                        else:
+                            global_log.error(
+                                "K8s API returned an unexpected status e.status_code for Pod %s/%s. Excluding pod from collection."
+                                % (pod_namespace, pod_name),
+                                exc_info=e,
+                            )
+
+                        continue
+
                     if pod:
                         # check to see if we should exclude this container
                         default_exclude = not k8s_include_by_default
