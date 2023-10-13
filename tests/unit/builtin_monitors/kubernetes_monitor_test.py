@@ -34,7 +34,8 @@ from scalyr_agent.monitor_utils.k8s import (
     KubeletApiException,
     K8sConfigBuilder,
     K8sNamespaceFilter,
-    PodInfo, K8sApiException,
+    PodInfo,
+    K8sApiException,
 )
 
 from urllib3.exceptions import (  # pylint: disable=import-error
@@ -56,7 +57,7 @@ from scalyr_agent.builtin_monitors.kubernetes_monitor import (
 from scalyr_agent.copying_manager import CopyingManager
 from scalyr_agent.util import FakeClock, FakeClockCounter
 from scalyr_agent.test_base import ScalyrTestCase, BaseScalyrLogCaptureTestCase
-from scalyr_agent.test_util import ScalyrTestUtils
+from scalyr_agent.test_util import ScalyrTestUtils, assert_has_calls_non_consecutive
 
 from tests.unit.monitor_utils.k8s_test import FakeCache
 from tests.unit.monitor_utils.k8s_test import KubernetesApi
@@ -1172,13 +1173,25 @@ class KubernetesContainerMetricsTest(ScalyrTestCase):
             },
         )
 
+
 class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
-    def test_get_container_not_found_by_k8s_api(self):
+    class K8sApiExceptionMatcher:
+        def __init__(self, status_code):
+            self.status_code = status_code
+
+        def __eq__(self, other):
+            return (
+                isinstance(other, K8sApiException)
+                and other.status_code == self.status_code
+            )
+
+    @patch("scalyr_agent.builtin_monitors.kubernetes_monitor.global_log")
+    def test_get_container_k8s_api_invalid_status(self, logger):
         """
         Mocking based test case which verifies that CRIEnumerator._get_container() correctly
-        handles the case when the Kubernetes API server returns a 404 error.
-        When k8s_include_by_default is set to True, it should be included.
-        When k8s_include_by_default is set to False, it should not be excluded.
+        Handles the case when the Kubernetes API server returns an invalid status code.
+        404 => Pod not found, Log Warning, excluded
+        401 => Unauthorized, Log Error, excluded
         """
         self._write_file_with_separator_conversion(
             """ {
@@ -1196,22 +1209,15 @@ class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
         CONTAINER_ID = "cont-1"
 
         def mock_get_containers_from_filesystem(k8s_namespaces_to_include=None):
-            result = [(POD_NAME, NAMESPACE, CONTAINER_NAME, CONTAINER_ID)]
-
-            return result
-
-        def mock_k8s_cache_pod(
-                namespace,
-                name,
-                current_time=None,
-                allow_expired=True,
-                query_options=None,
-                ignore_k8s_api_exception=True,
-        ):
-            raise K8sApiException("Pod not found", 404)
+            return [(POD_NAME, NAMESPACE, CONTAINER_NAME, CONTAINER_ID)] * 2
 
         k8s_cache = mock.Mock()
-        k8s_cache.pod.side_effect = mock_k8s_cache_pod
+        k8s_cache.pod.side_effect = [
+            K8sApiException("Not Found", 404),
+            K8sApiException("Unauthorized", 401),
+            K8sApiException("Not Found", 404),
+            K8sApiException("Unauthorized", 401),
+        ]
 
         cri = CRIEnumerator(
             global_config=global_config,
@@ -1225,37 +1231,37 @@ class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
 
         cri._get_containers_from_filesystem = mock_get_containers_from_filesystem
 
-        assert cri.get_containers(
-            k8s_cache=k8s_cache,
-            k8s_include_by_default=False
-        ) == {}
-
-        assert k8s_cache.pod.call_args_list[-1] == mock.call(
-            NAMESPACE,
-            POD_NAME,
-            mock.ANY,
-            allow_expired=False,
-            ignore_k8s_api_exception=False
+        assert (
+            cri.get_containers(k8s_cache=k8s_cache, k8s_include_by_default=False) == {}
         )
 
-        containers = cri.get_containers(
-            k8s_cache=k8s_cache,
-            k8s_include_by_default=True
+        assert (
+            cri.get_containers(k8s_cache=k8s_cache, k8s_include_by_default=True) == {}
         )
 
-        assert CONTAINER_ID in containers
-        assert containers[CONTAINER_ID]["name"] == CONTAINER_NAME
-        assert containers[CONTAINER_ID]["k8s_info"]["pod_name"] == POD_NAME
-        assert containers[CONTAINER_ID]["k8s_info"]["pod_namespace"] == NAMESPACE
-
-        assert k8s_cache.pod.call_args_list[-1] == mock.call(
-            NAMESPACE,
-            POD_NAME,
-            mock.ANY,
-            allow_expired=False,
-            ignore_k8s_api_exception=False
+        assert (
+            k8s_cache.pod.call_args_list
+            == [
+                mock.call(
+                    NAMESPACE,
+                    POD_NAME,
+                    mock.ANY,
+                    allow_expired=False,
+                    ignore_k8s_api_exception=False,
+                )
+            ]
+            * 4
         )
 
+        assert_has_calls_non_consecutive(
+            logger,
+            [
+                mock.call.warning(mock.ANY, exc_info=self.K8sApiExceptionMatcher(404)),
+                mock.call.error(mock.ANY, exc_info=self.K8sApiExceptionMatcher(401)),
+                mock.call.warning(mock.ANY, exc_info=self.K8sApiExceptionMatcher(404)),
+                mock.call.error(mock.ANY, exc_info=self.K8sApiExceptionMatcher(401)),
+            ],
+        )
 
     def test_get_containers_with_caching_and_dynamic_pod_metadata_update(self):
         """
