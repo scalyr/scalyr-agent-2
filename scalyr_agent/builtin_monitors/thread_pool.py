@@ -7,7 +7,9 @@ global_log = scalyr_logging.getLogger(__name__)
 
 class ExecutorMixIn:
     def __init__(self):
+        # Using 4 threads for processing requests, because of GIL and CPU bound tasks higher number would not help process the data faster.
         self._request_processing_executor = ThreadPoolExecutorFactory.get_singleton("request_processing_executor", max_workers=4)
+        self._request_reading_executor = ThreadPoolExecutorFactory.get_singleton("request_reading_executor")
 
     def process_request_thread(self, request, client_address):
         """Same as in BaseServer but as a thread.
@@ -27,10 +29,9 @@ class ExecutorMixIn:
            raise ValueError(str(self.__class__) + " is not initialized properly")
 
         """Start a new thread to process the request."""
-        # self._request_receive_executor.submit(
-        #     self.process_request_thread, request, client_address
-        # )
-        self.process_request_thread(request, client_address)
+        self._request_reading_executor.submit(
+            self.process_request_thread, request, client_address
+        )
 
     def server_close(self):
         super().server_close()
@@ -39,18 +40,12 @@ class ThreadPoolExecutorFactory():
     __lock = threading.Lock()
     __instances = {}
 
-    @staticmethod
-    def warm_up(thread_pool_executor: ThreadPoolExecutor):
-        for _ in range(thread_pool_executor._max_workers):
-            thread_pool_executor._adjust_thread_count()
-
     @classmethod
     def get_singleton(cls, name, max_workers=None):
         if name not in cls.__instances:
             with cls.__lock:
                 if name not in cls.__instances:
                     cls.__instances[name] = ThreadPoolExecutor(max_workers=max_workers)
-                    cls.warm_up(cls.__instances[name])
         return cls.__instances[name]
 
     @classmethod
