@@ -1,5 +1,5 @@
 import threading
-from concurrent.futures import Executor, ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 
 from scalyr_agent import scalyr_logging
 

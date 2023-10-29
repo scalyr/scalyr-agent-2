@@ -49,7 +49,7 @@ import six
 from six.moves import range
 import six.moves.socketserver
 
-from scalyr_agent.builtin_monitors.thread_pool import ThreadPoolExecutorFactory, ExecutorMixIn
+from scalyr_agent.builtin_monitors.thread_pool import ExecutorMixIn
 
 try:
     # Only available for python >= 3.6
