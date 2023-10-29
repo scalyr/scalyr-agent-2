@@ -93,8 +93,6 @@ __monitor__ = __name__
 
 RUN_EXPIRE_COUNT = 100
 
-SERVING_EXECUTOR_NAME = "syslog_server_executor"
-
 define_config_option(
     __monitor__,
     "module",
@@ -630,8 +628,6 @@ class SyslogRequest(object):
         """Reads self._max_buffer_size bytes from the buffer"""
 
         try:
-            # global_log.info("read")
-            # global_log.info(self._socket)
             data = self._socket.recv(self._max_buffer_size)
             if not data:
                 self.is_closed = True
@@ -995,8 +991,6 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
 
     @staticmethod
     def __request_stream_read(syslog_request, server_is_funning_fn):
-        # global_log.info("__request_stream_read")
-        # global_log.info(syslog_request._socket)
         count = 1
         data_batch = []
         while not syslog_request.is_closed:
@@ -1079,9 +1073,6 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
             "SyslogTCPHandler.handle - created syslog_parser. Thread: %d",
             threading.current_thread().ident,
         )
-
-        # global_log.info("handle")
-        # global_log.info(syslog_request._socket)
 
         try:
             data_batch = self.__request_stream_read(
