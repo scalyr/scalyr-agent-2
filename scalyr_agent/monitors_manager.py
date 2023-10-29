@@ -17,6 +17,8 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+from scalyr_agent.builtin_monitors.thread_pool import ThreadPoolExecutorFactory
+
 if False:  # NOSONAR
     from typing import List
 
@@ -208,6 +210,10 @@ class MonitorsManager(StoppableThread):
 
         start_time = time.time()
 
+        log.info("Stopping shared thread pools")
+        ThreadPoolExecutorFactory.shutdown(wait=False, cancel_futures=True)
+
+
         for monitor in self.__running_monitors:
             # noinspection PyBroadException
             try:
@@ -228,6 +234,10 @@ class MonitorsManager(StoppableThread):
                     monitor.stop(join_timeout=max_wait)
                 except Exception:
                     log.exception("Failed to stop the metric log due to an exception")
+
+                ThreadPoolExecutorFactory.shutdown(wait=True, cancel_futures=False)
+
+
 
         for monitor in self.__running_monitors:
             # noinspection PyBroadException

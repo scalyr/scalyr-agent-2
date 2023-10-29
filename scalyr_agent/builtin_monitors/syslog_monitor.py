@@ -18,6 +18,10 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 
 from __future__ import print_function
+
+from concurrent.futures import ThreadPoolExecutor, CancelledError
+from socketserver import ThreadingMixIn
+
 from scalyr_agent import compat
 
 __author__ = "scalyr@sentinelone.com"
@@ -44,6 +48,8 @@ from io import open
 import six
 from six.moves import range
 import six.moves.socketserver
+
+from scalyr_agent.builtin_monitors.thread_pool import ThreadPoolExecutorFactory, ExecutorMixIn
 
 try:
     # Only available for python >= 3.6
@@ -86,6 +92,8 @@ global_log = scalyr_logging.getLogger(__name__)
 __monitor__ = __name__
 
 RUN_EXPIRE_COUNT = 100
+
+SERVING_EXECUTOR_NAME = "syslog_server_executor"
 
 define_config_option(
     __monitor__,
@@ -570,6 +578,21 @@ class SyslogUDPHandler(six.moves.socketserver.BaseRequestHandler):
     a protocol neutral handler
     """
 
+    def __init__(self, request_processing_executor, request, client_address, server):
+        self.__request_processing_executor = request_processing_executor
+
+        if six.PY3:
+            super(SyslogUDPHandler, self).__init__(request, client_address, server)
+        else:
+            six.moves.socketserver.BaseRequestHandler.__init__(self, request, client_address, server)
+
+    def factory_method(request_processing_executor):
+        def create_handler(request, client_address, server):
+            return SyslogUDPHandler(request_processing_executor, request, client_address, server)
+
+        return create_handler
+
+
     def handle(self):
         data = six.ensure_text(self.request[0].strip(), "utf-8", errors="ignore")
         extra = {
@@ -577,7 +600,57 @@ class SyslogUDPHandler(six.moves.socketserver.BaseRequestHandler):
             "srcip": self.client_address[0],
             "destport": self.server.server_address[1],
         }
-        self.server.syslog_handler.handle(data, extra)
+
+        self.__request_processing_executor.submit(
+            self.server.syslog_handler.handle, data, extra
+        )
+
+        # self.server.syslog_handler.handle(data, extra)
+
+
+
+class SocketNotReadyException(Exception):
+    def __init__(self, cause):
+        self.cause = cause
+
+    def __str__(self):
+        return "SocketNotReadyException: " + str(self.cause)
+
+class SocketClosed(Exception):
+    pass
+
+class SyslogRequest(object):
+    def __init__(self, socket, max_buffer_size):
+        self._socket = socket
+        self._max_buffer_size = max_buffer_size
+        self._socket.setblocking(True)
+        self.is_closed = False
+
+    def read(self):
+        """Reads self._max_buffer_size bytes from the buffer"""
+
+        try:
+            # global_log.info("read")
+            # global_log.info(self._socket)
+            data = self._socket.recv(self._max_buffer_size)
+            if not data:
+                self.is_closed = True
+                raise SocketClosed()
+        except (socket.timeout, *NON_BLOCKING_SOCKET_DATA_NOT_READY_EXCEPTIONS) as e:
+            raise SocketNotReadyException(e)
+        except socket.error as e:
+            if e.errno == errno.EAGAIN:
+                return SocketNotReadyException(e)
+            else:
+                global_log.warning(
+                    "Network error while reading from syslog: %s",
+                    six.text_type(e),
+                    limit_once_per_x_secs=300,
+                    limit_key="syslog-network-error",
+                )
+                raise e
+
+        return data
 
 
 class SyslogRequestParser(object):
@@ -593,54 +666,27 @@ class SyslogRequestParser(object):
 
     def __init__(
         self,
-        socket,
         socket_client_address,
         socket_server_address,
         max_buffer_size,
-        message_size_can_exceed_tcp_buffer=False,
+        handle_frame,
+        message_size_can_exceed_tcp_buffer=False
     ):
-        self._socket = socket
         self._client_address = socket_client_address
         self._server_address = socket_server_address
 
-        if socket:
-            self._socket.setblocking(False)
-
         self._remaining = None
         self._max_buffer_size = max_buffer_size
+        self._handle_frame = handle_frame
         self._message_size_can_exceed_tcp_buffer = message_size_can_exceed_tcp_buffer
 
         self.is_closed = False
 
-    def read(self):
-        """Reads self._max_buffer_size bytes from the buffer"""
+    def process_batch(self, data_batch):
+        for data in data_batch:
+            self.process(data)
 
-        data = None
-        try:
-            data = self._socket.recv(self._max_buffer_size)
-            if not data:
-                self.is_closed = True
-        except socket.timeout:
-            self._socket_error = True
-            return None
-        except NON_BLOCKING_SOCKET_DATA_NOT_READY_EXCEPTIONS:
-            return None
-        except socket.error as e:
-            if e.errno == errno.EAGAIN:
-                return None
-            else:
-                global_log.warning(
-                    "Network error while reading from syslog: %s",
-                    six.text_type(e),
-                    limit_once_per_x_secs=300,
-                    limit_key="syslog-network-error",
-                )
-                self._socket_error = True
-                raise e
-
-        return data
-
-    def process(self, data, handle_frame):
+    def process(self, data):
         """Processes data returned from a previous call to read
         :type data: six.binary_type
         """
@@ -712,7 +758,7 @@ class SyslogRequestParser(object):
                     frame_data = six.ensure_text(
                         self._remaining, "utf-8", errors="ignore"
                     )
-                    handle_frame(frame_data, extra)
+                    self._handle_frame(frame_data, extra)
 
                     frames_handled += 1
                     # add a space to ensure the next frame won't start with a number
@@ -728,7 +774,7 @@ class SyslogRequestParser(object):
             frame_data = six.ensure_text(
                 self._remaining[self._offset : frame_end].strip(), "utf-8", "ignore"
             )
-            handle_frame(frame_data, extra)
+            self._handle_frame(frame_data, extra)
             frames_handled += 1
 
             self._offset += frame_length + skip
@@ -757,13 +803,13 @@ class SyslogRawRequestParser(SyslogRequestParser):
     the default parser which handles framed data, etc.
     """
 
-    def process(self, data, handle_frame):
+    def process(self, data):
         extra = {
             "proto": "tcp",
             "srcip": self._client_address[0],
             "destport": self._server_address[1],
         }
-        handle_frame(data, extra)
+        self.handle_frame(data, extra)
 
 
 class SyslogBatchedRequestParser(SyslogRequestParser):
@@ -782,21 +828,18 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
     # TODO: Refactor duplicated code and re-use common code between this and base class
     def __init__(
         self,
-        socket,
         socket_client_address,
         socket_server_address,
         max_buffer_size,
+        handle_frame,
         incomplete_frame_timeout=None,
         message_delimiter="\n",
     ):
-        self._socket = socket
         self._client_address = socket_client_address
         self._server_address = socket_server_address
 
-        if socket:
-            self._socket.setblocking(False)
-
         self._max_buffer_size = max_buffer_size
+        self.handle_frame = handle_frame
         self._incomplete_frame_timeout = incomplete_frame_timeout
         self._message_delimiter = six.ensure_binary(message_delimiter)
 
@@ -810,7 +853,7 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
 
         self.is_closed = False
 
-    def process(self, data, handle_frame):
+    def process(self, data):
         """Processes data returned from a previous call to read
         :type data: six.binary_type
         """
@@ -884,7 +927,7 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
                         limit_key="syslog-incomplete-message-flush",
                     )
 
-                    handle_frame(
+                    self.handle_frame(
                         self._remaining.decode("utf-8", "ignore").strip(), extra
                     )
                     frames_handled += 1
@@ -920,7 +963,7 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
 
         # All the currently available data has been processed, output it and reset the buffer
         if data_to_write:
-            handle_frame(data_to_write.decode("utf-8", "ignore").strip(), extra)
+            self.handle_frame(data_to_write.decode("utf-8", "ignore").strip(), extra)
             data_to_write = bytearray()
 
             self._last_handle_frame_call_time = int(time.time())
@@ -937,6 +980,10 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
     # each new connection.
 
     def __init__(self, *args, **kwargs):
+        self.__request_processing_executor = kwargs.pop("request_processing_executor", None)
+        if not self.__request_processing_executor:
+            raise ValueError("request_processing_executor is required")
+
         self.request_parser = kwargs.pop("request_parser", "default")
         self.incomplete_frame_timeout = kwargs.pop("incomplete_frame_timeout", None)
         self.message_delimiter = kwargs.pop("message_delimiter", "\n")
@@ -946,68 +993,34 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
         else:
             six.moves.socketserver.BaseRequestHandler.__init__(self, *args, **kwargs)
 
-    def handle(self):
-        if self.request_parser == "default":
-            request_stream = SyslogRequestParser(
-                socket=self.request,
-                socket_client_address=self.client_address,
-                socket_server_address=self.server.server_address,
-                max_buffer_size=self.server.tcp_buffer_size,
-                message_size_can_exceed_tcp_buffer=self.server.message_size_can_exceed_tcp_buffer,
-            )
-        elif self.request_parser == "batch":
-            request_stream = SyslogBatchedRequestParser(
-                socket=self.request,
-                socket_client_address=self.client_address,
-                socket_server_address=self.server.server_address,
-                max_buffer_size=self.server.tcp_buffer_size,
-                incomplete_frame_timeout=self.incomplete_frame_timeout,
-                message_delimiter=self.message_delimiter,
-            )
-        elif self.request_parser == "raw":
-            request_stream = SyslogRawRequestParser(
-                socket=self.request,
-                socket_client_address=self.client_address,
-                socket_server_address=self.server.server_address,
-                max_buffer_size=self.server.tcp_buffer_size,
-            )
-        else:
-            raise ValueError("Invalid request parser: %s" % (self.request_parser))
+    @staticmethod
+    def __request_stream_read(syslog_request, server_is_funning_fn):
+        # global_log.info("__request_stream_read")
+        # global_log.info(syslog_request._socket)
+        count = 1
+        data_batch = []
+        while not syslog_request.is_closed:
+            check_running = False
 
-        global_log.log(
-            scalyr_logging.DEBUG_LEVEL_1,
-            "SyslogTCPHandler.handle - created request_stream. Thread: %d",
-            threading.current_thread().ident,
-        )
+            try:
+                data = syslog_request.read()
 
-        try:
-            count = 0
-            while not request_stream.is_closed:
-                check_running = False
+                data_batch.append(data)
 
-                data = request_stream.read()
-                if data is not None:
-                    request_stream.process(data, self.server.syslog_handler.handle)
-                    count += 1
-                    if count > 1000:
-                        check_running = True
-                        count = 0
-                else:
-                    # don't hog the CPU
-                    time.sleep(0.01)
+                count += 1
+                if count > 1000:
                     check_running = True
+                    count = 0
+            except SocketNotReadyException as e:
+                time.sleep(0.01)
+                check_running = True
+            except SocketClosed:
+                continue
 
-                # limit the amount of times we check if the server is still running
-                # as this is a time consuming operation due to locking
-                if check_running and not self.server.is_running():
-                    break
+            if check_running and not server_is_funning_fn:
+                return None
 
-        except Exception as e:
-            global_log.warning(
-                "Error handling request: %s\n\t%s",
-                six.text_type(e),
-                traceback.format_exc(),
-            )
+            count += 1
 
         global_log.log(
             scalyr_logging.DEBUG_LEVEL_1,
@@ -1015,9 +1028,81 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
             threading.current_thread().ident,
         )
 
+        return data_batch
+
+    @staticmethod
+    def __request_data_batch_process(syslog_parser, data_batch):
+        try:
+            syslog_parser.process_batch(data_batch)
+        except Exception as e:
+            global_log.warning(
+                "Error processing request: %s\n\t%s",
+                six.text_type(e),
+                traceback.format_exc(),
+            )
+
+    def handle(self):
+        syslog_request = SyslogRequest(
+            socket=self.request,
+            max_buffer_size=self.server.tcp_buffer_size
+        )
+
+        if self.request_parser == "default":
+            syslog_parser = SyslogRequestParser(
+                socket_client_address=self.client_address,
+                socket_server_address=self.server.server_address,
+                max_buffer_size=self.server.tcp_buffer_size,
+                handle_frame=self.server.syslog_handler.handle,
+                message_size_can_exceed_tcp_buffer=self.server.message_size_can_exceed_tcp_buffer
+            )
+        elif self.request_parser == "batch":
+            syslog_parser = SyslogBatchedRequestParser(
+                socket_client_address=self.client_address,
+                socket_server_address=self.server.server_address,
+                max_buffer_size=self.server.tcp_buffer_size,
+                handle_frame=self.server.syslog_handler.handle,
+                incomplete_frame_timeout=self.incomplete_frame_timeout,
+                message_delimiter=self.message_delimiter
+            )
+        elif self.request_parser == "raw":
+            syslog_parser = SyslogRawRequestParser(
+                socket_client_address=self.client_address,
+                socket_server_address=self.server.server_address,
+                max_buffer_size=self.server.tcp_buffer_size,
+                handle_frame=self.server.syslog_handler.handle
+            )
+        else:
+            raise ValueError("Invalid request parser: %s" % (self.request_parser))
+
+        global_log.log(
+            scalyr_logging.DEBUG_LEVEL_1,
+            "SyslogTCPHandler.handle - created syslog_parser. Thread: %d",
+            threading.current_thread().ident,
+        )
+
+        # global_log.info("handle")
+        # global_log.info(syslog_request._socket)
+
+        try:
+            data_batch = self.__request_stream_read(
+                syslog_request,
+                self.server.is_running
+            )
+        except Exception as e:
+            global_log.warning(
+                "Error reading request: %s\n\t%s",
+                six.text_type(e),
+                traceback.format_exc(),
+            )
+            return
+
+        self.__request_processing_executor.submit(
+            self.__request_data_batch_process, syslog_parser, data_batch
+        )
+
 
 class SyslogUDPServer(
-    six.moves.socketserver.ThreadingMixIn, six.moves.socketserver.UDPServer
+    ExecutorMixIn, six.moves.socketserver.UDPServer
 ):
     """Class that creates a UDP SocketServer on a specified port"""
 
@@ -1030,8 +1115,10 @@ class SyslogUDPServer(
             "UDP Server: binding socket to %s" % six.text_type(address),
         )
 
+        ExecutorMixIn.__init__(self)
+
         self.allow_reuse_address = True
-        six.moves.socketserver.UDPServer.__init__(self, address, SyslogUDPHandler)
+        six.moves.socketserver.UDPServer.__init__(self, address, SyslogUDPHandler.factory_method(self._request_processing_executor))
 
     def verify_request(self, request, client_address):
         return self.__verifier.verify_request(client_address)
@@ -1042,7 +1129,7 @@ class SyslogUDPServer(
 
 
 class SyslogTCPServer(
-    six.moves.socketserver.ThreadingMixIn, six.moves.socketserver.TCPServer
+    ExecutorMixIn, six.moves.socketserver.TCPServer
 ):
     """Class that creates a TCP SocketServer on a specified port"""
 
@@ -1071,8 +1158,10 @@ class SyslogTCPServer(
         self.request_parser = request_parser
         self.message_delimiter = message_delimiter
 
+        ExecutorMixIn.__init__(self)
         handler_cls = functools.partial(
             SyslogTCPHandler,
+            request_processing_executor=self._request_processing_executor,
             request_parser=request_parser,
             incomplete_frame_timeout=incomplete_frame_timeout,
             message_delimiter=message_delimiter,
