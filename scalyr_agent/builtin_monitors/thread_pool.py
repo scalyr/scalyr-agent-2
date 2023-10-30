@@ -1,3 +1,21 @@
+#!/usr/bin/env python
+#
+# Copyright 2014 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ------------------------------------------------------------------------
+# @author ales.novak@sentinelone.com
+
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
@@ -5,11 +23,20 @@ from scalyr_agent import scalyr_logging
 
 global_log = scalyr_logging.getLogger(__name__)
 
+# A MixIn class used for adding a thread poll processing to a BaseServer (i.e. SyslogTCPServer, SyslogUDPServer)
 class ExecutorMixIn:
-    def __init__(self):
+    def __init__(self, global_config):
         # Using 4 threads for processing requests, because of GIL and CPU bound tasks higher number would not help process the data faster.
-        self._request_processing_executor = ThreadPoolExecutorFactory.get_singleton("request_processing_executor", max_workers=4)
-        self._request_reading_executor = ThreadPoolExecutorFactory.get_singleton("request_reading_executor")
+        reading_threads = 4
+        # Let the ThreadPoolExecutor decide how many threads to use based the numbre of logical CPUs
+        processing_threads = None
+
+        if global_config:
+            reading_threads = global_config.syslog_socket_thread_count
+            processing_threads = global_config.syslog_processing_thread_count
+
+        self._request_reading_executor = ThreadPoolExecutorFactory.get_singleton("request_reading_executor", max_workers=reading_threads)
+        self._request_processing_executor = ThreadPoolExecutorFactory.get_singleton("request_processing_executor", max_workers=processing_threads)
 
     def process_request_thread(self, request, client_address):
         """Same as in BaseServer but as a thread.

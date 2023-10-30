@@ -12,6 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ------------------------------------------------------------------------
+#
+# For each protocol and port defined in the configuration one instance of Syslog Server is started (SyslogTCPServer or SyslogUDPServer).
+# Syslog server inherits an ExecutorMixin enabling processing of the request in a pool of threads.
+# It's expected that the handler (SyslogUDPHandler or SyslogTCPHandler) will be implemented in a way that it will not block the thread after the request is processed.
+# The current handler implementation uses a separate thread pool for processing of the data read from the socket.
+#
 # author: scalyr@sentinelone.com
 
 from __future__ import unicode_literals
@@ -1097,7 +1103,7 @@ class SyslogUDPServer(
 ):
     """Class that creates a UDP SocketServer on a specified port"""
 
-    def __init__(self, port, bind_address, verifier):
+    def __init__(self, port, bind_address, verifier, global_config=None):
 
         self.__verifier = verifier
         address = (bind_address, port)
@@ -1106,7 +1112,7 @@ class SyslogUDPServer(
             "UDP Server: binding socket to %s" % six.text_type(address),
         )
 
-        ExecutorMixIn.__init__(self)
+        ExecutorMixIn.__init__(self, global_config=global_config)
 
         self.allow_reuse_address = True
         six.moves.socketserver.UDPServer.__init__(self, address, SyslogUDPHandler.factory_method(self._request_processing_executor))
@@ -1134,6 +1140,7 @@ class SyslogTCPServer(
         request_parser="default",
         incomplete_frame_timeout=None,
         message_delimiter="\n",
+        global_config=None
     ):
         self.__verifier = verifier
         address = (bind_address, port)
@@ -1149,7 +1156,7 @@ class SyslogTCPServer(
         self.request_parser = request_parser
         self.message_delimiter = message_delimiter
 
-        ExecutorMixIn.__init__(self)
+        ExecutorMixIn.__init__(self, global_config=global_config)
         handler_cls = functools.partial(
             SyslogTCPHandler,
             request_processing_executor=self._request_processing_executor,
@@ -1952,6 +1959,7 @@ class SyslogServer(object):
                     request_parser=request_parser,
                     incomplete_frame_timeout=incomplete_frame_timeout,
                     message_delimiter=message_delimiter,
+                    global_config=global_config
                 )
             elif protocol == "udp":
                 global_log.log(
@@ -1959,7 +1967,8 @@ class SyslogServer(object):
                     "Starting UDP Server (host=%s, port=%s)" % (bind_address, port),
                 )
                 server = SyslogUDPServer(
-                    port, bind_address=bind_address, verifier=verifier
+                    port, bind_address=bind_address, verifier=verifier,
+                    global_config=global_config
                 )
 
         except socket_error as e:
