@@ -38,7 +38,7 @@ import threading
 import platform
 
 from scalyr_agent.builtin_monitors import syslog_monitor
-from scalyr_agent.builtin_monitors.syslog_monitor import SyslogMonitor
+from scalyr_agent.builtin_monitors.syslog_monitor import SyslogMonitor, log_to_file
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogFrameParser
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogRequestParser
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogBatchedRequestParser
@@ -499,6 +499,9 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
     def test_run_tcp_server_small_tcp_buffer_size_message_size_can_exceed_tcp_buffer_false(
         self, mock_global_log
     ):
+        log_to_file("")
+        log_to_file("------------------")
+        log_to_file("SyslogMonitorConnectTest")
         # message_size_can_exceed_tcp_buffer size is False and tcp_buffer_size is 5 bytes. Timeout
         # should occur because partial data should be flushed before we receive a whole line
         config = {
@@ -524,10 +527,13 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
 
         self.assertEqual(mock_global_log.warning.call_count, 0)
 
+        log_to_file("send_and_wait_for_lines")
         self.send_and_wait_for_lines(
             s, expected_line1, expected_line_count=0, wait_for_lines=False
         )
+        log_to_file("time.sleep")
         time.sleep(2)
+        log_to_file("time.sleep DONE")
 
         # Ensure we did actually call handle_frame for each of the small frames
         self.assertEqual(
@@ -549,6 +555,8 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
 
         self.monitor.stop(wait_on_join=False)
         self.monitor = None
+
+        log_to_file("SyslogMonitorConnectTest END")
 
     @mock.patch(
         "scalyr_agent.builtin_monitors.syslog_monitor.SyslogHandler", TestSyslogHandler

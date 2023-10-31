@@ -25,6 +25,7 @@ from __future__ import absolute_import
 
 from __future__ import print_function
 
+import queue
 from concurrent.futures import ThreadPoolExecutor, CancelledError
 from socketserver import ThreadingMixIn
 
@@ -972,6 +973,9 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
             self._remaining = self._remaining[self._offset :]
             self._offset = 0
 
+def log_to_file(msg):
+    with open("/tmp/test.log", "a") as f:
+        f.write("Thread [" + threading.current_thread().name + "]: " + msg + "\n")
 
 class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
     """Class that reads data from a TCP request and passes it to
@@ -997,12 +1001,16 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
 
     @staticmethod
     def __request_stream_read(syslog_request, server_is_funning_fn):
+        log_to_file("SyslogTCPHandler::__request_stream_read")
         count = 1
         while not syslog_request.is_closed:
             check_running = False
 
             try:
+                log_to_file("SyslogTCPHandler::__request_stream_read data = syslog_request.read()")
                 data = syslog_request.read()
+
+                log_to_file("SyslogTCPHandler::__request_stream_read data=" + str(data))
 
                 yield data
 
@@ -1011,15 +1019,19 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
                     check_running = True
                     count = 0
             except SocketNotReadyException as e:
+                log_to_file("SyslogTCPHandler::__request_stream_read SocketNotReadyException")
                 time.sleep(0.01)
                 check_running = True
             except SocketClosed:
+                log_to_file("SyslogTCPHandler::__request_stream_read SocketClosed")
                 continue
 
             if check_running and not server_is_funning_fn:
-                return None
+                return
 
             count += 1
+
+        log_to_file("SyslogTCPHandler::__request_stream_read END")
 
         global_log.log(
             scalyr_logging.DEBUG_LEVEL_1,
@@ -1029,14 +1041,17 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
 
     @staticmethod
     def __request_data_process(syslog_parser, data):
+        log_to_file("SyslogTCPHandler::__request_data_process data=" + str(data))
         try:
             syslog_parser.process(data)
         except Exception as e:
+            log_to_file("SyslogTCPHandler::__request_data_process Exception")
             global_log.warning(
                 "Error processing request: %s\n\t%s",
                 six.text_type(e),
                 traceback.format_exc(),
             )
+        log_to_file("SyslogTCPHandler::__request_data_process data=" + str(data) + " DONE")
 
     def handle(self):
         syslog_request = SyslogRequest(
@@ -1076,11 +1091,27 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
         )
 
         try:
+            DONE = "DONE"
+            work_queue = queue.SimpleQueue()
+            def worker(queue):
+                data = queue.get(block=True)
+                log_to_file("SyslogTCPHandler.handle - worker got data data=" + str(data))
+                while data != DONE:
+                    self.__request_data_process(syslog_parser, data)
+                    data = queue.get(block=True)
+                    log_to_file("SyslogTCPHandler.handle - worker got data data=" + str(data))
+                log_to_file("SyslogTCPHandler.handle - worker got DONE")
+
+            log_to_file("SyslogTCPHandler.handle - submit worker to executor")
+            self.__request_processing_executor.submit(worker, work_queue)
+
             for data in self.__request_stream_read(syslog_request, self.server.is_running):
-                # ThreadPoolExecutor's queue is FIFO, we don't need to be affraid of the order of the messages
-                self.__request_processing_executor.submit(
-                    self.__request_data_process, syslog_parser, data
-                )
+                log_to_file("SyslogTCPHandler.handle - put data to queue")
+                work_queue.put(data)
+
+            log_to_file("SyslogTCPHandler.handle - put DONE to queue")
+            work_queue.put(DONE)
+
         except Exception as e:
             global_log.warning(
                 "Error reading request: %s\n\t%s",
