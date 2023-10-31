@@ -998,14 +998,13 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
     @staticmethod
     def __request_stream_read(syslog_request, server_is_funning_fn):
         count = 1
-        data_batch = []
         while not syslog_request.is_closed:
             check_running = False
 
             try:
                 data = syslog_request.read()
 
-                data_batch.append(data)
+                yield data
 
                 count += 1
                 if count > 1000:
@@ -1028,12 +1027,10 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
             threading.current_thread().ident,
         )
 
-        return data_batch
-
     @staticmethod
-    def __request_data_batch_process(syslog_parser, data_batch):
+    def __request_data_process(syslog_parser, data):
         try:
-            syslog_parser.process_batch(data_batch)
+            syslog_parser.process(data)
         except Exception as e:
             global_log.warning(
                 "Error processing request: %s\n\t%s",
@@ -1046,7 +1043,6 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
             socket=self.request,
             max_buffer_size=self.server.tcp_buffer_size
         )
-
         if self.request_parser == "default":
             syslog_parser = SyslogRequestParser(
                 socket_client_address=self.client_address,
@@ -1073,7 +1069,6 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
             )
         else:
             raise ValueError("Invalid request parser: %s" % (self.request_parser))
-
         global_log.log(
             scalyr_logging.DEBUG_LEVEL_1,
             "SyslogTCPHandler.handle - created syslog_parser. Thread: %d",
@@ -1081,10 +1076,11 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
         )
 
         try:
-            data_batch = self.__request_stream_read(
-                syslog_request,
-                self.server.is_running
-            )
+            for data in self.__request_stream_read(syslog_request, self.server.is_running):
+                # ThreadPoolExecutor's queue is FIFO, we don't need to be affraid of the order of the messages
+                self.__request_processing_executor.submit(
+                    self.__request_data_process, syslog_parser, data
+                )
         except Exception as e:
             global_log.warning(
                 "Error reading request: %s\n\t%s",
@@ -1092,10 +1088,6 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
                 traceback.format_exc(),
             )
             return
-
-        self.__request_processing_executor.submit(
-            self.__request_data_batch_process, syslog_parser, data_batch
-        )
 
 
 class SyslogUDPServer(
@@ -1823,7 +1815,7 @@ class SyslogHandler(object):
         return rv
 
     def handle(self, data, extra):  # type: (six.text_type, dict) -> None
-        """
+        """ 
         Feed syslog messages to the appropriate loggers.
         """
         # one more time ensure that we don't have binary string.

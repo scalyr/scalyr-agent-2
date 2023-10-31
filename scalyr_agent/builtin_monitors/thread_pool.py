@@ -72,7 +72,7 @@ class ThreadPoolExecutorFactory():
         if name not in cls.__instances:
             with cls.__lock:
                 if name not in cls.__instances:
-                    cls.__instances[name] = ThreadPoolExecutor(max_workers=max_workers)
+                    cls.__instances[name] = ThreadPoolExecutor(thread_name_prefix=name, max_workers=max_workers)
         return cls.__instances[name]
 
     @classmethod
