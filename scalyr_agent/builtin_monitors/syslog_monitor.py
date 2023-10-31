@@ -643,7 +643,7 @@ class SyslogRequest(object):
             raise SocketNotReadyException(e)
         except socket.error as e:
             if e.errno == errno.EAGAIN:
-                return SocketNotReadyException(e)
+                raise SocketNotReadyException(e)
             else:
                 global_log.warning(
                     "Network error while reading from syslog: %s",

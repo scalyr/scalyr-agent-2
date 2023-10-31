@@ -38,7 +38,8 @@ import threading
 import platform
 
 from scalyr_agent.builtin_monitors import syslog_monitor
-from scalyr_agent.builtin_monitors.syslog_monitor import SyslogMonitor, log_to_file
+from scalyr_agent.builtin_monitors.syslog_monitor import SyslogMonitor, log_to_file, SyslogRequest, \
+    SocketNotReadyException
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogFrameParser
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogRequestParser
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogBatchedRequestParser
@@ -870,20 +871,20 @@ class SyslogDefaultRequestParserTestCase(SyslogMonitorTestCase):
         max_buffer_size = 1024
 
         parser = SyslogRequestParser(
-            socket=mock_socket,
             socket_client_address=("127.0.0.1", 1234),
             socket_server_address=("127.0.0.2", 5678),
             max_buffer_size=max_buffer_size,
+            handle_frame=mock_handle_frame
         )
         self.assertEqual(parser._remaining, None)
 
         self.assertEqual(mock_global_log.warning.call_count, 0)
-        parser.process(None, mock_handle_frame)
+        parser.process(None)
         self.assertEqual(mock_handle_frame.call_count, 0)
         self.assertEqual(mock_global_log.warning.call_count, 1)
         self.assertEqual(parser._remaining, None)
 
-        parser.process(b"", mock_handle_frame)
+        parser.process(b"")
         self.assertEqual(mock_handle_frame.call_count, 0)
         self.assertEqual(parser._remaining, None)
 
@@ -897,14 +898,14 @@ class SyslogDefaultRequestParserTestCase(SyslogMonitorTestCase):
         mock_msg_1 = b"<14>Dec 24 16:12:48 hosttest.example.com tag-0-0-17[2593]: Hey diddle diddle, The Cat and the Fiddle, The Cow jump'd over the Spoon\n"
 
         parser = SyslogRequestParser(
-            socket=mock_socket,
             socket_client_address=("127.0.0.1", 1234),
             socket_server_address=("127.0.0.2", 5678),
             max_buffer_size=max_buffer_size,
+            handle_frame=mock_handle_frame
         )
         self.assertEqual(parser._remaining, None)
 
-        parser.process(mock_msg_1, mock_handle_frame)
+        parser.process(mock_msg_1)
         self.assertEqual(mock_handle_frame.call_count, 1)
         self.assertEqual(
             six.ensure_binary(mock_handle_frame.call_args_list[0][0][0]),
@@ -926,12 +927,12 @@ class SyslogDefaultRequestParserTestCase(SyslogMonitorTestCase):
         mock_data = mock_msg_1 + mock_msg_2 + mock_msg_3
 
         parser = SyslogBatchedRequestParser(
-            socket=mock_socket,
             socket_client_address=("127.0.0.1", 1234),
             socket_server_address=("127.0.0.2", 5678),
             max_buffer_size=max_buffer_size,
+            handle_frame=mock_handle_frame
         )
-        parser.process(mock_data, mock_handle_frame)
+        parser.process(mock_data)
 
         # Ensure we only call handle_frame once with all the data
         self.assertEqual(mock_handle_frame.call_count, 1)
@@ -972,12 +973,12 @@ class SyslogDefaultRequestParserTestCase(SyslogMonitorTestCase):
         mock_msg_3_expected = b"<14>Dec 24 16:12:48 hosttest.example.com tag-3-0-17[2593]: Hey diddle diddle ~\x01, The Cat and the Fiddle, The Cow jump'd over the Spoon\n"
 
         parser = SyslogRequestParser(
-            socket=mock_socket,
             socket_client_address=("127.0.0.1", 1234),
             socket_server_address=("127.0.0.2", 5678),
             max_buffer_size=max_buffer_size,
+            handle_frame=mock_handle_frame
         )
-        parser.process(mock_data, mock_handle_frame)
+        parser.process(mock_data)
 
         # Ensure handle_frame has been called once per message
         self.assertEqual(mock_handle_frame.call_count, 3)
@@ -1014,17 +1015,16 @@ class SyslogTCPRequestParserTestCase(SyslogMonitorTestCase):
         mock_socket_recv.counter = 0
         mock_socket.recv = mock_socket_recv
 
-        parser = SyslogRequestParser(
+        reader = SyslogRequest(
             socket=mock_socket,
-            socket_client_address=("127.0.0.1", 1234),
-            socket_server_address=("127.0.0.2", 5678),
-            max_buffer_size=64,
+            max_buffer_size=64
         )
-        self.assertIsNone(parser.read())
+
+        self.assertRaises(SocketNotReadyException, reader.read)
         self.assertEqual(mock_socket_recv.counter, 1)
-        self.assertIsNone(parser.read())
+        self.assertRaises(SocketNotReadyException, reader.read)
         self.assertEqual(mock_socket_recv.counter, 2)
-        self.assertEqual(parser.read(), "data1")
+        self.assertEqual(reader.read(), "data1")
         self.assertEqual(mock_socket_recv.counter, 3)
 
     @skipIf(sys.version_info < (3, 0, 0), "Skipping under Python 2")
@@ -1042,17 +1042,15 @@ class SyslogTCPRequestParserTestCase(SyslogMonitorTestCase):
         mock_socket_recv.counter = 0
         mock_socket.recv = mock_socket_recv
 
-        parser = SyslogRequestParser(
+        reader = SyslogRequest(
             socket=mock_socket,
-            socket_client_address=("127.0.0.1", 1234),
-            socket_server_address=("127.0.0.2", 5678),
             max_buffer_size=64,
         )
-        self.assertIsNone(parser.read())
+        self.assertRaises(SocketNotReadyException, reader.read)
         self.assertEqual(mock_socket_recv.counter, 1)
-        self.assertIsNone(parser.read())
+        self.assertRaises(SocketNotReadyException, reader.read)
         self.assertEqual(mock_socket_recv.counter, 2)
-        self.assertEqual(parser.read(), "data2")
+        self.assertEqual(reader.read(), "data2")
         self.assertEqual(mock_socket_recv.counter, 3)
 
 
@@ -1064,17 +1062,17 @@ class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
         max_buffer_size = 1024
 
         parser = SyslogBatchedRequestParser(
-            socket=mock_socket,
             socket_client_address=("127.0.0.1", 1234),
             socket_server_address=("127.0.0.2", 5678),
             max_buffer_size=max_buffer_size,
+            handle_frame=mock_handle_frame
         )
 
         self.assertEqual(mock_global_log.warning.call_count, 0)
-        parser.process(None, mock_handle_frame)
+        parser.process(None)
         self.assertEqual(mock_handle_frame.call_count, 0)
         self.assertEqual(mock_global_log.warning.call_count, 1)
-        parser.process(b"", mock_handle_frame)
+        parser.process(b"")
         self.assertEqual(mock_handle_frame.call_count, 0)
 
     def test_process_success_no_existing_buffer_recv_single_complete_message(self):
@@ -1087,12 +1085,12 @@ class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
         mock_msg_1 = b"<14>Dec 24 16:12:48 hosttest.example.com tag-0-0-17[2593]: Hey diddle diddle, The Cat and the Fiddle, The Cow jump'd over the Spoon\n"
 
         parser = SyslogBatchedRequestParser(
-            socket=mock_socket,
             socket_client_address=("127.0.0.1", 1234),
             socket_server_address=("127.0.0.2", 5678),
             max_buffer_size=max_buffer_size,
+            handle_frame=mock_handle_frame
         )
-        parser.process(mock_msg_1, mock_handle_frame)
+        parser.process(mock_msg_1)
         self.assertEqual(mock_handle_frame.call_count, 1)
         self.assertEqual(
             six.ensure_binary(mock_handle_frame.call_args_list[0][0][0]),
@@ -1112,12 +1110,12 @@ class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
         mock_data = mock_msg_1 + mock_msg_2 + mock_msg_3
 
         parser = SyslogBatchedRequestParser(
-            socket=mock_socket,
             socket_client_address=("127.0.0.1", 1234),
             socket_server_address=("127.0.0.2", 5678),
             max_buffer_size=max_buffer_size,
+            handle_frame=mock_handle_frame
         )
-        parser.process(mock_data, mock_handle_frame)
+        parser.process(mock_data)
 
         # Ensure we only call handle_frame once with all the data
         self.assertEqual(mock_handle_frame.call_count, 1)
@@ -1142,12 +1140,12 @@ class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
         mock_data = mock_msg_1 + mock_msg_2 + mock_msg_3[: int(len(mock_msg_3) / 2)]
 
         parser = SyslogBatchedRequestParser(
-            socket=mock_socket,
             socket_client_address=("127.0.0.1", 1234),
             socket_server_address=("127.0.0.2", 5678),
             max_buffer_size=max_buffer_size,
+            handle_frame=mock_handle_frame
         )
-        parser.process(mock_data, mock_handle_frame)
+        parser.process(mock_data)
 
         # Ensure we only call handle_frame. Since last message was incomplete, only first two
         # messages should have been flushed and part of the 3rd one should still be in internal
@@ -1163,7 +1161,7 @@ class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
         # Now emulate rest of the message 3 + complete message 4 arriving
         mock_data = mock_msg_3[int(len(mock_msg_3) / 2) :] + mock_msg_4
 
-        parser.process(mock_data, mock_handle_frame)
+        parser.process(mock_data)
         self.assertEqual(mock_handle_frame.call_count, 2)
         self.assertEqual(
             six.ensure_binary(mock_handle_frame.call_args_list[1][0][0]),
@@ -1183,13 +1181,13 @@ class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
         mock_data = mock_msg_1[: int(len(mock_msg_1) / 2)]
 
         parser = SyslogBatchedRequestParser(
-            socket=mock_socket,
             socket_client_address=("127.0.0.1", 1234),
             socket_server_address=("127.0.0.2", 5678),
             max_buffer_size=max_buffer_size,
             incomplete_frame_timeout=1,
+            handle_frame=mock_handle_frame
         )
-        parser.process(mock_data, mock_handle_frame)
+        parser.process(mock_data)
 
         # No complete frame
         self.assertEqual(mock_handle_frame.call_count, 0)
@@ -1200,7 +1198,7 @@ class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
 
         # We have not seen a complete frame / message yet, but a timeout has been reached so what
         # we have seen so far should be flushed.
-        parser.process(b"a", mock_handle_frame)
+        parser.process(b"a")
         self.assertEqual(mock_handle_frame.call_count, 1)
         self.assertEqual(
             six.ensure_binary(mock_handle_frame.call_args_list[0][0][0]),
@@ -1223,13 +1221,13 @@ class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
         mock_data = mock_msg_1 + mock_msg_2 + mock_msg_3[: int(len(mock_msg_3) / 2)]
 
         parser = SyslogBatchedRequestParser(
-            socket=mock_socket,
             socket_client_address=("127.0.0.1", 1234),
             socket_server_address=("127.0.0.2", 5678),
             max_buffer_size=max_buffer_size,
             message_delimiter="\000",
+            handle_frame=mock_handle_frame
         )
-        parser.process(mock_data, mock_handle_frame)
+        parser.process(mock_data)
 
         # Ensure we only call handle_frame. Since last message was incomplete, only first two
         # messages should have been flushed and part of the 3rd one should still be in internal
@@ -1245,7 +1243,7 @@ class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
         # Now emulate rest of the message 3 + complete message 4 arriving
         mock_data = mock_msg_3[int(len(mock_msg_3) / 2) :] + mock_msg_4
 
-        parser.process(mock_data, mock_handle_frame)
+        parser.process(mock_data)
         self.assertEqual(mock_handle_frame.call_count, 2)
         self.assertEqual(
             six.ensure_binary(mock_handle_frame.call_args_list[1][0][0]),
