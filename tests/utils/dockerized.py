@@ -116,8 +116,8 @@ def dockerized_case(
                 pass
 
             print(
-                "Create container '{0}' from '{1}' image.".format(
-                    container_name, builder.image_tag
+                "Create container '{0}' from '{1}' image with command '{2}'".format(
+                    container_name, builder.image_tag, command
                 )
             )
             container = docker_client.containers.run(

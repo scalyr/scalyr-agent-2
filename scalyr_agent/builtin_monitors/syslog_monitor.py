@@ -1092,7 +1092,7 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
 
         try:
             DONE = "DONE"
-            work_queue = queue.SimpleQueue()
+            work_queue = queue.Queue()
             def worker(queue):
                 data = queue.get(block=True)
                 log_to_file("SyslogTCPHandler.handle - worker got data data=" + str(data))
