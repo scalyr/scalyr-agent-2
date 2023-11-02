@@ -175,6 +175,7 @@ echo "::endgroup::"
 
 echo "Stopping agent"
 k8s_docker_id=$(docker ps | grep k8s_scalyr-agent_scalyr-agent-2 | awk {'print$1'})
-docker stop ${k8s_docker_id}
+# Give agent 2 minutes to stop to be sure the coverage file is saved
+docker stop --time 120 ${k8s_docker_id}
 echo "Agent stopped copying .coverage results."
 docker cp ${k8s_docker_id}:/.coverage .

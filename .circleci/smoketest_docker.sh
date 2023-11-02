@@ -194,6 +194,7 @@ echo "::endgroup::"
 echo ""
 echo "Stopping agent."
 echo ""
+# Give agent 2 minutes to stop to be sure the coverage file is saved
 docker stop --time 120 ${contname_agent}
 
 echo ""
