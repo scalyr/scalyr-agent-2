@@ -145,7 +145,7 @@ _DISTROS_LIST = [
         },
         ec2_instance_size_id=_EC2_INSTANCE_SIZE_X86_64,
         docker_image="debian:11",
-        expected_openssl_version_number=0x101010EF,
+        expected_openssl_version_number=0x1010117F,
     ),
     TargetDistro(
         name="debian10",
