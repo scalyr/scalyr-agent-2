@@ -56,6 +56,7 @@ def build_test_version_of_container_image(
             "docker",
             "run",
             "-d",
+            "--rm",
             "-p=5000:5000",
             f"--name={registry_container_name}",
             "registry:2",
@@ -119,8 +120,7 @@ def build_test_version_of_container_image(
                 check=True,
             )
     finally:
-        #delete_container(container_name=registry_container_name)
-        pass
+        delete_container(container_name=registry_container_name)
 
     return result_image_name
 
