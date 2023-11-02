@@ -91,6 +91,7 @@ def _test(python_version):
     finally:
         runner.stop(executable=python_version)
 
+
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__, remove_container=False)
 def test_syslog_python3(request):
