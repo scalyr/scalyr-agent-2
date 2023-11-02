@@ -194,7 +194,7 @@ echo "::endgroup::"
 echo ""
 echo "Stopping agent."
 echo ""
-docker stop ${contname_agent}
+docker stop --time 120 ${contname_agent}
 
 echo ""
 echo "Agent stopped, copying .coverage results."
