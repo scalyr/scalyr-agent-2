@@ -1081,13 +1081,16 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
             # Using the queue ensures the data is processed in the order it was read.
             DONE = "DONE"
             work_queue = queue.Queue()
-            def worker(queue):
+            def worker(queue, is_shutdown):
                 data = queue.get(block=True)
                 while data != DONE:
+                    if is_shutdown():
+                        global_log.info("ThreadPool shutting down, skipping further request processing.")
+                        break
                     self.__request_data_process(syslog_parser, data)
                     data = queue.get(block=True)
 
-            self.__request_processing_executor.submit(worker, work_queue)
+            self.__request_processing_executor.submit(worker, work_queue, lambda: self.__request_processing_executor._shutdown)
 
             for data in self.__request_stream_read(syslog_request, self.server.is_running):
                 work_queue.put(data)
