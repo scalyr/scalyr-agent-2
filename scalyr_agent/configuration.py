@@ -1475,6 +1475,16 @@ class Configuration(object):
         return self.__get_config().get_string("raw_scalyr_server")
 
     @property
+    def syslog_processing_thread_count(self):
+        """Returns the configuration value for 'scalyr_server'."""
+        return self.__get_config().get_int("syslog_processing_thread_count", default_value=4)
+
+    @property
+    def syslog_socket_thread_count(self):
+        """Returns the configuration value for 'scalyr_server'."""
+        return self.__get_config().get_int("syslog_socket_thread_count", none_if_missing=True)
+
+    @property
     def check_remote_if_no_tty(self):
         """Returns the configuration value for `check_remote_if_no_tty`"""
         return self.__get_config().get_bool("check_remote_if_no_tty")

@@ -86,6 +86,14 @@ class ConfigurationMock(Configuration):
     def log_rotation_max_bytes(self):
         return 20 * 1024 * 1024
 
+    @property
+    def syslog_processing_thread_count(self):
+        return 4
+
+    @property
+    def syslog_socket_thread_count(self):
+        return 4
+
 
 class LogWatcherMock(LogWatcher):
     def __init__(self):
