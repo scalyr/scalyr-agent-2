@@ -947,24 +947,25 @@ jobs:
         id: verify
         shell: bash
         run: |
-          AGENT_VERSION="$(cat VERSION | tr -d '\n')"
-
-          if [ "${{ github.ref_type }}" = "tag" ]; then
-            if [ "${{ github.ref_name }}" = "v${AGENT_VERSION}" ]; then
-              echo "tags=$AGENT_VERSION,latest" >> "${GITHUB_OUTPUT}"
-            else
-              echo "tags=empty" >> "${GITHUB_OUTPUT}"
-            fi        
-          elif [ "${{ github.ref_name }}" = "master" ]; then
-              echo "tags=${{ github.sha }}" >> "${GITHUB_OUTPUT}"
-          elif [ "${{ github.head_ref }}" = "release" ]; then
-              echo "tags=latest-release,pr-${{ github.event.number}}-${{ github.event.pull_request.commits}}-${{ github.sha }},\
-              $AGENT_VERSION,latest" >> "${GITHUB_OUTPUT}"
-          elif [ "${{ github.event_name }}" = "pull_request" ]; then
-              echo "tags=latest-pr,pr-${{ github.event.number}}-${{ github.event.pull_request.commits}}-${{ github.sha }}" >> "${GITHUB_OUTPUT}"
-          else
-            echo "tags=empty" >> "${GITHUB_OUTPUT}"
-          fi
+          echo tags=dtin-3193 >> "${GITHUB_OUTPUT}"
+#          AGENT_VERSION="$(cat VERSION | tr -d '\n')"
+#
+#          if [ "${{ github.ref_type }}" = "tag" ]; then
+#            if [ "${{ github.ref_name }}" = "v${AGENT_VERSION}" ]; then
+#              echo "tags=$AGENT_VERSION,latest" >> "${GITHUB_OUTPUT}"
+#            else
+#              echo "tags=empty" >> "${GITHUB_OUTPUT}"
+#            fi
+#          elif [ "${{ github.ref_name }}" = "master" ]; then
+#              echo "tags=${{ github.sha }}" >> "${GITHUB_OUTPUT}"
+#          elif [ "${{ github.head_ref }}" = "release" ]; then
+#              echo "tags=latest-release,pr-${{ github.event.number}}-${{ github.event.pull_request.commits}}-${{ github.sha }},\
+#              $AGENT_VERSION,latest" >> "${GITHUB_OUTPUT}"
+#          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+#              echo "tags=latest-pr,pr-${{ github.event.number}}-${{ github.event.pull_request.commits}}-${{ github.sha }}" >> "${GITHUB_OUTPUT}"
+#          else
+#            echo "tags=empty" >> "${GITHUB_OUTPUT}"
+#          fi
 
       - name: Publish image
         if: steps.verify.outputs.tags != 'empty'
