@@ -1,7 +1,16 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.2.6 "Trégor"
+## 2.2.7 "Zeratul" - Nov 6, 2023
+<!---
+Packaged by Ales Novak <ales.novak@sentinelone.com> on Nov 6, 2023 00:00 -0800
+--->
+
+* SCALYR_K8S_INCLUDE_ALL_CONTAINERS evironment flag fix -  When the K8s Pod API returned 404, the logs were being imported without a label marking the pod as included.
+* Base Ubuntu Fips image was upgraded to 2.0.32
+* Syslog Monitor uses a thread pool to process requests
+
+## 2.2.6 "Trégor" - Oct 11, 2023
 <!---
 Packaged by Ales Novak <ales.novak@sentinelone.com> on Oct 11, 2023 00:00 -0800
 --->
