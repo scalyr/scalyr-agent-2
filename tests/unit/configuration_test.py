@@ -635,6 +635,29 @@ class TestConfiguration(TestConfigurationBase):
         self.assertEqual("http://rick.com", config.monitor_configs[0].get("secure_url"))
         self.assertEqual("https://morty.com", config.monitor_configs[0].get("insecure_url"))
 
+    def test_allow_http_monitors_force_https_http_env(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            scalyr_server: "http://agent.scalyr.com",
+            monitors: [
+                {
+                    module: "tests.unit.test_monitor",
+                    secure_url: "http://rick.com",
+                    insecure_url: "http://morty.com"
+                }
+            ]
+          }
+        """
+        )
+
+        os.environ["SCALYR_ALLOW_HTTP_MONITORS"] = "false"
+
+        config = self._create_test_configuration_instance()
+        config.parse()
+        self.assertEqual("http://rick.com", config.monitor_configs[0].get("secure_url"))
+        self.assertEqual("https://morty.com", config.monitor_configs[0].get("insecure_url"))
+
     def test_allow_http_monitors_true(self):
         self._write_file_with_separator_conversion(
             """ {
