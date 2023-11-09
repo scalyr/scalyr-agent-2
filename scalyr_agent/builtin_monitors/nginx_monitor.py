@@ -31,6 +31,7 @@ define_config_option(
     "Always `scalyr_agent.builtin_monitors.nginx_monitor`",
     convert_to=six.text_type,
     required_option=True,
+    insecure_http_url=True
 )
 define_config_option(
     __monitor__,

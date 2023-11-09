@@ -614,6 +614,68 @@ class TestConfiguration(TestConfigurationBase):
         config.parse()
         self.assertEqual("http://agent.scalyr.com", config.scalyr_server)
 
+    def test_allow_http_monitors_force_https_http(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            allow_http_monitors: "false",
+            scalyr_server: "http://agent.scalyr.com",
+            monitors: [
+                {
+                    module: "tests.unit.test_monitor",
+                    secure_url: "http://rick.com",
+                    insecure_url: "http://morty.com"
+                }
+            ]
+          }
+        """
+        )
+        config = self._create_test_configuration_instance()
+        config.parse()
+        self.assertEqual("http://rick.com", config.monitor_configs[0].get("secure_url"))
+        self.assertEqual("https://morty.com", config.monitor_configs[0].get("insecure_url"))
+
+    def test_allow_http_monitors_true(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            allow_http_monitors: "true",
+            scalyr_server: "http://agent.scalyr.com",
+            monitors: [
+                {
+                    module: "tests.unit.test_monitor",
+                    secure_url: "http://rick.com",
+                    insecure_url: "http://morty.com"
+                }
+            ]
+          }
+        """
+        )
+        config = self._create_test_configuration_instance()
+        config.parse()
+        self.assertEqual("http://rick.com", config.monitor_configs[0].get("secure_url"))
+        self.assertEqual("http://morty.com", config.monitor_configs[0].get("insecure_url"))
+
+    def test_allow_http_monitors_default(self):
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            scalyr_server: "http://agent.scalyr.com",
+            monitors: [
+                {
+                    module: "tests.unit.test_monitor",
+                    secure_url: "http://rick.com",
+                    insecure_url: "http://morty.com"
+                }
+            ]
+          }
+        """
+        )
+        config = self._create_test_configuration_instance()
+        config.parse()
+        self.assertEqual("http://rick.com", config.monitor_configs[0].get("secure_url"))
+        self.assertEqual("http://morty.com", config.monitor_configs[0].get("insecure_url"))
+
     def test_non_string_value(self):
         self._write_file_with_separator_conversion(
             """ {
