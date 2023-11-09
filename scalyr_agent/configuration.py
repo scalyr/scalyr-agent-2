@@ -523,12 +523,6 @@ class Configuration(object):
                 monitor_config[name] = ensure_https_url(value)
         return monitor_config
 
-        # from scalyr_agent.builtin_monitors import unsecure_http_config_fields
-        # for field in unsecure_http_config_fields:
-        #     if field in monitor_config:
-        #         monitor_config[field] = ensure_https_url(monitor_config[field])
-
-
     def __verify_workers(self):
         """
         Verify all worker config entries from the "workers" list in config.
