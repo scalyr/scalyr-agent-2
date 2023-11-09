@@ -632,7 +632,7 @@ jobs:
           K8S_NODE_NAME: "${{ env.K8S_NODE_NAME }}"
           K8S_CLUSTER_NAME: "${{ env.K8S_CLUSTER_NAME }}"
         run: |
-          export RETRY_ATTEMPTS="14"
+          export RETRY_ATTEMPTS="30"
           export SLEEP_DELAY="10"
 
           # Verify agent is running
