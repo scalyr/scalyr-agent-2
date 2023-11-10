@@ -592,6 +592,7 @@ class SyslogUDPHandler(six.moves.socketserver.BaseRequestHandler):
         else:
             six.moves.socketserver.BaseRequestHandler.__init__(self, request, client_address, server)
 
+    @staticmethod
     def factory_method(request_processing_executor):
         def create_handler(request, client_address, server):
             return SyslogUDPHandler(request_processing_executor, request, client_address, server)
@@ -641,7 +642,9 @@ class SyslogRequest(object):
             if not data:
                 self.is_closed = True
                 raise SocketClosed()
-        except (socket.timeout, *NON_BLOCKING_SOCKET_DATA_NOT_READY_EXCEPTIONS) as e:
+        except socket.timeout as e:
+            raise SocketNotReadyException(e)
+        except NON_BLOCKING_SOCKET_DATA_NOT_READY_EXCEPTIONS as e:
             raise SocketNotReadyException(e)
         except socket.error as e:
             if e.errno == errno.EAGAIN:
