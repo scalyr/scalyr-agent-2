@@ -1,4 +1,4 @@
-from socketserver import ThreadingMixIn
+from six.moves.socketserver import ThreadingMixIn
 
 
 class ExecutorMixIn(ThreadingMixIn):
