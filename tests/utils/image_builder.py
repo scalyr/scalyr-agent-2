@@ -186,7 +186,7 @@ class AgentImageBuilder(object):
         dockerfile_path.write_text(self.get_dockerfile_content())
         self._copy_to_build_context(build_context_path)
 
-        subprocess.check_call(
+        subprocess.check_output(
             [
                 "docker",
                 "build",

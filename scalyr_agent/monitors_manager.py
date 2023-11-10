@@ -216,7 +216,7 @@ class MonitorsManager(StoppableThread):
         start_time = time.time()
 
         log.info("Stopping shared thread pools")
-        ThreadPoolExecutorFactory.shutdown(wait=False, cancel_futures=True)
+        ThreadPoolExecutorFactory.shutdown(wait=False)
 
 
         for monitor in self.__running_monitors:
@@ -240,7 +240,7 @@ class MonitorsManager(StoppableThread):
                 except Exception:
                     log.exception("Failed to stop the metric log due to an exception")
 
-                ThreadPoolExecutorFactory.shutdown(wait=True, cancel_futures=False)
+                ThreadPoolExecutorFactory.shutdown(wait=True)
 
 
 

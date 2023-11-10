@@ -98,5 +98,5 @@ def test_syslog_python3(request):
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__)
-def test_syslog_python3(request):
-    _test(python_version="python3")
+def test_syslog_python2(request):
+    _test(python_version="python2")

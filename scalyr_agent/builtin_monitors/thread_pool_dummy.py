@@ -7,5 +7,5 @@ class ExecutorMixIn(ThreadingMixIn):
 
 class ThreadPoolExecutorFactory():
     @classmethod
-    def shutdown(cls, wait=True, cancel_futures=False):
+    def shutdown(cls, wait=True):
         pass

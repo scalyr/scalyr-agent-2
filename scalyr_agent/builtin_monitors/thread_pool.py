@@ -76,11 +76,11 @@ class ThreadPoolExecutorFactory():
         return cls.__instances[name]
 
     @classmethod
-    def shutdown(cls, wait=True, cancel_futures=False):
+    def shutdown(cls, wait=True):
         wait_on_futures_str = " and waiting on futures" if wait else ""
         for name, executor in cls.__instances.items():
             global_log.info("Shutting down ThreadPoolExecutor%s: %s", wait_on_futures_str, name)
             try:
-                executor.shutdown(wait=wait, cancel_futures=cancel_futures)
+                executor.shutdown(wait=wait)
             except Exception as e:
                 global_log.error("Failed shutting down the ThreadPoolExecutor %s", executor, exc_info=e)

@@ -1314,6 +1314,7 @@ For help, contact us at [support@scalyr.com](mailto:support@scalyr.com).
                 "Error establishing database connection: %s" % (six.text_type(e)),
                 limit_once_per_x_secs=300,
                 limit_key="mysql_connect_to_db",
+                exc_info=e
             )
 
     def gather_sample(self):
