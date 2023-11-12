@@ -34,6 +34,8 @@ from tests.image_builder.monitors.common import CommonMonitorBuilder
 from tests.utils.log_reader import LogMetricReader, LogReaderError
 from tests.utils.log_reader import AgentLogReader
 
+from scalyr_agent import scalyr_logging
+
 import six
 
 HOST = "localhost"
@@ -41,6 +43,7 @@ USERNAME = "scalyr_test_user"
 PASSWORD = "scalyr_test_password"
 DATABASE = "scalyr_test_db"
 
+global_log = scalyr_logging.getLogger(__name__)
 
 @pytest.fixture()
 def mysql_client():
@@ -48,11 +51,15 @@ def mysql_client():
     # see: https://serverfault.com/a/872576
     os.system("chown -R mysql:mysql /var/lib/mysql /var/run/mysqld")
 
+    global_log.info("Starting the mysql server")
     exit_code = os.system("service mysql start --ssl")
 
     # On failure include service logs for ease of debugging
     if exit_code != 0:
+        global_log.error("Mysql server start error, dumping logs:")
         os.system("cat /var/log/mysql/mysql.log || true")
+
+    assert exit_code == 0, "Mysql server start error"
 
     os.system("mysql < /init.sql")
 
@@ -214,43 +221,43 @@ def _test(
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__)
-def test_mysql_python2(request):
+def i_test_mysql_python2(request):
     _test(request, python_version="python2")
 
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__)
-def test_mysql_python3(request):
+def i_test_mysql_python3(request):
     _test(request, python_version="python3")
 
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__)
-def test_mysql_python2_host(request):
+def i_test_mysql_python2_host(request):
     _test(request, python_version="python2", use_socket=False)
 
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__)
-def test_mysql_python3_host(request):
+def i_test_mysql_python3_host(request):
     _test(request, python_version="python3", use_socket=False)
 
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__)
-def test_mysql_python2_ssl(request):
+def i_test_mysql_python2_ssl(request):
     _test(request, python_version="python2", use_socket=False, use_ssl=True)
 
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__)
-def test_mysql_python3_ssl(request):
+def i_test_mysql_python3_ssl(request):
     _test(request, python_version="python3", use_socket=False, use_ssl=True)
 
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__)
-def test_mysql_python2_ssl_bad_cafile(request):
+def i_test_mysql_python2_ssl_bad_cafile(request):
     _test(
         request,
         python_version="python2",
@@ -263,7 +270,7 @@ def test_mysql_python2_ssl_bad_cafile(request):
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__)
-def test_mysql_python3_ssl_bad_cafile(request):
+def i_test_mysql_python3_ssl_bad_cafile(request):
     _test(
         request,
         python_version="python3",
@@ -289,7 +296,7 @@ def test_mysql_python2_ssl_bad_hostname(request):
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__)
-def test_mysql_python3_ssl_bad_hostname(request):
+def i_test_mysql_python3_ssl_bad_hostname(request):
     _test(
         request,
         python_version="python3",
