@@ -25,13 +25,14 @@ import docker
 
 from tests.utils.compat import Path
 
-from scalyr_agent import compat
+from scalyr_agent import compat, scalyr_logging
 
 DEFAULT_FILE_PATHS_TO_COPY = [
     "/var/log/scalyr-agent-2/agent.log",
     "/root/scalyr-agent-dev/log/agent.log",
 ]
 
+global_log = scalyr_logging.getLogger(__name__)
 
 def dockerized_case(
     builder_cls,
@@ -133,7 +134,8 @@ def dockerized_case(
             exit_code = container.wait()["StatusCode"]
 
             logs = six.ensure_text(container.logs(follow=True))
-            print(logs)
+            global_log.info("Container logs")
+            global_log.info(logs)
 
             # save logs if artifacts path is specified.
             artifacts_path = request.config.getoption("--artifacts-path", None)
@@ -157,7 +159,7 @@ def dockerized_case(
 
             if remove_container:
                 container.remove(force=True)
-                print("Container '{0}' removed.".format(builder.image_tag))
+                global_log.info("Container '{0}' removed.".format(builder.image_tag))
 
             # raise failed assertion, due to non-zero result from container.
             if exit_code:
