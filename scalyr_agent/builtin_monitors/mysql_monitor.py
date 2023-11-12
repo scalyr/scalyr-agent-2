@@ -459,7 +459,7 @@ class MysqlDB(object):
             self._cursor = None
             self._logger.error("Database connect failed: %s" % me)
         except Exception as ex:
-            self._logger.error("Exception trying to connect occured:  %s" % ex)
+            self._logger.error("Exception trying to connect occured:  %s" % ex, exc_info=ex)
             raise Exception("Exception trying to connect:  %s" % ex)
 
     def _close(self):

@@ -118,7 +118,6 @@ class MysqlAgentRunner(AgentRunner):
 class MySqlLogReader(LogMetricReader):
     LINE_PATTERN = r"\s*(?P<timestamp>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}.\d+Z)\s\[mysql_monitor\((?P<instance_id>[^\]]+)\)\]\s(?P<metric_name>[^\s]+)\s(?P<metric_value>.+)"
 
-
 def _test(
     request,
     python_version,
@@ -212,11 +211,14 @@ def _test(
 
         agent_log_reader.go_to_end()
     except LogReaderError as e:
-        if not expected_exception or (
-            expected_exception not in str(e)
-            and not re.search(expected_exception, str(e))
-        ):
-            raise e
+        if not expected_exception:
+            msg = "AssertionError, not exception expected, got: " + str(e)
+            global_log.error(msg, exc_info=e)
+            raise AssertionError(msg)
+        if expected_exception not in str(e)and not re.search(expected_exception, str(e)):
+            msg = "Assertion error, expected: " + str(expected_exception) + "got exception: " + str(e)
+            global_log.error(msg, exc_info=e)
+            raise AssertionError(msg)
 
 
 @pytest.mark.usefixtures("agent_environment")
