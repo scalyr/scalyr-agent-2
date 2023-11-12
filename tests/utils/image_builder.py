@@ -36,6 +36,9 @@ from scalyr_agent.__scalyr__ import get_package_root
 from tests.utils.common import create_tmp_directory
 from tests.utils.compat import Path
 
+from scalyr_agent import scalyr_logging
+
+global_log = scalyr_logging.getLogger(__name__)
 
 def _copy_agent_source(src_path, dest_path):
     gitignore_path = src_path / ".gitignore"
@@ -186,8 +189,7 @@ class AgentImageBuilder(object):
         dockerfile_path.write_text(self.get_dockerfile_content())
         self._copy_to_build_context(build_context_path)
 
-        subprocess.check_output(
-            [
+        cmd = [
                 "docker",
                 "build",
                 "-t",
@@ -197,6 +199,11 @@ class AgentImageBuilder(object):
                 "--rm",
                 six.text_type(build_context_path),
             ]
+
+        global_log.info(" ".join(cmd))
+
+        subprocess.check_output(
+            cmd
         )
 
         shutil.rmtree(six.text_type(build_context_path), ignore_errors=True)
