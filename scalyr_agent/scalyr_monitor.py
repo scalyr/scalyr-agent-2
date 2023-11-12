@@ -591,7 +591,7 @@ def define_config_option(
     default=None,
     env_aware=False,
     env_name=None,
-    insecure_http_url=False,
+    allow_http=True,
 ):
     """Defines a configuration option for the specified monitor.
 
@@ -632,7 +632,7 @@ def define_config_option(
     option.default = default
     option.env_aware = env_aware
     option.env_name = env_name
-    option.insecure_http_url = insecure_http_url
+    option.allow_http = allow_http
 
 
     MonitorInformation.set_monitor_info(monitor_module, option=option)
@@ -901,7 +901,7 @@ class ConfigOption(object):
         # Customer environment variable name (instead of SCALYR_<option_name>
         self.env_name = None
         # Marks a possibly unsecure HTTP url
-        self.insecure_http_url = False
+        self.allow_http = True
 
     def __repr__(self):
         return "%s %s %s" % (self.option_name, self.env_aware, self.env_name)

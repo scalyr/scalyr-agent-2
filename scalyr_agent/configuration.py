@@ -515,12 +515,12 @@ class Configuration(object):
 
     @staticmethod
     def force_http_monitor_config(monitor_config):
-        # Loads a monitor module, checks for options marked as insecure_http_url and forces https scheme there.
+        # Loads a monitor module, checks for options marked as allow_http=False and forces https scheme there.
         __import__(monitor_config["module"])
         monitor_info = MonitorInformation.get_monitor_info(monitor_config["module"])
         for name, value in monitor_config.iteritems():
             monitor_config_option = monitor_info.config_option(name)
-            if monitor_config_option and monitor_config_option.insecure_http_url:
+            if monitor_config_option and not monitor_config_option.allow_http:
                 monitor_config[name] = ensure_https_url(value)
         return monitor_config
 

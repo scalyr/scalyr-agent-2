@@ -129,7 +129,7 @@ define_config_option(
     "url",
     "URL to the OpenMetrics / Prometheus API endpoint (e.g. https://my.host:8080/metrics).",
     convert_to=six.text_type,
-    insecure_http_url=True
+    allow_http=False
 )
 
 define_config_option(

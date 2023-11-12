@@ -254,7 +254,7 @@ define_config_option(
     convert_to=six.text_type,
     default="https://${host_ip}:10250",
     env_aware=True,
-    insecure_http_url=True
+    allow_http=False
 )
 
 # Monitor specific options

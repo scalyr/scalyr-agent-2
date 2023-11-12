@@ -58,7 +58,7 @@ define_config_option(
     "url",
     "URL for the request. Must be HTTP or HTTPS.",
     required_option=True,
-    insecure_http_url=True
+    allow_http=False
 )
 define_config_option(
     __monitor__,

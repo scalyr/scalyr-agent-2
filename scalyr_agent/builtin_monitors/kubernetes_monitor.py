@@ -291,7 +291,7 @@ define_config_option(
     "DEPRECATED.",
     convert_to=six.text_type,
     default="https://kubernetes.default",
-    insecure_http_url=True
+    allow_http=False
 )
 
 define_config_option(
@@ -419,7 +419,7 @@ define_config_option(
     convert_to=six.text_type,
     default="https://${host_ip}:10250",
     env_aware=True,
-    insecure_http_url=True
+    allow_http=False
 )
 
 define_config_option(

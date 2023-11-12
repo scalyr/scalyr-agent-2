@@ -49,7 +49,7 @@ define_config_option(
     "Considered insecure",
     convert_to=six.text_type,
     required_option=True,
-    insecure_http_url=True
+    allow_http=True
 )
 
 class TestMonitor(ScalyrMonitor):

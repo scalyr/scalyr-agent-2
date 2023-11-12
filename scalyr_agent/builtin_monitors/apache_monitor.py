@@ -49,7 +49,7 @@ define_config_option(
     "number, at which the Apache status module is served. The URL should end in `/?auto` to "
     "indicate that the machine-readable version of the page should be returned.",
     default="http://localhost/server-status/?auto",
-    insecure_http_url=True
+    allow_http=False
 )
 define_config_option(
     __monitor__,
