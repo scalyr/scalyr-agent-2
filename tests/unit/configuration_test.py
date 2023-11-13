@@ -636,11 +636,6 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         self.assertRaises(BadConfiguration, config.parse)
 
-    def test_x(self):
-        import threading
-        print(threading.current_thread().name)
-        print(threading.current_thread().name)
-
     def test_non_string_attribute_values(self):
         self._write_file_with_separator_conversion(
             """ {
