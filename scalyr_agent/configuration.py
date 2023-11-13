@@ -21,6 +21,8 @@ from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
+from scalyr_agent.scalyr_monitor import MonitorInformation
+
 if False:
     from typing import Tuple
     from typing import Dict
@@ -76,6 +78,19 @@ MASKED_CONFIG_ITEM_VALUE = "********** MASKED **********"
 # prefix for the worker session log file name.
 AGENT_WORKER_SESSION_LOG_NAME_PREFIX = "agent-worker-session-"
 
+
+def ensure_https_url(server):
+    parts = six.moves.urllib.parse.urlparse(server)
+
+    # use index-based addressing for 2.4 compatibility
+    scheme = parts[0]
+
+    if not scheme:
+        return "https://" + server
+    elif scheme == "http":
+        return re.sub("^http://", "https://", server)
+    else:
+        return server
 
 class Configuration(object):
     """Encapsulates the results of a single read of the configuration file.
@@ -302,17 +317,8 @@ class Configuration(object):
             # force https unless otherwise instructed not to
             if not self.__config["allow_http"]:
                 server = self.__config["scalyr_server"].strip()
-                https_server = server
 
-                parts = six.moves.urllib.parse.urlparse(server)
-
-                # use index-based addressing for 2.4 compatibility
-                scheme = parts[0]
-
-                if not scheme:
-                    https_server = "https://" + server
-                elif scheme == "http":
-                    https_server = re.sub("^http://", "https://", server)
+                https_server = ensure_https_url(server)
 
                 if https_server != server:
                     self.__config["scalyr_server"] = https_server
@@ -484,7 +490,7 @@ class Configuration(object):
                 )
                 self.__log_configs.append(profile_config)
 
-            self.__monitor_configs = list(self.__config.get_json_array("monitors"))
+            self.__monitor_configs = self.__get_monitors_config()
 
             # Perform validation for k8s_logs option
             self._check_k8s_logs_config_option_and_warn()
@@ -498,6 +504,25 @@ class Configuration(object):
         except BadConfiguration as e:
             self.__last_error = e
             raise e
+
+    def __get_monitors_config(self):
+        monitors_config = list(self.__config.get_json_array("monitors"))
+        if not self.allow_http_monitors:
+            return list(map(
+                    self.force_http_monitor_config, monitors_config
+            ))
+        return monitors_config
+
+    @staticmethod
+    def force_http_monitor_config(monitor_config):
+        # Loads a monitor module, checks for options marked as allow_http=False and forces https scheme there.
+        __import__(monitor_config["module"])
+        monitor_info = MonitorInformation.get_monitor_info(monitor_config["module"])
+        for name, value in monitor_config.iteritems():
+            monitor_config_option = monitor_info.config_option(name)
+            if monitor_config_option and not monitor_config_option.allow_http:
+                monitor_config[name] = ensure_https_url(value)
+        return monitor_config
 
     def __verify_workers(self):
         """
@@ -979,6 +1004,10 @@ class Configuration(object):
         )
 
         return monitor_config
+
+    @property
+    def allow_http_monitors(self):
+        return self.__get_config().get_bool("allow_http_monitors")
 
     # k8s cache options
     @property
@@ -2232,6 +2261,9 @@ class Configuration(object):
         )
         self.__verify_or_set_optional_bool(
             config, "allow_http", False, description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_bool(
+            config, "allow_http_monitors", True, description, apply_defaults, env_aware=True
         )
         self.__verify_or_set_optional_bool(
             config,
