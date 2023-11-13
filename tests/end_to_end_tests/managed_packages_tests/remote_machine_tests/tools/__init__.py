@@ -73,6 +73,8 @@ def download_stable_packages(
 
     output_dir.mkdir(parents=True, exist_ok=True)
     agent_package_path = output_dir / file_name
+    if agent_package_path.exists():
+        raise Exception("While downloading a stable package, found an existing one: " + str(agent_package_path))
     with requests.Session() as s:
         resp = s.get(url=package_url)
         resp.raise_for_status()
