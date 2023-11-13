@@ -89,7 +89,7 @@ def test_packages(
 
     logger.info("Install agent from install script.")
     with open(convenience_script_path, "r") as fd:
-        loggger.info(fd.read())
+        logger.info(fd.read())
     _install_from_convenience_script(
         script_path=convenience_script_path,
         target_distro=target_distro,
