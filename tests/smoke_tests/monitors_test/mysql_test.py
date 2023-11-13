@@ -223,43 +223,43 @@ def _test(
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__)
-def i_test_mysql_python2(request):
+def test_mysql_python2(request):
     _test(request, python_version="python2")
 
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__)
-def i_test_mysql_python3(request):
+def test_mysql_python3(request):
     _test(request, python_version="python3")
 
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__)
-def i_test_mysql_python2_host(request):
+def test_mysql_python2_host(request):
     _test(request, python_version="python2", use_socket=False)
 
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__)
-def i_test_mysql_python3_host(request):
+def test_mysql_python3_host(request):
     _test(request, python_version="python3", use_socket=False)
 
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__)
-def i_test_mysql_python2_ssl(request):
+def test_mysql_python2_ssl(request):
     _test(request, python_version="python2", use_socket=False, use_ssl=True)
 
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__)
-def i_test_mysql_python3_ssl(request):
+def test_mysql_python3_ssl(request):
     _test(request, python_version="python3", use_socket=False, use_ssl=True)
 
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__)
-def i_test_mysql_python2_ssl_bad_cafile(request):
+def test_mysql_python2_ssl_bad_cafile(request):
     _test(
         request,
         python_version="python2",
@@ -272,7 +272,7 @@ def i_test_mysql_python2_ssl_bad_cafile(request):
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__)
-def i_test_mysql_python3_ssl_bad_cafile(request):
+def test_mysql_python3_ssl_bad_cafile(request):
     _test(
         request,
         python_version="python3",
