@@ -240,8 +240,6 @@ class MonitorsManager(StoppableThread):
                 except Exception:
                     log.exception("Failed to stop the metric log due to an exception")
 
-                ThreadPoolExecutorFactory.shutdown(wait=True)
-
 
 
         for monitor in self.__running_monitors:
