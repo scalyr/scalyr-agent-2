@@ -22,3 +22,4 @@ RUN DEBIANFRONTEND=noninteractive apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 ENV OPENSSL_CONF /etc/ssl/openssl.cnf.fips
+ENV SCALYR_ALLOW_HTTP_MONITORS false

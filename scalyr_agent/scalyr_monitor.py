@@ -591,6 +591,7 @@ def define_config_option(
     default=None,
     env_aware=False,
     env_name=None,
+    allow_http=True,
 ):
     """Defines a configuration option for the specified monitor.
 
@@ -631,6 +632,8 @@ def define_config_option(
     option.default = default
     option.env_aware = env_aware
     option.env_name = env_name
+    option.allow_http = allow_http
+
 
     MonitorInformation.set_monitor_info(monitor_module, option=option)
     return None
@@ -751,6 +754,17 @@ class MonitorInformation(object):
         return sorted(
             six.itervalues(self.__options), key=self.__get_insert_sort_position
         )
+
+    def config_option(self, name):
+        """Returns the configuration option with the specified name.
+
+        @param name: The name of the option
+        @type name: ConfigOption
+
+        @return: The option or None if not found
+        @rtype: ConfigOption
+        """
+        return self.__options.get(name)
 
     @property
     def metrics(self):
@@ -886,6 +900,8 @@ class ConfigOption(object):
         self.env_aware = False
         # Customer environment variable name (instead of SCALYR_<option_name>
         self.env_name = None
+        # Marks a possibly unsecure HTTP url
+        self.allow_http = True
 
     def __repr__(self):
         return "%s %s %s" % (self.option_name, self.env_aware, self.env_name)
