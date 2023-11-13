@@ -180,7 +180,7 @@ jobs:
           rm -rf artifacts test-results .coverage
           mkdir -p artifacts test-results
           ARTIFACTS_DIR=$(mktemp -d)
-          tox -e agent_monitors_ubuntu -- --artifacts-path artifacts -n 2 --junitxml=test-results/junit-1.xml --artifacts-path $ARTIFACTS_DIR || { ec=$?; echo Tests failed, dumping agent log:; cat $ARTIFACTS_DIR/*/agent.log; exit $ec }
+          tox -e agent_monitors_ubuntu -- --artifacts-path artifacts -n 2 --junitxml=test-results/junit-1.xml
         env:
           SCALYR_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
           READ_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
