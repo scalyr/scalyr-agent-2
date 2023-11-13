@@ -292,13 +292,13 @@ def test_mysql_python2_ssl_bad_hostname(request):
         use_socket=False,
         use_ssl=True,
         ca_file="/var/lib/mysql/ca.pem",
-        expected_exception=r"hostname '127.0.0.1' doesn't match 'MySQL_Server_5.7.\d+_Auto_Generated_Server_Certificate'",
+        expected_exception=r"hostname u'127.0.0.1' doesn't match u'MySQL_Server_5.7.\d+_Auto_Generated_Server_Certificate'",
     )
 
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__)
-def i_test_mysql_python3_ssl_bad_hostname(request):
+def test_mysql_python3_ssl_bad_hostname(request):
     _test(
         request,
         python_version="python3",
