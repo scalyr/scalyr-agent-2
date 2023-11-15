@@ -1133,7 +1133,7 @@ class SyslogUDPServer(
 
         ExecutorMixIn.__init__(self, global_config=global_config)
 
-        self.allow_reuse_address = False
+        self.allow_reuse_address = True
         six.moves.socketserver.UDPServer.__init__(self, address, SyslogUDPHandler.factory_method(self._request_processing_executor))
 
     def verify_request(self, request, client_address):
