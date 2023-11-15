@@ -27,16 +27,16 @@ global_log = scalyr_logging.getLogger(__name__)
 class ExecutorMixIn:
     def __init__(self, global_config):
         # Using 4 threads for processing requests, because of GIL and CPU bound tasks higher number would not help process the data faster.
-        reading_threads = 4
+        processing_threads = 4
         # Let the ThreadPoolExecutor decide how many threads to use based the numbre of logical CPUs
-        processing_threads = None
+        reading_threads = None
 
         if global_config:
             reading_threads = global_config.syslog_socket_thread_count
             processing_threads = global_config.syslog_processing_thread_count
 
-        self._request_reading_executor = ThreadPoolExecutorFactory.get_singleton("request_reading_executor", max_workers=reading_threads)
-        self._request_processing_executor = ThreadPoolExecutorFactory.get_singleton("request_processing_executor", max_workers=processing_threads)
+        self._request_reading_executor = ThreadPoolExecutor(max_workers=reading_threads)
+        self._request_processing_executor = ThreadPoolExecutor(max_workers=processing_threads)
 
     def process_request_thread(self, request, client_address):
         """Same as in BaseServer but as a thread.
@@ -61,6 +61,8 @@ class ExecutorMixIn:
         )
 
     def server_close(self):
+        self._request_reading_executor.shutdown(wait=False)
+        self._request_processing_executor.shutdown(wait=False)
         super().server_close()
 
 class ThreadPoolExecutorFactory():

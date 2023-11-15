@@ -721,7 +721,7 @@ class PosixPlatformController(PlatformController):
         # Try killing the daemon process
         try:
             # Do 5 seconds worth of TERM signals.  If that doesn't work, KILL it.
-            term_attempts = 50
+            term_attempts = 500
             while term_attempts > 0:
                 os.kill(pid, signal.SIGTERM)
                 PosixPlatformController.__sleep(0.1)
