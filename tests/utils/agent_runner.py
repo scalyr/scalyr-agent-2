@@ -218,6 +218,8 @@ class AgentRunner(object):
             if self._enable_coverage:
                 # NOTE: We need to pass in command string as a single argument to coverage run
                 args = [
+                    executable,
+                    "-m",
                     "coverage",
                     "run",
                     "--branch",
