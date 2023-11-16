@@ -26,8 +26,6 @@ from __future__ import absolute_import
 from __future__ import print_function
 
 import queue
-from concurrent.futures import ThreadPoolExecutor, CancelledError
-from socketserver import ThreadingMixIn
 
 from scalyr_agent import compat
 
