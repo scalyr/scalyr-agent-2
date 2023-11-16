@@ -26,6 +26,8 @@ from __future__ import absolute_import
 from __future__ import print_function
 
 import queue
+from concurrent.futures import ThreadPoolExecutor, CancelledError
+from socketserver import ThreadingMixIn
 
 from scalyr_agent import compat
 
@@ -1095,6 +1097,7 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
                             global_log.info("ThreadPool shutting down, skipping further request processing.")
                             break
                         self.__request_data_process(syslog_parser, data)
+                        queue.task_done()
                         data = queue.get(block=True)
 
                 self.__request_processing_executor.submit(worker, work_queue, lambda: self.__request_processing_executor._shutdown)
