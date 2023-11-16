@@ -215,10 +215,6 @@ class MonitorsManager(StoppableThread):
 
         start_time = time.time()
 
-        log.info("Stopping shared thread pools")
-        ThreadPoolExecutorFactory.shutdown(wait=False)
-
-
         for monitor in self.__running_monitors:
             # noinspection PyBroadException
             try:
@@ -239,7 +235,6 @@ class MonitorsManager(StoppableThread):
                     monitor.stop(join_timeout=max_wait)
                 except Exception:
                     log.exception("Failed to stop the metric log due to an exception")
-
 
 
         for monitor in self.__running_monitors:
