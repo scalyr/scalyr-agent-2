@@ -34,6 +34,8 @@ from tests.image_builder.monitors.common import CommonMonitorBuilder
 from tests.utils.log_reader import LogMetricReader, LogReaderError
 from tests.utils.log_reader import AgentLogReader
 
+from scalyr_agent import scalyr_logging
+
 import six
 
 HOST = "localhost"
@@ -41,6 +43,7 @@ USERNAME = "scalyr_test_user"
 PASSWORD = "scalyr_test_password"
 DATABASE = "scalyr_test_db"
 
+global_log = scalyr_logging.getLogger(__name__)
 
 @pytest.fixture()
 def mysql_client():
@@ -48,11 +51,15 @@ def mysql_client():
     # see: https://serverfault.com/a/872576
     os.system("chown -R mysql:mysql /var/lib/mysql /var/run/mysqld")
 
+    global_log.info("Starting the mysql server")
     exit_code = os.system("service mysql start --ssl")
 
     # On failure include service logs for ease of debugging
     if exit_code != 0:
+        global_log.error("Mysql server start error, dumping logs:")
         os.system("cat /var/log/mysql/mysql.log || true")
+
+    assert exit_code == 0, "Mysql server start error"
 
     os.system("mysql < /init.sql")
 
@@ -110,7 +117,6 @@ class MysqlAgentRunner(AgentRunner):
 
 class MySqlLogReader(LogMetricReader):
     LINE_PATTERN = r"\s*(?P<timestamp>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}.\d+Z)\s\[mysql_monitor\((?P<instance_id>[^\]]+)\)\]\s(?P<metric_name>[^\s]+)\s(?P<metric_value>.+)"
-
 
 def _test(
     request,
@@ -205,11 +211,14 @@ def _test(
 
         agent_log_reader.go_to_end()
     except LogReaderError as e:
-        if not expected_exception or (
-            expected_exception not in str(e)
-            and not re.search(expected_exception, str(e))
-        ):
-            raise e
+        if not expected_exception:
+            msg = "AssertionError, not exception expected, got: " + str(e)
+            global_log.error(msg, exc_info=e)
+            raise AssertionError(msg)
+        if expected_exception not in str(e)and not re.search(expected_exception, str(e)):
+            msg = "Assertion error, expected: " + str(expected_exception) + "got exception: " + str(e)
+            global_log.error(msg, exc_info=e)
+            raise AssertionError(msg)
 
 
 @pytest.mark.usefixtures("agent_environment")
@@ -283,7 +292,7 @@ def test_mysql_python2_ssl_bad_hostname(request):
         use_socket=False,
         use_ssl=True,
         ca_file="/var/lib/mysql/ca.pem",
-        expected_exception=r"hostname '127.0.0.1' doesn't match 'MySQL_Server_5.7.\d+_Auto_Generated_Server_Certificate'",
+        expected_exception=r"hostname u'127.0.0.1' doesn't match u'MySQL_Server_5.7.\d+_Auto_Generated_Server_Certificate'",
     )
 
 

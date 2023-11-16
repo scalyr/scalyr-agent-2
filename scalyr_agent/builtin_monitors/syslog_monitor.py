@@ -26,8 +26,6 @@ from __future__ import absolute_import
 from __future__ import print_function
 
 import queue
-from concurrent.futures import ThreadPoolExecutor, CancelledError
-from socketserver import ThreadingMixIn
 
 from scalyr_agent import compat
 
@@ -56,7 +54,10 @@ import six
 from six.moves import range
 import six.moves.socketserver
 
-from scalyr_agent.builtin_monitors.thread_pool import ExecutorMixIn
+if six.PY2:
+    from scalyr_agent.builtin_monitors.thread_pool_dummy import ExecutorMixIn
+else:
+    from scalyr_agent.builtin_monitors.thread_pool import ExecutorMixIn
 
 try:
     # Only available for python >= 3.6
@@ -591,6 +592,7 @@ class SyslogUDPHandler(six.moves.socketserver.BaseRequestHandler):
         else:
             six.moves.socketserver.BaseRequestHandler.__init__(self, request, client_address, server)
 
+    @staticmethod
     def factory_method(request_processing_executor):
         def create_handler(request, client_address, server):
             return SyslogUDPHandler(request_processing_executor, request, client_address, server)
@@ -606,9 +608,13 @@ class SyslogUDPHandler(six.moves.socketserver.BaseRequestHandler):
             "destport": self.server.server_address[1],
         }
 
-        self.__request_processing_executor.submit(
-            self.server.syslog_handler.handle, data, extra
-        )
+        if self.__request_processing_executor:
+            self.__request_processing_executor.submit(
+                self.server.syslog_handler.handle, data, extra
+            )
+        else:
+            self.server.syslog_handler.handle(data, extra)
+
 
 
 class SocketNotReadyException(Exception):
@@ -636,7 +642,9 @@ class SyslogRequest(object):
             if not data:
                 self.is_closed = True
                 raise SocketClosed()
-        except (socket.timeout, *NON_BLOCKING_SOCKET_DATA_NOT_READY_EXCEPTIONS) as e:
+        except socket.timeout as e:
+            raise SocketNotReadyException(e)
+        except NON_BLOCKING_SOCKET_DATA_NOT_READY_EXCEPTIONS as e:
             raise SocketNotReadyException(e)
         except socket.error as e:
             if e.errno == errno.EAGAIN:
@@ -980,8 +988,6 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
 
     def __init__(self, *args, **kwargs):
         self.__request_processing_executor = kwargs.pop("request_processing_executor", None)
-        if not self.__request_processing_executor:
-            raise ValueError("request_processing_executor is required")
 
         self.request_parser = kwargs.pop("request_parser", "default")
         self.incomplete_frame_timeout = kwargs.pop("incomplete_frame_timeout", None)
@@ -1077,25 +1083,30 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
         )
 
         try:
-            # Worker is responsible for processing the data read from one request.
-            # Using the queue ensures the data is processed in the order it was read.
-            DONE = "DONE"
-            work_queue = queue.Queue()
-            def worker(queue, is_shutdown):
-                data = queue.get(block=True)
-                while data != DONE:
-                    if is_shutdown():
-                        global_log.info("ThreadPool shutting down, skipping further request processing.")
-                        break
-                    self.__request_data_process(syslog_parser, data)
+            if self.__request_processing_executor:
+                # Worker is responsible for processing the data read from one request.
+                # Using the queue ensures the data is processed in the order it was read.
+                DONE = "DONE"
+                work_queue = queue.Queue()
+                def worker(queue, is_shutdown):
                     data = queue.get(block=True)
+                    while data != DONE:
+                        if is_shutdown():
+                            global_log.info("ThreadPool shutting down, skipping further request processing.")
+                            break
+                        self.__request_data_process(syslog_parser, data)
+                        data = queue.get(block=True)
 
-            self.__request_processing_executor.submit(worker, work_queue, lambda: self.__request_processing_executor._shutdown)
+                self.__request_processing_executor.submit(worker, work_queue, lambda: self.__request_processing_executor._shutdown)
 
-            for data in self.__request_stream_read(syslog_request, self.server.is_running):
-                work_queue.put(data)
+                for data in self.__request_stream_read(syslog_request, self.server.is_running):
+                    work_queue.put(data)
 
-            work_queue.put(DONE)
+                work_queue.put(DONE)
+            else:
+                for data in self.__request_stream_read(syslog_request, self.server.is_running):
+                    self.__request_data_process(syslog_parser, data)
+
 
         except Exception as e:
             global_log.warning(
