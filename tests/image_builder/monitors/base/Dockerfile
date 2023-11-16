@@ -2,10 +2,7 @@ FROM ubuntu:18.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt update -y
-RUN apt install -y mysql-server
-RUN apt install -y postgresql
-RUN apt install -y git
-
+RUN apt install -y mysql-server postgresql git
 
 USER postgres
 RUN service postgresql start && createuser root && createdb root && psql -c "alter user root superuser;" && service postgresql stop
