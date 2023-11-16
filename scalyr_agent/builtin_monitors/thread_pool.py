@@ -64,25 +64,3 @@ class ExecutorMixIn:
         self._request_reading_executor.shutdown(wait=False)
         self._request_processing_executor.shutdown(wait=False)
         super().server_close()
-
-class ThreadPoolExecutorFactory():
-    __lock = threading.Lock()
-    __instances = {}
-
-    @classmethod
-    def get_singleton(cls, name, max_workers=None):
-        if name not in cls.__instances:
-            with cls.__lock:
-                if name not in cls.__instances:
-                    cls.__instances[name] = ThreadPoolExecutor(thread_name_prefix=name, max_workers=max_workers)
-        return cls.__instances[name]
-
-    @classmethod
-    def shutdown(cls, wait=True, cancel_futures=False):
-        wait_on_futures_str = " and waiting on futures" if wait else ""
-        for name, executor in cls.__instances.items():
-            global_log.info("Shutting down ThreadPoolExecutor%s: %s", wait_on_futures_str, name)
-            try:
-                executor.shutdown(wait=wait, cancel_futures=cancel_futures)
-            except Exception as e:
-                global_log.error("Failed shutting down the ThreadPoolExecutor %s", executor, exc_info=e)

@@ -39,13 +39,6 @@ import scalyr_agent.scalyr_logging as scalyr_logging
 
 import six
 
-if six.PY2:
-    from scalyr_agent.builtin_monitors.thread_pool_dummy import ThreadPoolExecutorFactory
-else:
-    from scalyr_agent.builtin_monitors.thread_pool import ThreadPoolExecutorFactory
-
-
-
 log = scalyr_logging.getLogger(__name__)
 
 # Holds reference to the currently active MonitorsManager instance (singleton). Reference to this
