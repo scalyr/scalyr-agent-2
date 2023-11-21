@@ -30,10 +30,12 @@ from agent_build_refactored.managed_packages.managed_packages_builders import (
     LinuxAIOPackagesBuilder,
     LinuxNonAIOPackageBuilder,
 )
+from scalyr_agent import scalyr_logging
 
 _STABLE_REPO_URL = "https://scalyr-repo.s3.amazonaws.com/stable"
 _PARENT_DIR = pl.Path(__file__).parent
 
+global_log = scalyr_logging.getLogger(__name__)
 
 def get_packages_stable_version(version: str = None):
 
@@ -74,12 +76,13 @@ def download_stable_packages(
     output_dir.mkdir(parents=True, exist_ok=True)
     agent_package_path = output_dir / file_name
     if agent_package_path.exists():
-        raise Exception("While downloading a stable package, found an existing one: " + str(agent_package_path))
-    with requests.Session() as s:
-        resp = s.get(url=package_url)
-        resp.raise_for_status()
+        global_log.info("While downloading a stable package, found an existing one, skipping: " + str(agent_package_path))
+    else:
+        with requests.Session() as s:
+            resp = s.get(url=package_url)
+            resp.raise_for_status()
 
-        agent_package_path.write_bytes(resp.content)
+            agent_package_path.write_bytes(resp.content)
 
 
 def create_packages_repo_root(
