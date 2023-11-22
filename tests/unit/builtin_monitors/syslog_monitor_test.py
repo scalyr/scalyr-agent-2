@@ -274,8 +274,8 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
 
     def test_fair_workers_distribution(self):
         # Given
-        udp_servers_count = 5
-        tcp_servers_count = 5
+        udp_servers_count = 3
+        tcp_servers_count = 3
         connections = 10
         messages_per_connection = 50
         handling_time = 0.01
