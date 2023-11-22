@@ -1,6 +1,19 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.2.8 "Marcus" - Nov 20, 2023
+<!---
+Packaged by Ales Novak <ales.novak@sentinelone.com> on Nov 20, 2023 00:00 -0800
+--->
+
+Features:
+* Added allow_http_monitors root configuration option. If true it forces monitors to use https instead of http where relevant. By default true for fips docker images, false otherwise.
+
+Bug fixes:
+* Tls certificate handling defect in 2.2.4 - https://github.com/scalyr/scalyr-agent-2/issues/1199
+* Python2 support fixed (broken with version 2.2.7)
+
+
 ## 2.2.7 "Zeratul" - Nov 6, 2023
 <!---
 Packaged by Ales Novak <ales.novak@sentinelone.com> on Nov 6, 2023 00:00 -0800
