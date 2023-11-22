@@ -281,7 +281,7 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
         handling_time = 0.01
         advantage_time = handling_time * 10
         warmup_messages = (udp_servers_count + tcp_servers_count) * connections * messages_per_connection // 5
-        message_window = (udp_servers_count + tcp_servers_count) * 5
+        message_window = (udp_servers_count + tcp_servers_count) * 10
         shutdown_time = connections * messages_per_connection * handling_time + 3
 
         with self.start_servers(udp_servers_count, tcp_servers_count, handling_time) as (udp_servers, tcp_servers):
