@@ -331,7 +331,6 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
 
             # Check that the workers are distributed evenly
             for start in range(warmup_messages, len(logged_port_sorted) - warmup_messages):
-                print(f"{start}-{start+message_window}: {len(set(logged_port_sorted[start:start+message_window]))}")
                 assert len(set(logged_port_sorted[start:start+message_window])) == len(udp_servers + tcp_servers)
 
 
