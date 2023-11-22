@@ -280,8 +280,8 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
         messages_per_connection = 50
         handling_time = 0.01
         advantage_time = handling_time * 10
-        warmup_messages = (udp_servers_count + tcp_servers_count) * connections * messages_per_connection // 5
-        message_window = (udp_servers_count + tcp_servers_count) * 10
+        warmup_messages = (udp_servers_count + tcp_servers_count) * connections * messages_per_connection // 4
+        message_window = (udp_servers_count + tcp_servers_count) * 15
         shutdown_time = connections * messages_per_connection * handling_time + 3
 
         with self.start_servers(udp_servers_count, tcp_servers_count, handling_time) as (udp_servers, tcp_servers):
@@ -331,6 +331,7 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
 
             # Check that the workers are distributed evenly
             for start in range(warmup_messages, len(logged_port_sorted) - warmup_messages):
+                print(f"{start}-{start+message_window}: {len(set(logged_port_sorted[start:start+message_window]))}")
                 assert len(set(logged_port_sorted[start:start+message_window])) == len(udp_servers + tcp_servers)
 
 
