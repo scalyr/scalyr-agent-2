@@ -35,8 +35,17 @@ class ExecutorMixIn:
             reading_threads = global_config.syslog_socket_thread_count
             processing_threads = global_config.syslog_processing_thread_count
 
-        self._request_reading_executor = ThreadPoolExecutor(max_workers=reading_threads)
-        self._request_processing_executor = ThreadPoolExecutor(max_workers=processing_threads)
+        self._request_reading_executor = ThreadPoolExecutor(max_workers=reading_threads, thread_name_prefix="request_reading_executor")
+        self._request_processing_executor = ThreadPoolExecutor(max_workers=processing_threads, thread_name_prefix="request_processing_executor")
+
+        # Since the older versions of python use daemon threads, we need to let the pool create the threads this constructor's thread.
+        self.__warmup_thread_pool(self._request_reading_executor)
+        self.__warmup_thread_pool(self._request_processing_executor)
+
+    def __warmup_thread_pool(self, thread_pool):
+        # Warmup the thread pool
+        for _ in range(thread_pool._max_workers):
+            thread_pool.submit(lambda: None)
 
     def process_request_thread(self, request, client_address):
         """Same as in BaseServer but as a thread.

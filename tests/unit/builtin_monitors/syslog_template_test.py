@@ -94,6 +94,10 @@ class ConfigurationMock(Configuration):
     def syslog_socket_thread_count(self):
         return 4
 
+    @property
+    def syslog_monitors_shutdown_grace_period(self):
+        return 5
+
 
 class LogWatcherMock(LogWatcher):
     def __init__(self):

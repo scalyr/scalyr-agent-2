@@ -988,6 +988,7 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
 
     def __init__(self, *args, **kwargs):
         self.__request_processing_executor = kwargs.pop("request_processing_executor", None)
+        self.__global_config = kwargs.pop("global_config", None)
 
         self.request_parser = kwargs.pop("request_parser", "default")
         self.incomplete_frame_timeout = kwargs.pop("incomplete_frame_timeout", None)
@@ -1088,15 +1089,24 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
                 # Using the queue ensures the data is processed in the order it was read.
                 DONE = "DONE"
                 work_queue = queue.Queue()
+                GRACE_PERIOD = self.__global_config.syslog_monitors_shutdown_grace_period if self.__global_config else 5
                 def worker(queue, is_shutdown):
-                    data = queue.get(block=True)
+                    data = None
+                    shutdown_started = None
                     while data != DONE:
                         if is_shutdown():
-                            global_log.info("ThreadPool shutting down, skipping further request processing.")
-                            break
-                        self.__request_data_process(syslog_parser, data)
-                        queue.task_done()
-                        data = queue.get(block=True)
+                            if shutdown_started is None:
+                                shutdown_started = time.time()
+                            elif time.time() - shutdown_started > GRACE_PERIOD:
+                                break
+                        if data is not None:
+                            self.__request_data_process(syslog_parser, data)
+                            queue.task_done()
+
+                        try:
+                            data = queue.get(block=True, timeout=0.1)
+                        except queue.Empty:
+                            data = None
 
                 self.__request_processing_executor.submit(worker, work_queue, lambda: self.__request_processing_executor._shutdown)
 
@@ -1180,6 +1190,7 @@ class SyslogTCPServer(
         handler_cls = functools.partial(
             SyslogTCPHandler,
             request_processing_executor=self._request_processing_executor,
+            global_config=global_config,
             request_parser=request_parser,
             incomplete_frame_timeout=incomplete_frame_timeout,
             message_delimiter=message_delimiter,
