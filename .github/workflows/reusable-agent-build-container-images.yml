@@ -652,7 +652,7 @@ jobs:
 
           # Kubernetes API cAdvisor metrics (static monitor)
           echo "Kubernetes API cAdvisor metrics monitor checks"
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'-kubernetes-api-cadvisor-metrics" "machine_cpu_cores 2"'
+          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'-kubernetes-api-cadvisor-metrics" "machine_cpu_cores '$(nproc --all)'"'
           MINIMUM_RESULTS=2 ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'-kubernetes-api-cadvisor-metrics" "container_cpu_load_average_10s "'
           # Verify locally calculated rate metrics
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile contains "openmetrics_monitor-'${K8S_NODE_NAME}'-kubernetes-api-cadvisor-metrics" "container_cpu_usage_seconds_total_rate "'
