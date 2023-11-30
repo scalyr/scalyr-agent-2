@@ -45,7 +45,7 @@ class ExecutorMixIn:
     def __warmup_thread_pool(self, thread_pool):
         # Warmup the thread pool
         for _ in range(thread_pool._max_workers):
-            thread_pool.submit(lambda: None)
+            thread_pool._adjust_thread_count()
 
     def process_request_thread(self, request, client_address):
         """Same as in BaseServer but as a thread.
@@ -54,11 +54,20 @@ class ExecutorMixIn:
 
         """
         try:
+            global_log.info(f"SYSLOG {threading.current_thread().name} - {self.__class__}.process_request_thread - processing request ")
             self.finish_request(request, client_address)
+            global_log.info(
+                f"SYSLOG {threading.current_thread().name} - {self.__class__}.process_request_thread - finished request ")
         except Exception:
+            global_log.info(
+                f"SYSLOG {threading.current_thread().name} - {self.__class__}.process_request_thread - exception in request ")
             self.handle_error(request, client_address)
         finally:
+            global_log.info(
+                f"SYSLOG {threading.current_thread().name} - {self.__class__}.process_request_thread - shutting down request ")
             self.shutdown_request(request)
+        global_log.info(
+            f"SYSLOG {threading.current_thread().name} - {self.__class__}.process_request_thread - FINISHED ")
 
     def process_request(self, request, client_address):
         if not self._request_processing_executor:
