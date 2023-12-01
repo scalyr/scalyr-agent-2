@@ -695,100 +695,97 @@ class SyslogRequestParser(object):
             self.process(data)
 
     def process(self, data):
-        try:
-            """Processes data returned from a previous call to read
-            :type data: six.binary_type
-            """
-            if not data:
-                global_log.warning(
-                    "Syslog has seen an empty request, could be an indication of missing data",
-                    limit_once_per_x_secs=600,
-                    limit_key="syslog-empty-request",
-                )
-                return
+        """Processes data returned from a previous call to read
+        :type data: six.binary_type
+        """
+        if not data:
+            global_log.warning(
+                "Syslog has seen an empty request, could be an indication of missing data",
+                limit_once_per_x_secs=600,
+                limit_key="syslog-empty-request",
+            )
+            return
 
-            # append data to what we had remaining from the previous call
-            if self._remaining:
-                self._remaining += data
+        # append data to what we had remaining from the previous call
+        if self._remaining:
+            self._remaining += data
+        else:
+            self._remaining = data
+            self._offset = 0
+
+        size = len(self._remaining)
+
+        # process the buffer until we are out of bytes
+        frames_handled = 0
+
+        extra = {
+            "proto": "tcp",
+            "srcip": self._client_address[0],
+            "destport": self._server_address[1],
+        }
+
+        while self._offset < size:
+            # get the first byte to determine if framed or not
+            # 2->TODO use slicing to get bytes in both python versions.
+            c = self._remaining[self._offset : self._offset + 1]
+            framed = b"0" <= c <= b"9"
+
+            skip = 0  # do we need to skip any bytes at the end of the frame (e.g. newlines)
+
+            # if framed, read the frame size
+            if framed:
+                frame_end = -1
+                pos = self._remaining.find(b" ", self._offset)
+                if pos != -1:
+                    frame_size = int(self._remaining[self._offset : pos])
+                    message_offset = pos + 1
+                    if size - message_offset >= frame_size:
+                        self._offset = message_offset
+                        frame_end = self._offset + frame_size
             else:
-                self._remaining = data
-                self._offset = 0
+                # not framed, find the first newline
+                frame_end = self._remaining.find(b"\n", self._offset)
+                skip = 1
 
-            size = len(self._remaining)
+            # if we couldn't find the end of a frame, then it's time
+            # to exit the loop and wait for more data
+            if frame_end == -1:
+                if not self._message_size_can_exceed_tcp_buffer and (
+                    size - self._offset >= self._max_buffer_size
+                ):
+                    global_log.warning(
+                        "Syslog frame exceeded maximum buffer size of %s bytes. You should either "
+                        'increase the value of "tcp_buffer_size" monitor config option or set '
+                        '"message_size_can_exceed_tcp_buffer" monitor config option to True.'
+                        % (self._max_buffer_size),
+                        limit_once_per_x_secs=300,
+                        limit_key="syslog-max-buffer-exceeded",
+                    )
 
-            # process the buffer until we are out of bytes
-            frames_handled = 0
+                    # skip invalid bytes which can appear because of the buffer overflow.
+                    frame_data = six.ensure_text(
+                        self._remaining, "utf-8", errors="ignore"
+                    )
+                    self._handle_frame(frame_data, extra)
 
-            extra = {
-                "proto": "tcp",
-                "srcip": self._client_address[0],
-                "destport": self._server_address[1],
-            }
+                    frames_handled += 1
+                    # add a space to ensure the next frame won't start with a number
+                    # and be incorrectly interpreted as a framed message
+                    self._remaining = b" "
+                    self._offset = 0
 
-            while self._offset < size:
-                # get the first byte to determine if framed or not
-                # 2->TODO use slicing to get bytes in both python versions.
-                c = self._remaining[self._offset : self._offset + 1]
-                framed = b"0" <= c <= b"9"
+                break
 
-                skip = 0  # do we need to skip any bytes at the end of the frame (e.g. newlines)
+            # output the frame
+            frame_length = frame_end - self._offset
 
-                # if framed, read the frame size
-                if framed:
-                    frame_end = -1
-                    pos = self._remaining.find(b" ", self._offset)
-                    if pos != -1:
-                        frame_size = int(self._remaining[self._offset : pos])
-                        message_offset = pos + 1
-                        if size - message_offset >= frame_size:
-                            self._offset = message_offset
-                            frame_end = self._offset + frame_size
-                else:
-                    # not framed, find the first newline
-                    frame_end = self._remaining.find(b"\n", self._offset)
-                    skip = 1
+            frame_data = six.ensure_text(
+                self._remaining[self._offset : frame_end].strip(), "utf-8", "ignore"
+            )
+            self._handle_frame(frame_data, extra)
+            frames_handled += 1
 
-                # if we couldn't find the end of a frame, then it's time
-                # to exit the loop and wait for more data
-                if frame_end == -1:
-                    if not self._message_size_can_exceed_tcp_buffer and (
-                        size - self._offset >= self._max_buffer_size
-                    ):
-                        global_log.warning(
-                            "Syslog frame exceeded maximum buffer size of %s bytes. You should either "
-                            'increase the value of "tcp_buffer_size" monitor config option or set '
-                            '"message_size_can_exceed_tcp_buffer" monitor config option to True.'
-                            % (self._max_buffer_size),
-                            limit_once_per_x_secs=300,
-                            limit_key="syslog-max-buffer-exceeded",
-                        )
-
-                        # skip invalid bytes which can appear because of the buffer overflow.
-                        frame_data = six.ensure_text(
-                            self._remaining, "utf-8", errors="ignore"
-                        )
-                        self._handle_frame(frame_data, extra)
-
-                        frames_handled += 1
-                        # add a space to ensure the next frame won't start with a number
-                        # and be incorrectly interpreted as a framed message
-                        self._remaining = b" "
-                        self._offset = 0
-
-                    break
-
-                # output the frame
-                frame_length = frame_end - self._offset
-
-                frame_data = six.ensure_text(
-                    self._remaining[self._offset : frame_end].strip(), "utf-8", "ignore"
-                )
-                self._handle_frame(frame_data, extra)
-                frames_handled += 1
-
-                self._offset += frame_length + skip
-        except Exception as e:
-            raise e
+            self._offset += frame_length + skip
 
         if frames_handled == 0:
             global_log.info(
