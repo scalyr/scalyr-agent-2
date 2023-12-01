@@ -1023,7 +1023,7 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
             except SocketClosed:
                 continue
 
-            if check_running and not server_is_funning_fn:
+            if check_running and not server_is_funning_fn():
                 return
 
             count += 1
@@ -1033,17 +1033,6 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
             "SyslogTCPHandler.handle - closing request_stream. Thread: %d",
             threading.current_thread().ident,
         )
-
-    @staticmethod
-    def __request_data_process(syslog_parser, data):
-        try:
-            syslog_parser.process(data)
-        except Exception as e:
-            global_log.warning(
-                "Error processing request: %s\n\t%s",
-                six.text_type(e),
-                traceback.format_exc(),
-            )
 
     def _syslog_request_parser(self):
         if self.request_parser == "default":
@@ -1074,31 +1063,16 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
             raise ValueError("Invalid request parser: %s" % (self.request_parser))
 
     @staticmethod
-    def __worker(work_queue, is_shutdown, data_processor, done_token, grace_period):
+    def __worker(data_processor, data, last_processing_future):
         try:
-            data = None
-            shutdown_started_time = None
-            data_empty_limit = 200
-            data_empty_count = 0
-            while data != done_token and data_empty_count < data_empty_limit:
-                if is_shutdown():
-                    if shutdown_started_time is None:
-                        shutdown_started_time = time.time()
-                    elif time.time() - shutdown_started_time > grace_period:
-                        break
-                if data is not None:
-                    data_processor(data)
-                    work_queue.task_done()
-                    data_empty_count = 0
-                else:
-                    data_empty_count += 1
-
-                try:
-                    data = work_queue.get(block=True, timeout=0.1)
-                except queue.Empty:
-                    data = None
+            if last_processing_future:
+                # Using hardcoded timeout here just to avoid a deadlock in case of a bug or an unexpected error
+                last_processing_future.result(timeout=10)
+            data_processor(data)
+        except TimeoutError as e:
+            global_log.error("Timeout error in syslog handler worker while waiting for previous requests data being parsed : %s", six.text_type(e), exc_info=e)
         except Exception as e:
-            global_log.error("Error in syslog handler worker: %s", six.text_type(e), exc_info=True)
+            global_log.error("Error in syslog handler worker: %s", six.text_type(e), exc_info=e)
 
 
 
@@ -1117,24 +1091,20 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
 
         try:
             if self.__request_processing_executor:
-                # Worker is responsible for processing the data read from one request.
-                # Using the queue ensures the data is processed in the order it was read.
-                DONE = "DONE"
-                work_queue = queue.Queue()
-                GRACE_PERIOD = self.__global_config.syslog_monitors_shutdown_grace_period if self.__global_config else 5
-
-                self.__request_processing_executor.submit(
-                    self.__worker, work_queue, lambda: self.__request_processing_executor._shutdown,
-                    lambda data: self.__request_data_process(syslog_parser, data), DONE, GRACE_PERIOD
-                )
-
+                # Using last_future to ensure the data from one requests is processes in the same order as it was received
+                last_future = None
                 for data in self.__request_stream_read(syslog_request, self.server.is_running):
-                    work_queue.put(data)
-
-                work_queue.put(DONE)
+                    last_future = self.__request_processing_executor.submit(self.__worker, syslog_parser.process, data, last_future)
             else:
-                for data in self.__request_stream_read(syslog_request, self.server.is_running):
-                    self.__request_data_process(syslog_parser, data)
+                try:
+                    for data in self.__request_stream_read(syslog_request, self.server.is_running):
+                        syslog_parser.process(data)
+                except Exception as e:
+                    global_log.warning(
+                        "Error processing request: %s\n\t%s",
+                        six.text_type(e),
+                        traceback.format_exc(),
+                    )
 
 
         except Exception as e:

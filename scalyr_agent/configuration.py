@@ -1006,10 +1006,6 @@ class Configuration(object):
         return monitor_config
 
     @property
-    def syslog_monitors_shutdown_grace_period(self):
-        return self.__get_config().get_int("syslog_monitors_shutdown_grace_period")
-
-    @property
     def allow_http_monitors(self):
         return self.__get_config().get_bool("allow_http_monitors")
 
@@ -2268,9 +2264,6 @@ class Configuration(object):
         )
         self.__verify_or_set_optional_bool(
             config, "allow_http_monitors", True, description, apply_defaults, env_aware=True
-        )
-        self.__verify_or_set_optional_int(
-            config, "syslog_monitors_shutdown_grace_period", 10, description, apply_defaults, env_aware=True
         )
         self.__verify_or_set_optional_bool(
             config,

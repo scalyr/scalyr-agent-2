@@ -280,7 +280,6 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
         messages_per_connection = 50
         handling_time = 0.01
         advantage_time = handling_time * 10
-        warmup_messages = (udp_servers_count + tcp_servers_count) * connections * messages_per_connection // 4
         message_window = (udp_servers_count + tcp_servers_count) * 15
         shutdown_time = connections * messages_per_connection * handling_time + 3
 
@@ -301,12 +300,17 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
                 for t in threads:
                     t.start()
 
+                return threads
+
+            def join_threads(threads):
                 for t in threads:
                     t.join()
 
-            send_data_to_servers(udp_servers[:1] + tcp_servers[:1])
+
+            threads_first = send_data_to_servers(udp_servers[:1] + tcp_servers[:1])
             time.sleep(advantage_time)
-            send_data_to_servers(udp_servers[1:] + tcp_servers[1:])
+            threads_rest = send_data_to_servers(udp_servers[1:] + tcp_servers[1:])
+            join_threads(threads_first + threads_rest)
 
             time.sleep(shutdown_time)
 
@@ -330,7 +334,8 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
             logged_port_sorted = [x[0] for x in logged_port_timestamp_sorted]
 
             # Check that the workers are distributed evenly
-            for start in range(warmup_messages, len(logged_port_sorted) - warmup_messages):
+            for start in range(len(logged_port_sorted) // 2):
+                print(len(set(logged_port_sorted[start:start+message_window])))
                 assert len(set(logged_port_sorted[start:start+message_window])) == len(udp_servers + tcp_servers)
 
 
