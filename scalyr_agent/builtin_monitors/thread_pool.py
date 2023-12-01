@@ -54,20 +54,11 @@ class ExecutorMixIn:
 
         """
         try:
-            global_log.info(f"SYSLOG {threading.current_thread().name} - {self.__class__}.process_request_thread - processing request ")
             self.finish_request(request, client_address)
-            global_log.info(
-                f"SYSLOG {threading.current_thread().name} - {self.__class__}.process_request_thread - finished request ")
         except Exception:
-            global_log.info(
-                f"SYSLOG {threading.current_thread().name} - {self.__class__}.process_request_thread - exception in request ")
             self.handle_error(request, client_address)
         finally:
-            global_log.info(
-                f"SYSLOG {threading.current_thread().name} - {self.__class__}.process_request_thread - shutting down request ")
             self.shutdown_request(request)
-        global_log.info(
-            f"SYSLOG {threading.current_thread().name} - {self.__class__}.process_request_thread - FINISHED ")
 
     def process_request(self, request, client_address):
         if not self._request_processing_executor:

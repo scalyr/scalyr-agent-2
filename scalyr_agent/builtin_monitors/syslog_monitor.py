@@ -97,17 +97,6 @@ except ImportError:
 import scalyr_agent.scalyr_logging as scalyr_logging
 
 global_log = scalyr_logging.getLogger(__name__)
-def syslog_log(msg, exc_info=None):
-    try:
-        threads = "\n".join(
-            str((t.name, t.is_alive(), t.native_id, t.ident))
-            for t in threading.enumerate()
-            if t.name.startswith("request_")
-        )
-    except Exception as e:
-        threads = "Error getting threads: %s" % e
-    global_log.info(msg, exc_info=exc_info)
-    global_log.info(f"SYSLOG threads: {threads}")
 
 __monitor__ = __name__
 
@@ -708,7 +697,6 @@ class SyslogRequestParser(object):
 
     def process(self, data):
         try:
-            syslog_log(f"SYSLOG {threading.current_thread().name} - {self.__class__}.process {data}")
             """Processes data returned from a previous call to read
             :type data: six.binary_type
             """
@@ -739,7 +727,6 @@ class SyslogRequestParser(object):
             }
 
             while self._offset < size:
-                syslog_log(f"SYSLOG {threading.current_thread().name} - {self.__class__}.process LOOP {self._offset}<{size} {data}")
                 # get the first byte to determine if framed or not
                 # 2->TODO use slicing to get bytes in both python versions.
                 c = self._remaining[self._offset : self._offset + 1]
@@ -749,7 +736,6 @@ class SyslogRequestParser(object):
 
                 # if framed, read the frame size
                 if framed:
-                    syslog_log(f"SYSLOG {threading.current_thread().name} - {self.__class__}.process FRAMED {data}")
                     frame_end = -1
                     pos = self._remaining.find(b" ", self._offset)
                     if pos != -1:
@@ -759,7 +745,6 @@ class SyslogRequestParser(object):
                             self._offset = message_offset
                             frame_end = self._offset + frame_size
                 else:
-                    syslog_log(f"SYSLOG {threading.current_thread().name} - {self.__class__}.process NOT_FRAMED {data}")
                     # not framed, find the first newline
                     frame_end = self._remaining.find(b"\n", self._offset)
                     skip = 1
@@ -805,7 +790,6 @@ class SyslogRequestParser(object):
                 self._offset += frame_length + skip
                 syslog_log(f"SYSLOG {threading.current_thread().name} - {self.__class__}.process frames_handled {frames_handled} {data}")
         except Exception as e:
-            syslog_log(f"SYSLOG EXCEPTION {threading.current_thread().name} - {self.__class__}.process EXCEPTION {e}", exc_info=e)
             raise e
 
         if frames_handled == 0:
@@ -817,7 +801,6 @@ class SyslogRequestParser(object):
 
         self._remaining = self._remaining[self._offset :]
         self._offset = 0
-        syslog_log(f"SYSLOG {threading.current_thread().name} - {self.__class__}.process FINISHED {data}")
 
 
 class SyslogRawRequestParser(SyslogRequestParser):
@@ -834,7 +817,6 @@ class SyslogRawRequestParser(SyslogRequestParser):
     """
 
     def process(self, data):
-        syslog_log(f"SYSLOG {threading.current_thread().name} - {self.__class__}.process {data}")
         extra = {
             "proto": "tcp",
             "srcip": self._client_address[0],
@@ -885,7 +867,6 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
         self.is_closed = False
 
     def process(self, data):
-        syslog_log(f"SYSLOG {threading.current_thread().name} - {self.__class__}.process {data}")
         """Processes data returned from a previous call to read
         :type data: six.binary_type
         """
@@ -1058,7 +1039,6 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
     @staticmethod
     def __request_data_process(syslog_parser, data):
         try:
-            syslog_log(f"SYSLOG {threading.current_thread().name} - __request_data_process {data}")
             syslog_parser.process(data)
         except Exception as e:
             global_log.warning(
@@ -1098,22 +1078,17 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
     @staticmethod
     def __worker(work_queue, is_shutdown, data_processor, done_token, grace_period):
         try:
-            syslog_log(f"SYSLOG {threading.current_thread().name} - Worker starting ")
             data = None
-            shutdown_started = None
+            shutdown_started_time = None
             data_empty_limit = 200
             data_empty_count = 0
             while data != done_token and data_empty_count < data_empty_limit:
                 if is_shutdown():
-                    syslog_log(f"SYSLOG {threading.current_thread().name} - Worker is_shutdown")
-                    if shutdown_started is None:
-                        shutdown_started = time.time()
-                    elif time.time() - shutdown_started > grace_period:
-                        syslog_log(f"SYSLOG {threading.current_thread().name} - Worker grace period exceeded")
+                    if shutdown_started_time is None:
+                        shutdown_started_time = time.time()
+                    elif time.time() - shutdown_started_time > grace_period:
                         break
-                    syslog_log(f"SYSLOG {threading.current_thread().name} - Worker grace period not exceeded")
                 if data is not None:
-                    syslog_log(f"SYSLOG {threading.current_thread().name} - Worker processing {data}")
                     data_processor(data)
                     work_queue.task_done()
                     data_empty_count = 0
@@ -1122,17 +1097,14 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
 
                 try:
                     data = work_queue.get(block=True, timeout=0.1)
-                    syslog_log(f"SYSLOG {threading.current_thread().name} - Worker got data: {data} from the queue")
                 except queue.Empty:
                     data = None
-            syslog_log(f"SYSLOG {threading.current_thread().name} - Worker Loop finished, last data: {data}, data_empty_count: {data_empty_count}")
         except Exception as e:
-            syslog_log(f"SYSLOG {threading.current_thread().name} - Worker EXCEPTION {e}", exc_info=e)
+            global_log.error("Error in syslog handler worker: %s", six.text_type(e), exc_info=True)
 
 
 
     def handle(self):
-        syslog_log(f"SYSLOG {threading.current_thread().name} Incoming request for {self.request_parser}")
         syslog_request = SyslogRequest(
             socket=self.request,
             max_buffer_size=self.server.tcp_buffer_size
@@ -1159,13 +1131,11 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
                 )
 
                 for data in self.__request_stream_read(syslog_request, self.server.is_running):
-                    syslog_log(f"SYSLOG {threading.current_thread().name} - Adding to the queue: {data}")
                     work_queue.put(data)
 
                 work_queue.put(DONE)
             else:
                 for data in self.__request_stream_read(syslog_request, self.server.is_running):
-                    syslog_log(f"SYSLOG {threading.current_thread().name} - Processing in the current thread: {data}")
                     self.__request_data_process(syslog_parser, data)
 
 
@@ -1634,7 +1604,6 @@ class SyslogHandler(object):
         return six.text_type(result)
 
     def __handle_docker_logs(self, data):
-        syslog_log(f"SYSLOG {threading.current_thread().name} - {self.__class__}.__handle_docker_logs {data}")
 
         watcher = None
         module = None
@@ -1645,7 +1614,6 @@ class SyslogHandler(object):
         (cname, cid, labels, line_content) = self.__extract_container_info(data)
 
         if cname is None:
-            syslog_log(f"SYSLOG {threading.current_thread().name} - {self.__class__}.__handle_docker_logs CNAME is None {data}")
             return
 
         current_time = time.time()
@@ -1687,8 +1655,6 @@ class SyslogHandler(object):
                         self.__docker_loggers[cname] = info
                     else:
                         global_log.warn("Unable to create logger for %s." % cname)
-                        global_log.info(
-                            f"SYSLOG {threading.current_thread().name} - {self.__class__}.__handle_docker_logs Unable to create logger {data}")
                         return
 
                 # at this point __docker_loggers will always contain
@@ -1740,11 +1706,7 @@ class SyslogHandler(object):
         if self.__docker_log_deleter:
             self.__docker_log_deleter.check_for_old_logs(current_log_files)
 
-        syslog_log(f"SYSLOG {threading.current_thread().name} - {self.__class__}.__handle_docker_logs FINISHED {data}")
-
     def __handle_syslog_logs(self, data, extra):
-        global_log.info(
-            f"SYSLOG {threading.current_thread().name} - {self.__class__}.__handle_syslog_logs {data}")
         extra.update(SyslogHandler._parse_syslog(data))
         extra = {k.upper(): v for k, v in extra.items()}
 
@@ -1886,8 +1848,6 @@ class SyslogHandler(object):
                 limit_key="syslog-not-template-log",
             )
             self.__logger.info(data)
-        global_log.info(
-            f"SYSLOG {threading.current_thread().name} - {self.__class__}.__handle_syslog_logs FINISHED {data}")
 
     @staticmethod
     def _parse_syslog(msg):
@@ -1914,8 +1874,7 @@ class SyslogHandler(object):
         return rv
 
     def handle(self, data, extra):  # type: (six.text_type, dict) -> None
-        syslog_log(f"SYSLOG {threading.current_thread().name} - {self.__class__}.handle {data}")
-        """ 
+        """
         Feed syslog messages to the appropriate loggers.
         """
         # one more time ensure that we don't have binary string.
@@ -1926,13 +1885,10 @@ class SyslogHandler(object):
         elif self.__syslog_file_template:
             self.__handle_syslog_logs(data, extra)
         else:
-            syslog_log(f"SYSLOG {threading.current_thread().name} - self.__logger.info(data) {data}")
             self.__logger.info(data)
-            syslog_log(f"SYSLOG {threading.current_thread().name} - self.__logger.info(data) FINISHED {data}")
 
         # We add plus one because the calling code strips off the trailing new lines.
         self.__line_reporter(data.count("\n") + 1)
-        syslog_log(f"SYSLOG {threading.current_thread().name} - {self.__class__}.handle FINISHED {data}")
 
 
 class RequestVerifier(object):
