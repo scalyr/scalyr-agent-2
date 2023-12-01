@@ -988,7 +988,6 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
 
     def __init__(self, *args, **kwargs):
         self.__request_processing_executor = kwargs.pop("request_processing_executor", None)
-        self.__global_config = kwargs.pop("global_config", None)
 
         self.request_parser = kwargs.pop("request_parser", "default")
         self.incomplete_frame_timeout = kwargs.pop("incomplete_frame_timeout", None)
@@ -1175,7 +1174,6 @@ class SyslogTCPServer(
         handler_cls = functools.partial(
             SyslogTCPHandler,
             request_processing_executor=self._request_processing_executor,
-            global_config=global_config,
             request_parser=request_parser,
             incomplete_frame_timeout=incomplete_frame_timeout,
             message_delimiter=message_delimiter,
