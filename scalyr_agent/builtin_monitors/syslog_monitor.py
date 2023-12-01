@@ -1,5 +1,4 @@
 # Copyright 2017-2023 Scalyr Inc.
-# Copyright 2017-2023 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -788,7 +787,6 @@ class SyslogRequestParser(object):
                 frames_handled += 1
 
                 self._offset += frame_length + skip
-                syslog_log(f"SYSLOG {threading.current_thread().name} - {self.__class__}.process frames_handled {frames_handled} {data}")
         except Exception as e:
             raise e
 
