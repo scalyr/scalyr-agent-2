@@ -1078,7 +1078,7 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
         try:
             if last_processing_future:
                 try:
-                    last_processing_future.done(timeout=TIMEOUT_TOTAL_TIME)
+                    last_processing_future.result(timeout=TIMEOUT_TOTAL_TIME)
                 except concurrent.futures.TimeoutError as e:
                     global_log.error(TIMEOUT_ERROR_MSG, exc_info=e)
                     raise SyslogTCPHandler.PreviousMessageHandlingError(TIMEOUT_ERROR_MSG)
