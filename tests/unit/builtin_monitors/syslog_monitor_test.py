@@ -251,7 +251,7 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
     def test_shutdown_with_pending_requests(self):
         with self.start_servers(udp_servers_count=0, tcp_servers_count=1, handling_time=0.2) as (udp_servers, tcp_servers):
             for server in tcp_servers:
-                MESSAGES_COUNT = 10
+                MESSAGES_COUNT = 30
                 t = self.__send_syslog_messages(
                     server.socket.getsockname(),
                     server.socket.type,

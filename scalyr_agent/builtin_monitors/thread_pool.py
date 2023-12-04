@@ -20,14 +20,17 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 from scalyr_agent import scalyr_logging
+import time
 
 global_log = scalyr_logging.getLogger(__name__)
 
 # A MixIn class used for adding a thread poll processing to a BaseServer (i.e. SyslogTCPServer, SyslogUDPServer)
 class ExecutorMixIn:
     def __init__(self, global_config):
-        # Using 4 threads for processing requests, because of GIL and CPU bound tasks higher number would not help process the data faster.
-        processing_threads = 4
+        # Using 8 threads for processing requests, because of GIL and CPU bound tasks higher number would not help process the data faster.
+        # The reason for multiple threads is to avoid deadlock in an unexpected situation before waiting for previous data
+        # on a single request being processed fails and it's not caught do to a bug.
+        processing_threads = 8
         # Let the ThreadPoolExecutor decide how many threads to use based the numbre of logical CPUs
         reading_threads = None
 
@@ -70,6 +73,27 @@ class ExecutorMixIn:
         )
 
     def server_close(self):
-        self._request_reading_executor.shutdown(wait=False)
-        self._request_processing_executor.shutdown(wait=False)
         super().server_close()
+
+        self.__wait_for_tasks_to_complete(self._request_reading_executor, self._request_processing_executor, timeout=5)
+
+        try:
+            self._request_reading_executor.shutdown(wait=False, cancel_futures=True)
+            self._request_processing_executor.shutdown(wait=False, cancel_futures=True)
+        except TypeError:
+            # Older versions of python do not support cancel_futures
+            self._request_reading_executor.shutdown(wait=False)
+            self._request_processing_executor.shutdown(wait=False)
+
+    @staticmethod
+    def __wait_for_tasks_to_complete(*executors, timeout):
+        semaphore = threading.Semaphore(0)
+        for executor in executors:
+            executor.submit(lambda: semaphore.release())
+
+        time_stop_waiting = time.time() + timeout
+        for _ in executors:
+            if time.time() > time_stop_waiting:
+                break
+            semaphore.acquire(timeout=time_stop_waiting-time.time())
+

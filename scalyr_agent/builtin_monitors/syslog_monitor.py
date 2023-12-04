@@ -25,6 +25,7 @@ from __future__ import absolute_import
 
 from __future__ import print_function
 
+import concurrent.futures
 import queue
 
 from scalyr_agent import compat
@@ -986,6 +987,13 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
     # NOTE: Thole whole handler abstraction is not great since it means a new class instance for
     # each new connection.
 
+    class PreviousMessageHandlingError(Exception):
+        def __int__(self, message):
+            self.message = message
+
+        def __repr__(self):
+            return "PreviousMessageHandlingError: " + self.message
+
     def __init__(self, *args, **kwargs):
         self.__request_processing_executor = kwargs.pop("request_processing_executor", None)
 
@@ -1060,17 +1068,29 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
 
     @staticmethod
     def __worker(data_processor, data, last_processing_future):
+        # Hardcoded timeout total time to stop polluting Thread Pool in case of a bug or an unexpected error
+        TIMEOUT_TOTAL_TIME = 10
+        CANCEL_FURTHER_PROCESSING_MSG = "Cancelling further processing."
+        TIMEOUT_ERROR_MSG = "Timeout error while waiting for previous message being parsed." + " " + CANCEL_FURTHER_PROCESSING_MSG
+        CANCELLED_ERROR_MSG = "Future of the revious message parser cancelled." + " " + CANCEL_FURTHER_PROCESSING_MSG
+        GENERIC_EXCEPTION_MSG = "Exception from the previous message handler. " + " " + CANCEL_FURTHER_PROCESSING_MSG
+
         try:
             if last_processing_future:
-                # Using hardcoded timeout here just to avoid a deadlock in case of a bug or an unexpected error
-                last_processing_future.result(timeout=10)
+                try:
+                    last_processing_future.done(timeout=TIMEOUT_TOTAL_TIME)
+                except concurrent.futures.TimeoutError as e:
+                    global_log.error(TIMEOUT_ERROR_MSG, exc_info=e)
+                    raise SyslogTCPHandler.PreviousMessageHandlingError(TIMEOUT_ERROR_MSG)
+                except concurrent.futures.CancelledError as e:
+                    global_log.error(CANCELLED_ERROR_MSG, exc_info=e)
+                    raise SyslogTCPHandler.PreviousMessageHandlingError(CANCELLED_ERROR_MSG)
+                except Exception as e:
+                    global_log.error(GENERIC_EXCEPTION_MSG, exc_info=e)
+                    raise SyslogTCPHandler.PreviousMessageHandlingError(GENERIC_EXCEPTION_MSG)
             data_processor(data)
-        except TimeoutError as e:
-            global_log.error("Timeout error in syslog handler worker while waiting for previous requests data being parsed : %s", six.text_type(e), exc_info=e)
         except Exception as e:
             global_log.error("Error in syslog handler worker: %s", six.text_type(e), exc_info=e)
-
-
 
     def handle(self):
         syslog_request = SyslogRequest(
@@ -2041,7 +2061,7 @@ class SyslogServer(object):
     def start(self, run_state):
         self.__prepare_run_state(run_state)
         self.__server.serve_forever()
-        self.__server.socket.close()
+        self.__server.server_close()
 
     def start_threaded(self, run_state):
         self.__prepare_run_state(run_state)
