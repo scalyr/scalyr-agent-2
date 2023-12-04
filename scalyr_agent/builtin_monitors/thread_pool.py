@@ -37,6 +37,9 @@ class ExecutorMixIn:
         if global_config:
             reading_threads = global_config.syslog_socket_thread_count
             processing_threads = global_config.syslog_processing_thread_count
+            self._shutdown_grace_period = global_config.syslog_monitors_shutdown_grace_period
+        else:
+            _shutdown_grace_period = 5
 
         self._request_reading_executor = ThreadPoolExecutor(max_workers=reading_threads, thread_name_prefix="request_reading_executor")
         self._request_processing_executor = ThreadPoolExecutor(max_workers=processing_threads, thread_name_prefix="request_processing_executor")
@@ -75,7 +78,7 @@ class ExecutorMixIn:
     def server_close(self):
         super().server_close()
 
-        self.__wait_for_tasks_to_complete(self._request_reading_executor, self._request_processing_executor, timeout=5)
+        self.__wait_for_tasks_to_complete(self._request_reading_executor, self._request_processing_executor, timeout=self._shutdown_grace_period)
 
         try:
             self._request_reading_executor.shutdown(wait=False, cancel_futures=True)

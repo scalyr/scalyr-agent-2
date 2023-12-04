@@ -186,12 +186,19 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
             self.logged_data.append(self.LogLine(time.time(), data, extra))
             time.sleep(self.handling_time)
 
+    class MockConfig():
+        def __init__(self):
+            self.syslog_processing_thread_count = 4
+            self.syslog_socket_thread_count = 4
+            self.syslog_monitors_shutdown_grace_period = 1
+
     def __tcp_server(self, port, handling_time):
         server = SyslogTCPServer(
             port,
-            tcp_buffer_size = 8192,
+            tcp_buffer_size = 50,
             bind_address=self.BIND_ADDRESS,
             verifier=self.VERIFIER,
+            global_config=SyslogMonitorThreadingTest.MockConfig(),
         )
         server.syslog_handler = self.SyslogHandlerMock(server.socket.getsockname(), server.socket.type, handling_time)
         return server
@@ -201,6 +208,7 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
             port,
             bind_address=self.BIND_ADDRESS,
             verifier=self.VERIFIER,
+            global_config=SyslogMonitorThreadingTest.MockConfig(),
         )
         server.syslog_handler = self.SyslogHandlerMock(server.socket.getsockname(), server.socket.type, handling_time)
         return server
@@ -249,13 +257,17 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
         return t
 
     def test_shutdown_with_pending_requests(self):
-        with self.start_servers(udp_servers_count=0, tcp_servers_count=1, handling_time=0.2) as (udp_servers, tcp_servers):
+        HANDLING_TIME = 0.1
+        mock_config = self.MockConfig()
+        with self.start_servers(udp_servers_count=0, tcp_servers_count=1, handling_time=HANDLING_TIME) as (udp_servers, tcp_servers):
             for server in tcp_servers:
-                MESSAGES_COUNT = 30
+                time_start = time.time()
+                MESSAGES_COUNT = 300
+                CONNECTIONS = 10
                 t = self.__send_syslog_messages(
                     server.socket.getsockname(),
                     server.socket.type,
-                    connections=1,
+                    connections=CONNECTIONS,
                     messages_per_connection=MESSAGES_COUNT
                 )
                 t.start()
@@ -264,13 +276,22 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
                 time.sleep(0.5)
 
                 server.shutdown()
+                server.server_close()
 
-                for _ in range(20):
-                    if len(server.syslog_handler.logged_data) >= MESSAGES_COUNT:
-                        break
-                    time.sleep(0.1)
+                EXPECTED_MESSAGES_PROCESSED_IN_GRACE_PERIOD = int((time.time() - time_start) / HANDLING_TIME)
 
-                assert len(server.syslog_handler.logged_data) == MESSAGES_COUNT
+                time.sleep(
+                    mock_config.syslog_processing_thread_count * 10 * HANDLING_TIME
+                )
+
+                assert len(server.syslog_handler.logged_data) >= EXPECTED_MESSAGES_PROCESSED_IN_GRACE_PERIOD
+
+                msg_count_after_grace_period_elapsed = len(server.syslog_handler.logged_data)
+
+                time.sleep(1)
+
+                # No new messages processed
+                assert len(server.syslog_handler.logged_data) == msg_count_after_grace_period_elapsed
 
     def test_fair_workers_distribution(self):
         # Given

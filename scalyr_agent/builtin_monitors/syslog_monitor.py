@@ -1070,9 +1070,10 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
     def __worker(data_processor, data, last_processing_future):
         # Hardcoded timeout total time to stop polluting Thread Pool in case of a bug or an unexpected error
         TIMEOUT_TOTAL_TIME = 10
-        CANCEL_FURTHER_PROCESSING_MSG = "Cancelling further processing."
-        TIMEOUT_ERROR_MSG = "Timeout error while waiting for previous message being parsed." + " " + CANCEL_FURTHER_PROCESSING_MSG
-        CANCELLED_ERROR_MSG = "Future of the revious message parser cancelled." + " " + CANCEL_FURTHER_PROCESSING_MSG
+        CANCEL_FURTHER_PROCESSING_MSG = "Cancelling further processing for this request."
+        TIMEOUT_ERROR_MSG = "Timeout error while waiting for previous message being parsed. If the server is not shutting down, this may be a bug or an unexpected error." + " " + CANCEL_FURTHER_PROCESSING_MSG
+        CANCELLED_ERROR_MSG = "Future of the revious message parser cancelled. The server is probably shutting down. " + " " + CANCEL_FURTHER_PROCESSING_MSG
+        PREVIOUS_CANCELEED_ERROR_MSG = "Previous message parser encountered an error. " + " " + CANCEL_FURTHER_PROCESSING_MSG
         GENERIC_EXCEPTION_MSG = "Exception from the previous message handler. " + " " + CANCEL_FURTHER_PROCESSING_MSG
 
         try:
@@ -1080,11 +1081,15 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
                 try:
                     last_processing_future.result(timeout=TIMEOUT_TOTAL_TIME)
                 except concurrent.futures.TimeoutError as e:
-                    global_log.error(TIMEOUT_ERROR_MSG, exc_info=e)
+                    global_log.warn(TIMEOUT_ERROR_MSG)
                     raise SyslogTCPHandler.PreviousMessageHandlingError(TIMEOUT_ERROR_MSG)
                 except concurrent.futures.CancelledError as e:
-                    global_log.error(CANCELLED_ERROR_MSG, exc_info=e)
+                    global_log.warn(CANCELLED_ERROR_MSG)
+                    global_log.info(f"Thread: {threading.current_thread().name} __worker {e}")
                     raise SyslogTCPHandler.PreviousMessageHandlingError(CANCELLED_ERROR_MSG)
+                except SyslogTCPHandler.PreviousMessageHandlingError as e:
+                    global_log.debug(PREVIOUS_CANCELEED_ERROR_MSG, exc_info=e)
+                    raise e
                 except Exception as e:
                     global_log.error(GENERIC_EXCEPTION_MSG, exc_info=e)
                     raise SyslogTCPHandler.PreviousMessageHandlingError(GENERIC_EXCEPTION_MSG)
@@ -1107,7 +1112,7 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
 
         try:
             if self.__request_processing_executor:
-                # Using last_future to ensure the data from one requests is processes in the same order as it was received
+                # Using last_future to ensure the data from one requests is processed in the same order as it was received
                 last_future = None
                 for data in self.__request_stream_read(syslog_request, self.server.is_running):
                     last_future = self.__request_processing_executor.submit(self.__worker, syslog_parser.process, data, last_future)
