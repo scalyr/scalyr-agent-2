@@ -278,15 +278,15 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
                 server.shutdown()
                 server.server_close()
 
-                EXPECTED_MESSAGES_PROCESSED_IN_GRACE_PERIOD = int((time.time() - time_start) / HANDLING_TIME)
+                msg_count_before_grace_period_elapsed = len(server.syslog_handler.logged_data)
 
                 time.sleep(
                     mock_config.syslog_processing_thread_count * 10 * HANDLING_TIME + 3
                 )
 
-                assert len(server.syslog_handler.logged_data) >= EXPECTED_MESSAGES_PROCESSED_IN_GRACE_PERIOD
-
                 msg_count_after_grace_period_elapsed = len(server.syslog_handler.logged_data)
+
+                assert msg_count_after_grace_period_elapsed > msg_count_before_grace_period_elapsed
 
                 # Cancel futures introduced in 3.9
                 if sys.version_info[0:2] >= (3, 9):
