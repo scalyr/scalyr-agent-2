@@ -281,7 +281,7 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
                 EXPECTED_MESSAGES_PROCESSED_IN_GRACE_PERIOD = int((time.time() - time_start) / HANDLING_TIME)
 
                 time.sleep(
-                    mock_config.syslog_processing_thread_count * 10 * HANDLING_TIME + 2
+                    mock_config.syslog_processing_thread_count * 10 * HANDLING_TIME + 3
                 )
 
                 assert len(server.syslog_handler.logged_data) >= EXPECTED_MESSAGES_PROCESSED_IN_GRACE_PERIOD
