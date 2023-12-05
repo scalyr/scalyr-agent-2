@@ -288,10 +288,11 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
 
                 msg_count_after_grace_period_elapsed = len(server.syslog_handler.logged_data)
 
-                time.sleep(1)
-
-                # No new messages processed
-                assert len(server.syslog_handler.logged_data) == msg_count_after_grace_period_elapsed
+                # Cancel futures introduced in 3.9
+                if sys.version_info[0:2] >= (3, 9):
+                    time.sleep(1)
+                    # No new messages processed
+                    assert len(server.syslog_handler.logged_data) == msg_count_after_grace_period_elapsed
 
     def test_fair_workers_distribution(self):
         # Given
