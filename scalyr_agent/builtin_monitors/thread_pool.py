@@ -39,7 +39,7 @@ class ExecutorMixIn:
             processing_threads = global_config.syslog_processing_thread_count
             self._shutdown_grace_period = global_config.syslog_monitors_shutdown_grace_period
         else:
-            _shutdown_grace_period = 5
+            self._shutdown_grace_period = 5
 
         self._request_reading_executor = ThreadPoolExecutor(max_workers=reading_threads, thread_name_prefix="request_reading_executor")
         self._request_processing_executor = ThreadPoolExecutor(max_workers=processing_threads, thread_name_prefix="request_processing_executor")
