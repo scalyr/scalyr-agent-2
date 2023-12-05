@@ -1118,7 +1118,7 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
                         last_future = self.__request_processing_executor.submit(self.__worker, syslog_parser.process, data, last_future)
                     except RuntimeError:
                         # There's no way of telling what happened to the executor, it does not have a specific exception class for this case.
-                        global_log.warn(f"Cannot submit futher data for processing. The server is probably shutting down.")
+                        global_log.warn("Cannot submit futher data for processing. The server is probably shutting down.")
                         break
             else:
                 try:
