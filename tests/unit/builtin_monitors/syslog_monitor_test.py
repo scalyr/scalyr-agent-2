@@ -192,34 +192,34 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
             self.syslog_socket_thread_count = 4
             self.syslog_monitors_shutdown_grace_period = 1
 
-    def __tcp_server(self, port, handling_time):
+    def __tcp_server(self, port, handling_time, global_config):
         server = SyslogTCPServer(
             port,
             tcp_buffer_size = 50,
             bind_address=self.BIND_ADDRESS,
             verifier=self.VERIFIER,
-            global_config=SyslogMonitorThreadingTest.MockConfig(),
+            global_config=global_config,
         )
         server.syslog_handler = self.SyslogHandlerMock(server.socket.getsockname(), server.socket.type, handling_time)
         return server
 
-    def __udp_server(self, port, handling_time):
+    def __udp_server(self, port, handling_time, global_config):
         server = SyslogUDPServer(
             port,
             bind_address=self.BIND_ADDRESS,
             verifier=self.VERIFIER,
-            global_config=SyslogMonitorThreadingTest.MockConfig(),
+            global_config=global_config,
         )
         server.syslog_handler = self.SyslogHandlerMock(server.socket.getsockname(), server.socket.type, handling_time)
         return server
 
     @contextmanager
-    def start_servers(self, udp_servers_count, tcp_servers_count, handling_time):
+    def start_servers(self, udp_servers_count, tcp_servers_count, handling_time, global_config):
         udp_servers = [
-            self.__udp_server(0, handling_time) for _ in range(udp_servers_count)
+            self.__udp_server(0, handling_time, global_config) for _ in range(udp_servers_count)
         ]
         tcp_servers = [
-            self.__tcp_server(0, handling_time) for _ in range(tcp_servers_count)
+            self.__tcp_server(0, handling_time, global_config) for _ in range(tcp_servers_count)
         ]
 
         threads = [
@@ -256,19 +256,45 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
         t = threading.Thread(target=send)
         return t
 
-    def test_shutdown_with_pending_requests(self):
-        HANDLING_TIME = 0.1
-        mock_config = self.MockConfig()
-        with self.start_servers(udp_servers_count=0, tcp_servers_count=1, handling_time=HANDLING_TIME) as (udp_servers, tcp_servers):
+    def test_without_global_config(self):
+        with self.start_servers(udp_servers_count=1, tcp_servers_count=1, handling_time=0, global_config=None) as (udp_servers, tcp_servers):
             for server in tcp_servers:
-                time_start = time.time()
-                MESSAGES_COUNT = 300
+                MESSAGES_PER_CONNECTION = 100
                 CONNECTIONS = 10
                 t = self.__send_syslog_messages(
                     server.socket.getsockname(),
                     server.socket.type,
                     connections=CONNECTIONS,
-                    messages_per_connection=MESSAGES_COUNT
+                    messages_per_connection=MESSAGES_PER_CONNECTION
+                )
+                t.start()
+                t.join()
+
+                time.sleep(0.5)
+
+                server.shutdown()
+                server.server_close()
+
+                for _ in range(100):
+                    time.sleep(0.1)
+                    if len(server.syslog_handler.logged_data) == CONNECTIONS * MESSAGES_PER_CONNECTION:
+                        break
+
+                assert len(server.syslog_handler.logged_data) == CONNECTIONS * MESSAGES_PER_CONNECTION
+
+
+    def test_shutdown_with_pending_requests(self):
+        HANDLING_TIME = 0.1
+        mock_config = self.MockConfig()
+        with self.start_servers(udp_servers_count=0, tcp_servers_count=1, handling_time=HANDLING_TIME) as (udp_servers, tcp_servers):
+            for server in tcp_servers:
+                MESSAGES_PER_CONNECTION = 300
+                CONNECTIONS = 10
+                t = self.__send_syslog_messages(
+                    server.socket.getsockname(),
+                    server.socket.type,
+                    connections=CONNECTIONS,
+                    messages_per_connection=MESSAGES_PER_CONNECTION
                 )
                 t.start()
                 t.join()
