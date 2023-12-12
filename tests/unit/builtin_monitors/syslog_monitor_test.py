@@ -286,7 +286,7 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
     def test_shutdown_with_pending_requests(self):
         HANDLING_TIME = 0.1
         mock_config = self.MockConfig()
-        with self.start_servers(udp_servers_count=0, tcp_servers_count=1, handling_time=HANDLING_TIME) as (udp_servers, tcp_servers):
+        with self.start_servers(udp_servers_count=0, tcp_servers_count=1, handling_time=HANDLING_TIME, global_config=mock_config) as (udp_servers, tcp_servers):
             for server in tcp_servers:
                 MESSAGES_PER_CONNECTION = 300
                 CONNECTIONS = 10
@@ -331,7 +331,7 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
         message_window = (udp_servers_count + tcp_servers_count) * 15
         shutdown_time = connections * messages_per_connection * handling_time + 3
 
-        with self.start_servers(udp_servers_count, tcp_servers_count, handling_time) as (udp_servers, tcp_servers):
+        with self.start_servers(udp_servers_count, tcp_servers_count, handling_time, global_config=self.MockConfig()) as (udp_servers, tcp_servers):
             # When
             # Send some data to the servers
             def send_data_to_servers(servers):

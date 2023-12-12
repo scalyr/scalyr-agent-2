@@ -21,6 +21,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from scalyr_agent import scalyr_logging
 import time
+import sys
 
 global_log = scalyr_logging.getLogger(__name__)
 
@@ -80,13 +81,12 @@ class ExecutorMixIn:
 
         self.__wait_for_tasks_to_complete(self._request_reading_executor, self._request_processing_executor, timeout=self._shutdown_grace_period)
 
-        try:
-            self._request_reading_executor.shutdown(wait=False, cancel_futures=True)
-            self._request_processing_executor.shutdown(wait=False, cancel_futures=True)
-        except TypeError:
-            # Older versions of python do not support cancel_futures
-            self._request_reading_executor.shutdown(wait=False)
-            self._request_processing_executor.shutdown(wait=False)
+        shutdown_args = {"wait": False}
+        if sys.version_info[0:2] >= (3, 9):
+            shutdown_args["cancel_futures"] = True
+
+        self._request_reading_executor.shutdown(**shutdown_args)
+        self._request_processing_executor.shutdown(**shutdown_args)
 
     @staticmethod
     def __wait_for_tasks_to_complete(*executors, timeout):
