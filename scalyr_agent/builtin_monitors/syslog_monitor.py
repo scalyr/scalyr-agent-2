@@ -25,6 +25,7 @@ from __future__ import absolute_import
 
 from __future__ import print_function
 
+import concurrent.futures
 import queue
 
 from scalyr_agent import compat
@@ -986,6 +987,13 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
     # NOTE: Thole whole handler abstraction is not great since it means a new class instance for
     # each new connection.
 
+    class PreviousMessageHandlingError(Exception):
+        def __int__(self, message):
+            self.message = message
+
+        def __repr__(self):
+            return "PreviousMessageHandlingError: " + self.message
+
     def __init__(self, *args, **kwargs):
         self.__request_processing_executor = kwargs.pop("request_processing_executor", None)
 
@@ -999,7 +1007,7 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
             six.moves.socketserver.BaseRequestHandler.__init__(self, *args, **kwargs)
 
     @staticmethod
-    def __request_stream_read(syslog_request, server_is_funning_fn):
+    def __request_stream_read(syslog_request, server_is_running_fn):
         count = 1
         while not syslog_request.is_closed:
             check_running = False
@@ -1019,7 +1027,7 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
             except SocketClosed:
                 continue
 
-            if check_running and not server_is_funning_fn:
+            if check_running and not server_is_running_fn():
                 return
 
             count += 1
@@ -1029,17 +1037,6 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
             "SyslogTCPHandler.handle - closing request_stream. Thread: %d",
             threading.current_thread().ident,
         )
-
-    @staticmethod
-    def __request_data_process(syslog_parser, data):
-        try:
-            syslog_parser.process(data)
-        except Exception as e:
-            global_log.warning(
-                "Error processing request: %s\n\t%s",
-                six.text_type(e),
-                traceback.format_exc(),
-            )
 
     def _syslog_request_parser(self):
         if self.request_parser == "default":
@@ -1069,6 +1066,36 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
         else:
             raise ValueError("Invalid request parser: %s" % (self.request_parser))
 
+    @staticmethod
+    def __worker(data_processor, data, last_processing_future):
+        # Hardcoded timeout total time to stop populating Thread Pool in case of a bug or an unexpected error
+        TIMEOUT_TOTAL_TIME = 10
+        CANCEL_FURTHER_PROCESSING_MSG = "Cancelling further processing for this request."
+        TIMEOUT_ERROR_MSG = "Timeout error while waiting for previous message being parsed. If the server is not shutting down, this may be a bug or an unexpected error." + " " + CANCEL_FURTHER_PROCESSING_MSG
+        CANCELLED_ERROR_MSG = "Future of the previous message parser cancelled. The server is probably shutting down. " + " " + CANCEL_FURTHER_PROCESSING_MSG
+        PREVIOUS_CANCELLED_ERROR_MSG = "Previous message parser encountered an error. " + " " + CANCEL_FURTHER_PROCESSING_MSG
+        GENERIC_EXCEPTION_MSG = "Exception from the previous message handler. " + " " + CANCEL_FURTHER_PROCESSING_MSG
+
+        try:
+            if last_processing_future:
+                try:
+                    last_processing_future.result(timeout=TIMEOUT_TOTAL_TIME)
+                except concurrent.futures.TimeoutError as e:
+                    global_log.warn(TIMEOUT_ERROR_MSG)
+                    raise SyslogTCPHandler.PreviousMessageHandlingError(TIMEOUT_ERROR_MSG)
+                except concurrent.futures.CancelledError as e:
+                    global_log.warn(CANCELLED_ERROR_MSG)
+                    raise SyslogTCPHandler.PreviousMessageHandlingError(CANCELLED_ERROR_MSG)
+                except SyslogTCPHandler.PreviousMessageHandlingError as e:
+                    global_log.debug(PREVIOUS_CANCELLED_ERROR_MSG, exc_info=e)
+                    raise SyslogTCPHandler.PreviousMessageHandlingError(PREVIOUS_CANCELLED_ERROR_MSG)
+                except Exception as e:
+                    global_log.error(GENERIC_EXCEPTION_MSG, exc_info=e)
+                    raise SyslogTCPHandler.PreviousMessageHandlingError(GENERIC_EXCEPTION_MSG)
+            data_processor(data)
+        except Exception as e:
+            global_log.error("Error in syslog handler worker: %s", six.text_type(e), exc_info=e)
+
     def handle(self):
         syslog_request = SyslogRequest(
             socket=self.request,
@@ -1084,28 +1111,25 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
 
         try:
             if self.__request_processing_executor:
-                # Worker is responsible for processing the data read from one request.
-                # Using the queue ensures the data is processed in the order it was read.
-                DONE = "DONE"
-                work_queue = queue.Queue()
-                def worker(queue, is_shutdown):
-                    data = queue.get(block=True)
-                    while data != DONE:
-                        if is_shutdown():
-                            global_log.info("ThreadPool shutting down, skipping further request processing.")
-                            break
-                        self.__request_data_process(syslog_parser, data)
-                        data = queue.get(block=True)
-
-                self.__request_processing_executor.submit(worker, work_queue, lambda: self.__request_processing_executor._shutdown)
-
+                # Using last_future to ensure the data from one requests is processed in the same order as it was received
+                last_future = None
                 for data in self.__request_stream_read(syslog_request, self.server.is_running):
-                    work_queue.put(data)
-
-                work_queue.put(DONE)
+                    try:
+                        last_future = self.__request_processing_executor.submit(self.__worker, syslog_parser.process, data, last_future)
+                    except RuntimeError:
+                        # There's no way of telling what happened to the executor, it does not have a specific exception class for this case.
+                        global_log.warn("Cannot submit futher data for processing. The server is probably shutting down.")
+                        break
             else:
                 for data in self.__request_stream_read(syslog_request, self.server.is_running):
-                    self.__request_data_process(syslog_parser, data)
+                    try:
+                        syslog_parser.process(data)
+                    except Exception as e:
+                        global_log.warning(
+                            "Error processing request: %s\n\t%s",
+                            six.text_type(e),
+                            traceback.format_exc(),
+                        )
 
 
         except Exception as e:
@@ -1842,7 +1866,7 @@ class SyslogHandler(object):
         return rv
 
     def handle(self, data, extra):  # type: (six.text_type, dict) -> None
-        """ 
+        """
         Feed syslog messages to the appropriate loggers.
         """
         # one more time ensure that we don't have binary string.
@@ -2046,7 +2070,7 @@ class SyslogServer(object):
     def start(self, run_state):
         self.__prepare_run_state(run_state)
         self.__server.serve_forever()
-        self.__server.socket.close()
+        self.__server.server_close()
 
     def start_threaded(self, run_state):
         self.__prepare_run_state(run_state)

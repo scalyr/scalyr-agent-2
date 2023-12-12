@@ -20,23 +20,39 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 from scalyr_agent import scalyr_logging
+import time
+import sys
 
 global_log = scalyr_logging.getLogger(__name__)
 
 # A MixIn class used for adding a thread poll processing to a BaseServer (i.e. SyslogTCPServer, SyslogUDPServer)
 class ExecutorMixIn:
     def __init__(self, global_config):
-        # Using 4 threads for processing requests, because of GIL and CPU bound tasks higher number would not help process the data faster.
-        reading_threads = 4
+        # Using 8 threads for processing requests, because of GIL and CPU bound tasks higher number would not help process the data faster.
+        # The reason for multiple threads is to avoid deadlock in an unexpected situation before waiting for previous data
+        # on a single request being processed fails and it's not caught do to a bug.
+        processing_threads = 8
         # Let the ThreadPoolExecutor decide how many threads to use based the numbre of logical CPUs
-        processing_threads = None
+        reading_threads = None
 
         if global_config:
             reading_threads = global_config.syslog_socket_thread_count
             processing_threads = global_config.syslog_processing_thread_count
+            self._shutdown_grace_period = global_config.syslog_monitors_shutdown_grace_period
+        else:
+            self._shutdown_grace_period = 5
 
-        self._request_reading_executor = ThreadPoolExecutorFactory.get_singleton("request_reading_executor", max_workers=reading_threads)
-        self._request_processing_executor = ThreadPoolExecutorFactory.get_singleton("request_processing_executor", max_workers=processing_threads)
+        self._request_reading_executor = ThreadPoolExecutor(max_workers=reading_threads, thread_name_prefix="request_reading_executor")
+        self._request_processing_executor = ThreadPoolExecutor(max_workers=processing_threads, thread_name_prefix="request_processing_executor")
+
+        # Since the older versions of python use daemon threads, we need to let the pool create the threads this constructor's thread.
+        self.__warmup_thread_pool(self._request_reading_executor)
+        self.__warmup_thread_pool(self._request_processing_executor)
+
+    def __warmup_thread_pool(self, thread_pool):
+        # Warmup the thread pool
+        for _ in range(thread_pool._max_workers):
+            thread_pool._adjust_thread_count()
 
     def process_request_thread(self, request, client_address):
         """Same as in BaseServer but as a thread.
@@ -63,24 +79,24 @@ class ExecutorMixIn:
     def server_close(self):
         super().server_close()
 
-class ThreadPoolExecutorFactory():
-    __lock = threading.Lock()
-    __instances = {}
+        self.__wait_for_tasks_to_complete(self._request_reading_executor, self._request_processing_executor, timeout=self._shutdown_grace_period)
 
-    @classmethod
-    def get_singleton(cls, name, max_workers=None):
-        if name not in cls.__instances:
-            with cls.__lock:
-                if name not in cls.__instances:
-                    cls.__instances[name] = ThreadPoolExecutor(thread_name_prefix=name, max_workers=max_workers)
-        return cls.__instances[name]
+        shutdown_args = {"wait": False}
+        if sys.version_info[0:2] >= (3, 9):
+            shutdown_args["cancel_futures"] = True
 
-    @classmethod
-    def shutdown(cls, wait=True):
-        wait_on_futures_str = " and waiting on futures" if wait else ""
-        for name, executor in cls.__instances.items():
-            global_log.info("Shutting down ThreadPoolExecutor%s: %s", wait_on_futures_str, name)
-            try:
-                executor.shutdown(wait=wait)
-            except Exception as e:
-                global_log.error("Failed shutting down the ThreadPoolExecutor %s", executor, exc_info=e)
+        self._request_reading_executor.shutdown(**shutdown_args)
+        self._request_processing_executor.shutdown(**shutdown_args)
+
+    @staticmethod
+    def __wait_for_tasks_to_complete(*executors, timeout):
+        semaphore = threading.Semaphore(0)
+        for executor in executors:
+            executor.submit(lambda: semaphore.release())
+
+        time_stop_waiting = time.time() + timeout
+        for _ in executors:
+            if time.time() > time_stop_waiting:
+                break
+            semaphore.acquire(timeout=time_stop_waiting-time.time())
+

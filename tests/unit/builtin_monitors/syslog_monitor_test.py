@@ -18,6 +18,8 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+from contextlib import contextmanager
+from dataclasses import dataclass
 
 if False:
     from typing import List
@@ -39,7 +41,7 @@ import platform
 
 from scalyr_agent.builtin_monitors import syslog_monitor
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogMonitor, SyslogRequest, \
-    SocketNotReadyException
+    SocketNotReadyException, SyslogTCPServer, SyslogUDPServer
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogFrameParser
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogRequestParser
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogBatchedRequestParser
@@ -53,6 +55,7 @@ import mock
 
 from scalyr_agent.test_base import skipIf
 
+global_log = scalyr_logging.getLogger(__name__)
 
 class SyslogFrameParserTestCase(unittest.TestCase):
     def test_framed_messages(self):
@@ -154,6 +157,236 @@ class SyslogMonitorTestCase(ScalyrTestCase):
             self.fail("Unexpected Exception: %s" % six.text_type(e))
         except Exception:
             self.fail("Unexpected Exception: %s" % sys.exc_info()[0])
+
+
+
+class SyslogMonitorThreadingTest(ScalyrTestCase):
+
+    BIND_ADDRESS = "localhost"
+
+    class RequestVerifierMock():
+        def verify_request(self, client_address):
+            return True
+
+    VERIFIER = RequestVerifierMock()
+    class SyslogHandlerMock():
+        @dataclass
+        class LogLine:
+            timestamp: float
+            data: str
+            extra: dict
+
+        def __init__(self, address, type, handling_time):
+            self.logged_data = []
+            self.address = address
+            self.type = type
+            self.handling_time = handling_time
+
+        def handle(self, data, extra):
+            self.logged_data.append(self.LogLine(time.time(), data, extra))
+            time.sleep(self.handling_time)
+
+    class MockConfig():
+        def __init__(self):
+            self.syslog_processing_thread_count = 4
+            self.syslog_socket_thread_count = 4
+            self.syslog_monitors_shutdown_grace_period = 1
+
+    def __tcp_server(self, port, handling_time, global_config):
+        server = SyslogTCPServer(
+            port,
+            tcp_buffer_size = 50,
+            bind_address=self.BIND_ADDRESS,
+            verifier=self.VERIFIER,
+            global_config=global_config,
+        )
+        server.syslog_handler = self.SyslogHandlerMock(server.socket.getsockname(), server.socket.type, handling_time)
+        return server
+
+    def __udp_server(self, port, handling_time, global_config):
+        server = SyslogUDPServer(
+            port,
+            bind_address=self.BIND_ADDRESS,
+            verifier=self.VERIFIER,
+            global_config=global_config,
+        )
+        server.syslog_handler = self.SyslogHandlerMock(server.socket.getsockname(), server.socket.type, handling_time)
+        return server
+
+    @contextmanager
+    def start_servers(self, udp_servers_count, tcp_servers_count, handling_time, global_config):
+        udp_servers = [
+            self.__udp_server(0, handling_time, global_config) for _ in range(udp_servers_count)
+        ]
+        tcp_servers = [
+            self.__tcp_server(0, handling_time, global_config) for _ in range(tcp_servers_count)
+        ]
+
+        threads = [
+            threading.Thread(target=server.serve_forever)
+            for server in udp_servers + tcp_servers
+        ]
+
+        for thread in threads:
+            thread.start()
+
+        yield udp_servers, tcp_servers
+
+        for server in udp_servers + tcp_servers:
+            server.shutdown()
+
+        for thread in threads:
+            thread.join(timeout=0.1)
+            assert not thread.is_alive()
+
+    @staticmethod
+    def __send_syslog_messages(address, type, connections, messages_per_connection):
+        def message(connection_n, message_n):
+            message = f"<123> message-{connection_n, message_n}\n"
+            return message
+
+        def send():
+            for i in range(connections):
+                sock = socket.socket(socket.AF_INET, type)
+                sock.connect(address)
+                for j in range(messages_per_connection):
+                    sock.send(message(i,j).encode())
+                sock.close()
+
+        t = threading.Thread(target=send)
+        return t
+
+    def test_without_global_config(self):
+        with self.start_servers(udp_servers_count=1, tcp_servers_count=1, handling_time=0, global_config=None) as (udp_servers, tcp_servers):
+            for server in tcp_servers:
+                MESSAGES_PER_CONNECTION = 100
+                CONNECTIONS = 10
+                t = self.__send_syslog_messages(
+                    server.socket.getsockname(),
+                    server.socket.type,
+                    connections=CONNECTIONS,
+                    messages_per_connection=MESSAGES_PER_CONNECTION
+                )
+                t.start()
+                t.join()
+
+                time.sleep(0.5)
+
+                server.shutdown()
+                server.server_close()
+
+                for _ in range(100):
+                    time.sleep(0.1)
+                    if len(server.syslog_handler.logged_data) == CONNECTIONS * MESSAGES_PER_CONNECTION:
+                        break
+
+                assert len(server.syslog_handler.logged_data) == CONNECTIONS * MESSAGES_PER_CONNECTION
+
+
+    def test_shutdown_with_pending_requests(self):
+        HANDLING_TIME = 0.1
+        mock_config = self.MockConfig()
+        with self.start_servers(udp_servers_count=0, tcp_servers_count=1, handling_time=HANDLING_TIME, global_config=mock_config) as (udp_servers, tcp_servers):
+            for server in tcp_servers:
+                MESSAGES_PER_CONNECTION = 300
+                CONNECTIONS = 10
+                t = self.__send_syslog_messages(
+                    server.socket.getsockname(),
+                    server.socket.type,
+                    connections=CONNECTIONS,
+                    messages_per_connection=MESSAGES_PER_CONNECTION
+                )
+                t.start()
+                t.join()
+
+                time.sleep(0.5)
+
+                server.shutdown()
+                server.server_close()
+
+                msg_count_before_grace_period_elapsed = len(server.syslog_handler.logged_data)
+
+                time.sleep(
+                    mock_config.syslog_processing_thread_count * 10 * HANDLING_TIME + 3
+                )
+
+                msg_count_after_grace_period_elapsed = len(server.syslog_handler.logged_data)
+
+                assert msg_count_after_grace_period_elapsed > msg_count_before_grace_period_elapsed
+
+                # Cancel futures introduced in 3.9
+                if sys.version_info[0:2] >= (3, 9):
+                    time.sleep(1)
+                    # No new messages processed
+                    assert len(server.syslog_handler.logged_data) == msg_count_after_grace_period_elapsed
+
+    def test_fair_workers_distribution(self):
+        # Given
+        udp_servers_count = 3
+        tcp_servers_count = 3
+        connections = 10
+        messages_per_connection = 50
+        handling_time = 0.01
+        advantage_time = handling_time * 10
+        message_window = (udp_servers_count + tcp_servers_count) * 15
+        shutdown_time = connections * messages_per_connection * handling_time + 3
+
+        with self.start_servers(udp_servers_count, tcp_servers_count, handling_time, global_config=self.MockConfig()) as (udp_servers, tcp_servers):
+            # When
+            # Send some data to the servers
+            def send_data_to_servers(servers):
+                threads = [
+                    self.__send_syslog_messages(
+                        server.socket.getsockname(),
+                        server.socket.type,
+                        connections,
+                        messages_per_connection
+                    )
+                    for server in servers
+                ]
+
+                for t in threads:
+                    t.start()
+
+                return threads
+
+            def join_threads(threads):
+                for t in threads:
+                    t.join()
+
+
+            threads_first = send_data_to_servers(udp_servers[:1] + tcp_servers[:1])
+            time.sleep(advantage_time)
+            threads_rest = send_data_to_servers(udp_servers[1:] + tcp_servers[1:])
+            join_threads(threads_first + threads_rest)
+
+            time.sleep(shutdown_time)
+
+            shutdown_threads = [
+                threading.Thread(target=server.shutdown)
+                for server in udp_servers + tcp_servers
+            ]
+            for t in shutdown_threads:
+                t.start()
+
+            for t in shutdown_threads:
+                t.join()
+
+            # Then
+            logged_port_timestamp_sorted = sorted([
+                (server.socket.getsockname()[1], log_line.timestamp)
+                for server in udp_servers + tcp_servers
+                for log_line in server.syslog_handler.logged_data
+            ], key=lambda x: x[1])
+
+            logged_port_sorted = [x[0] for x in logged_port_timestamp_sorted]
+
+            # Check that the workers are distributed evenly
+            for start in range(len(logged_port_sorted) // 2):
+                print(len(set(logged_port_sorted[start:start+message_window])))
+                assert len(set(logged_port_sorted[start:start+message_window])) == len(udp_servers + tcp_servers)
+
+
 
 
 class SyslogMonitorConfigTest(SyslogMonitorTestCase):

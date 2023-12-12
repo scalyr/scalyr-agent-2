@@ -39,13 +39,6 @@ import scalyr_agent.scalyr_logging as scalyr_logging
 
 import six
 
-if six.PY2:
-    from scalyr_agent.builtin_monitors.thread_pool_dummy import ThreadPoolExecutorFactory
-else:
-    from scalyr_agent.builtin_monitors.thread_pool import ThreadPoolExecutorFactory
-
-
-
 log = scalyr_logging.getLogger(__name__)
 
 # Holds reference to the currently active MonitorsManager instance (singleton). Reference to this
@@ -215,10 +208,6 @@ class MonitorsManager(StoppableThread):
 
         start_time = time.time()
 
-        log.info("Stopping shared thread pools")
-        ThreadPoolExecutorFactory.shutdown(wait=False)
-
-
         for monitor in self.__running_monitors:
             # noinspection PyBroadException
             try:
@@ -239,7 +228,6 @@ class MonitorsManager(StoppableThread):
                     monitor.stop(join_timeout=max_wait)
                 except Exception:
                     log.exception("Failed to stop the metric log due to an exception")
-
 
 
         for monitor in self.__running_monitors:
