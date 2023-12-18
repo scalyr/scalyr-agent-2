@@ -278,6 +278,8 @@ jobs:
           - { "version": "v1.24.14", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true }
           - { "version": "v1.25.10", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true }
           - { "version": "v1.26.5", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true }
+          # CRI-O
+          - { "version": "v1.27.4", "driver": "docker", "runtime": "cri-o", "run_cronjob_checks": true }
 
     steps:
       - name: Checkout Repository
@@ -340,9 +342,10 @@ jobs:
 
           docker image ls
 
-          # Needed for containerd runtime
-          if [ "${{ matrix.k8s_version.runtime }}" = "containerd" ]; then
-            minikube image load k8s-image:test
+          # Needed for containerd or cri-o runtime
+          if [ "${{ matrix.k8s_version.runtime }}" = "containerd" ] || [ "${{ matrix.k8s_version.runtime }}" = "cri-o" ]; then
+            docker tag k8s-image:test docker.io/library/k8s-image:test
+            minikube image load docker.io/library/k8s-image:test
           fi
 
       # Here we build the dummy container which continuously prints data to stdout and stderr
@@ -351,17 +354,19 @@ jobs:
           docker build -f docker/Dockerfile.docker_monitor_testing_config -t std-printer scripts/
           docker image ls
 
-          # Needed for containerd runtime
-          if [ "${{ matrix.k8s_version.runtime }}" = "containerd" ]; then
-            minikube image load std-printer:latest
+          # Needed for containerd or cri-o runtime
+          if [ "${{ matrix.k8s_version.runtime }}" = "containerd" ] || [ "${{ matrix.k8s_version.runtime }}" = "cri-o" ]; then
+            docker tag std-printer:latest docker.io/library/std-printer:latest
+            minikube image load docker.io/library/std-printer:latest
           fi
 
       # Create pod for our mock std printer container which logs will be ingested by the agent
       - name: Create mock pod
         run: |
+          minikube image ls
           kubectl apply -f tests/e2e/k8s_k8s_monitor/std_printer_deployment.yaml
-
-          sleep 10
+          
+          kubectl wait --for=condition=ready pod -l app=std-printer
           kubectl get pods -A
 
           export APP_POD_NAME=$(kubectl get pod --namespace=default --selector=app=std-printer -o jsonpath="{.items[0].metadata.name}")
@@ -380,8 +385,6 @@ jobs:
           # We need to use a different file for different K8s versions due to promotion (removal of
           # old v1beta alias) from v1beta to v1 in v1.25.0. v1 has been available since v1.21.0
           kubectl apply -f tests/e2e/k8s_events_monitor/cronjob_v1.yaml
-
-          sleep 10
           kubectl get cronjob -A
 
       - name: Create scalyr-agent-2 daemonset
@@ -474,6 +477,10 @@ jobs:
         run: |
           export RETRY_ATTEMPTS="14"
           export SLEEP_DELAY="10"
+          
+          # Wait for at least one hello-printer job to be scheduled and completed. 
+          RETRIES=1; 
+          until echo -n "Waiting for first job to be completed - retry $RETRIES: " && kubectl wait --for=condition=complete job -l app=hello-printer || [ $RETRIES -gt 60 ]; do sleep 1; RETRIES=$(($RETRIES+1)); done
 
           # Verify agent is running
           echo "Job events checks"
@@ -514,6 +521,8 @@ jobs:
           - { "version": "v1.24.14", "driver": "docker", "runtime": "containerd" }
           - { "version": "v1.25.10", "driver": "docker", "runtime": "containerd" }
           - { "version": "v1.26.5", "driver": "docker", "runtime": "containerd" }
+          # CRI-O
+          - { "version": "v1.27.4", "driver": "docker", "runtime": "cri-o" }
 
     steps:
       - name: Checkout Repository
@@ -575,10 +584,11 @@ jobs:
             --image-type k8s
 
           docker image ls
-
-          # Needed for containerd runtime
-          if [ "${{ matrix.k8s_version.runtime }}" = "containerd" ]; then
-            minikube image load k8s-image:test
+          
+          # Needed for containerd or cri-o runtime
+          if [ "${{ matrix.k8s_version.runtime }}" = "containerd" ] || [ "${{ matrix.k8s_version.runtime }}" = "cri-o" ]; then
+            docker tag k8s-image:test docker.io/library/k8s-image:test
+            minikube image load docker.io/library/k8s-image:test
           fi
 
       # Here we build the dummy Java app image which exposes JMX metrics via exporter
@@ -590,9 +600,10 @@ jobs:
 
           docker image ls
 
-          # Needed for containerd runtime
-          if [ "${{ matrix.k8s_version.runtime }}" = "containerd" ]; then
-            minikube image load java-hello-world:latest
+          # Needed for containerd or cri-o runtime
+          if [ "${{ matrix.k8s_version.runtime }}" = "containerd" ] || [ "${{ matrix.k8s_version.runtime }}" = "cri-o" ]; then
+            docker tag java-hello-world:latest docker.io/library/java-hello-world:latest
+            minikube image load docker.io/library/java-hello-world:latest
           fi
 
       # Create mock pods and exporters which will be scrapped by the monitor
@@ -641,6 +652,7 @@ jobs:
 
           # Verify monitor is running
           echo "Monitor running checks"
+          kubectl get pods -A
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/agent.log" "Found 3 URL(s) to scrape for node"'
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/agent.log" "There are currently 3 dynamic and 2 static open metrics monitors running"'
           echo ""
