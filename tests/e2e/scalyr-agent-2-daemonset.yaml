@@ -83,6 +83,15 @@ spec:
           initialDelaySeconds: 60
           periodSeconds: 60
           timeoutSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+              - scalyr-agent-2
+              - status
+              - -H
+          initialDelaySeconds: 1
+          periodSeconds: 1
+          timeoutSeconds: 30
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler

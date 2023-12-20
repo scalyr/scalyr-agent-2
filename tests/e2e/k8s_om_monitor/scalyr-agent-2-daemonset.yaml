@@ -94,6 +94,15 @@ spec:
                 - -H
             initialDelaySeconds: 60
             periodSeconds: 60
+          readinessProbe:
+            exec:
+              command:
+                - scalyr-agent-2
+                - status
+                - -H
+            initialDelaySeconds: 1
+            periodSeconds: 1
+            timeoutSeconds: 30
           # We want to use custom config for the Kubernetes OpenMetrics monitor
           # and not one bundled with the agent.
           lifecycle:
