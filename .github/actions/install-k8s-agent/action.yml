@@ -110,8 +110,12 @@ runs:
         kubectl apply -f "${{ inputs.main_yaml_path }}"
 
         # Give it some time to start up
-        echo "Sleeping ${{ inputs.sleep_delay }} seconds and giving agent some time to become ready..."
-        sleep ${{ inputs.sleep_delay }}
+        echo "Waiting for agent to become ready, timeout ${{ inputs.sleep_delay }}s ..."
+        kubectl wait --for=condition=ready --namespace scalyr --timeout=${{ inputs.sleep_delay }}s pod -l app=scalyr-agent-2
+        
+        echo "Scalyr agent Status:"  
+        kubectl exec --namespace scalyr `kubectl get pod --namespace scalyr -l app=scalyr-agent-2 -o name` -- scalyr-agent-2 status -v
+        
         kubectl -n scalyr get event
         kubectl -n scalyr get serviceaccount
         kubectl -n scalyr get pods
