@@ -481,6 +481,7 @@ jobs:
           # Wait for at least one hello-printer job to be scheduled and completed. 
           RETRIES=1; 
           until echo -n "Waiting for first job to be completed - retry $RETRIES: " && kubectl wait --for=condition=complete job -l app=hello-printer || [ $RETRIES -gt 60 ]; do sleep 1; RETRIES=$(($RETRIES+1)); done
+          [ $RETRIES -gt 60 ] && echo "Job didn't start in time" && exit 1
 
           # Verify agent is running
           echo "Job events checks"
