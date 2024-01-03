@@ -33,8 +33,7 @@ __author__ = "anthonyj@sentinelone.com"
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.client_auth import ClientAuth
-
-from scalyr_client import AddEventsRequest
+from scalyr_agent.scalyr_client import AddEventsRequest
 
 log = scalyr_logging.getLogger(__name__)
 
