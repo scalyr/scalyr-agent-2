@@ -740,6 +740,13 @@ class Configuration(object):
             "default_sessions_per_worker",
             "default_worker_session_status_message_interval",
             "enable_worker_session_process_metrics_gather",
+            "server_url"
+            "auth",
+            "client_id",     # oauth2
+            "client_secret", # oauth2
+            "token_url",     # oauth2
+            "scopes",        # oauth2
+            "transport",
             # NOTE: It's important we use sanitzed_ version of this method which masks the API key
             "sanitized_worker_configs",
         ]
@@ -1463,6 +1470,41 @@ class Configuration(object):
     def api_key(self):
         """Returns the configuration value for 'api_key'."""
         return self.__get_config().get_string("api_key")
+
+    @property
+    def server_url(self):
+        """Returns the configuration value for 'server_url'."""
+        return self.__get_config().get_string("server_url")
+
+    @property
+    def auth(self):
+        """Returns the configuration value for 'auth'."""
+        return self.__get_config().get_string("auth")
+
+    @property
+    def client_id(self):
+        """Returns the configuration value for 'client_id'."""
+        return self.__get_config().get_string("client_id")
+
+    @property
+    def client_secret(self):
+        """Returns the configuration value for 'client_secret'."""
+        return self.__get_config().get_string("client_secret")
+
+    @property
+    def token_url(self):
+        """Returns the configuration value for 'token_url'."""
+        return self.__get_config().get_string("token_url")
+
+    @property
+    def scopes(self):
+        """Returns the configuration value for 'scopes'."""
+        return self.__get_config().get_json_array("scopes")
+
+    @property
+    def transport(self):
+        """Returns the configuration value for 'transport'."""
+        return self.__get_config().get_string("transport")
 
     @property
     def scalyr_server(self):
@@ -2776,6 +2818,27 @@ class Configuration(object):
             description,
             apply_defaults,
             env_aware=True,
+        )
+        self.__verify_or_set_optional_string(
+            config,
+            "transport",
+            "",
+            description,
+            apply_defaults
+        )
+        self.__verify_or_set_optional_string(
+            config,
+            "server_url",
+            "",
+            description,
+            apply_defaults
+        )
+        self.__verify_or_set_optional_string(
+            config,
+            "auth",
+            "",
+            description,
+            apply_defaults
         )
         self.__verify_or_set_optional_bool(
             config,
