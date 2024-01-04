@@ -43,6 +43,9 @@ from scalyr_agent.scalyr_client import (
     ScalyrClientSession,
     ScalyrClientSessionStatus,
 )
+from scalyr_agent.otlp_client import (
+    create_otlp_client,
+)
 from scalyr_agent.copying_manager.checkpoints import (
     update_checkpoint_state_in_file,
     write_checkpoint_state_to_file,
@@ -1226,8 +1229,9 @@ class CopyingManagerWorkerSession(
         """
         api_key = self.__worker_config_entry["api_key"]
         if self.__config.use_new_ingestion:
-
             self.__new_scalyr_client = create_new_client(self.__config, api_key=api_key)
+        elif self.__config.transport == "otlp":
+            self.__scalyr_client = create_otlp_client(self.__config, self.__worker_config_entry)
         else:
             self.__scalyr_client = create_client(
                 self.__config,
