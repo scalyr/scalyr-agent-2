@@ -1,0 +1,5 @@
+FROM python:3.11-alpine
+
+ADD long_message_printer.py /long_message_printer.py
+
+CMD ["python3", "-u", "/long_message_printer.py"]
