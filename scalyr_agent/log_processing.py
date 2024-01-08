@@ -90,6 +90,7 @@ log = scalyr_logging.getLogger(__name__)
 
 class CRIParseError(Exception):
     def __init__(self, line, message):
+        # type: (str, str) -> None
         self.line = line
         self.message = message
 
@@ -100,6 +101,7 @@ class CRILogLine(object):
     __slots__ = ("timestamp", "stream", "tags", "message", "raw_timestamp", "is_partial", "is_full")
 
     def __init__(self, timestamp, stream, tags, message, raw_timestamp):
+        # type: (int, str, list, str, str) -> None
         self.timestamp = timestamp
         self.stream = stream
         self.tags = tags
@@ -111,6 +113,7 @@ class CRILogLine(object):
 
     @classmethod
     def from_raw_line(cls, raw_line):
+        # type: (bytes) -> CRILogLine
         decoded_raw_line = raw_line.decode("utf-8", "replace")
         timestamp, stream, tags, message, raw_timestamp = cls.__parse_cri_log(
             decoded_raw_line
@@ -153,7 +156,9 @@ class CRILogLine(object):
         return timestamp, stream, tags, line, raw_timestamp
 
 class CRILogLineBuffer(object):
+    # This class is responsible for buffering CRI log lines for one stream and returning completed lines
     def __init__(self, first_line_time):
+        # type: (float) -> None
         self.__stream = None
         self.__lines = []
         self.__timestamp = None
@@ -162,6 +167,7 @@ class CRILogLineBuffer(object):
         self.__first_line_time = first_line_time
 
     def append(self, log_line):
+        # type: (CRILogLine) -> None
         if not self.__lines:
             self.__timestamp = log_line.timestamp
             self.__raw_timestamp = log_line.raw_timestamp
@@ -174,20 +180,25 @@ class CRILogLineBuffer(object):
 
     @property
     def stream(self):
+        # type: () -> str
         return self.__stream
 
     @property
     def first_line_time(self):
+        # type: () -> float
         return self.__first_line_time
 
     @property
     def is_partial(self):
+        # type: () -> bool
         return self.__is_partial
 
     def payload_length(self):
+        # type: () -> int
         return sum(map(len, self.__lines))
 
     def build_cri_result(self, include_raw_timestamp_field):
+        # type: (bool) -> LogLine
         def strip_new_line(s):
             if s:
                 if s[-2:] == "\r\n":
@@ -207,12 +218,17 @@ class CRILogLineBuffer(object):
         return result
 
 class CRIStreamBuffers(object):
+    # This class holds the buffers for all CRI streams and provides methods for adding lines and getting completed buffers
     def __init__(self, max_line_size, line_completion_wait_time):
+        # type: (int, int) -> None
         self.__max_line_size = max_line_size
         self.__line_completion_wait_time = line_completion_wait_time
         self.__buffers = {}
 
     def append_log_line(self, log_line, current_time):
+        # type: (CRILogLine, float) -> Optional[CRILogLineBuffer]
+        # Appends a new line to the buffer and returns the buffer if it is complete
+
         stream = log_line.stream
         if stream not in self.__buffers:
             self.__buffers[stream] = CRILogLineBuffer(current_time)
@@ -232,6 +248,7 @@ class CRIStreamBuffers(object):
         )
 
     def pop_completed(self, current_time):
+        # type: (float) -> Optional[CRILogLineBuffer]
         for stream, buffer in self.__buffers.items():
             if self.__buffer_completed(buffer, current_time):
                 return self.__buffers.pop(stream)
