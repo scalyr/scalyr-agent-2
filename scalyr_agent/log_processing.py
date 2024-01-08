@@ -89,10 +89,10 @@ COPY_STALENESS_THRESHOLD = 15 * 60
 log = scalyr_logging.getLogger(__name__)
 
 class CRIParseError(Exception):
-    def __init__(self, line, message):
-        # type: (str, str) -> None
-        self.line = line
+    def __init__(self, message, line):
+        # type: (str, Union[str,bytes]) -> None
         self.message = message
+        self.line = line
 
     def __repr__(self):
         return "Error parsing line - %s: %s" % self.message, self.line
