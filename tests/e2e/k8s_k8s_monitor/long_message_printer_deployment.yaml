@@ -1,23 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: std-printer
+  name: long-message-printer
   namespace: default
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: std-printer
+      app: long-message-printer
   template:
     metadata:
       labels:
-        app: std-printer
+        app: long-message-printer
       annotations:
-        log.config.scalyr.com/attributes.parser: "test-parser-1"
+        log.config.scalyr.com/attributes.parser: "test-parser-2"
     spec:
       containers:
-      - name: std-printer
-        image: docker.io/library/std-printer:latest
+      - name: long-message-printer
+        image: docker.io/library/long-message-printer:latest
         imagePullPolicy: Never
       nodeSelector:
         kubernetes.io/os: linux

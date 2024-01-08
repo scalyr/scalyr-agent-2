@@ -54,15 +54,14 @@ function retry_on_failure {
      "$@" && break
      exit_code=$?
 
-     echo_with_date ""
-     echo_with_date "Function returned non-zero status code, sleeping ${SLEEP_DELAY}s before next attempt.."
-     echo_with_date ""
-
-     i=$((i+1))
-
      if [ "${i}" -lt "${RETRY_ATTEMPTS}" ]; then
+       echo_with_date ""
+       echo_with_date "Function returned non-zero status code, sleeping ${SLEEP_DELAY}s before next attempt.."
+       echo_with_date ""
        sleep "${SLEEP_DELAY}"
      fi
+
+     i=$((i+1))
   done
 
   if [ "${exit_code}" -ne 0 ]; then
