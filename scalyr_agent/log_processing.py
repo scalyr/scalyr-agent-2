@@ -88,45 +88,170 @@ COPY_STALENESS_THRESHOLD = 15 * 60
 
 log = scalyr_logging.getLogger(__name__)
 
+class CRIParseError(Exception):
+    def __init__(self, message, line):
+        # type: (str, Union[str,bytes]) -> None
+        self.message = message
+        self.line = line
 
-def _parse_cri_log(line):
-    """
-    Parse a log line that uses the K8S Container Runtime Interface (CRI) format
-    https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/kubelet-cri-logging.md
-    """
-    # find the end of the timestamp segment
-    index = line.find(" ")
-    if index < 0:
-        return None, None, None, None
+    def __repr__(self):
+        return "Error parsing line - %s: %s" % self.message, self.line
 
-    # parse the timestamp
-    timestamp = rfc3339_to_nanoseconds_since_epoch(line[:index])
-    if timestamp is None:
-        return None, None, None, None
+class CRILogLine(object):
+    __slots__ = ("timestamp", "stream", "tags", "message", "raw_timestamp", "is_partial", "is_full")
 
-    # skip over the ' ' delimiter and parse the stream type
-    line = line[index + 1 :]
-    index = line.find(" ")
-    if index < 0:
-        return None, None, None, None
+    def __init__(self, timestamp, stream, tags, message, raw_timestamp):
+        # type: (int, str, list, str, str) -> None
+        self.timestamp = timestamp
+        self.stream = stream
+        self.tags = tags
+        self.message = message
+        self.raw_timestamp = raw_timestamp
 
-    stream = line[:index]
-    if stream != "stdout" and stream != "stderr":
-        return None, None, None, None
+        self.is_partial = "P" in tags if tags else False
+        self.is_full = "F" in tags if tags else False
 
-    # skip over the ' ' delimiter and parse the tags
-    line = line[index + 1 :]
-    index = line.find(" ")
-    if index < 0:
-        return None, None, None, None
+    @classmethod
+    def from_raw_line(cls, raw_line):
+        # type: (bytes) -> CRILogLine
+        decoded_raw_line = raw_line.decode("utf-8", "replace")
+        timestamp, stream, tags, message, raw_timestamp = cls.__parse_cri_log(
+            decoded_raw_line
+        )
 
-    tags = line[:index]
+        log_line = cls(timestamp, stream, tags, message, raw_timestamp)
 
-    # skip over the ' ' delimiter and get the log line
-    line = line[index + 1 :]
+        if not log_line.is_partial and not log_line.is_full:
+            raise CRIParseError("Expected tags to contain P or F", raw_line)
 
-    return timestamp, stream, tags, line
+        return log_line
 
+    @staticmethod
+    def __parse_cri_log(line):
+        """
+        Parse a log line that uses the K8S Container Runtime Interface (CRI) format
+        https://github.com/kubernetes/design-proposals-archive/blob/main/node/kubelet-cri-logging.md
+        Please be aware that the sample log lines in the proposal mix stdout and stderr streams, which is not the case
+        in the actual implementation.
+        """
+        parts = line.split(" ", maxsplit=3)
+        # The 4 parts are the timestamp, stream, tags, and message. The 4th part can contain spaces.
+        if len(parts) < 3:
+            raise CRIParseError("Expected 3 or 4 records (timestamp, stream, tags, optional message), got %d" % len(parts), line)
+
+        # parse the timestamp
+        timestamp = rfc3339_to_nanoseconds_since_epoch(parts[0])
+        if timestamp is None:
+            raise CRIParseError("Could not parse timestamp", line)
+        raw_timestamp = timestamp
+
+        # parse the stream type
+        stream = parts[1]
+        if stream != "stdout" and stream != "stderr":
+            raise CRIParseError("Unknown stream type", line)
+
+        tags = parts[2].split(":")
+        line = parts[3] if len(parts) == 4 else ""
+
+        return timestamp, stream, tags, line, raw_timestamp
+
+class CRILogLineBuffer(object):
+    # This class is responsible for buffering CRI log lines for one stream and returning completed lines
+    def __init__(self, first_line_time):
+        # type: (float) -> None
+        self.__stream = None
+        self.__lines = []
+        self.__timestamp = None
+        self.__raw_timestamp = None
+        self.__is_partial = True
+        self.__first_line_time = first_line_time
+
+    def append(self, log_line):
+        # type: (CRILogLine) -> None
+        if not self.__lines:
+            self.__timestamp = log_line.timestamp
+            self.__raw_timestamp = log_line.raw_timestamp
+            self.__stream = log_line.stream
+
+        self.__lines.append(log_line.message)
+
+        if log_line.is_full:
+            self.__is_partial = False
+
+    @property
+    def stream(self):
+        # type: () -> str
+        return self.__stream
+
+    @property
+    def first_line_time(self):
+        # type: () -> float
+        return self.__first_line_time
+
+    @property
+    def is_partial(self):
+        # type: () -> bool
+        return self.__is_partial
+
+    def payload_length(self):
+        # type: () -> int
+        return sum(map(len, self.__lines))
+
+    def build_cri_result(self, include_raw_timestamp_field):
+        # type: (bool) -> LogLine
+        def strip_new_line(s):
+            if s:
+                if s[-2:] == "\r\n":
+                    return s[:-2]
+                if s[-1] == "\n":
+                    return s[:-1]
+            return s
+
+        lines_string = "".join(map(strip_new_line, self.__lines)) + "\n"
+
+        result = LogLine(lines_string.encode("utf-8"))
+        result.timestamp = self.__timestamp
+        result.attrs = {"stream": self.__stream}
+        if include_raw_timestamp_field:
+            result.attrs["raw_timestamp"] = self.__raw_timestamp
+
+        return result
+
+class CRIStreamBuffers(object):
+    # This class holds the buffers for all CRI streams and provides methods for adding lines and getting completed buffers
+    def __init__(self, max_line_size, line_completion_wait_time):
+        # type: (int, int) -> None
+        self.__max_line_size = max_line_size
+        self.__line_completion_wait_time = line_completion_wait_time
+        self.__buffers = {}
+
+    def append_log_line(self, log_line, current_time):
+        # type: (CRILogLine, float) -> Optional[CRILogLineBuffer]
+        # Appends a new line to the buffer and returns the buffer if it is complete
+
+        stream = log_line.stream
+        if stream not in self.__buffers:
+            self.__buffers[stream] = CRILogLineBuffer(current_time)
+
+        self.__buffers[stream].append(log_line)
+
+        if self.__buffer_completed(self.__buffers[stream], current_time):
+            return self.__buffers.pop(stream)
+        else:
+            return None
+
+    def __buffer_completed(self, buffer, current_time):
+        return (
+                not buffer.is_partial
+                or current_time - buffer.first_line_time > self.__line_completion_wait_time
+                or buffer.payload_length() >= self.__max_line_size
+        )
+
+    def pop_completed(self, current_time):
+        # type: (float) -> Optional[CRILogLineBuffer]
+        for stream, buffer in self.__buffers.items():
+            if self.__buffer_completed(buffer, current_time):
+                return self.__buffers.pop(stream)
 
 class LogLine(object):
     """A class representing a line from a log file.
@@ -315,6 +440,8 @@ class LogFileIterator(object):
 
         if self.__file_system is None:
             self.__file_system = FileSystem()
+
+        self.__cri_stream_buffers = CRIStreamBuffers(self.__max_line_length, self.__line_completion_wait_time)
 
         # If we have a checkpoint, then iterate over it, seeing if the contents are up-to-date.  If so, then
         # we will pick up from the left off point.
@@ -670,36 +797,40 @@ class LogFileIterator(object):
 
         # read a complete line from our line_matcher, with check to see if we allow for extended lines, and if so,
         # then read more pages so that we can parse an entire extended line.
-        next_line = self.__read_extended_line(current_time)
 
-        result = LogLine(line=next_line)
 
-        if len(result.line) == 0:
-            return result
 
         # check to see if we need to parse the line as cri.
-        # Note: we don't handle multi-line lines.
         if self.__parse_format == "cri":
-            # 2->TODO decode line to parse it.
-            timestamp, stream, tags, message = _parse_cri_log(
-                result.line.decode("utf-8", "replace")
-            )
-            if message is None:
-                log.warning(
-                    "Didn't find a valid log line in CRI format for log %s.  Logging full line."
-                    % (self.__path),
-                    limit_once_per_x_secs=300,
-                    limit_key=("invalid-cri-format-%s" % self.__path),
-                )
-            else:
-                result.line = message.encode("utf-8")
-                result.timestamp = timestamp
-                result.attrs = {"stream": stream}
-                if self.__include_raw_timestamp_field:
-                    result.attrs["raw_timestamp"] = timestamp
+            # If any buffer expired the line_completion_wait_time then we need to return it
+            cri_buffer = self.__cri_stream_buffers.pop_completed(current_time)
+            if cri_buffer is not None:
+                return cri_buffer.build_cri_result(self.__include_raw_timestamp_field)
+
+            next_line = self.__read_extended_line(current_time)
+            while next_line:
+                try:
+                    log_line = CRILogLine.from_raw_line(next_line)
+                    cri_buffer = self.__cri_stream_buffers.append_log_line(log_line, current_time)
+                    if cri_buffer is not None:
+                        self.__sync_position_with_buffer()
+                        return cri_buffer.build_cri_result(self.__include_raw_timestamp_field)
+
+                except CRIParseError as e:
+                    log.error("Error parsing line: %s, reason: %s" % (e.line, e.message))
+
+                next_line = self.__read_extended_line(current_time)
+
+            self.__sync_position_with_buffer()
+            return LogLine(line=b"")
 
         # or see if we need to parse it as json
         elif self.__parse_format == "json":
+            next_line = self.__read_extended_line(current_time)
+            result = LogLine(line=next_line)
+            if len(result.line) == 0:
+                return result
+
             try:
                 # 2->TODO decode line to parse it.
                 # TODO: optimize
@@ -755,10 +886,7 @@ class LogFileIterator(object):
                                 current_time - self.__merge_json_line_time
                                 < self.__line_completion_wait_time
                             ):
-                                self.__buffer.seek(original_buffer_position)
-                                self.__position = self.__determine_mark_position(
-                                    self.__buffer.tell()
-                                )
+                                self.__seek_to(original_buffer_position)
                                 log.log(
                                     scalyr_logging.DEBUG_LEVEL_3,
                                     "Incomplete merged line found in file %s, will reattempt reading.",
@@ -806,6 +934,11 @@ class LogFileIterator(object):
                     limit_once_per_x_secs=300,
                     limit_key=("bad-json-%s" % self.__path),
                 )
+        else:
+            next_line = self.__read_extended_line(current_time)
+            result = LogLine(line=next_line)
+            if len(result.line) == 0:
+                return result
 
         raw_line_length = self.__buffer.tell() - original_buffer_position
 
@@ -846,7 +979,7 @@ class LogFileIterator(object):
 
             return self.__read_next_fragment_from_extended_line_buffer()
         else:
-            self.__position = self.__determine_mark_position(self.__buffer.tell())
+            self.__sync_position_with_buffer()
 
             # Just a sanity check.
             # if len(self.__buffer_contents_index) > 0:
@@ -857,6 +990,13 @@ class LogFileIterator(object):
             #                                              expected_size, actual_size)
 
         return result
+
+    def __sync_position_with_buffer(self):
+        self.__position = self.__determine_mark_position(self.__buffer.tell())
+
+    def __seek_to(self, original_buffer_position):
+        self.__buffer.seek(original_buffer_position)
+        self.__sync_position_with_buffer()
 
     def __read_extended_line(self, current_time):
         # read a complete line from our line_matcher
@@ -896,7 +1036,7 @@ class LogFileIterator(object):
         )
         if self.__extended_line_position is None:
             self.__buffer.seek(self.__extended_line_buffer.raw_size, 1)
-            self.__position = self.__determine_mark_position(self.__buffer.tell())
+            self.__sync_position_with_buffer()
 
         return result
 
@@ -1437,7 +1577,7 @@ class LogFileIterator(object):
 
         original_buffer_position = self.__buffer.tell()
         # Seek to the end
-        self.__buffer.seek(0, 2)
+        self.__buffer.seek(0, os.SEEK_END)
         initial_size = self.__buffer.tell()
 
         end_size = initial_size + page_size

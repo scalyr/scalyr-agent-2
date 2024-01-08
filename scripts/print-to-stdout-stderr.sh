@@ -24,5 +24,9 @@ echo ""
 for i in {1..1000000}; do
     echo "stdout: line $i"
     echo "stderr: line $i" 1>&2
+    echo -n "line $i BEGIN DELAYED MESSAGE stdout"
+    echo -n "line $i BEGIN DELAYED MESSAGE stderr" 1>&2
     sleep "${SLEEP_DELAY}"
+    echo "-END DELAYED MESSAGE stdout line $i"
+    echo "-END DELAYED MESSAGE stderr line $i" 1>&2
 done

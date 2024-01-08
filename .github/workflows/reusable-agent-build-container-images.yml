@@ -349,24 +349,29 @@ jobs:
           fi
 
       # Here we build the dummy container which continuously prints data to stdout and stderr
-      - name: Build Dummy App Docker Image
+      - name: Build Dummy App Docker Images
         run: |
           docker build -f docker/Dockerfile.docker_monitor_testing_config -t std-printer scripts/
+          docker build -f docker/Dockerfile.long_message_printer -t long-message-printer scripts/
           docker image ls
 
           # Needed for containerd or cri-o runtime
           if [ "${{ matrix.k8s_version.runtime }}" = "containerd" ] || [ "${{ matrix.k8s_version.runtime }}" = "cri-o" ]; then
-            docker tag std-printer:latest docker.io/library/std-printer:latest
-            minikube image load docker.io/library/std-printer:latest
+            for IMAGE in std-printer long-message-printer; do
+              docker tag ${IMAGE}:latest docker.io/library/${IMAGE}:latest
+              minikube image load docker.io/library/${IMAGE}:latest
+            done
           fi
 
       # Create pod for our mock std printer container which logs will be ingested by the agent
-      - name: Create mock pod
+      - name: Create mock pods
         run: |
           minikube image ls
           kubectl apply -f tests/e2e/k8s_k8s_monitor/std_printer_deployment.yaml
+          kubectl apply -f tests/e2e/k8s_k8s_monitor/long_message_printer_deployment.yaml
           
           kubectl wait --for=condition=ready pod -l app=std-printer
+          kubectl wait --for=condition=ready pod -l app=long-message-printer
           kubectl get pods -A
 
           export APP_POD_NAME=$(kubectl get pod --namespace=default --selector=app=std-printer -o jsonpath="{.items[0].metadata.name}")
@@ -385,6 +390,7 @@ jobs:
           # We need to use a different file for different K8s versions due to promotion (removal of
           # old v1beta alias) from v1beta to v1 in v1.25.0. v1 has been available since v1.21.0
           kubectl apply -f tests/e2e/k8s_events_monitor/cronjob_v1.yaml
+
           kubectl get cronjob -A
 
       - name: Create scalyr-agent-2 daemonset
@@ -428,6 +434,7 @@ jobs:
           # annotation set as part of the deployment YAML.
           # After a while, we change that dynamically using kubectl and verify that this change has
           # been correctly picked up by the agent.
+          echo Waiting 20s for some data to be ingested
           sleep 20
 
           echo "Initial pod ingested data checks"
@@ -463,6 +470,29 @@ jobs:
             echo "Kubernetes event monitor log has to be handled by the agent 1 time, but it got ${k8s_event_log_files_number}"
             exit 1
           fi
+          
+          echo "Wait for BEGIN DELAYED MESSAGE-END DELAYED MESSAGE lines. They should not be splitted."
+          MINIMUM_RESULTS=10 ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" app="std-printer" parser="test-parser-1" stream="stdout" "BEGIN DELAYED MESSAGE stdout"'
+          MINIMUM_RESULTS=10 ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" app="std-printer" parser="test-parser-1" stream="stderr" "BEGIN DELAYED MESSAGE stderr"'
+          echo "Looking for partial lines."
+          RETRY_ATTEMPTS=1 ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" app="std-printer" parser="test-parser-1" stream="stdout" "BEGIN DELAYED MESSAGE stdout" !"BEGIN DELAYED MESSAGE stdout-END DELAYED MESSAGE stdout"' && echo -e $ERR_MSG && exit 1 || echo -e $SUCCESS_MSG
+          RETRY_ATTEMPTS=1 ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" app="std-printer" parser="test-parser-1" stream="stderr" "BEGIN DELAYED MESSAGE stderr" !"BEGIN DELAYED MESSAGE stderr-END DELAYED MESSAGE stderr"' && echo -e $ERR_MSG && exit 1 || echo -e $SUCCESS_MSG
+          echo 'Looking for mixed streams'
+          RETRY_ATTEMPTS=1 ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" app="std-printer" parser="test-parser-1" stream="stdout" "stderr"' && echo -e $MIXED_STREAMS_ERR_MSG && exit 1 || echo -e $MIXED_STREAMS_SUCCESS_MSG
+          RETRY_ATTEMPTS=1 ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" app="std-printer" parser="test-parser-1" stream="stderr" "stdout"' && echo -e $MIXED_STREAMS_ERR_MSG && exit 1 || echo -e $MIXED_STREAMS_SUCCESS_MSG
+          
+          echo "Wait for BEGIN_LONG_MESSAGE .* END_LONG_MESSAGE lines. They should not be splitted."
+          MINIMUM_RESULTS=10 ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" app="long-message-printer" parser="test-parser-2" stream="stdout" "stdout_BEGIN_LONG_MESSAGE"'
+          MINIMUM_RESULTS=10 ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" app="long-message-printer" parser="test-parser-2" stream="stderr" "stderr_BEGIN_LONG_MESSAGE"'
+          echo "Looking for partial lines."
+          RETRY_ATTEMPTS=1 ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" app="long-message-printer" parser="test-parser-2" stream="stdout" "stdout_BEGIN_LONG_MESSAGE" !(message matches "BEGIN_LONG_MESSAGE.*END_LONG_MESSAGE")'  && echo -e $ERR_MSG && exit 1 || echo -e $SUCCESS_MSG
+          RETRY_ATTEMPTS=1 ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" app="long-message-printer" parser="test-parser-2" stream="stderr" "stderr_BEGIN_LONG_MESSAGE" !(message matches "BEGIN_LONG_MESSAGE.*END_LONG_MESSAGE")'  && echo -e $ERR_MSG && exit 1 || echo -e $SUCCESS_MSG
+          echo 'Looking for mixed streams'
+          RETRY_ATTEMPTS=1 ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" app="long-message-printer" parser="test-parser-2" stream="stdout" "stderr"'  && echo -e $MIXED_STREAMS_ERR_MSG && exit 1 || echo -e $MIXED_STREAMS_SUCCESS_MSG
+          RETRY_ATTEMPTS=1 ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" app="long-message-printer" parser="test-parser-2" stream="stderr" "stdout"'  && echo -e $MIXED_STREAMS_ERR_MSG && exit 1 || echo -e $MIXED_STREAMS_SUCCESS_MSG
+
+          
+          echo ""
 
       # We only assert this under newer Kubernetes versions since in the old ones CronJobs were not
       # available out of the box
@@ -646,7 +676,7 @@ jobs:
         run: |
           export RETRY_ATTEMPTS="30"
           export SLEEP_DELAY="10"
-
+          
           # Verify agent is running
           echo "Agent running checks"
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/agent.log" "Starting scalyr agent..."'

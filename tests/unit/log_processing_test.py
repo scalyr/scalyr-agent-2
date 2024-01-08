@@ -27,7 +27,10 @@ import unittest
 import sys
 import time
 import platform
+from datetime import datetime, timezone, timedelta
 from io import open
+
+import pytest
 
 import scalyr_agent.util as scalyr_util
 
@@ -38,11 +41,11 @@ from scalyr_agent.log_processing import (
     LogLineSampler,
     LogLineRedacter,
     LogFileProcessor,
-    LogMatcher,
+    LogMatcher, CRILogLineBuffer, CRIStreamBuffers,
 )
 from scalyr_agent.line_matcher import LineGrouper
 from scalyr_agent.log_processing import FileSystem
-from scalyr_agent.log_processing import _parse_cri_log as parse_cri_log
+from scalyr_agent.log_processing import CRILogLine, CRIParseError
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.json_lib import JsonArray
 from scalyr_agent.util import md5_hexdigest
@@ -57,94 +60,153 @@ from six import unichr
 from six.moves import range
 
 
+class Timestamp():
+    def __init__(self, iso, nanos):
+        self.iso = iso
+        self.nanos = nanos
+
+def timestamp_generator(seconds_ago_start):
+    now = datetime.now(timezone.utc).astimezone()
+    start_timestamp = now - timedelta(minutes=seconds_ago_start)
+    
+    for seconds_after in range(0, 1000):
+        timestamp = start_timestamp + timedelta(seconds=seconds_after)
+        yield Timestamp(bytes(timestamp.isoformat(), "utf-8"), round(timestamp.timestamp() * 1000 * 1000) * 1000)
+
+def assert_line(log_line, line, timestamp, stream):
+    assert log_line.line == line
+    assert log_line.timestamp == timestamp
+    assert log_line.attrs["stream"] == stream
+
+
+class TestCRILogLineBuffer(ScalyrTestCase):
+    def test_is_partial_on_empty(self):
+        assert CRILogLineBuffer(first_line_time=0).is_partial
+
+    def test_is_partial(self):
+        LINE_1 = "line 1"
+        LINE_2 = "line 2"
+
+        buffer = CRILogLineBuffer(first_line_time=0)
+        buffer.append(CRILogLine(0, "stdout", ["P"], LINE_1, None))
+
+        assert buffer.is_partial
+
+        buffer.append(CRILogLine(0, "stdout", ["F"], LINE_2, None))
+
+        assert not buffer.is_partial
+
+class TestCRIStreamBuffers(ScalyrTestCase):
+    def test_completed_on_empty(self):
+        assert None == CRIStreamBuffers(max_line_size=10, line_completion_wait_time=10).pop_completed(current_time=1)
+
+    def test_completed(self):
+        buffers = CRIStreamBuffers(max_line_size=100, line_completion_wait_time=10)
+        assert None == buffers.append_log_line(CRILogLine(0, "stdout", ["P"], "line 01 ", None), 0)
+        assert buffers.append_log_line(CRILogLine(1, "stderr", ["F"], "line 02 ", None), 1).build_cri_result(True).line == b"line 02 \n"
+
+        assert None == buffers.pop_completed(current_time=1)
+
+        assert None == buffers.append_log_line(CRILogLine(2, "stderr", ["P"], "line 03 ", None), 2)
+        assert None == buffers.append_log_line(CRILogLine(3, "stdout", ["P"], "line 04 ", None), 3)
+        assert buffers.append_log_line(CRILogLine(4, "stderr", ["F"], "line 05 ", None), 4).build_cri_result(True).line == b"line 03 line 05 \n"
+
+        assert None == buffers.pop_completed(current_time=5)
+
+        assert None == buffers.pop_completed(current_time=10)
+        assert buffers.pop_completed(current_time=11).build_cri_result(True).line == b"line 01 line 04 \n"
+
+    def test_completed_max_length(self):
+        LINE_LEN = len("line 00 ")
+
+        buffers = CRIStreamBuffers(max_line_size=LINE_LEN * 2, line_completion_wait_time=10)
+        buffers.append_log_line(CRILogLine(0, "stdout", ["P"], "line 00 ", None), 0)
+        buffers.append_log_line(CRILogLine(1, "stderr", ["P"], "line 01 ", None), 1)
+
+        assert None == buffers.pop_completed(current_time=2)
+
+        assert buffers.append_log_line(CRILogLine(2, "stdout", ["P"], "line 02 ", None), 2).build_cri_result(True).line == b"line 00 line 02 \n"
+
+
+
 class TestCRILogParsing(ScalyrTestCase):
     def test_invalid_line(self):
-        line = "sdflkjasdlfkjweirjlasdfj"
-        ts, stream, tags, msg = parse_cri_log(line)
-        self.assertIsNone(ts)
-        self.assertIsNone(stream)
-        self.assertIsNone(tags)
-        self.assertIsNone(msg)
+        line = b"sdflkjasdlfkjweirjlasdfj"
+        with pytest.raises(CRIParseError):
+            CRILogLine.from_raw_line(line)
 
     def test_invalid_timestamp(self):
-        line = "sdflkjasdlfk jweirjlasdfj"
-        ts, stream, tags, msg = parse_cri_log(line)
-        self.assertIsNone(ts)
-        self.assertIsNone(stream)
-        self.assertIsNone(tags)
-        self.assertIsNone(msg)
+        line = b"sdflkjasdlfk jweirjlasdfj"
+        with pytest.raises(CRIParseError):
+            CRILogLine.from_raw_line(line)
 
     def test_missing_stream(self):
-        line = "2019-04-08T15:18:20.56064743Z "
-        ts, stream, tags, msg = parse_cri_log(line)
-        self.assertIsNone(ts)
-        self.assertIsNone(stream)
-        self.assertIsNone(tags)
-        self.assertIsNone(msg)
+        line = b"2019-04-08T15:18:20.56064743Z "
+        with pytest.raises(CRIParseError):
+            CRILogLine.from_raw_line(line)
 
     def test_invalid_stream(self):
-        line = "2019-04-08T15:18:20.56064743Z foobar"
-        ts, stream, tags, msg = parse_cri_log(line)
-        self.assertIsNone(ts)
-        self.assertIsNone(stream)
-        self.assertIsNone(tags)
-        self.assertIsNone(msg)
+        line = b"2019-04-08T15:18:20.56064743Z foobar"
+        with pytest.raises(CRIParseError):
+            CRILogLine.from_raw_line(line)
 
     def test_missing_tags(self):
-        line = "2019-04-08T15:18:20.56064743Z stdout "
-        ts, stream, tags, msg = parse_cri_log(line)
-        self.assertIsNone(ts)
-        self.assertIsNone(stream)
-        self.assertIsNone(tags)
-        self.assertIsNone(msg)
+        line = b"2019-04-08T15:18:20.56064743Z stdout "
+        with pytest.raises(CRIParseError):
+            CRILogLine.from_raw_line(line)
 
     def test_multi_tags(self):
-        line = "2019-04-08T15:18:20.56064743Z stdout P:B:D message"
-        ts, stream, tags, msg = parse_cri_log(line)
-        self.assertEqual(1554736700560647430, ts)
-        self.assertEqual("stdout", stream)
-        self.assertEqual("P:B:D", tags)
-        self.assertEqual("message", msg)
+        line = b"2019-04-08T15:18:20.56064743Z stdout P:B:F message"
+        cri_log_line = CRILogLine.from_raw_line(line)
+        self.assertEqual(1554736700560647430, cri_log_line.timestamp)
+        self.assertEqual("stdout", cri_log_line.stream)
+        self.assertEqual(["P", "B", "F"], cri_log_line.tags)
+        self.assertEqual("message", cri_log_line.message)
+
+    def test_tags_full_and_partial_missing(self):
+        line = b"2019-04-08T15:18:20.56064743Z stdout A:B:D message"
+        with pytest.raises(CRIParseError):
+            CRILogLine.from_raw_line(line)
 
     def test_missing_log(self):
-        line = "2019-04-08T15:18:20.56064743Z stdout P "
-        ts, stream, tags, msg = parse_cri_log(line)
-        self.assertEqual(1554736700560647430, ts)
-        self.assertEqual("stdout", stream)
-        self.assertEqual("P", tags)
-        self.assertEqual("", msg)
+        line = b"2019-04-08T15:18:20.56064743Z stdout P "
+        cri_log_line = CRILogLine.from_raw_line(line)
+        self.assertEqual(1554736700560647430, cri_log_line.timestamp)
+        self.assertEqual("stdout", cri_log_line.stream)
+        self.assertEqual(["P"], cri_log_line.tags)
+        self.assertEqual("", cri_log_line.message)
 
     def test_valid_line_stdout(self):
-        line = "2019-04-08T15:18:20.56064743Z stdout P message"
-        ts, stream, tags, msg = parse_cri_log(line)
-        self.assertEqual(1554736700560647430, ts)
-        self.assertEqual("stdout", stream)
-        self.assertEqual("P", tags)
-        self.assertEqual("message", msg)
+        line = b"2019-04-08T15:18:20.56064743Z stdout P message"
+        cri_log_line = CRILogLine.from_raw_line(line)
+        self.assertEqual(1554736700560647430, cri_log_line.timestamp)
+        self.assertEqual("stdout", cri_log_line.stream)
+        self.assertEqual(["P"], cri_log_line.tags)
+        self.assertEqual("message", cri_log_line.message)
 
     def test_valid_line_stderr(self):
-        line = "2019-04-08T15:18:20.56064743Z stderr P message"
-        ts, stream, tags, msg = parse_cri_log(line)
-        self.assertEqual(1554736700560647430, ts)
-        self.assertEqual("stderr", stream)
-        self.assertEqual("P", tags)
-        self.assertEqual("message", msg)
+        line = b"2019-04-08T15:18:20.56064743Z stderr P message"
+        cri_log_line = CRILogLine.from_raw_line(line)
+        self.assertEqual(1554736700560647430, cri_log_line.timestamp)
+        self.assertEqual("stderr", cri_log_line.stream)
+        self.assertEqual(["P"], cri_log_line.tags)
+        self.assertEqual("message", cri_log_line.message)
 
     def test_valid_line_single(self):
-        line = "2019-04-08T15:18:20.56064743Z stdout F message"
-        ts, stream, tags, msg = parse_cri_log(line)
-        self.assertEqual(1554736700560647430, ts)
-        self.assertEqual("stdout", stream)
-        self.assertEqual("F", tags)
-        self.assertEqual("message", msg)
+        line = b"2019-04-08T15:18:20.56064743Z stdout F message"
+        cri_log_line = CRILogLine.from_raw_line(line)
+        self.assertEqual(1554736700560647430, cri_log_line.timestamp)
+        self.assertEqual("stdout", cri_log_line.stream)
+        self.assertEqual(["F"], cri_log_line.tags)
+        self.assertEqual("message", cri_log_line.message)
 
     def test_valid_line_partial(self):
-        line = "2019-04-08T15:18:20.56064743Z stdout P message"
-        ts, stream, tags, msg = parse_cri_log(line)
-        self.assertEqual(1554736700560647430, ts)
-        self.assertEqual("stdout", stream)
-        self.assertEqual("P", tags)
-        self.assertEqual("message", msg)
+        line = b"2019-04-08T15:18:20.56064743Z stdout P message"
+        cri_log_line = CRILogLine.from_raw_line(line)
+        self.assertEqual(1554736700560647430, cri_log_line.timestamp)
+        self.assertEqual("stdout", cri_log_line.stream)
+        self.assertEqual(["P"], cri_log_line.tags)
+        self.assertEqual("message", cri_log_line.message)
 
 
 class TestLogFileIterator(ScalyrTestCase):
@@ -269,6 +331,200 @@ class TestLogFileIterator(ScalyrTestCase):
 
         self.assertEqual(expected, self.readline().line)
         self.assertEqual(expected_next, self.readline().line)
+
+    def test_cri_partial_lines(self):
+        timestamp_gen = timestamp_generator(10)
+        self.log_file = self._create_iterator(
+            {"path": self.__path, "parse_format": "cri"}
+        )
+        self.scan_for_new_bytes()
+
+        lines = [
+            next(timestamp_gen).iso + b" stdout F full_content_1\n",
+            next(timestamp_gen).iso + b" stdout P partial_content_1\n",
+            next(timestamp_gen).iso + b" stdout F -full_content_2\n",
+            next(timestamp_gen).iso + b" stdout F full_content_3\n"
+        ]
+        self.append_file(self.__path, *lines)
+
+        self.scan_for_new_bytes()
+
+        assert self.readline().line == b"full_content_1\n"
+        assert self.readline().line == b"partial_content_1-full_content_2\n"
+        assert self.readline().line == b"full_content_3\n"
+
+    def test_cri_empty_lines(self):
+        timestamp_gen = timestamp_generator(10)
+        self.log_file = self._create_iterator(
+            {"path": self.__path, "parse_format": "cri"}
+        )
+        self.scan_for_new_bytes()
+
+        lines = [
+            next(timestamp_gen).iso + b" stdout F full_content_1\n",
+            next(timestamp_gen).iso + b" stdout P \n",
+            next(timestamp_gen).iso + b" stdout F full_content_2\n",
+            next(timestamp_gen).iso + b" stdout F \n"
+        ]
+        self.append_file(self.__path, *lines)
+
+        self.scan_for_new_bytes()
+
+        assert self.readline().line == b"full_content_1\n"
+        assert self.readline().line == b"full_content_2\n"
+        assert self.readline().line == b"\n"
+
+    def test_cri_windows_eol(self):
+        timestamp_gen = timestamp_generator(10)
+        self.log_file = self._create_iterator(
+            {"path": self.__path, "parse_format": "cri"}
+        )
+        self.scan_for_new_bytes()
+
+        lines = [
+            next(timestamp_gen).iso + b" stdout F full_content_1\r\n",
+            next(timestamp_gen).iso + b" stdout P partial_content_1\r\n",
+            next(timestamp_gen).iso + b" stdout F full_content_2\r\n",
+            next(timestamp_gen).iso + b" stdout F full_content_3\r\n"
+        ]
+        self.append_file(self.__path, *lines)
+
+        self.scan_for_new_bytes()
+
+        assert self.readline().line == b"full_content_1\n"
+        assert self.readline().line == b"partial_content_1full_content_2\n"
+        assert self.readline().line == b"full_content_3\n"
+
+    def test_cri_split_messages_mixed_streams(self):
+        self.log_file = self._create_iterator(
+            {"path": self.__path, "parse_format": "cri"}
+        )
+        self.scan_for_new_bytes()
+
+        lines = [
+            b"2023-12-20T16:18:41.129027195+00:00 stdout F stdout: line 1\n",
+            b"2023-12-20T16:18:41.129027195+00:00 stdout P BEGIN PARTIAL_MESSAGE\n",
+            b"2023-12-20T16:18:41.129069776+00:00 stderr F stderr: line 1\n",
+            b"2023-12-20T16:18:41.129069776+00:00 stderr P BEGIN PARTIAL_MESSAGE\n",
+            b"2023-12-20T16:18:42.129069776+00:00 stderr P -MIDDLE OF PARTIAL_MESSAGE\n",
+            b"2023-12-20T16:18:43.186370550+00:00 stdout F -END PARTIAL_MESSAGE\n",
+            b"2023-12-20T16:18:43.187212946+00:00 stderr F -END PARTIAL_MESSAGE\n",
+            b"2023-12-20T16:18:43.194095421+00:00 stdout F stdout: line 2\n",
+        ]
+
+        self.append_file(self.__path, *lines)
+
+        self.scan_for_new_bytes()
+
+        assert_line(self.readline(), b"stdout: line 1\n", 1703089121129027195, "stdout")
+        assert_line(self.readline(), b"stderr: line 1\n", 1703089121129069776, "stderr")
+        assert_line(self.readline(), b"BEGIN PARTIAL_MESSAGE-END PARTIAL_MESSAGE\n", 1703089121129027195, "stdout")
+        assert_line(self.readline(), b"BEGIN PARTIAL_MESSAGE-MIDDLE OF PARTIAL_MESSAGE-END PARTIAL_MESSAGE\n", 1703089121129069776, "stderr")
+        assert_line(self.readline(), b"stdout: line 2\n", 1703089123194095421, "stdout")
+
+    def test_cri_split_messages_mixed_streams_small_page_size(self):
+        self.log_file = self._create_iterator(
+            {"path": self.__path, "parse_format": "cri"}
+        )
+        self.scan_for_new_bytes()
+
+        lines = [
+            b"2023-12-20T16:18:41.129027195+00:00 stdout F stdout: line 1\n",
+            b"2023-12-20T16:18:41.129027195+00:00 stdout P BEGIN PARTIAL_MESSAGE\n",
+            b"2023-12-20T16:18:41.129027195+00:00 stdout P -MIDDLE OF PARTIAL_MESSAGE\n",
+            b"2023-12-20T16:18:41.129069776+00:00 stderr F stderr: line 1\n",
+            b"2023-12-20T16:18:41.129069776+00:00 stderr P BEGIN PARTIAL_MESSAGE\n",
+            b"2023-12-20T16:18:42.129069776+00:00 stderr P -MIDDLE OF PARTIAL_MESSAGE\n",
+            b"2023-12-20T16:18:43.186370550+00:00 stdout F -END PARTIAL_MESSAGE\n",
+            b"2023-12-20T16:18:43.187212946+00:00 stderr F -END PARTIAL_MESSAGE\n",
+            b"2023-12-20T16:18:43.194095421+00:00 stdout F stdout: line 2\n",
+        ]
+
+        self.append_file(self.__path, *lines)
+
+        self.scan_for_new_bytes()
+
+        assert_line(self.readline(), b"stdout: line 1\n", 1703089121129027195, "stdout")
+        assert_line(self.readline(), b"stderr: line 1\n", 1703089121129069776, "stderr")
+        assert_line(self.readline(), b"BEGIN PARTIAL_MESSAGE-MIDDLE OF PARTIAL_MESSAGE-END PARTIAL_MESSAGE\n", 1703089121129027195, "stdout")
+        assert_line(self.readline(), b"BEGIN PARTIAL_MESSAGE-MIDDLE OF PARTIAL_MESSAGE-END PARTIAL_MESSAGE\n", 1703089121129069776, "stderr")
+        assert_line(self.readline(), b"stdout: line 2\n", 1703089123194095421, "stdout")
+
+    def test_line_completion_wait_time(self):
+        self.log_file = self._create_iterator(
+            log_config={"path": self.__path, "parse_format": "cri"},
+            config=_create_configuration({"line_completion_wait_time": 0.5})
+        )
+        self.scan_for_new_bytes()
+
+        lines = [
+            b"2024-01-02T12:27:16.290902843+00:00 " + body
+            for body in [
+                b"stdout P BEGIN PARTIAL MESSAGE\n",
+                b"stderr F line 1\n",
+                b"stderr F line 1\n",
+                b"stderr F line 1\n",
+                b"stdout P -MIDDLE PARTIAL MESSAGE\n",
+                b"stderr F line 1\n",
+                b"stderr F line 1\n",
+                b"stderr F line 1\n",
+                b"stderr F line 1\n",
+                b"stderr F line 1\n",
+                b"stderr F line 1\n",
+                b"stdout F END PARTIAL MESSAGE\n",
+            ]
+        ]
+
+        self.append_file(self.__path, *lines)
+
+        self.scan_for_new_bytes()
+
+        assert_line(self.readline(), b"line 1\n", 1704198436290902843, "stderr")
+        assert_line(self.readline(), b"line 1\n", 1704198436290902843, "stderr")
+        assert_line(self.readline(), b"line 1\n", 1704198436290902843, "stderr")
+        assert_line(self.readline(), b"line 1\n", 1704198436290902843, "stderr")
+        assert_line(self.readline(), b"BEGIN PARTIAL MESSAGE-MIDDLE PARTIAL MESSAGE\n", 1704198436290902843, "stdout")
+        assert_line(self.readline(), b"line 1\n", 1704198436290902843, "stderr")
+        assert_line(self.readline(), b"line 1\n", 1704198436290902843, "stderr")
+        assert_line(self.readline(), b"line 1\n", 1704198436290902843, "stderr")
+        assert_line(self.readline(), b"line 1\n", 1704198436290902843, "stderr")
+        assert_line(self.readline(), b"line 1\n", 1704198436290902843, "stderr")
+        assert_line(self.readline(), b"END PARTIAL MESSAGE\n", 1704198436290902843, "stdout")
+
+    def test_cri_skip_un_parseable_lines(self):
+        self.log_file = self._create_iterator(
+            {"path": self.__path, "parse_format": "cri"}
+        )
+        self.scan_for_new_bytes()
+
+        timestamp_gen = timestamp_generator(10)
+
+        lines = [
+            (next(timestamp_gen), body)
+            for body in [
+                b"stdout F stdout: line 1\n",
+                b"stderr F stderr: line 1\n",
+                b"BAD_FORMAT\n",
+                b"stdout F stdout: line 2\n",
+                b"stderr F stderr: line 2\n",
+                b"stderr P BEGIN PARTIAL_MESSAGE\n",
+                b"stdout P BEGIN PARTIAL_MESSAGE\n",
+                b"BAD_FORMAT\n",
+                b"stdout F -END PARTIAL_MESSAGE\n",
+                b"stderr F -END PARTIAL_MESSAGE\n"
+            ]
+        ]
+
+        self.append_file(self.__path, *map(lambda line: line[0].iso + b" " + line[1], lines))
+
+        self.scan_for_new_bytes()
+
+        assert_line(self.readline(), b"stdout: line 1\n", lines[0][0].nanos, "stdout")
+        assert_line(self.readline(), b"stderr: line 1\n", lines[1][0].nanos, "stderr")
+        assert_line(self.readline(), b"stdout: line 2\n", lines[3][0].nanos, "stdout")
+        assert_line(self.readline(), b"stderr: line 2\n", lines[4][0].nanos, "stderr")
+        assert_line(self.readline(), b"BEGIN PARTIAL_MESSAGE-END PARTIAL_MESSAGE\n", lines[6][0].nanos, "stdout")
+        assert_line(self.readline(), b"BEGIN PARTIAL_MESSAGE-END PARTIAL_MESSAGE\n", lines[5][0].nanos, "stderr")
 
     def test_multiple_line_groupers(self):
         log_config = {
@@ -1171,7 +1427,7 @@ class TestLogFileIterator(ScalyrTestCase):
         )
         self.scan_for_new_bytes()
         self.append_file(
-            self.__path, b"2015-08-03T09:12:43.56064743Z stdout P message\n"
+            self.__path, b"2015-08-03T09:12:43.56064743Z stdout F message\n"
         )
         self.scan_for_new_bytes()
 
@@ -1194,7 +1450,7 @@ class TestLogFileIterator(ScalyrTestCase):
         )
         self.scan_for_new_bytes()
         self.append_file(
-            self.__path, b"2015-08-03T09:12:43.56064743Z stdout P message\n"
+            self.__path, b"2015-08-03T09:12:43.56064743Z stdout F message\n"
         )
         self.scan_for_new_bytes()
 
