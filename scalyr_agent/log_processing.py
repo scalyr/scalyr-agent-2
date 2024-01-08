@@ -127,7 +127,9 @@ class CRILogLine(object):
     def __parse_cri_log(line):
         """
         Parse a log line that uses the K8S Container Runtime Interface (CRI) format
-        https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/kubelet-cri-logging.md
+        https://github.com/kubernetes/design-proposals-archive/blob/main/node/kubelet-cri-logging.md
+        Please be aware that the sample log lines in the proposal mix stdout and stderr streams, which is not the case
+        in the actual implementation.
         """
         parts = line.split(" ", maxsplit=3)
         # The 4 parts are the timestamp, stream, tags, and message. The 4th part can contain spaces.
@@ -187,8 +189,11 @@ class CRILogLineBuffer(object):
 
     def build_cri_result(self, include_raw_timestamp_field):
         def strip_new_line(s):
-            if s and s[-1] == "\n":
-                return s[:-1]
+            if s:
+                if s[-2:] == "\r\n":
+                    return s[:-2]
+                if s[-1] == "\n":
+                    return s[:-1]
             return s
 
         lines_string = "".join(map(strip_new_line, self.__lines)) + "\n"
@@ -214,6 +219,11 @@ class CRIStreamBuffers(object):
 
         self.__buffers[stream].append(log_line)
 
+        if self.__buffer_completed(self.__buffers[stream], current_time):
+            return self.__buffers.pop(stream)
+        else:
+            return None
+
     def __buffer_completed(self, buffer, current_time):
         return (
                 not buffer.is_partial
@@ -221,17 +231,10 @@ class CRIStreamBuffers(object):
                 or buffer.payload_length() >= self.__max_line_size
         )
 
-    def any_buffer_completed(self, current_time):
-        return any(
-            self.__buffer_completed(buffer, current_time)
-            for buffer in self.__buffers.values()
-        )
-
     def pop_completed(self, current_time):
         for stream, buffer in self.__buffers.items():
             if self.__buffer_completed(buffer, current_time):
-                del self.__buffers[stream]
-                return buffer
+                return self.__buffers.pop(stream)
 
 class LogLine(object):
     """A class representing a line from a log file.
@@ -782,25 +785,27 @@ class LogFileIterator(object):
 
         # check to see if we need to parse the line as cri.
         if self.__parse_format == "cri":
-            while not self.__cri_stream_buffers.any_buffer_completed(current_time):
-                next_line = self.__read_extended_line(current_time)
-                if len(next_line) == 0:
-                    break
+            # If any buffer expired the line_completion_wait_time then we need to return it
+            cri_buffer = self.__cri_stream_buffers.pop_completed(current_time)
+            if cri_buffer is not None:
+                return cri_buffer.build_cri_result(self.__include_raw_timestamp_field)
 
+            next_line = self.__read_extended_line(current_time)
+            while next_line:
                 try:
                     log_line = CRILogLine.from_raw_line(next_line)
-                    self.__cri_stream_buffers.append_log_line(log_line, current_time)
+                    cri_buffer = self.__cri_stream_buffers.append_log_line(log_line, current_time)
+                    if cri_buffer is not None:
+                        self.__sync_position_with_buffer()
+                        return cri_buffer.build_cri_result(self.__include_raw_timestamp_field)
+
                 except CRIParseError as e:
                     log.error("Error parsing line: %s, reason: %s" % (e.line, e.message))
 
-            cri_buffer = self.__cri_stream_buffers.pop_completed(current_time)
-            if cri_buffer is None:
-                result = LogLine(line=b"")
-            else:
-                result = cri_buffer.build_cri_result(self.__include_raw_timestamp_field)
+                next_line = self.__read_extended_line(current_time)
 
             self.__sync_position_with_buffer()
-            return result
+            return LogLine(line=b"")
 
         # or see if we need to parse it as json
         elif self.__parse_format == "json":

@@ -98,28 +98,23 @@ class TestCRILogLineBuffer(ScalyrTestCase):
 
 class TestCRIStreamBuffers(ScalyrTestCase):
     def test_completed_on_empty(self):
-        assert not CRIStreamBuffers(max_line_size=10, line_completion_wait_time=10).any_buffer_completed(current_time=1)
         assert None == CRIStreamBuffers(max_line_size=10, line_completion_wait_time=10).pop_completed(current_time=1)
 
     def test_completed(self):
         buffers = CRIStreamBuffers(max_line_size=100, line_completion_wait_time=10)
-        buffers.append_log_line(CRILogLine(0, "stdout", ["P"], "line 01 ", None), 0)
-        buffers.append_log_line(CRILogLine(1, "stderr", ["F"], "line 02 ", None), 1)
+        assert None == buffers.append_log_line(CRILogLine(0, "stdout", ["P"], "line 01 ", None), 0)
+        assert buffers.append_log_line(CRILogLine(1, "stderr", ["F"], "line 02 ", None), 1).build_cri_result(True).line == b"line 02 \n"
 
-        assert buffers.any_buffer_completed(current_time=1)
-        assert buffers.pop_completed(current_time=1).build_cri_result(True).line == b"line 02 \n"
-        assert not buffers.any_buffer_completed(current_time=1)
+        assert None == buffers.pop_completed(current_time=1)
 
-        buffers.append_log_line(CRILogLine(2, "stderr", ["P"], "line 03 ", None), 2)
-        buffers.append_log_line(CRILogLine(3, "stdout", ["P"], "line 04 ", None), 3)
-        buffers.append_log_line(CRILogLine(4, "stderr", ["F"], "line 05 ", None), 4)
+        assert None == buffers.append_log_line(CRILogLine(2, "stderr", ["P"], "line 03 ", None), 2)
+        assert None == buffers.append_log_line(CRILogLine(3, "stdout", ["P"], "line 04 ", None), 3)
+        assert buffers.append_log_line(CRILogLine(4, "stderr", ["F"], "line 05 ", None), 4).build_cri_result(True).line == b"line 03 line 05 \n"
 
-        assert buffers.any_buffer_completed(current_time=5)
-        assert buffers.pop_completed(current_time=5).build_cri_result(True).line == b"line 03 line 05 \n"
-        assert not buffers.any_buffer_completed(current_time=5)
+        assert None == buffers.pop_completed(current_time=5)
 
-        assert not buffers.any_buffer_completed(current_time=10)
-        assert buffers.any_buffer_completed(current_time=11)
+        assert None == buffers.pop_completed(current_time=10)
+        assert buffers.pop_completed(current_time=11).build_cri_result(True).line == b"line 01 line 04 \n"
 
     def test_completed_max_length(self):
         LINE_LEN = len("line 00 ")
@@ -128,12 +123,9 @@ class TestCRIStreamBuffers(ScalyrTestCase):
         buffers.append_log_line(CRILogLine(0, "stdout", ["P"], "line 00 ", None), 0)
         buffers.append_log_line(CRILogLine(1, "stderr", ["P"], "line 01 ", None), 1)
 
-        assert not buffers.any_buffer_completed(current_time=2)
+        assert None == buffers.pop_completed(current_time=2)
 
-        buffers.append_log_line(CRILogLine(2, "stdout", ["P"], "line 02 ", None), 2)
-
-        assert buffers.any_buffer_completed(current_time=3)
-        assert buffers.pop_completed(current_time=1).build_cri_result(True).line == b"line 00 line 02 \n"
+        assert buffers.append_log_line(CRILogLine(2, "stdout", ["P"], "line 02 ", None), 2).build_cri_result(True).line == b"line 00 line 02 \n"
 
 
 
@@ -381,6 +373,27 @@ class TestLogFileIterator(ScalyrTestCase):
         assert self.readline().line == b"full_content_1\n"
         assert self.readline().line == b"full_content_2\n"
         assert self.readline().line == b"\n"
+
+    def test_cri_windows_eol(self):
+        timestamp_gen = timestamp_generator(10)
+        self.log_file = self._create_iterator(
+            {"path": self.__path, "parse_format": "cri"}
+        )
+        self.scan_for_new_bytes()
+
+        lines = [
+            next(timestamp_gen).iso + b" stdout F full_content_1\r\n",
+            next(timestamp_gen).iso + b" stdout P partial_content_1\r\n",
+            next(timestamp_gen).iso + b" stdout F full_content_2\r\n",
+            next(timestamp_gen).iso + b" stdout F full_content_3\r\n"
+        ]
+        self.append_file(self.__path, *lines)
+
+        self.scan_for_new_bytes()
+
+        assert self.readline().line == b"full_content_1\n"
+        assert self.readline().line == b"partial_content_1full_content_2\n"
+        assert self.readline().line == b"full_content_3\n"
 
     def test_cri_split_messages_mixed_streams(self):
         self.log_file = self._create_iterator(
