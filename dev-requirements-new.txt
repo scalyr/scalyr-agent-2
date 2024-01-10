@@ -13,9 +13,9 @@ repoze.lru==0.7
 six==1.14.0
 
 # Required for OTLP output
-opentelemetry-sdk==1.20.0
-opentelemetry-exporter-otlp==1.20.0
-opentelemetry-exporter-otlp-proto-http==1.20.0
+opentelemetry-sdk==1.22.0
+opentelemetry-exporter-otlp==1.22.0
+opentelemetry-exporter-otlp-proto-http==1.22.0
 
 # Required for redis monitor.
 redis==2.10.5
