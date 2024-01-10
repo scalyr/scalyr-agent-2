@@ -766,11 +766,6 @@ class Configuration(object):
             "default_worker_session_status_message_interval",
             "enable_worker_session_process_metrics_gather",
             "server_url"
-            "auth",
-            "client_id",  # oauth2
-            "client_secret",  # oauth2
-            "token_url",  # oauth2
-            "scopes",  # oauth2
             "transport",
             # NOTE: It's important we use sanitzed_ version of this method which masks the API key
             "sanitized_worker_configs",
