@@ -25,8 +25,6 @@ from __future__ import absolute_import
 
 from __future__ import print_function
 
-import concurrent.futures
-import queue
 
 from scalyr_agent import compat
 
@@ -58,6 +56,7 @@ import six.moves.socketserver
 if six.PY2:
     from scalyr_agent.builtin_monitors.thread_pool_dummy import ExecutorMixIn
 else:
+    import concurrent.futures
     from scalyr_agent.builtin_monitors.thread_pool import ExecutorMixIn
 
 try:
