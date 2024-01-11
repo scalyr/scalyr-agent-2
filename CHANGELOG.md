@@ -1,6 +1,20 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.2.9 "Tandi" - Jan 11, 2024
+<!---
+Packaged by Ales Novak <ales.novak@sentinelone.com> on Jan 11, 2024 00:00 -0800
+--->
+
+Feature:
+* Support for CRI multi lines - implementing support for the following format: https://github.com/kubernetes/design-proposals-archive/blob/main/node/kubelet-cri-logging.md
+
+Fix:
+* Python2 suport for Syslog monitor fixed
+
+Security Fix:
+* Alpine image upgraded from 3.18.13 to 3.18.14 to fix recently found vulnerabilities
+
 ## 2.2.8 "Marcus" - Nov 20, 2023
 <!---
 Packaged by Ales Novak <ales.novak@sentinelone.com> on Nov 20, 2023 00:00 -0800
