@@ -20,7 +20,6 @@ import pytest
 import sys
 import tempfile
 from scalyr_agent.builtin_monitors.windows_event_log_monitor import NewJsonApi, NewApi
-import win32evtlog
 
 if sys.platform == "win32":
     import scalyr_agent.builtin_monitors.windows_event_log_monitor
@@ -29,6 +28,7 @@ if sys.platform == "win32":
     )
     import win32api  # pylint: disable=import-error
     import win32con  # pylint: disable=import-error
+    import win32evtlog # pylint: disable=import-error
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
