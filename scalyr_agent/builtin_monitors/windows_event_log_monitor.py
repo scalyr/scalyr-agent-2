@@ -516,7 +516,7 @@ class NewApi(Api):
 
                 error_message = None
                 try:
-                    handle = win32evtlog.EvtSubscribe (
+                    handle = win32evtlog.EvtSubscribe(
                         channel,
                         flags,
                         Bookmark=bookmark,
