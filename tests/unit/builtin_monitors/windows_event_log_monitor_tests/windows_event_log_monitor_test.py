@@ -19,7 +19,7 @@ import os
 import pytest
 import sys
 import tempfile
-from scalyr_agent.builtin_monitors.windows_event_log_monitor import NewJsonApi
+from scalyr_agent.builtin_monitors.windows_event_log_monitor import NewJsonApi, NewApi
 
 if sys.platform == "win32":
     import scalyr_agent.builtin_monitors.windows_event_log_monitor
@@ -28,6 +28,7 @@ if sys.platform == "win32":
     )
     import win32api  # pylint: disable=import-error
     import win32con  # pylint: disable=import-error
+    import win32evtlog # pylint: disable=import-error
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
@@ -43,6 +44,92 @@ def _get_parameter_msg_fixture_path():
         "parametermsgfixture.dll",
     )
 
+def _get_test_evtx_path():
+    # Binary event file. Created by saving a selection of events in the Windows EventViewer.
+    # Contents:
+    # <Event
+    # 	xmlns='http://schemas.microsoft.com/win/2004/08/events/event'>
+    # 	<System>
+    # 		<Provider Name='Microsoft-Windows-Security-SPP' Guid='{E23B33B0-C8C9-472C-A5F9-F2BDFEA0F156}' EventSourceName='Software Protection Platform Service'/>
+    # 		<EventID Qualifiers='16384'>1033</EventID>
+    # 		<Version>0</Version>
+    # 		<Level>4</Level>
+    # 		<Task>0</Task>
+    # 		<Opcode>0</Opcode>
+    # 		<Keywords>0x80000000000000</Keywords>
+    # 		<TimeCreated SystemTime='2024-01-15T12:53:07.9637286Z'/>
+    # 		<EventRecordID>7097</EventRecordID>
+    # 		<Correlation/>
+    # 		<Execution ProcessID='36380' ThreadID='0'/>
+    # 		<Channel>Application</Channel>
+    # 		<Computer>S1LT-1515</Computer>
+    # 		<Security/>
+    # 	</System>
+    # 	<EventData>
+    # 		<Data>(Security-SPP-Reserved-EnableNotificationMode) </Data>
+    # 		<Data>55c92734-d682-4d71-983e-d6ec3f16059f</Data>
+    # 		<Data>fe74f55b-0338-41d6-b267-4a201abe7285</Data>
+    # 	</EventData>
+    # </Event>
+
+    # <Event
+    # 	xmlns='http://schemas.microsoft.com/win/2004/08/events/event'>
+    # 	<System>
+    # 		<Provider Name='MsiInstaller'/>
+    # 		<EventID Qualifiers='0'>1040</EventID>
+    # 		<Version>0</Version>
+    # 		<Level>4</Level>
+    # 		<Task>0</Task>
+    # 		<Opcode>0</Opcode>
+    # 		<Keywords>0x80000000000000</Keywords>
+    # 		<TimeCreated SystemTime='2024-01-15T14:23:25.7585180Z'/>
+    # 		<EventRecordID>7104</EventRecordID>
+    # 		<Correlation/>
+    # 		<Execution ProcessID='1436' ThreadID='0'/>
+    # 		<Channel>Application</Channel>
+    # 		<Computer>S1LT-1515</Computer>
+    # 		<Security UserID='S-1-12-1-2752833898-1275485911-2855531437-3679324835'/>
+    # 	</System>
+    # 	<EventData>
+    # 		<Data>C:\Users\ales.novak\AppData\Local\Package Cache\{A8E320AF-B8C7-493C-97D8-6328C1CE721B}v3.10.150.0\dev.msi</Data>
+    # 		<Data>34720</Data>
+    # 		<Data>(NULL)</Data>
+    # 		<Data>(NULL)</Data>
+    # 		<Data>(NULL)</Data>
+    # 		<Data>(NULL)</Data>
+    # 		<Data></Data>
+    # 	</EventData>
+    # </Event>
+    # <Event
+    # 	xmlns='http://schemas.microsoft.com/win/2004/08/events/event'>
+    # 	<System>
+    # 		<Provider Name='Microsoft-Windows-RestartManager' Guid='{0888e5ef-9b98-4695-979d-e92ce4247224}'/>
+    # 		<EventID>10000</EventID>
+    # 		<Version>0</Version>
+    # 		<Level>4</Level>
+    # 		<Task>0</Task>
+    # 		<Opcode>0</Opcode>
+    # 		<Keywords>0x8000000000000000</Keywords>
+    # 		<TimeCreated SystemTime='2024-01-15T14:23:25.4974542Z'/>
+    # 		<EventRecordID>7105</EventRecordID>
+    # 		<Correlation/>
+    # 		<Execution ProcessID='1436' ThreadID='29928'/>
+    # 		<Channel>Application</Channel>
+    # 		<Computer>S1LT-1515</Computer>
+    # 		<Security UserID='S-1-12-1-2752833898-1275485911-2855531437-3679324835'/>
+    # 	</System>
+    # 	<UserData>
+    # 		<RmSessionEvent
+    # 			xmlns='http://www.microsoft.com/2005/08/Windows/Reliability/RestartManager/'>
+    # 			<RmSessionId>0</RmSessionId>
+    # 			<UTCStartTime>2024-01-15T14:23:25.4965313Z</UTCStartTime>
+    # 		</RmSessionEvent>
+    # 	</UserData>
+    # </Event>
+    return os.path.join(
+        os.path.dirname(__file__),
+        "Testing.evtx"
+    )
 
 @pytest.mark.windows_platform
 class WindowsEventLogMonitorTest(ScalyrTestCase):
@@ -357,6 +444,54 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
                 % (channel, provider),
             )
 
+    @skipIf(sys.platform != "win32", "Skipping tests under non-Windows platform")
+    def test_format_event_as_dict(self):
+        query_handle = win32evtlog.EvtQuery(_get_test_evtx_path(), win32evtlog.EvtQueryFilePath)
+        events = win32evtlog.EvtNext(query_handle, 100)
+
+        config = {
+            "module": "windows_event_log_monitor",
+        }
+        logger = scalyr_logging.getLogger(config["module"])
+
+        new_api = NewApi(config, logger, None)
+
+        render_context = win32evtlog.EvtCreateRenderContext(
+            win32evtlog.EvtRenderContextSystem
+        )
+
+        vals = new_api.GetFormattedEventAsDict(render_context, events[0])
+        self.assertEqual(vals["EventID"], 1033)
+        self.assertEqual(vals["EventIDQualifiers"], 16384)
+        self.assertEqual(vals["InstanceID"], (16384 << 16) | 1033)
+        self.assertIn("These policies are being excluded since they are only defined with override-only attribute.", vals["Message"])
+        self.assertEqual(vals["Level"], "Information")
+        self.assertEqual(vals["Opcode"], 0)
+        self.assertEqual(vals["Keywords"], ["Classic"])
+        self.assertEqual(vals["Channel"], "Application")
+        self.assertEqual(vals["ProviderName"], "Microsoft-Windows-Security-SPP")
+
+        vals = new_api.GetFormattedEventAsDict(render_context, events[1])
+        self.assertEqual(vals["EventID"], 1040)
+        self.assertEqual(vals["EventIDQualifiers"], 0)
+        self.assertEqual(vals["InstanceID"], 1040)
+        self.assertIn("Beginning a Windows Installer transaction", vals["Message"])
+        self.assertEqual(vals["Level"], "Information")
+        self.assertEqual(vals["Opcode"], "Info")
+        self.assertEqual(vals["Keywords"], ["Classic"])
+        self.assertEqual(vals["Channel"], "Application")
+        self.assertEqual(vals["ProviderName"], "MsiInstaller")
+
+        vals = new_api.GetFormattedEventAsDict(render_context, events[2])
+        self.assertEqual(vals["EventID"], 10000)
+        self.assertNotIn("EventIDQualifiers", vals)
+        self.assertNotIn("InstanceID", vals)
+        self.assertIn("Starting session 0", vals["Message"])
+        self.assertEqual(vals["Level"], "Information")
+        self.assertEqual(vals["Opcode"], "Info")
+        self.assertEqual(vals["Keywords"], '0x8000000000000000')
+        self.assertEqual(vals["Channel"], "Application")
+        self.assertEqual(vals["ProviderName"], "Microsoft-Windows-RestartManager")
 
 @pytest.mark.windows_platform
 class WindowsEventLogMonitorTest2(BaseScalyrLogCaptureTestCase):
