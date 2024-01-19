@@ -241,6 +241,7 @@ class SyslogTemplateTest(ScalyrTestCase):
             {
                 "path": "./syslog.log",
                 "attributes": {
+                    "monitor": "agentSyslog",
                     "proto": "tcp",
                     "srcip": "127.0.0.1",
                     "destport": self.__class__.tcp_port,
@@ -321,6 +322,7 @@ class SyslogTemplateTest(ScalyrTestCase):
             {
                 "path": "./syslog-tcp-%d.log" % self.__class__.tcp_port,
                 "attributes": {
+                    "monitor": "agentSyslog",
                     "proto": "tcp",
                     "srcip": "127.0.0.1",
                     "destport": self.__class__.tcp_port,
@@ -335,6 +337,7 @@ class SyslogTemplateTest(ScalyrTestCase):
             {
                 "path": "./syslog-udp-%d.log" % self.__class__.udp_port,
                 "attributes": {
+                    "monitor": "agentSyslog",
                     "proto": "udp",
                     "srcip": "127.0.0.1",
                     "destport": self.__class__.udp_port,
@@ -388,6 +391,7 @@ class SyslogTemplateTest(ScalyrTestCase):
             {
                 "path": "./syslog-tcp-%d.log" % self.__class__.tcp_port,
                 "attributes": {
+                    "monitor": "agentSyslog",
                     "proto": "tcp",
                     "srcip": "127.0.0.1",
                     "destport": self.__class__.tcp_port,
@@ -402,6 +406,7 @@ class SyslogTemplateTest(ScalyrTestCase):
             {
                 "path": "./syslog-tcp-%d.log" % (self.__class__.tcp_port + 1,),
                 "attributes": {
+                    "monitor": "agentSyslog",
                     "proto": "tcp",
                     "srcip": "127.0.0.1",
                     "destport": self.__class__.tcp_port + 1,
@@ -443,6 +448,7 @@ class SyslogTemplateTest(ScalyrTestCase):
             {
                 "path": "./syslog-127.0.0.1.log",
                 "attributes": {
+                    "monitor": "agentSyslog",
                     "proto": "tcp",
                     "srcip": "127.0.0.1",
                     "destport": self.__class__.tcp_port,
@@ -457,6 +463,7 @@ class SyslogTemplateTest(ScalyrTestCase):
             {
                 "path": "./syslog-127.0.1.1.log",
                 "attributes": {
+                    "monitor": "agentSyslog",
                     "proto": "tcp",
                     "srcip": "127.0.0.2",
                     "destport": self.__class__.tcp_port,
@@ -493,6 +500,7 @@ class SyslogTemplateTest(ScalyrTestCase):
             {
                 "path": "./syslog-alpha.log",
                 "attributes": {
+                    "monitor": "agentSyslog",
                     "proto": "tcp",
                     "srcip": "127.0.0.1",
                     "destport": self.__class__.tcp_port,
@@ -507,6 +515,7 @@ class SyslogTemplateTest(ScalyrTestCase):
             {
                 "path": "./syslog-bravo.log",
                 "attributes": {
+                    "monitor": "agentSyslog",
                     "proto": "tcp",
                     "srcip": "127.0.0.1",
                     "destport": self.__class__.tcp_port,
@@ -551,6 +560,7 @@ class SyslogTemplateTest(ScalyrTestCase):
             {
                 "path": "./syslog-alpha.log",
                 "attributes": {
+                    "monitor": "agentSyslog",
                     "proto": "tcp",
                     "srcip": "127.0.0.1",
                     "destport": self.__class__.tcp_port,
@@ -565,6 +575,7 @@ class SyslogTemplateTest(ScalyrTestCase):
             {
                 "path": "./syslog-bravo.log",
                 "attributes": {
+                    "monitor": "agentSyslog",
                     "proto": "tcp",
                     "srcip": "127.0.0.1",
                     "destport": self.__class__.tcp_port,
@@ -605,6 +616,7 @@ class SyslogTemplateTest(ScalyrTestCase):
             {
                 "path": "./syslog-alpha.log",
                 "attributes": {
+                    "monitor": "agentSyslog",
                     "proto": "tcp",
                     "srcip": "127.0.0.1",
                     "destport": self.__class__.tcp_port,
@@ -619,6 +631,7 @@ class SyslogTemplateTest(ScalyrTestCase):
             {
                 "path": "./syslog-bravo.log",
                 "attributes": {
+                    "monitor": "agentSyslog",
                     "proto": "tcp",
                     "srcip": "127.0.0.1",
                     "destport": self.__class__.tcp_port,
@@ -661,6 +674,7 @@ class SyslogTemplateTest(ScalyrTestCase):
             {
                 "path": "./syslog-alpha.log",
                 "attributes": {
+                    "monitor": "agentSyslog",
                     "proto": "tcp",
                     "srcip": "127.0.0.1",
                     "destport": self.__class__.tcp_port,
@@ -675,6 +689,7 @@ class SyslogTemplateTest(ScalyrTestCase):
             {
                 "path": "./syslog-bravo.log",
                 "attributes": {
+                    "monitor": "agentSyslog",
                     "proto": "tcp",
                     "srcip": "127.0.0.1",
                     "destport": self.__class__.tcp_port,
@@ -715,6 +730,7 @@ class SyslogTemplateTest(ScalyrTestCase):
             {
                 "path": "./syslog-apiserver.log",
                 "attributes": {
+                    "monitor": "agentSyslog",
                     "proto": "tcp",
                     "srcip": "127.0.0.1",
                     "destport": self.__class__.tcp_port,
@@ -729,6 +745,7 @@ class SyslogTemplateTest(ScalyrTestCase):
             {
                 "path": "./syslog-database.log",
                 "attributes": {
+                    "monitor": "agentSyslog",
                     "proto": "tcp",
                     "srcip": "127.0.0.1",
                     "destport": self.__class__.tcp_port,
@@ -770,6 +787,7 @@ class SyslogTemplateTest(ScalyrTestCase):
             {
                 "path": "./syslog-app1.log",
                 "attributes": {
+                    "monitor": "agentSyslog",
                     "proto": "tcp",
                     "srcip": "127.0.0.1",
                     "destport": self.__class__.tcp_port,
@@ -785,6 +803,7 @@ class SyslogTemplateTest(ScalyrTestCase):
             {
                 "path": "./syslog-app2.log",
                 "attributes": {
+                    "monitor": "agentSyslog",
                     "proto": "tcp",
                     "srcip": "127.0.0.1",
                     "destport": self.__class__.tcp_port,
@@ -836,6 +855,7 @@ class SyslogTemplateTest(ScalyrTestCase):
             {
                 "path": "./syslog-app1.log",
                 "attributes": {
+                    "monitor": "agentSyslog",
                     "proto": "tcp",
                     "srcip": "127.0.0.1",
                     "destport": self.__class__.tcp_port,
@@ -851,6 +871,7 @@ class SyslogTemplateTest(ScalyrTestCase):
             {
                 "path": "./syslog-app2.log",
                 "attributes": {
+                    "monitor": "agentSyslog",
                     "proto": "tcp",
                     "srcip": "127.0.0.1",
                     "destport": self.__class__.tcp_port,
@@ -890,6 +911,7 @@ class SyslogTemplateTest(ScalyrTestCase):
                 {
                     "path": "./syslog-app%d.log" % i,
                     "attributes": {
+                        "monitor": "agentSyslog",
                         "proto": "tcp",
                         "srcip": "127.0.0.1",
                         "destport": self.__class__.tcp_port,
