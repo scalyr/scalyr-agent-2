@@ -1,4 +1,4 @@
-# Copyright 2017-2023 Scalyr Inc.
+# Copyright 2017-2024 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -1768,6 +1768,7 @@ class SyslogHandler(object):
                         )
 
                         attribs = self.__syslog_attributes.copy()
+                        attribs["monitor"] = "agentSyslog"
                         attribs.update(
                             {
                                 k: v
