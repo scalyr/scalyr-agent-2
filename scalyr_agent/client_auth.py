@@ -5,7 +5,7 @@ from base64 import b64encode
 
 from urllib.parse import urlparse
 
-from scalyr_agent.third_party import requests
+import requests
 
 
 class ClientAuth(object):
