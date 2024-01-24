@@ -3,7 +3,6 @@
 # source: opentelemetry/proto/collector/logs/v1/logs_service.proto
 """Generated protocol buffer code."""
 from google.protobuf import descriptor as _descriptor
-from google.protobuf import descriptor_pool as _descriptor_pool
 from google.protobuf import message as _message
 from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
@@ -15,13 +14,128 @@ _sym_db = _symbol_database.Default()
 from opentelemetry.proto.logs.v1 import logs_pb2 as opentelemetry_dot_proto_dot_logs_dot_v1_dot_logs__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n8opentelemetry/proto/collector/logs/v1/logs_service.proto\x12%opentelemetry.proto.collector.logs.v1\x1a&opentelemetry/proto/logs/v1/logs.proto\"\\\n\x18\x45xportLogsServiceRequest\x12@\n\rresource_logs\x18\x01 \x03(\x0b\x32).opentelemetry.proto.logs.v1.ResourceLogs\"u\n\x19\x45xportLogsServiceResponse\x12X\n\x0fpartial_success\x18\x01 \x01(\x0b\x32?.opentelemetry.proto.collector.logs.v1.ExportLogsPartialSuccess\"O\n\x18\x45xportLogsPartialSuccess\x12\x1c\n\x14rejected_log_records\x18\x01 \x01(\x03\x12\x15\n\rerror_message\x18\x02 \x01(\t2\x9d\x01\n\x0bLogsService\x12\x8d\x01\n\x06\x45xport\x12?.opentelemetry.proto.collector.logs.v1.ExportLogsServiceRequest\x1a@.opentelemetry.proto.collector.logs.v1.ExportLogsServiceResponse\"\x00\x42\x98\x01\n(io.opentelemetry.proto.collector.logs.v1B\x10LogsServiceProtoP\x01Z0go.opentelemetry.io/proto/otlp/collector/logs/v1\xaa\x02%OpenTelemetry.Proto.Collector.Logs.V1b\x06proto3')
+DESCRIPTOR = _descriptor.FileDescriptor(
+  name='opentelemetry/proto/collector/logs/v1/logs_service.proto',
+  package='opentelemetry.proto.collector.logs.v1',
+  syntax='proto3',
+  serialized_options=b'\n(io.opentelemetry.proto.collector.logs.v1B\020LogsServiceProtoP\001Z0go.opentelemetry.io/proto/otlp/collector/logs/v1\252\002%OpenTelemetry.Proto.Collector.Logs.V1',
+  create_key=_descriptor._internal_create_key,
+  serialized_pb=b'\n8opentelemetry/proto/collector/logs/v1/logs_service.proto\x12%opentelemetry.proto.collector.logs.v1\x1a&opentelemetry/proto/logs/v1/logs.proto\"\\\n\x18\x45xportLogsServiceRequest\x12@\n\rresource_logs\x18\x01 \x03(\x0b\x32).opentelemetry.proto.logs.v1.ResourceLogs\"u\n\x19\x45xportLogsServiceResponse\x12X\n\x0fpartial_success\x18\x01 \x01(\x0b\x32?.opentelemetry.proto.collector.logs.v1.ExportLogsPartialSuccess\"O\n\x18\x45xportLogsPartialSuccess\x12\x1c\n\x14rejected_log_records\x18\x01 \x01(\x03\x12\x15\n\rerror_message\x18\x02 \x01(\t2\x9d\x01\n\x0bLogsService\x12\x8d\x01\n\x06\x45xport\x12?.opentelemetry.proto.collector.logs.v1.ExportLogsServiceRequest\x1a@.opentelemetry.proto.collector.logs.v1.ExportLogsServiceResponse\"\x00\x42\x98\x01\n(io.opentelemetry.proto.collector.logs.v1B\x10LogsServiceProtoP\x01Z0go.opentelemetry.io/proto/otlp/collector/logs/v1\xaa\x02%OpenTelemetry.Proto.Collector.Logs.V1b\x06proto3'
+  ,
+  dependencies=[opentelemetry_dot_proto_dot_logs_dot_v1_dot_logs__pb2.DESCRIPTOR,])
 
 
 
-_EXPORTLOGSSERVICEREQUEST = DESCRIPTOR.message_types_by_name['ExportLogsServiceRequest']
-_EXPORTLOGSSERVICERESPONSE = DESCRIPTOR.message_types_by_name['ExportLogsServiceResponse']
-_EXPORTLOGSPARTIALSUCCESS = DESCRIPTOR.message_types_by_name['ExportLogsPartialSuccess']
+
+_EXPORTLOGSSERVICEREQUEST = _descriptor.Descriptor(
+  name='ExportLogsServiceRequest',
+  full_name='opentelemetry.proto.collector.logs.v1.ExportLogsServiceRequest',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='resource_logs', full_name='opentelemetry.proto.collector.logs.v1.ExportLogsServiceRequest.resource_logs', index=0,
+      number=1, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=139,
+  serialized_end=231,
+)
+
+
+_EXPORTLOGSSERVICERESPONSE = _descriptor.Descriptor(
+  name='ExportLogsServiceResponse',
+  full_name='opentelemetry.proto.collector.logs.v1.ExportLogsServiceResponse',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='partial_success', full_name='opentelemetry.proto.collector.logs.v1.ExportLogsServiceResponse.partial_success', index=0,
+      number=1, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=233,
+  serialized_end=350,
+)
+
+
+_EXPORTLOGSPARTIALSUCCESS = _descriptor.Descriptor(
+  name='ExportLogsPartialSuccess',
+  full_name='opentelemetry.proto.collector.logs.v1.ExportLogsPartialSuccess',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='rejected_log_records', full_name='opentelemetry.proto.collector.logs.v1.ExportLogsPartialSuccess.rejected_log_records', index=0,
+      number=1, type=3, cpp_type=2, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='error_message', full_name='opentelemetry.proto.collector.logs.v1.ExportLogsPartialSuccess.error_message', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=352,
+  serialized_end=431,
+)
+
+_EXPORTLOGSSERVICEREQUEST.fields_by_name['resource_logs'].message_type = opentelemetry_dot_proto_dot_logs_dot_v1_dot_logs__pb2._RESOURCELOGS
+_EXPORTLOGSSERVICERESPONSE.fields_by_name['partial_success'].message_type = _EXPORTLOGSPARTIALSUCCESS
+DESCRIPTOR.message_types_by_name['ExportLogsServiceRequest'] = _EXPORTLOGSSERVICEREQUEST
+DESCRIPTOR.message_types_by_name['ExportLogsServiceResponse'] = _EXPORTLOGSSERVICERESPONSE
+DESCRIPTOR.message_types_by_name['ExportLogsPartialSuccess'] = _EXPORTLOGSPARTIALSUCCESS
+_sym_db.RegisterFileDescriptor(DESCRIPTOR)
+
 ExportLogsServiceRequest = _reflection.GeneratedProtocolMessageType('ExportLogsServiceRequest', (_message.Message,), {
   'DESCRIPTOR' : _EXPORTLOGSSERVICEREQUEST,
   '__module__' : 'opentelemetry.proto.collector.logs.v1.logs_service_pb2'
@@ -43,17 +157,32 @@ ExportLogsPartialSuccess = _reflection.GeneratedProtocolMessageType('ExportLogsP
   })
 _sym_db.RegisterMessage(ExportLogsPartialSuccess)
 
-_LOGSSERVICE = DESCRIPTOR.services_by_name['LogsService']
-if _descriptor._USE_C_DESCRIPTORS == False:
 
-  DESCRIPTOR._options = None
-  DESCRIPTOR._serialized_options = b'\n(io.opentelemetry.proto.collector.logs.v1B\020LogsServiceProtoP\001Z0go.opentelemetry.io/proto/otlp/collector/logs/v1\252\002%OpenTelemetry.Proto.Collector.Logs.V1'
-  _EXPORTLOGSSERVICEREQUEST._serialized_start=139
-  _EXPORTLOGSSERVICEREQUEST._serialized_end=231
-  _EXPORTLOGSSERVICERESPONSE._serialized_start=233
-  _EXPORTLOGSSERVICERESPONSE._serialized_end=350
-  _EXPORTLOGSPARTIALSUCCESS._serialized_start=352
-  _EXPORTLOGSPARTIALSUCCESS._serialized_end=431
-  _LOGSSERVICE._serialized_start=434
-  _LOGSSERVICE._serialized_end=591
+DESCRIPTOR._options = None
+
+_LOGSSERVICE = _descriptor.ServiceDescriptor(
+  name='LogsService',
+  full_name='opentelemetry.proto.collector.logs.v1.LogsService',
+  file=DESCRIPTOR,
+  index=0,
+  serialized_options=None,
+  create_key=_descriptor._internal_create_key,
+  serialized_start=434,
+  serialized_end=591,
+  methods=[
+  _descriptor.MethodDescriptor(
+    name='Export',
+    full_name='opentelemetry.proto.collector.logs.v1.LogsService.Export',
+    index=0,
+    containing_service=None,
+    input_type=_EXPORTLOGSSERVICEREQUEST,
+    output_type=_EXPORTLOGSSERVICERESPONSE,
+    serialized_options=None,
+    create_key=_descriptor._internal_create_key,
+  ),
+])
+_sym_db.RegisterServiceDescriptor(_LOGSSERVICE)
+
+DESCRIPTOR.services_by_name['LogsService'] = _LOGSSERVICE
+
 # @@protoc_insertion_point(module_scope)
