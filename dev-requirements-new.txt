@@ -14,6 +14,7 @@ six==1.14.0
 
 # Required for opentelemetry support.
 importlib-metadata
+protobuf==3.17.3
 
 # Required for redis monitor.
 redis==2.10.5
