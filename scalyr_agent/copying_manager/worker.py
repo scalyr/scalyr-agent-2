@@ -215,7 +215,8 @@ class AddEventsTask(object):
         # If there is a AddEventsTask object already created for the next request due to pipelining, this is set to it.
         # This must be the next request if this request is successful, otherwise, we will lose bytes.
         self.next_pipelined_task = None
-
+        # last status
+        self.__receive_response_status = ()
 
 class CopyingManagerWorkerSessionInterface(six.with_metaclass(ABCMeta)):
     """
@@ -357,6 +358,7 @@ class CopyingManagerWorkerSession(
 
         # The current pending AddEventsTask.  We will retry the contained AddEventsRequest several times.
         self.__pending_add_events_task = None
+        self.__receive_response_status = {}
 
         # The next LogFileProcessor that should have log lines read from it for transmission.
         self.__current_processor = 0
@@ -492,6 +494,7 @@ class CopyingManagerWorkerSession(
                         # on the ground and advance.
                         if current_time - last_success > self.__config.max_retry_time:
                             if self.__pending_add_events_task is not None:
+
                                 if (
                                     "parseResponseFailed"
                                     in self.__pending_add_events_task.__receive_response_status

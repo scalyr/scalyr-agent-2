@@ -3,7 +3,6 @@ import json
 import urllib
 from base64 import b64encode
 
-from scalyr_agent.connection import ConnectionFactory
 from urllib.parse import urlparse
 
 from scalyr_agent.third_party import requests
