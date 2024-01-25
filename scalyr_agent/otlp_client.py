@@ -33,13 +33,13 @@ __author__ = "anthonyj@sentinelone.com"
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
-from scalyr_agent.third_party.opentelemetry.proto.logs.v1.logs_pb2 import ScopeLogs, LogsData, LogRecord, ResourceLogs
-from scalyr_agent.third_party.opentelemetry.proto.common.v1.common_pb2 import AnyValue as PB2AnyValue
-from scalyr_agent.third_party.opentelemetry.proto.common.v1.common_pb2 import KeyValue as PB2KeyValue
-from scalyr_agent.third_party.opentelemetry.proto.common.v1.common_pb2 import (
+from opentelemetry.proto.logs.v1.logs_pb2 import ScopeLogs, LogsData, LogRecord, ResourceLogs
+from opentelemetry.proto.common.v1.common_pb2 import AnyValue as PB2AnyValue
+from opentelemetry.proto.common.v1.common_pb2 import KeyValue as PB2KeyValue
+from opentelemetry.proto.common.v1.common_pb2 import (
     KeyValueList as PB2KeyValueList,
 )
-from scalyr_agent.third_party.opentelemetry.proto.common.v1.common_pb2 import (
+from opentelemetry.proto.common.v1.common_pb2 import (
     ArrayValue as PB2ArrayValue,
 )
 
