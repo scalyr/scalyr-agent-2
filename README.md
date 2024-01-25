@@ -1,5 +1,5 @@
 # Scalyr Agent (scalyr-agent-2)
-
+ 
 [![Lint](https://github.com/scalyr/scalyr-agent-2/actions/workflows/lint.yml/badge.svg)](https://github.com/scalyr/scalyr-agent-2/actions/workflows/lint.yml) [![Unittests](https://github.com/scalyr/scalyr-agent-2/actions/workflows/unittests.yml/badge.svg)](https://github.com/scalyr/scalyr-agent-2/actions/workflows/unittests.yml) [![Docker Images Build](https://github.com/scalyr/scalyr-agent-2/actions/workflows/agent-build.yml/badge.svg)](https://github.com/scalyr/scalyr-agent-2/actions/workflows/agent-build.yml) [![Kubernetes End to End Tests](https://github.com/scalyr/scalyr-agent-2/actions/workflows/end_to_end_tests.yml/badge.svg)](https://github.com/scalyr/scalyr-agent-2/actions/workflows/end_to_end_tests.yml) [![codecov](https://codecov.io/gh/scalyr/scalyr-agent-2/branch/master/graph/badge.svg)](https://codecov.io/gh/scalyr/scalyr-agent-2)
 
 This repository holds the source code for the Scalyr Agent, a daemon that collects logs and metrics from
