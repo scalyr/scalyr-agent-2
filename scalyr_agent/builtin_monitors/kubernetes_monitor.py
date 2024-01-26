@@ -3189,6 +3189,7 @@ class ContainerChecker(object):
         parser = "docker"
         common_annotations = {}
         container_annotations = {}
+        all_annotations = {}
         # pod name and namespace are set to an invalid value for cases where errors occur and a log
         # message is produced, so that the log message has clearly invalid values for these rather
         # than just being empty
@@ -3271,6 +3272,7 @@ class ContainerChecker(object):
                 # by default all annotations will be applied to all containers
                 # in the pod
                 all_annotations = pod.annotations
+
                 container_specific_annotations = False
 
                 # get any common annotations for all containers
@@ -3408,6 +3410,56 @@ class ContainerChecker(object):
         # Update root level parser if attributes["parser"] is set
         if "parser" in attrs:
             result["parser"] = attrs["parser"]
+
+        # Based on the pod annotations in a format {container_name}.{team}.secret={secret_name}
+        # we might want to add api_keys parameter
+        if container_annotations or all_annotations:
+            def filter_teams(annotations):
+                return {
+                    team: value
+                    for team, value in annotations.items()
+                    if re.fullmatch("team\\d+", team)
+                }
+
+            def fetch_secret(name):
+                secret = k8s_cache.secret(pod_namespace, name, time.time())
+                if secret:
+                    return secret
+
+                self._logger.warning(
+                    "Failed to fetch secret '%s' for pod '%s/%s'"
+                    % (name, pod_namespace, pod_name),
+                    limit_once_per_x_secs=300,
+                    limit_key="k8s-fetch-secret-%s" % name,
+                )
+
+            def get_secret_api_key(secret):
+                api_key = secret.data.get("api-key")
+
+                if not api_key:
+                    self._logger.warning(
+                        "Secret '%s/%s' does not contain a scalyr-api-key field, ingoring."
+                        % (pod_namespace, secret.name),
+                        limit_once_per_x_secs=300,
+                        limit_key="k8s-fetch-secret-%s" % secret.name
+                    )
+
+                return api_key
+
+            team_annotations = filter_teams(container_annotations) or filter_teams(all_annotations)
+
+            api_keys = [
+                get_secret_api_key(
+                    fetch_secret(
+                        team_annotations[team]["secret"]
+                    )
+                )
+                for team in team_annotations.keys()
+                if team_annotations.get(team).get("secret")
+            ]
+
+            if api_keys:
+                result["api_keys"] = list(filter(lambda api_key: api_key is not None, api_keys))
 
         return result
 

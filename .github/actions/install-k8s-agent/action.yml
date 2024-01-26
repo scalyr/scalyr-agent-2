@@ -9,6 +9,15 @@ inputs:
   scalyr_api_key:
     description: "Write API key to be used by the agent."
     required: true
+  scalyr_api_key_team_1:
+    description: "Write API key to be used by the agent."
+    required: false
+  scalyr_api_key_team_2:
+    description: "Write API key to be used by the agent."
+    required: false
+  scalyr_api_key_team_3:
+    description: "Write API key to be used by the agent."
+    required: false
   scalyr_cluster_name:
     description: "Cluster name to use."
     required: true
@@ -80,6 +89,21 @@ runs:
 
         # Define api key
         kubectl create secret generic scalyr-api-key --namespace scalyr --from-literal=scalyr-api-key="${{ inputs.scalyr_api_key }}"
+        
+        # Create a secret if the scalyr_api_key_team_1 is set
+        if [ ! -z "${{ inputs.scalyr_api_key_team_1 }}" ]; then
+          kubectl create secret generic scalyr-api-key-team-1 --namespace scalyr --from-literal=scalyr-api-key="${{ inputs.scalyr_api_key_team_1 }}"
+        fi
+        
+        # Create a secret if the scalyr_api_key_team_2 is set
+        if [ ! -z "${{ inputs.scalyr_api_key_team_2 }}" ]; then
+          kubectl create secret generic scalyr-api-key-team-2 --namespace scalyr --from-literal=scalyr-api-key="${{ inputs.scalyr_api_key_team_2 }}"
+        fi
+        
+        # Create a secret if the scalyr_api_key_team_3 is set
+        if [ ! -z "${{ inputs.scalyr_api_key_team_3 }}" ]; then
+          kubectl create secret generic scalyr-api-key-team-3 --namespace scalyr --from-literal=scalyr-api-key="${{ inputs.scalyr_api_key_team_3 }}"
+        fi
 
         # Create configmap
         kubectl create configmap --namespace scalyr scalyr-config \
