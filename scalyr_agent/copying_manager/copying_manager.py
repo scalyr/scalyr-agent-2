@@ -72,6 +72,64 @@ CONSOLIDATED_CHECKPOINTS_FILE_NAME = "checkpoints.json"
 WORKER_SESSION_PROCESS_MONITOR_ID_PREFIX = "agent_worker_session_"
 
 
+class DynamicWorkers(object):
+    """
+    This class is responsible for managing the dynamic workers.
+    """
+
+    def __init__(self):
+        self.__workers_by_api_key = {}
+        self.__last_id = 0
+
+    def next_id(self):
+        self.__last_id += 1
+        return "dynamic_" + str(self.__last_id)
+
+    def get_worker(self, api_key):
+        # type: (six.text_type) -> Optional[CopyingManagerWorker]
+        """
+        Get worker by api key.
+        """
+        return self.__workers_by_api_key.get(api_key)
+
+    def has_worker(self, api_key):
+        # type: (six.text_type) -> bool
+        """
+        Check if worker exists.
+        """
+        return api_key in self.__workers_by_api_key
+
+    def add_worker(self, worker):
+        # type: (CopyingManagerWorker) -> None
+        """
+        Add worker.
+        """
+        self.__workers_by_api_key[worker.worker_id] = worker
+        return worker
+
+    def get_or_create_worker(self, api_key):
+        # type: (CopyingManagerWorker) -> None
+        """
+        Add worker.
+        """
+        if self.has_worker(api_key):
+            return self.get_worker(api_key)
+
+        return self.add_worker(
+            self.__new_worker(api_key)
+        )
+
+    def __new_worker(self, api_key, config):
+        # type: (six.text_type, Configuration) -> CopyingManagerWorker
+
+        worker_config = {
+            "api_key": api_key,
+            "id": self.next_id()
+        }
+
+        return CopyingManagerWorker(config, worker_config)
+
+
 class CopyingManagerWorker(object):
     """
     This abstraction is responsible for maintaining the worker sessions
@@ -312,6 +370,33 @@ class CopyingManagerWorker(object):
         return result
 
 
+class LogPathsBeingProcessed(object):
+    def __init__(self, paths=None):
+        # (path, worker_id) => LogFileProcessor
+        # type: Dict[Tuple[six.text_type, six.text_type], LogFileProcessor]
+        self.__paths = paths if paths else {}
+
+    def set(self, path, worker_id, log_processor):
+        # type: (six.text_type, six.text_type, LogFileProcessor) -> None
+        self.__paths[(path, worker_id)] = log_processor
+
+    def get(self, path, worker_id):
+        # type: (six.text_type, six.text_type) -> Optional[LogFileProcessor]
+        return self.__paths.get((path, worker_id))
+
+    def contains(self, path, worker_id):
+        # type: (six.text_type, six.text_type) -> bool
+        return (path, worker_id) in self.__paths
+
+    def copy(self):
+        # type: () -> LogPathsBeingProcessed
+        return LogPathsBeingProcessed(paths=self.__paths.copy())
+
+    def items(self):
+        # type: () -> List[Tuple[Tuple[six.text_type, six.text_type], LogFileProcessor]]
+        return self.__paths.items()
+
+
 class CopyingManager(StoppableThread, LogWatcher):
     """Manages the process of copying all configured log files to the Scalyr server.
 
@@ -366,7 +451,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         # a dict of paths -> monitor names that have been dynamically added to the copying manager
         # the copying manager ensures that operations on a dynamically added path can only be performed
         # by the same monitor (i.e. only the monitor that dynamically added a path can remove or update
-        # that monitor).
+        # that path).
         self.__dynamic_paths = {}
 
         # a dict of log paths pending removal once their bytes pending count reaches 0
@@ -387,7 +472,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         self.__pending_log_matchers = []
 
         # A dict from file path to the LogFileProcessor that is processing it.
-        self.__log_paths_being_processed = {}
+        self.__log_paths_being_processed = LogPathsBeingProcessed()
         # A lock that protects the status variables and the __log_matchers variable, the only variables that
         # are access in generate_status() which needs to be thread safe.
         self.__lock = threading.Lock()
@@ -420,6 +505,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         self.__total_scan_iterations = 0
 
         # The worker instance for each entry in the 'workers' list in the configuration.
+        # The key is the worker id.
         self.__workers = dict()  # type: Dict[six.text_type, CopyingManagerWorker]
 
         # The list of LogMatcher objects that are watching for new files to appear.
@@ -465,10 +551,11 @@ class CopyingManager(StoppableThread, LogWatcher):
 
     def add_log_config(self, monitor_name, log_config, force_add=False):
         """Add the log_config item to the list of paths being watched
+        If force_add is true and the log_config item is marked to be removed the removal will be canceled.
+        Otherwise, the item will be added only if it's not monitored already.
         param: monitor_name - the name of the monitor adding the log config
         param: log_config - a log_config object containing the path to be added
-        param force_add: True or force add this file and cancel any removal which
-        may have been scheduled before hand.
+        param force_add: bool, see above
         We really just want to use this with Docker monitor where there is a small windows between
         the container restart where the log file is not immediately removed.
         returns: an updated log_config object
@@ -484,6 +571,7 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         try:
             path = log_config["path"]
+            api_keys = log_
 
             # Make sure path is not already scheduled for removal. If it is and force_add is true,
             # we cancel scheduled removal and continue to monitor it
@@ -570,7 +658,8 @@ class CopyingManager(StoppableThread, LogWatcher):
 
     def remove_log_path(self, monitor_name, log_path):
         """Remove the log_path from the list of paths being watched
-        params: log_path - a string containing the path to the file no longer being watched
+        param: monitor - the monitor removing the path
+        param: log_path - a string containing path of the log file to remove
         """
         # get the list of paths with 0 reference counts
         self.__lock.acquire()
@@ -1252,12 +1341,12 @@ class CopyingManager(StoppableThread, LogWatcher):
         processors = self.__log_paths_being_processed.copy()
 
         # set processors to empty
-        self.__log_paths_being_processed = {}
+        self.__log_paths_being_processed = LogPathsBeingProcessed()
 
         # add back any processors that haven't been closed
-        for path, p in processors.items():
+        for (path, worker_id), p in processors.items():
             if not p.is_closed():
-                self.__log_paths_being_processed[path] = p
+                self.__log_paths_being_processed.set(path, worker_id, p)
 
     def __create_log_processors_for_log_matchers(
         self, log_matchers, checkpoints=None, copy_at_index_zero=False
@@ -1296,6 +1385,7 @@ class CopyingManager(StoppableThread, LogWatcher):
             # get the worker which is responsible for this log matcher.
             worker = self.__workers[matcher.log_entry_config.get("worker_id")]
             for new_processor in matcher.find_matches(
+                worker.worker_id,
                 self.__log_paths_being_processed,
                 checkpoints,
                 copy_at_index_zero=copy_at_index_zero,
@@ -1305,7 +1395,7 @@ class CopyingManager(StoppableThread, LogWatcher):
             ):
 
                 log_path = new_processor.get_log_path()
-                self.__log_paths_being_processed[log_path] = new_processor
+                self.__log_paths_being_processed.set(log_path, worker.worker_id, new_processor)
 
                 # if the log file pending removal, mark that it has now been processed
                 if log_path in pending_removal:
