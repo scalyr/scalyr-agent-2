@@ -213,7 +213,7 @@ class AddEventsTask(object):
         # This must be the next request if this request is successful, otherwise, we will lose bytes.
         self.next_pipelined_task = None
         # last status
-        self.__receive_response_status = ()
+        self.receive_response_status = ()
 
 class CopyingManagerWorkerSessionInterface(six.with_metaclass(ABCMeta)):
     """
@@ -493,7 +493,7 @@ class CopyingManagerWorkerSession(
 
                                 if (
                                     "parseResponseFailed"
-                                    in self.__pending_add_events_task.__receive_response_status
+                                    in self.__pending_add_events_task.receive_response_status
                                 ):
                                     log.error(
                                         "Repeatedly failed to parse response due to exception.  Dropping events",
@@ -588,7 +588,7 @@ class CopyingManagerWorkerSession(
                                 full_response = ""
                             else:
                                 (result, bytes_sent, full_response) = get_response()
-                                self.__pending_add_events_task.__receive_response_status = (
+                                self.__pending_add_events_task.receive_response_status = (
                                     result
                                 )
                             blocking_response_time_end = time.time()
