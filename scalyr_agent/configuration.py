@@ -2215,6 +2215,10 @@ class Configuration(object):
         if api_key:
             config.put("api_key", api_key)
 
+        # Ingore api_key check if we are not writing to Scalyr/DataSet/SDL
+        if "transport" in config and config.get_string("transport") != "scalyr":
+            return
+
         if "api_key" not in config:
             raise BadConfiguration(
                 'The configuration file is missing the required field "api_key" that '
@@ -2866,7 +2870,7 @@ class Configuration(object):
         self.__verify_or_set_optional_string(
             config,
             "transport",
-            "",
+            "scalyr",
             description,
             apply_defaults
         )

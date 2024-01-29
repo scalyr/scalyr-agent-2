@@ -18,10 +18,6 @@ from __future__ import absolute_import
 
 from typing import Any, Mapping, Optional, List
 
-import sys, platform, ssl
-
-import six
-from six.moves import map
 import six.moves.http_client
 
 from scalyr_agent.__scalyr__ import SCALYR_VERSION
