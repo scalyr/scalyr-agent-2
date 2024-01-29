@@ -24,7 +24,7 @@ class LogWatcher(object):
     to add/remove a set of log paths
     """
 
-    def add_log_config(self, monitor_name, log_config, force_add):
+    def add_log_config(self, monitor_name, log_config, force_add=True):
         """Add the log_config item to the list of paths being watched
         If force_add is true and the log_config item is marked to be removed the removal will be canceled.
         Otherwise, the item will be added only if it's not monitored already.
