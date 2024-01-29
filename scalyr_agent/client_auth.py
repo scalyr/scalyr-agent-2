@@ -43,10 +43,10 @@ class BearerToken(object):
 class OAuth2(object):
     def __init__(self, configuration, headers):
         self.headers = headers # Headers modified for external requests
-        self.client_id = configuration.client_id
-        self.client_secret = configuration.client_secret
-        self.token_url = configuration.token_url
-        scopes = " ".join(configuration.scopes)
+        self.client_id = configuration.oauth_client_id
+        self.client_secret = configuration.oauth_client_secret
+        self.token_url = configuration.oauth_token_url
+        scopes = " ".join(configuration.oauth_scopes)
         # Payload Body for the token exchange
         self.auth_request = "grant_type=client_credentials&scope=" + urllib.parse.quote_plus(scopes)
         # Our token to use in requests

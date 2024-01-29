@@ -1510,22 +1510,22 @@ class Configuration(object):
         return self.__get_config().get_string("auth")
 
     @property
-    def client_id(self):
+    def oauth_client_id(self):
         """Returns the configuration value for 'oauth_client_id'."""
         return self.__get_config().get_string("oauth_client_id")
 
     @property
-    def client_secret(self):
+    def oauth_client_secret(self):
         """Returns the configuration value for 'oauth_client_secret'."""
         return self.__get_config().get_string("oauth_client_secret")
 
     @property
-    def token_url(self):
+    def oauth_token_url(self):
         """Returns the configuration value for 'oauth_token_url'."""
         return self.__get_config().get_string("oauth_token_url")
 
     @property
-    def scopes(self):
+    def oauth_scopes(self):
         """Returns the configuration value for 'oauth_scopes'."""
         return self.__get_config().get_json_array("oauth_scopes")
 
