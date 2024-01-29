@@ -355,7 +355,6 @@ class CopyingManagerWorkerSession(
 
         # The current pending AddEventsTask.  We will retry the contained AddEventsRequest several times.
         self.__pending_add_events_task = None
-        self.__receive_response_status = {}
 
         # The next LogFileProcessor that should have log lines read from it for transmission.
         self.__current_processor = 0
