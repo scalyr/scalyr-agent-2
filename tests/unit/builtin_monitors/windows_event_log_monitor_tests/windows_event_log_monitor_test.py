@@ -19,9 +19,8 @@ import os
 import pytest
 import sys
 import tempfile
-from scalyr_agent.builtin_monitors.windows_event_log_monitor import NewJsonApi
 
-if sys.platform == "win32":
+if sys.platform == "Windows":
     import scalyr_agent.builtin_monitors.windows_event_log_monitor
     from scalyr_agent.builtin_monitors.windows_event_log_monitor import (
         WindowEventLogMonitor,
@@ -38,7 +37,7 @@ from scalyr_agent.test_base import skipIf
 def _get_parameter_msg_fixture_path():
     # TODO Document how the test dll is created
     return os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+        os.path.dirname(os.path.dirname(__file__)),
         "fixtures",
         "parametermsgfixture.dll",
     )
@@ -46,7 +45,7 @@ def _get_parameter_msg_fixture_path():
 
 @pytest.mark.windows_platform
 class WindowsEventLogMonitorTest(ScalyrTestCase):
-    @skipIf(sys.platform != "win32", "Skipping tests under non-Windows platform")
+    @skipIf(sys.platform != "Windows", "Skipping tests under non-Windows platform")
     def test_emit_warning_on_maximum_records_per_source_config_option_new_api(self):
         monitor_config = {
             "module": "windows_event_log_monitor",
@@ -106,7 +105,7 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
             "affect when using new evt API."
         )
 
-    @skipIf(sys.platform != "win32", "Skipping tests under non-Windows platform")
+    @skipIf(sys.platform != "Windows", "Skipping tests under non-Windows platform")
     def test_newjsonapi_backwards_compatible(self):
         monitor_config = {
             "module": "windows_event_log_monitor",
@@ -134,7 +133,7 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
             )
         )
 
-    @skipIf(sys.platform != "win32", "Skipping tests under non-Windows platform")
+    @skipIf(sys.platform != "Windows", "Skipping tests under non-Windows platform")
     def test_convert_json_array_to_object(self):
         self.assertEqual(
             scalyr_agent.builtin_monitors.windows_event_log_monitor._convert_json_array_to_object(
@@ -196,7 +195,7 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
             {"n": {"a": 1}, "n2": {"b": 2}, "2": {"c": 3, "@Name": "n"}},
         )
 
-    @skipIf(sys.platform != "win32", "Skipping tests under non-Windows platform")
+    @skipIf(sys.platform != "Windows", "Skipping tests under non-Windows platform")
     def test_strip_xmltodict_prefixes(self):
         self.assertEqual(
             scalyr_agent.builtin_monitors.windows_event_log_monitor._strip_xmltodict_prefixes(
@@ -240,24 +239,23 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
             [{"a": "a", "Text": "t"}],
         )
 
-    @skipIf(sys.platform != "win32", "Skipping tests under non-Windows platform")
+    @skipIf(sys.platform != "Windows", "Skipping tests under non-Windows platform")
     @mock.patch(
         "scalyr_agent.builtin_monitors.windows_event_log_monitor._DLL.dllpath",
         return_value=_get_parameter_msg_fixture_path(),
     )
     def test_replace_param_placeholders(self, *args):
         # pylint: disable=no-member
-        json_api_config = {
-            "dll_handle_cache_size": 100,
-            "dll_handle_cache_ttl": 100,
-            "placeholder_param_cache_size": 100,
-            "placeholder_param_cache_ttl": 100,
-            "placeholder_render": True
+        monitor_config = {
+            "module": "windows_event_log_monitor",
+            "sources": "Application, Security, System",
+            "event_types": "All",
+            "json": True,
         }
         scalyr_agent.builtin_monitors.windows_event_log_monitor.windll = mock.Mock()
         mock_logger = mock.Mock()
 
-        json_api = NewJsonApi(json_api_config, mock_logger, None)
+        monitor = WindowEventLogMonitor(monitor_config, mock_logger)
         test_events = [
             {
                 "Event": {
@@ -285,44 +283,43 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
             },
         ]
 
-        result = json_api._replace_param_placeholders(test_events[0])
+        result = monitor._replace_param_placeholders(test_events[0])
         self.assertEqual(result["Event"]["EventData"]["Data"], "blarg")
 
-        result = json_api._replace_param_placeholders(test_events[1])
+        result = monitor._replace_param_placeholders(test_events[1])
         self.assertEqual(result["Event"]["EventData"]["Data"]["One"], "honk")
         self.assertEqual(result["Event"]["EventData"]["Data"]["Two"]["Text"], "rawr")
         self.assertEqual(result["Event"]["EventData"]["Data"]["Three"]["Text"], "Nice")
 
-    @skipIf(sys.platform != "win32", "Skipping tests under non-Windows platform")
+    @skipIf(sys.platform != "Windows", "Skipping tests under non-Windows platform")
     @mock.patch(
         "scalyr_agent.builtin_monitors.windows_event_log_monitor._DLL.dllpath",
         return_value=_get_parameter_msg_fixture_path(),
     )
     def test_param_placeholder_value_resolution(self, *args):
         # pylint: disable=no-member
-        json_api_config = {
-            "dll_handle_cache_size": 100,
-            "dll_handle_cache_ttl": 100,
-            "placeholder_param_cache_size": 100,
-            "placeholder_param_cache_ttl": 100,
-            "placeholder_render": True
+        monitor_config = {
+            "module": "windows_event_log_monitor",
+            "sources": "Application, Security, System",
+            "event_types": "All",
+            "json": True,
         }
         scalyr_agent.builtin_monitors.windows_event_log_monitor.windll = mock.Mock()
         mock_logger = mock.Mock()
 
-        json_api = NewJsonApi(json_api_config, mock_logger, None)
-        value = json_api._param_placeholder_value("MyChannel", "MyProvider", "%%392")
+        monitor = WindowEventLogMonitor(monitor_config, mock_logger)
+        value = monitor._param_placeholder_value("MyChannel", "MyProvider", "%%392")
         self.assertEqual(value, "blarg")
-        value = json_api._param_placeholder_value("MyChannel", "MyProvider", "%%553")
+        value = monitor._param_placeholder_value("MyChannel", "MyProvider", "%%553")
         self.assertEqual(value, "honk")
-        value = json_api._param_placeholder_value("MyChannel", "MyProvider", "%%990")
+        value = monitor._param_placeholder_value("MyChannel", "MyProvider", "%%990")
         self.assertEqual(value, "rawr")
-        value = json_api._param_placeholder_value("MyChannel", "MyProvider", "%%69")
+        value = monitor._param_placeholder_value("MyChannel", "MyProvider", "%%69")
         self.assertEqual(value, "Nice")
-        value = json_api._param_placeholder_value("MyChannel", "MyProvider", "%%1111")
+        value = monitor._param_placeholder_value("MyChannel", "MyProvider", "%%1111")
         self.assertEqual(value, "all your base are belong to us")
 
-    @skipIf(sys.platform != "win32", "Skipping tests under non-Windows platform")
+    @skipIf(sys.platform != "Windows", "Skipping tests under non-Windows platform")
     def test_parameter_msg_file_location_lookup(self):
         msgDLL = _get_parameter_msg_fixture_path()
         channel = "Application"
