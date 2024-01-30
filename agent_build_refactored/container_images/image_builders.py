@@ -230,6 +230,8 @@ class ContainerisedAgentBuilder(Builder):
         for third_party_lib in third_party_lis_root.iterdir():
             if third_party_lib.name == "tcollector":
                 continue
+            if third_party_lib.name == "opentelemetry":
+                continue
             if third_party_lib.is_dir():
                 shutil.rmtree(third_party_lib)
             if third_party_lib.is_file():
