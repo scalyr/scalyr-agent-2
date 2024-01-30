@@ -92,7 +92,9 @@ def create_otlp_client(config, worker_config, server_url=None):
     @param config: The agent configuration object used for dynamically loading up auth patterns
     @param server_url: The URL to the OTLP server. If None, use default scalyr_server value from config"""
     if server_url == None:
-        su = config.server_url or worker_config.server_url
+        su = config.server_url
+        if "server_url" in worker_config:
+            su = worker_config["server_url"]
         server_url = su + "/v1/logs"
     return OTLPClientSession(config, server_url)
 
