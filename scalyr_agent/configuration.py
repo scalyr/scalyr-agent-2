@@ -2304,6 +2304,30 @@ class Configuration(object):
         self.__verify_or_set_optional_string(
             config, "api_key", "", description, apply_defaults, env_aware=True
         )
+        self.__verify_or_set_optional_string(
+            config, "transport", "scalyr", description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_string(
+            config, "auth", "", description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_string(
+            config, "oauth_client_id", "", description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_string(
+            config, "oauth_client_secret", "", description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_string(
+            config, "oauth_token_url", "", description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_array_of_strings(
+            config,
+            "oauth_scopes",
+            [],
+            description,
+            apply_defaults,
+            separators=[None, ","],
+            env_aware=True,
+        )
         self.__verify_or_set_optional_bool(
             config, "allow_http", False, description, apply_defaults, env_aware=True
         )
