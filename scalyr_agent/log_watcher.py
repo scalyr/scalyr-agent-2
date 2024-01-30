@@ -24,16 +24,11 @@ class LogWatcher(object):
     to add/remove a set of log paths
     """
 
-    def add_log_config(self, monitor_name, log_config, force_add=True):
-        """Add the log_config item to the list of paths being watched
-        If force_add is true and the log_config item is marked to be removed the removal will be canceled.
-        Otherwise, the item will be added only if it's not monitored already.
-        param: monitor_name - the name of the monitor adding the log config
-        param: log_config - a log_config object containing the path to be added
-        param force_add: bool, see above
-        We really just want to use this with Docker monitor where there is a small windows between
-        the container restart where the log file is not immediately removed.
-        returns: an updated log_config object
+    def add_log_config(self, monitor_name, log_config):
+        """Add the path specified by the log_config to the list of paths being watched
+        param: monitor_name - the name of the monitor adding the log_config
+        param: log_config - a log_config object containing at least a path
+        returns: the log_config variable with updated path and default information
         """
         pass
 

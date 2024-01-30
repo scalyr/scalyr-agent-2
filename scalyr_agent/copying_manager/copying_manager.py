@@ -465,11 +465,10 @@ class CopyingManager(StoppableThread, LogWatcher):
 
     def add_log_config(self, monitor_name, log_config, force_add=False):
         """Add the log_config item to the list of paths being watched
-        If force_add is true and the log_config item is marked to be removed the removal will be canceled.
-        Otherwise, the item will be added only if it's not monitored already.
         param: monitor_name - the name of the monitor adding the log config
         param: log_config - a log_config object containing the path to be added
-        param force_add: bool, see above
+        param force_add: True or force add this file and cancel any removal which
+        may have been scheduled before hand.
         We really just want to use this with Docker monitor where there is a small windows between
         the container restart where the log file is not immediately removed.
         returns: an updated log_config object
@@ -571,8 +570,7 @@ class CopyingManager(StoppableThread, LogWatcher):
 
     def remove_log_path(self, monitor_name, log_path):
         """Remove the log_path from the list of paths being watched
-        param: monitor - the monitor removing the path
-        param: log_path - a string containing path of the log file to remove
+        params: log_path - a string containing the path to the file no longer being watched
         """
         # get the list of paths with 0 reference counts
         self.__lock.acquire()

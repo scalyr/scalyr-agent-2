@@ -1136,8 +1136,6 @@ class RunState(object):
         self.__condition.wait(timeout)
 
 
-
-
 class FakeRunState(RunState):
     """A RunState subclass that does not actually sleep when sleep_but_awaken_if_stopped that can be used for tests."""
 

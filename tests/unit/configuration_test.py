@@ -2836,7 +2836,7 @@ class TestGetConfigFromEnv(TestConfigurationBase):
 
 
 class FakeLogWatcher:
-    def add_log_config(self, a, b, force_add=False):
+    def add_log_config(self, a, b):
         pass
 
 

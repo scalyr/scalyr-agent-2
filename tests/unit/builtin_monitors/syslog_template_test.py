@@ -102,7 +102,7 @@ class LogWatcherMock(LogWatcher):
     def __init__(self):
         self.log_configs = []
 
-    def add_log_config(self, monitor_name, log_config, force_add=False):
+    def add_log_config(self, monitor_name, log_config):
         assert monitor_name == "scalyr_agent.builtin_monitors.syslog_monitor"
 
         log_config_copy = copy.deepcopy(log_config)

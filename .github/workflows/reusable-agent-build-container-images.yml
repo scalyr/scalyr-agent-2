@@ -369,11 +369,9 @@ jobs:
           minikube image ls
           kubectl apply -f tests/e2e/k8s_k8s_monitor/std_printer_deployment.yaml
           kubectl apply -f tests/e2e/k8s_k8s_monitor/long_message_printer_deployment.yaml
-          kubectl apply -f tests/e2e/k8s_k8s_monitor/multiple_account_printers.yaml
           
           kubectl wait --for=condition=ready pod -l app=std-printer
           kubectl wait --for=condition=ready pod -l app=long-message-printer
-          kubectl wait --for=condition=ready pod -l app=multiple-account-printer
           kubectl get pods -A
 
           export APP_POD_NAME=$(kubectl get pod --namespace=default --selector=app=std-printer -o jsonpath="{.items[0].metadata.name}")
@@ -400,9 +398,6 @@ jobs:
         with:
           scalyr_server: "agent.scalyr.com"
           scalyr_api_key: "${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}"
-          scalyr_api_key_team_1: "${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_2_WRITE }}"
-          scalyr_api_key_team_2: "${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_3_WRITE }}"
-          scalyr_api_key_team_3: "${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_4_WRITE }}"
           scalyr_cluster_name: "${K8S_CLUSTER_NAME}"
           scalyr_k8s_events_disable: "false"
           main_yaml_path: "tests/e2e/scalyr-agent-2-daemonset.yaml"
@@ -525,56 +520,6 @@ jobs:
           echo "CronJob events checks"
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/kubernetes_events.log" $parser="k8sEvents" k8s-kind="CronJob" involvedObjectKind="CronJob" involvedObjectName="hello" watchEventType="ADDED" reason="SawCompletedJob"'
 
-      - name: Verify multiaccount records have been ingested
-        timeout-minutes: 14
-        env:
-          scalyr_api_key_team_1: "${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}"
-          scalyr_api_key_team_2: "${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}"
-          scalyr_api_key_team_3: "${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}"
-          SCALYR_AGENT_POD_NAME: "${{ env.SCALYR_AGENT_POD_NAME }}"
-        run: |
-          export RETRY_ATTEMPTS="1"
-          
-          function scalyr_query() {
-            scalyr query --columns=message "serverHost=\"${SCALYR_AGENT_POD_NAME}\" app=\"multiple-account-printer\" $@"
-          }
-          
-          function ingested_line_count() {
-            API_KEY=$1
-            MESSAGE=$2
-            scalyr_readlog_token=${API_KEY} scalyr_query ${MESSAGE}" | wc -l
-          }
-          
-          function assert_ingested_once() {
-            API_KEY=$1
-            MESSAGE=$2
-            LINE_COUNT=`scalyr_readlog_token=${API_KEY} scalyr_query ${MESSAGE}" | wc -l`
-          }
-          
-          function assert_not_ingested() {
-            API_KEY=$1
-            MESSAGE=$2
-            scalyr_readlog_token=${API_KEY} scalyr_query ${MESSAGE}" && echo -e $SUCCESS_MSG || echo -e $ERR_MSG && exit 1
-          }
-          
-          # See tests/e2e/k8s_k8s_monitor/multiple_account_printers.yaml:16 for the following annotations:
-          # log.config.scalyr.com/attributes.parser: "test-parser-1"
-          # log.config.scalyr.com/team1.secret: "scalyr-api-key-team-1"
-          # log.config.scalyr.com/cont1.team2.secret: "scalyr-api-key-team-2"
-          # log.config.scalyr.com/cont2.team2.secret: "scalyr-api-key-team-2"
-          # log.config.scalyr.com/cont2.team3.secret: "scalyr-api-key-team-3"
-            
-          # Container 1 log is ingested with the scalyr-api-key-team-2 only
-          scalyr_query(
-          
-          # Container 2 log is ingested with the scalyr-api-key-team-2 and scalyr-api-key-team-3 only
-          
-          # Container 3 log is ingested with the scalyr-api-key-team-1 only
-                    
-          
-          scalyr_readlog_token=${{ scalyr_api_key_team_2 }} ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" app="multiple-account-printer" "MULTIPLE_ACCOUNT_TEST_CONTAINER_NAME:cont1'
-          scalyr_readlog_token=${{ scalyr_api_key_team_2 }} ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" app="multiple-account-printer" "MULTIPLE_ACCOUNT_TEST_CONTAINER_NAME:cont1'
-
       - name: Notify Slack on Failure
         if: ${{ failure() && github.ref_name == 'master' }}
         uses: act10ns/slack@ed1309ab9862e57e9e583e51c7889486b9a00b0f # v2.0.0
@@ -584,7 +529,6 @@ jobs:
           status: ${{ job.status }}
           steps: ${{ toJson(steps) }}
           channel: '#eng-dataset-cloud-tech'
-
 
   k8s_open_metrics_monitor_tests:
     name: OpenMetrics Monitor - k8s ${{ inputs.builder_name }} ${{ matrix.k8s_version.version }}-${{ matrix.k8s_version.runtime}}
