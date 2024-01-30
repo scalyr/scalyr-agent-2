@@ -624,9 +624,7 @@ class NewApi(Api):
             if qualifiers_val[1] != win32evtlog.EvtVarTypeNull:
                 # then combine the event id with the qualifiers to
                 # make the full event id.
-                result["EventIDQualifiers"] = qualifiers_val[0]
-                result["InstanceID"] = win32api.MAKELONG(event_id, qualifiers_val[0])
-
+                event_id = win32api.MAKELONG(event_id, qualifiers_val[0])
             result["EventID"] = event_id
 
         metadata = None
