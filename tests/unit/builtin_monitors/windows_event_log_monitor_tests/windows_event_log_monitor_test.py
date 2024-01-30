@@ -28,7 +28,7 @@ if sys.platform == "win32":
     )
     import win32api  # pylint: disable=import-error
     import win32con  # pylint: disable=import-error
-    import win32evtlog  # pylint: disable=import-error
+    import win32evtlog # pylint: disable=import-error
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
