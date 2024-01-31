@@ -91,12 +91,12 @@ def create_otlp_client(config, worker_config, server_url=None):
     @param quiet: If true, only errors should be written to stdout.
     @param config: The agent configuration object used for dynamically loading up auth patterns
     @param server_url: The URL to the OTLP server. If None, use default scalyr_server value from config"""
-    if server_url == None:
+    su = server_url
+    if server_url is None:
         su = config.server_url
         if "server_url" in worker_config:
             su = worker_config["server_url"]
-        server_url = su + "/v1/logs"
-    return OTLPClientSession(config, server_url)
+    return OTLPClientSession(config, su)
 
 class ScalyrClientSessionStatus(object):
     def __init__(self):
@@ -111,8 +111,8 @@ class ScalyrClientSessionStatus(object):
 
 
 class OTLPClientSession(object):
-    def __init__(self, configuration, server_url=None):
-        self.__full_address = configuration.server_url
+    def __init__(self, configuration, server_url):
+        self.__full_address = server_url
         self.__ca_file = str(configuration.ca_cert_path)
         self.__request_deadline = 60.0
         self.__intermediate_certs_file = str(configuration.intermediate_certs_path)
