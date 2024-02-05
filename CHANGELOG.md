@@ -1,6 +1,17 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.2.10 "Aradesh" - Feb 5, 2024
+<!---
+Packaged by Ales Novak <ales.novak@sentinelone.com> on Feb 5, 2024 00:00 -0800
+--->
+
+Improvement:
+* Windows Event Log Monitor - EventID field has been expanded into three fields. Until now EventID from the Windows Event Log was represented only by EventID field computed the following way win32api.MAKELONG(EventID, EventIDQualifiers). EventID and EventIDQualifiers now hold the values from the Windows Event Log without any modification and InstanceID is computed from EventID and EventIDQualifiers as described above.
+
+Fix:
+* Missing monitor field added to the event data sent by Syslog Monitor. The following field was added - ‘monitor’:'agentSyslog'.
+
 ## 2.2.9 "Tandi" - Jan 11, 2024
 <!---
 Packaged by Ales Novak <ales.novak@sentinelone.com> on Jan 11, 2024 00:00 -0800
