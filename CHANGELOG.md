@@ -1,6 +1,14 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.2.11 "Maxson" - Feb 7, 2024
+<!---
+Packaged by Ales Novak <ales.novak@sentinelone.com> on Feb 7, 2024 00:00 -0800
+--->
+
+Security fix:
+* Alpine image upgraded to 3.19.1 to mitigate [CVE-2023-7104](https://www.cve.org/CVERecord?id=CVE-2023-7104) and [CVE-2023-5363](https://www.cve.org/CVERecord?id=CVE-2023-5363)
+
 ## 2.2.10 "Aradesh" - Feb 5, 2024
 <!---
 Packaged by Ales Novak <ales.novak@sentinelone.com> on Feb 5, 2024 00:00 -0800
