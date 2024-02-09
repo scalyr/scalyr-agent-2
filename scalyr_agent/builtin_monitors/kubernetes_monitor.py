@@ -17,6 +17,9 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+if False:  # NOSONAR
+    from typing import Dict, List
+
 __author__ = "imron@scalyr.com"
 
 import six
@@ -66,7 +69,7 @@ from scalyr_agent.monitor_utils.k8s import (
     KubeletApiException,
     K8sApiTemporaryError,
     K8sConfigBuilder,
-    K8sNamespaceFilter,
+    K8sNamespaceFilter, KubernetesCache,
 )
 from scalyr_agent.monitor_utils.k8s import (
     K8sApiPermanentError,
@@ -2499,6 +2502,29 @@ class CRIEnumerator(ContainerEnumerator):
         return result
 
 
+class DockerLog(object):
+    def __init__(self, cid, stream, log_config):
+        self.__cid = cid
+        self.__stream = stream
+        self.__log_config = log_config
+
+    @property
+    def cid(self):
+        return self.__cid
+
+    @property
+    def stream(self):
+        return self.__stream
+
+    @property
+    def log_config(self):
+        return self.__log_config
+
+    @log_config.setter
+    def log_config(self, value):
+        self.__log_config = value
+
+
 class ContainerChecker(object):
     """
     Monitors containers to check when they start and stop running.
@@ -2627,7 +2653,8 @@ class ContainerChecker(object):
         self.__controlled_warmer = controlled_warmer
 
         # give this an initial empty value
-        self.raw_logs = []
+        self.raw_logs = [] # type: List[DockerLog]
+        self.docker_logs = [] # type: List[DockerLog]
 
         self.__stopped = False
 
@@ -3048,10 +3075,10 @@ class ContainerChecker(object):
                 # update the log config for any changed containers
                 if self.__log_watcher:
                     for logger in self.raw_logs:
-                        if logger["cid"] in changed:
-                            info = changed[logger["cid"]]
+                        if logger.cid in changed:
+                            info = changed[logger.cid]
                             new_config = self.__get_log_config_for_container(
-                                logger["cid"], info, self.k8s_cache, base_attributes
+                                logger.cid, info, self.k8s_cache, base_attributes
                             )
                             self._logger.log(
                                 scalyr_logging.DEBUG_LEVEL_1,
@@ -3090,19 +3117,19 @@ class ContainerChecker(object):
 
             # go through all the raw logs and see if any of them exist in the stopping list, and if so, stop them
             for logger in self.raw_logs:
-                cid = logger["cid"]
+                cid = logger.cid
                 if cid in stopping:
-                    path = logger["log_config"]["path"]
+                    path = logger.log_config["path"]
                     if self.__log_watcher:
                         self.__log_watcher.schedule_log_path_for_removal(
                             self.__module.module_name, path
                         )
 
             self.raw_logs[:] = [
-                line for line in self.raw_logs if line["cid"] not in stopping
+                line for line in self.raw_logs if line.cid not in stopping
             ]
             self.docker_logs[:] = [
-                line for line in self.docker_logs if line["cid"] not in stopping
+                line for line in self.docker_logs if line.cid not in stopping
             ]
 
     def __start_loggers(self, starting, k8s_cache):
@@ -3121,8 +3148,8 @@ class ContainerChecker(object):
     def __start_docker_logs(self, docker_logs):
         for log in docker_logs:
             if self.__log_watcher:
-                log["log_config"] = self.__log_watcher.add_log_config(
-                    self.__module.module_name, log["log_config"], force_add=True
+                log.log_config = self.__log_watcher.add_log_config(
+                    self.__module.module_name, log.log_config, force_add=True
                 )
 
             self.raw_logs.append(log)
@@ -3412,6 +3439,7 @@ class ContainerChecker(object):
         return result
 
     def __get_docker_logs(self, containers, k8s_cache):
+        # type: (Dict, KubernetesCache) -> List[DockerLog]
         """Returns a list of dicts containing the container id, stream, and a log_config
         for each container in the 'containers' param.
         """
@@ -3425,7 +3453,7 @@ class ContainerChecker(object):
                 cid, info, k8s_cache, attributes
             )
             if log_config:
-                result.append({"cid": cid, "stream": "raw", "log_config": log_config})
+                result.append(DockerLog(cid=cid, stream="raw", log_config=log_config))
 
         return result
 
