@@ -4285,10 +4285,14 @@ class Configuration(object):
                 worker_entry, "api_key", description % entry_index
             )
 
+        # Only use scalyr_server if our transport is scalyr
+        default_server_url = self.scalyr_server
+        if self.transport != "scalyr":
+            default_server_url = self.server_url
         self.__verify_or_set_optional_string(
             worker_entry,
             "server_url",
-            default_value=self.scalyr_server,
+            default_value=default_server_url,
             config_description=description % entry_index,
         )
 

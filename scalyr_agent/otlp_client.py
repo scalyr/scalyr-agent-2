@@ -38,6 +38,7 @@ from opentelemetry.proto.common.v1.common_pb2 import (
 from opentelemetry.proto.common.v1.common_pb2 import (
     ArrayValue as PB2ArrayValue,
 )
+from urllib3.util import parse_url
 
 import scalyr_agent.util as scalyr_util
 from scalyr_agent.scalyr_client import AddEventsRequest
@@ -112,7 +113,9 @@ class ScalyrClientSessionStatus(object):
 
 class OTLPClientSession(object):
     def __init__(self, configuration, server_url):
-        self.__full_address = server_url
+        parsed_url = parse_url(server_url + OTLP_LOGS_PATH)
+        self.address = parsed_url.scheme + "://" + parsed_url.hostname + ":" + str(parsed_url.port)
+        self.logs_path = parsed_url.path
         self.__ca_file = str(configuration.ca_cert_path)
         self.__request_deadline = 60.0
         self.__intermediate_certs_file = str(configuration.intermediate_certs_path)
@@ -164,7 +167,7 @@ class OTLPClientSession(object):
         try:
             if self.__connection is None:
                 self.__connection = ConnectionFactory.connection(
-                    self.__full_address,
+                    self.address,
                     self.__request_deadline,
                     self.__ca_file,
                     self.__intermediate_certs_file,
@@ -184,7 +187,7 @@ class OTLPClientSession(object):
             )
         self.ensure_auth_session()
 
-        self.__connection.post(OTLP_LOGS_PATH, self.__generate_body(add_events_request))
+        self.__connection.post(self.logs_path, self.__generate_body(add_events_request))
         res = self.__connection.response()
         return scalyr_util.wrap_response_if_necessary("success", 0, "success", block_on_response)
 
