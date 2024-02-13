@@ -114,7 +114,10 @@ class ScalyrClientSessionStatus(object):
 class OTLPClientSession(object):
     def __init__(self, configuration, server_url):
         parsed_url = parse_url(server_url + OTLP_LOGS_PATH)
-        self.address = parsed_url.scheme + "://" + parsed_url.hostname + ":" + str(parsed_url.port)
+        self.address = parsed_url.scheme + "://" + parsed_url.hostname
+        # Append Explicit Port
+        if parsed_url.port is not None:
+            self.address += ":" + str(parsed_url.port)
         self.logs_path = parsed_url.path
         self.__ca_file = str(configuration.ca_cert_path)
         self.__request_deadline = 60.0
