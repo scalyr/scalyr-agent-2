@@ -4287,7 +4287,7 @@ class Configuration(object):
 
         # Only use scalyr_server if our transport is scalyr
         default_server_url = self.scalyr_server
-        if self.transport != "scalyr":
+        if self.transport != "scalyr" and self.server_url is not None and self.server_url is not "":
             default_server_url = self.server_url
         self.__verify_or_set_optional_string(
             worker_entry,
