@@ -27,8 +27,6 @@ from scalyr_agent.connection import ConnectionFactory
 
 __author__ = "anthonyj@sentinelone.com"
 
-import scalyr_agent.scalyr_logging as scalyr_logging
-
 from opentelemetry.proto.logs.v1.logs_pb2 import ScopeLogs, LogsData, LogRecord, ResourceLogs
 from opentelemetry.proto.common.v1.common_pb2 import AnyValue as PB2AnyValue
 from opentelemetry.proto.common.v1.common_pb2 import KeyValue as PB2KeyValue
@@ -40,11 +38,14 @@ from opentelemetry.proto.common.v1.common_pb2 import (
 )
 from urllib3.util import parse_url
 
+import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
 from scalyr_agent.scalyr_client import AddEventsRequest
 log = scalyr_logging.getLogger(__name__)
 
 OTLP_LOGS_PATH = "/v1/logs"
+
+log = scalyr_logging.getLogger(__name__)
 
 # OTLP Protobuf Helpers
 def _encode_value(value: Any) -> PB2AnyValue:
@@ -97,6 +98,7 @@ def create_otlp_client(config, worker_config, server_url=None):
         su = config.server_url
         if "server_url" in worker_config:
             su = worker_config["server_url"]
+    log.setLevel(config.debug_level)
     return OTLPClientSession(config, su)
 
 class ScalyrClientSessionStatus(object):
@@ -118,7 +120,9 @@ class OTLPClientSession(object):
         # Append Explicit Port
         if parsed_url.port is not None:
             self.address += ":" + str(parsed_url.port)
+        log.info("OTLP Endpoint: %s" %(self.address))
         self.logs_path = parsed_url.path
+        log.info("OTLP API Logs Path: %s" % (self.logs_path))
         self.__ca_file = str(configuration.ca_cert_path)
         self.__request_deadline = 60.0
         self.__intermediate_certs_file = str(configuration.intermediate_certs_path)
@@ -145,6 +149,7 @@ class OTLPClientSession(object):
         schedule_delay_millis = configuration.min_request_spacing_interval * 1000
         if schedule_delay_millis <= 0:
             schedule_delay_millis = 1000
+
     def ensure_auth_session(self):
         return self.auth.authenticate()
 
@@ -189,9 +194,8 @@ class OTLPClientSession(object):
                 error_code, 0, "", block_on_response
             )
         self.ensure_auth_session()
-
+        log.log(scalyr_logging.DEBUG_LEVEL_1, "Request Headers: %s" %(self.headers))
         self.__connection.post(self.logs_path, self.__generate_body(add_events_request))
-        res = self.__connection.response()
         return scalyr_util.wrap_response_if_necessary("success", 0, "success", block_on_response)
 
     def augment_user_agent(self, fragments):

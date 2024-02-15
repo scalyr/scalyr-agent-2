@@ -4285,9 +4285,9 @@ class Configuration(object):
                 worker_entry, "api_key", description % entry_index
             )
 
-        # Only use scalyr_server if our transport is scalyr
+        # Only use scalyr_server if our transport is scalyr (but still use it if we don't get a server_url)
         default_server_url = self.scalyr_server
-        if self.transport != "scalyr" and self.server_url is not None and self.server_url is not "":
+        if self.transport != "scalyr" and self.server_url is not None and self.server_url != "":
             default_server_url = self.server_url
         self.__verify_or_set_optional_string(
             worker_entry,
