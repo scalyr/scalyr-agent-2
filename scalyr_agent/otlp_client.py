@@ -37,6 +37,7 @@ from opentelemetry.proto.common.v1.common_pb2 import (
     ArrayValue as PB2ArrayValue,
 )
 from urllib3.util import parse_url
+from timeit import default_timer as timer
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
@@ -143,6 +144,7 @@ class OTLPClientSession(object):
         self.total_request_bytes_sent = 0
         self.pending_request_bytes_sent = 0
         self.total_connections_created = 0
+        self.total_request_latency = 0
         self.configuration = configuration
         self.auth = ClientAuth(self.configuration, self.headers)
         self.exporter = None # ScalyrOTLPLogExporter(server_url, headers=self.headers)
@@ -160,8 +162,8 @@ class OTLPClientSession(object):
         result.total_request_bytes_sent = self.total_request_bytes_sent
         result.total_compressed_request_bytes_sent = 0
         result.total_response_bytes_received = 0
-        result.total_request_latency_secs = 0
-        result.total_connections_created = 0
+        result.total_request_latency_secs = self.total_request_latency
+        result.total_connections_created = self.total_connections_created
         result.total_compression_time = 0
         return result
 
@@ -195,7 +197,16 @@ class OTLPClientSession(object):
             )
         self.ensure_auth_session()
         log.log(scalyr_logging.DEBUG_LEVEL_1, "Request Headers: %s" %(self.headers))
-        self.__connection.post(self.logs_path, self.__generate_body(add_events_request))
+        request_body=self.__generate_body(add_events_request)
+        start = timer()
+        self.__connection.post(self.logs_path, request_body)
+        end = timer()
+        self.total_request_latency += end - start
+        if self.__connection.status_code() == 200:
+            self.total_requests_sent+=1
+            self.total_request_bytes_sent+=len(request_body)
+        else:
+            self.total_requests_failed+=1
         return scalyr_util.wrap_response_if_necessary("success", 0, "success", block_on_response)
 
     def augment_user_agent(self, fragments):
@@ -279,7 +290,7 @@ class OTLPAddEventsRequest(object):
         pass
 
     def total_events(self):
-        return 0
+        return self.total_events()
 
     def increment_timing_data(self, **key_values):
         pass
