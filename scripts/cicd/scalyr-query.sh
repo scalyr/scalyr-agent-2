@@ -22,6 +22,7 @@ set -e
 
 RETRY_ATTEMPTS=${RETRY_ATTEMPTS:-"10"}
 SLEEP_DELAY=${SLEEP_DELAY:-"15"}
+START_TIME=${START_TIME:-"20m"}
 
 # Script will fail if query doesn't return at least this number of results / lines
 MINIMUM_RESULTS=${MINIMUM_RESULTS:-"1"}
@@ -72,13 +73,18 @@ function retry_on_failure {
 
 function query_scalyr {
     echo_with_date "Using query '${SCALYR_TOOL_QUERY}'"
+    echo_with_date "scalyr query '${SCALYR_TOOL_QUERY}' --columns='timestamp,severity,message' --start='${START_TIME}' --count='100' --output multiline"
+    scalyr query "${SCALYR_TOOL_QUERY}" --columns='timestamp,severity,message' --start="${START_TIME}" --count='100' --output multiline --verbose
 
-    RESULT=$(eval "scalyr query '${SCALYR_TOOL_QUERY}' --columns='timestamp,severity,message' --start='20m' --count='100' --output multiline")
+    RESULT=$(eval "scalyr query '${SCALYR_TOOL_QUERY}' --columns='timestamp,severity,message' --start='${START_TIME}' --count='100' --output multiline")
     RESULT_LINES=$(echo -e "${RESULT}" | sed '/^$/d' | wc -l)
 
     echo_with_date "Results for query '${SCALYR_TOOL_QUERY}':"
     echo_with_date ""
-    echo -e "${RESULT}"
+    echo -e "${RESULT}" | head --lines=5
+    if [ "${RESULT_LINES}" -gt 5 ]; then
+      echo "... the rest of the lines truncated."
+    fi
 
     if [ "${RESULT_LINES}" -lt ${MINIMUM_RESULTS} ]; then
         echo_with_date ""

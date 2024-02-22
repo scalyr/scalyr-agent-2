@@ -102,6 +102,11 @@ _OBJECT_ENDPOINTS = {
         "list": Template("/api/v1/namespaces/${namespace}/pods"),
         "list-all": "/api/v1/pods",
     },
+    "Secret": {
+        "single": Template("/api/v1/namespaces/${namespace}/secrets/${name}"),
+        "list": Template("/api/v1/namespaces/${namespace}/secrets"),
+        "list-all": "/api/v1/secrets"
+    },
     "ReplicaSet": {
         "single": Template("/apis/apps/v1/namespaces/${namespace}/replicasets/${name}"),
         "list": Template("/apis/apps/v1/namespaces/${namespace}/replicasets"),
@@ -516,6 +521,16 @@ class PodInfo(object):
 
     def __repr__(self):
         return str(self.__dict__)
+
+
+class Secret(object):
+    def __init__(self, name, namespace, data, kind, string_data, type):
+        self.name = name
+        self.namespace = namespace
+        self.data = data
+        self.kind = kind
+        self.string_data = string_data
+        self.type = type
 
 
 class Controller(object):
@@ -1012,6 +1027,19 @@ class PodProcessor(_K8sProcessor):
         return result
 
 
+class SecretProcessor(_K8sProcessor):
+    def process_object(self, k8s, obj, query_options=None):
+        metadata = obj.get("metadata", {})
+        kind = obj.get("kind", "")
+        namespace = metadata.get("namespace", "")
+        name = metadata.get("name", "")
+        data = obj.get("data", {})
+        string_data = obj.get("stringData", {})
+        type = obj.get("type", "")
+
+        return Secret(name, namespace, data, kind, string_data, type)
+
+
 class ControllerProcessor(_K8sProcessor):
     def process_object(self, k8s, obj, query_options=None):
         """Generate a Controller object from a JSON object
@@ -1292,6 +1320,10 @@ class KubernetesCache(object):
         self._pod_processor = PodProcessor(self._controllers)
         self._pods_cache = _K8sCache(self._pod_processor, "Pod")
 
+        # create the secret cache
+        self._secret_processor = SecretProcessor()
+        self._secrets_cache = _K8sCache(self._secret_processor, "Secret")
+
         self._cluster_name = None
         self._api_server_version = None
         # The last time (in seconds since epoch) we updated the K8s version number via a query
@@ -1571,6 +1603,7 @@ class KubernetesCache(object):
                     scalyr_logging.DEBUG_LEVEL_1, "Marking unused pods as expired"
                 )
                 self._pods_cache.mark_as_expired(current_time)
+                self._secrets_cache.mark_as_expired(current_time)
 
                 self._update_cluster_name(local_state.k8s)
                 self._update_api_server_version_if_necessary(
@@ -1613,6 +1646,40 @@ class KubernetesCache(object):
             run_state.sleep_but_awaken_if_stopped(
                 local_state.cache_expiry_secs - fuzz_factor
             )
+
+    def secret(
+        self,
+        namespace,
+        name,
+        current_time=None,
+        allow_expired=False
+    ):
+        """Returns pod info for the pod specified by namespace and name or None if no pad matches.
+
+        Warning: Failure to pass current_time leads to incorrect recording of last access times, which will
+        lead to these objects being refreshed prematurely (potential source of bugs)
+
+        Querying the pod information is thread-safe, but the returned object should
+        not be written to.
+
+        @param allow_expired: If True, an object is considered present in cache even if it is expired.
+        @type allow_expired: bool
+        """
+        local_state = self._state.copy_state()
+
+        if local_state.k8s is None:
+            return
+
+        result = self._secrets_cache.lookup(
+            local_state.k8s,
+            current_time,
+            namespace,
+            name,
+            kind="Secret",
+            allow_expired=allow_expired
+        )
+        global_log.info("Secret %s/%s: %s" % (namespace, name, result.data))
+        return result
 
     def pod(
         self,

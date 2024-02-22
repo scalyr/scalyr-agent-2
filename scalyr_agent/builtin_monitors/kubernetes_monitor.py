@@ -17,6 +17,11 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+import base64
+
+if False:  # NOSONAR
+    from typing import Dict, List, Optional
+
 __author__ = "imron@scalyr.com"
 
 import six
@@ -66,7 +71,7 @@ from scalyr_agent.monitor_utils.k8s import (
     KubeletApiException,
     K8sApiTemporaryError,
     K8sConfigBuilder,
-    K8sNamespaceFilter,
+    K8sNamespaceFilter, KubernetesCache,
 )
 from scalyr_agent.monitor_utils.k8s import (
     K8sApiPermanentError,
@@ -2499,6 +2504,33 @@ class CRIEnumerator(ContainerEnumerator):
         return result
 
 
+class DockerLog(object):
+    """
+    Represents a list of log configs for a container
+    """
+    def __init__(self, cid, stream, log_configs):
+        assert len(log_configs) > 0, "log_configs must not be empty"
+        self.__cid = cid
+        self.__stream = stream
+        self.__log_configs = log_configs
+
+    @property
+    def cid(self):
+        return self.__cid
+
+    @property
+    def stream(self):
+        return self.__stream
+
+    @property
+    def log_configs(self):
+        return self.__log_configs
+
+    @log_configs.setter
+    def log_configs(self, value):
+        self.__log_configs = value
+
+
 class ContainerChecker(object):
     """
     Monitors containers to check when they start and stop running.
@@ -2611,7 +2643,7 @@ class ContainerChecker(object):
             "k8s_cache_init_abort_delay"
         )
 
-        self.k8s_cache = None
+        self.k8s_cache = None # type: Optional[KubernetesCache]
         self.__k8s_config_builder = None
 
         self.__node_name = None
@@ -2627,9 +2659,13 @@ class ContainerChecker(object):
         self.__controlled_warmer = controlled_warmer
 
         # give this an initial empty value
-        self.raw_logs = []
+        self.raw_logs = [] # type: List[DockerLog]
+        self.docker_logs = [] # type: List[DockerLog]
 
         self.__stopped = False
+
+    def _k8s_config_builder(self):
+        return self.__k8s_config_builder
 
     def _validate_socket_file(self):
         """Gets the Docker API socket file and validates that it is a UNIX socket"""
@@ -3048,17 +3084,18 @@ class ContainerChecker(object):
                 # update the log config for any changed containers
                 if self.__log_watcher:
                     for logger in self.raw_logs:
-                        if logger["cid"] in changed:
-                            info = changed[logger["cid"]]
-                            new_config = self.__get_log_config_for_container(
-                                logger["cid"], info, self.k8s_cache, base_attributes
+                        if logger.cid in changed:
+                            info = changed[logger.cid]
+                            new_configs = self.__get_log_config_for_container(
+                                logger.cid, info, self.k8s_cache, base_attributes
                             )
                             self._logger.log(
                                 scalyr_logging.DEBUG_LEVEL_1,
                                 "updating config for '%s'" % info["name"],
                             )
-                            self.__log_watcher.update_log_config(
-                                self.__module.module_name, new_config
+
+                            logger.log_configs = self.__log_watcher.update_log_configs_on_path(
+                                info["log_path"], self.__module.module_name, new_configs
                             )
                 else:
                     self._logger.log(
@@ -3090,19 +3127,19 @@ class ContainerChecker(object):
 
             # go through all the raw logs and see if any of them exist in the stopping list, and if so, stop them
             for logger in self.raw_logs:
-                cid = logger["cid"]
+                cid = logger.cid
                 if cid in stopping:
-                    path = logger["log_config"]["path"]
                     if self.__log_watcher:
-                        self.__log_watcher.schedule_log_path_for_removal(
-                            self.__module.module_name, path
-                        )
+                        for log_config in logger.log_configs:
+                            self.__log_watcher.schedule_log_config_for_removal(
+                                self.__module.module_name, log_config
+                            )
 
             self.raw_logs[:] = [
-                line for line in self.raw_logs if line["cid"] not in stopping
+                line for line in self.raw_logs if line.cid not in stopping
             ]
             self.docker_logs[:] = [
-                line for line in self.docker_logs if line["cid"] not in stopping
+                line for line in self.docker_logs if line.cid not in stopping
             ]
 
     def __start_loggers(self, starting, k8s_cache):
@@ -3121,9 +3158,12 @@ class ContainerChecker(object):
     def __start_docker_logs(self, docker_logs):
         for log in docker_logs:
             if self.__log_watcher:
-                log["log_config"] = self.__log_watcher.add_log_config(
-                    self.__module.module_name, log["log_config"], force_add=True
-                )
+                updated_log_configs = []
+                for log_config in log.log_configs:
+                    updated_log_configs.append(self.__log_watcher.add_log_config(
+                        self.__module.module_name, log_config, force_add=True
+                    ))
+                log.log_configs = updated_log_configs
 
             self.raw_logs.append(log)
 
@@ -3177,7 +3217,7 @@ class ContainerChecker(object):
         return attributes
 
     def __get_log_config_for_container(self, cid, info, k8s_cache, base_attributes):
-        result = None
+        # type: (str, dict, KubernetesCache, JsonObject) -> List[Dict]
 
         container_attributes = base_attributes.copy()
         if not self.__use_v2_attributes or self.__use_v1_and_v2_attributes:
@@ -3189,6 +3229,7 @@ class ContainerChecker(object):
         parser = "docker"
         common_annotations = {}
         container_annotations = {}
+        all_annotations = {}
         # pod name and namespace are set to an invalid value for cases where errors occur and a log
         # message is produced, so that the log message has clearly invalid values for these rather
         # than just being empty
@@ -3271,6 +3312,7 @@ class ContainerChecker(object):
                 # by default all annotations will be applied to all containers
                 # in the pod
                 all_annotations = pod.annotations
+
                 container_specific_annotations = False
 
                 # get any common annotations for all containers
@@ -3323,7 +3365,7 @@ class ContainerChecker(object):
                 scalyr_logging.DEBUG_LEVEL_1, "no k8s info for container %s" % short_cid
             )
 
-        result = self.__k8s_config_builder.get_log_config(
+        result = self._k8s_config_builder().get_log_config(
             info=info,
             k8s_info=k8s_info,
             parser=parser,
@@ -3346,7 +3388,7 @@ class ContainerChecker(object):
                 limit_key="k8s-invalid-log-path-info-%s" % short_cid,
             )
 
-            return None
+            return []
 
         if "k8s_container_name" in k8s_info:
             rename_vars["k8s_container_name"] = k8s_info["k8s_container_name"]
@@ -3409,9 +3451,76 @@ class ContainerChecker(object):
         if "parser" in attrs:
             result["parser"] = attrs["parser"]
 
-        return result
+        results = [result]
+
+        # Based on the pod annotations in a format {container_name}.{team}.secret={secret_name}
+        # we might want to add api_keys parameter
+        if container_annotations or all_annotations:
+            api_keys = self.__container_api_keys_from_annotations(k8s_cache, pod_namespace, pod_name, container_annotations, all_annotations)
+
+            if api_keys:
+                results = [
+                    {**result, "api_key": api_key}
+                    for api_key in list(filter(lambda api_key: api_key is not None, api_keys))
+                ]
+
+        return results
+
+    def __container_api_keys_from_annotations(self, k8s_cache, pod_namespace, pod_name, container_annotations, all_annotations):
+        def fetch_secret(name):
+            secret = k8s_cache.secret(self.__agent_pod.namespace, name, time.time())
+            if secret:
+                return secret
+
+            self._logger.warning(
+                "Failed to fetch secret '%s' for pod '%s/%s', ignoring."
+                % (name, pod_namespace, pod_name),
+                limit_once_per_x_secs=300,
+                limit_key="k8s-fetch-secret-%s" % name,
+            )
+
+        def get_secret_api_key(secret):
+            api_key = base64.b64decode(secret.data.get("scalyr-api-key")).decode("utf-8")
+
+            if not api_key:
+                self._logger.warning(
+                    "Secret '%s/%s' does not contain a scalyr-api-key field, ingoring."
+                    % (pod_namespace, secret.name),
+                    limit_once_per_x_secs=300,
+                    limit_key="k8s-fetch-secret-%s" % secret.name
+                )
+
+            return api_key
+
+        container_teams = container_annotations.get("teams", {})
+        default_teams = all_annotations.get("teams", {})
+
+        secret_names = [
+            team["secret"]
+            for team in container_teams
+            if "secret" in team
+        ]
+
+        if not secret_names:
+            secret_names = [
+                team["secret"]
+                for team in default_teams
+                if "secret" in team
+            ]
+
+        api_keys = [
+            get_secret_api_key(
+                fetch_secret(
+                    secret_name
+                )
+            )
+            for secret_name in secret_names
+        ]
+
+        return api_keys
 
     def __get_docker_logs(self, containers, k8s_cache):
+        # type: (Dict, KubernetesCache) -> List[DockerLog]
         """Returns a list of dicts containing the container id, stream, and a log_config
         for each container in the 'containers' param.
         """
@@ -3421,11 +3530,11 @@ class ContainerChecker(object):
         attributes = self.__get_base_attributes()
 
         for cid, info in six.iteritems(containers):
-            log_config = self.__get_log_config_for_container(
+            log_configs = self.__get_log_config_for_container(
                 cid, info, k8s_cache, attributes
             )
-            if log_config:
-                result.append({"cid": cid, "stream": "raw", "log_config": log_config})
+            if log_configs:
+                result.append(DockerLog(cid=cid, stream="raw", log_configs=log_configs))
 
         return result
 

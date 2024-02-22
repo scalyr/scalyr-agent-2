@@ -30,6 +30,26 @@ fields behave differently when configured via k8s annotations:
 * lineGroupers (not supported at all)
 * path (the path is always fixed for k8s container logs)
 
+### Configuring multiple accounts per container
+
+Containers can be assigned one or more Scalyr API keys by specifying the `log.config.scalyr.com/{container_name}.teams.{team_number}.secret` annotation.  
+The `container_name` is the name of the container as specified in the pod spec, and the `team_number` is a unique number for each team.  
+The `secret` is the name of the secret holding the Scalyr API key for the team.  
+A default fallback api key can be specified by using the `log.config.scalyr.com/teams.{team_number}.secret` annotation.
+The monitor first looks into the container specific annotation, and if not found, it falls back to the default annotation or the global configuration api key.
+For example, if you had a pod with three containers `cont1`, `cont2` and `cont3` and you wanted to assign different Scalyr API keys to each container, 
+you could specify the following annotations:
+
+        log.config.scalyr.com/teams.1.secret: "scalyr-api-key-team-2"
+        log.config.scalyr.com/cont1.teams.2.secret: "scalyr-api-key-team-3"
+        log.config.scalyr.com/cont2.teams.1.secret: "scalyr-api-key-team-3"
+        log.config.scalyr.com/cont2.teams.2.secret: "scalyr-api-key-team-4"
+
+In this example
+* `cont1` would use the api key from `scalyr-api-key-team-3` secret
+* `cont2` would be sending the data to two teams accessible by api keys stored in `scalyr-api-key-team-3` and `scalyr-api-key-team-4` secrets.
+* `cont3` would use the default api key from `scalyr-api-key-team-2` secret
+
 ### Excluding Logs
 
 Containers and pods can be specifically included/excluded from having their logs collected and

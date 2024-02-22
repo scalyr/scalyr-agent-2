@@ -44,6 +44,18 @@ on:
         required: true
       CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ:
         required: true
+      SCALYR_API_KEY_READ_2:
+        required: true
+      SCALYR_API_KEY_READ_3:
+        required: true
+      SCALYR_API_KEY_READ_4:
+        required: true
+      SCALYR_API_KEY_WRITE_2:
+        required: true
+      SCALYR_API_KEY_WRITE_3:
+        required: true
+      SCALYR_API_KEY_WRITE_4:
+        required: true
       PULL_REGISTRY_USERNAME:
         required: true
       PULL_REGISTRY_PASSWORD:
@@ -369,9 +381,11 @@ jobs:
           minikube image ls
           kubectl apply -f tests/e2e/k8s_k8s_monitor/std_printer_deployment.yaml
           kubectl apply -f tests/e2e/k8s_k8s_monitor/long_message_printer_deployment.yaml
+          kubectl apply -f tests/e2e/k8s_k8s_monitor/multiple_account_printers.yaml
           
           kubectl wait --for=condition=ready pod -l app=std-printer
           kubectl wait --for=condition=ready pod -l app=long-message-printer
+          kubectl wait --for=condition=ready pod -l app=multiple-account-printer
           kubectl get pods -A
 
           export APP_POD_NAME=$(kubectl get pod --namespace=default --selector=app=std-printer -o jsonpath="{.items[0].metadata.name}")
@@ -398,6 +412,9 @@ jobs:
         with:
           scalyr_server: "agent.scalyr.com"
           scalyr_api_key: "${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}"
+          scalyr_api_key_team_2: "${{ secrets.SCALYR_API_KEY_WRITE_2 }}"
+          scalyr_api_key_team_3: "${{ secrets.SCALYR_API_KEY_WRITE_3 }}"
+          scalyr_api_key_team_4: "${{ secrets.SCALYR_API_KEY_WRITE_4 }}"
           scalyr_cluster_name: "${K8S_CLUSTER_NAME}"
           scalyr_k8s_events_disable: "false"
           main_yaml_path: "tests/e2e/scalyr-agent-2-daemonset.yaml"
@@ -520,6 +537,23 @@ jobs:
           echo "CronJob events checks"
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/kubernetes_events.log" $parser="k8sEvents" k8s-kind="CronJob" involvedObjectKind="CronJob" involvedObjectName="hello" watchEventType="ADDED" reason="SawCompletedJob"'
 
+      - name: Verify multiaccount records have been ingested
+        timeout-minutes: 14
+        env:
+          scalyr_api_key_team: "${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}"
+          scalyr_api_key_team_2: "${{ secrets.SCALYR_API_KEY_READ_2 }}"
+          scalyr_api_key_team_3: "${{ secrets.SCALYR_API_KEY_READ_3 }}"
+          scalyr_api_key_team_4: "${{ secrets.SCALYR_API_KEY_READ_4 }}"
+          SCALYR_AGENT_POD_NAME: "${{ env.SCALYR_AGENT_POD_NAME }}"
+          ACCOUNT_NAME: "cloudtech-testing@scalyr.com"
+          ACCOUNT_NAME_2: "cloudtech-testing-2@scalyr.com"
+          ACCOUNT_NAME_3: "cloudtech-testing-3@scalyr.com"
+          ACCOUNT_NAME_4: "cloudtech-testing-4@scalyr.com"
+        run: |
+          echo 'Looking for multiple account logs'
+          
+          ./scripts/cicd/verify-multiaccount-records-have-been-ingested.sh
+
       - name: Notify Slack on Failure
         if: ${{ failure() && github.ref_name == 'master' }}
         uses: act10ns/slack@ed1309ab9862e57e9e583e51c7889486b9a00b0f # v2.0.0
@@ -529,6 +563,7 @@ jobs:
           status: ${{ job.status }}
           steps: ${{ toJson(steps) }}
           channel: '#eng-dataset-cloud-tech'
+
 
   k8s_open_metrics_monitor_tests:
     name: OpenMetrics Monitor - k8s ${{ inputs.builder_name }} ${{ matrix.k8s_version.version }}-${{ matrix.k8s_version.runtime}}

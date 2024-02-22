@@ -146,6 +146,12 @@ echo "Using smoketest.py script from ${SMOKE_TESTS_SCRIPT_BRANCH} branch and URL
 
 function print_debugging_info_on_exit() {
     echo ""
+    echo "::group::Scalyr Agent status"
+    echo ""
+    docker exec ${contname_agent} scalyr-agent-2 status -v || true
+    echo "::endgroup::"
+
+    echo ""
     echo "::group::Docker logs for ${contname_agent} container"
     echo ""
     docker logs "${contname_agent}" || true
