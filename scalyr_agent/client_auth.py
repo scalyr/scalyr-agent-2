@@ -50,7 +50,7 @@ class Basic(object):
     def __init__(self, configuration, headers):
         authorization_header_value = b64encode(
             bytes(('' + configuration.basic_username + ":" + configuration.basic_password).encode("utf-8"))).decode('utf-8')
-        headers["Authoriztion"]="Basic " + authorization_header_value
+        headers["Authorization"]="Basic " + authorization_header_value
 
     def authenticate(self):
         return True
