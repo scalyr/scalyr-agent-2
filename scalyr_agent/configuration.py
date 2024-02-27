@@ -1530,6 +1530,16 @@ class Configuration(object):
         return self.__get_config().get_json_array("oauth_scopes")
 
     @property
+    def basic_username(self):
+        """Returns the configuration value for 'basic_username'."""
+        return self.__get_config().get_string("basic_username")
+
+    @property
+    def basic_password(self):
+        """Returns the configuration value for 'basic_password'."""
+        return self.__get_config().get_string("basic_password")
+
+    @property
     def transport(self):
         """Returns the configuration value for 'transport'."""
         return self.__get_config().get_string("transport")
@@ -2327,6 +2337,12 @@ class Configuration(object):
             apply_defaults,
             separators=[None, ","],
             env_aware=True,
+        )
+        self.__verify_or_set_optional_string(
+            config, "basic_username", "", description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_string(
+            config, "basic_password", "", description, apply_defaults, env_aware=True
         )
         self.__verify_or_set_optional_bool(
             config, "allow_http", False, description, apply_defaults, env_aware=True

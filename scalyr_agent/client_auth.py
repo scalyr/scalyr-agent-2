@@ -21,6 +21,8 @@ class ClientAuth(object):
             self.auth = OAuth2(self.configuration, self.headers)
         elif self.configuration.auth == "bearer":
             self.auth = BearerToken(self.configuration, self.headers)
+        elif self.configuration.auth == "basic":
+            self.auth = Basic(self.configuration, self.headers)
         else:
             self.auth = NoAuth(self.configuration, self.headers)
 
@@ -33,13 +35,22 @@ class NoAuth(object):
 
     def authenticate(self):
         # Add a header just so for traceability
-        self.headers["x-no-auth"]="true"
+        self.headers["x-no-custom-auth"]="true"
         return True
 
 # Simple Authorization Header as Bearer Token using `api_key` configuration
 class BearerToken(object):
     def __init__(self, configuration, headers):
         headers.set("Authorization", "Bearer " + configuration.api_key)
+
+    def authenticate(self):
+        return True
+
+class Basic(object):
+    def __init__(self, configuration, headers):
+        authorization_header_value = b64encode(
+            bytes(('' + configuration.basic_username + ":" + configuration.basic_password).encode("utf-8"))).decode('utf-8')
+        headers["Authoriztion"]="Basic " + authorization_header_value
 
     def authenticate(self):
         return True
