@@ -145,6 +145,12 @@ class TestPathWorkerIdDict(object):
             ("path2", "worker_id2")
         ]
 
+        assert list(d.copy().items()) == [
+            (("path1", "worker_id1"), "value1"),
+            (("path1", "worker_id3"), "value3"),
+            (("path2", "worker_id2"), "value2"),
+        ]
+
         assert len(d) == 3
 
         assert d.pop("path1", "worker_id1") == "value1"
