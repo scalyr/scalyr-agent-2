@@ -25,7 +25,6 @@ echo_with_date() {
 
 function validate_var_exists() {
   VAR_NAME=$1
-  eval VALUE=\$$VAR_NAME
   if [ -z "${!VAR_NAME}" ]; then
       echo_with_date "$VAR_NAME is unset or set to the empty string"
       exit 1
