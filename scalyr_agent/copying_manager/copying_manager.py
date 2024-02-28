@@ -1,5 +1,4 @@
-# Copyright 2014-2020 Scalyr Inc.
-# Copyright 2014-2020 Scalyr Inc.
+# Copyright 2014-2024 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -83,7 +82,7 @@ class DynamicWorkers(object):
         self.__workers_by_api_key = {}
         self.__workers_by_id = {}
         self.__last_id = 0
-        self.__create_worker_lock = threading.Lock()
+        self.__worker_lock = threading.Lock()
 
     def get_worker(self, worker_id):
         # type: (str) -> Optional[CopyingManagerWorker]
@@ -98,7 +97,7 @@ class DynamicWorkers(object):
         Add worker.
         """
         if not api_key in self.__workers_by_api_key:
-            with self.__create_worker_lock:
+            with self.__worker_lock:
                 if not api_key in self.__workers_by_api_key:
                     worker = self.__create_worker(api_key, global_config)
                     self.__workers_by_api_key[api_key] = worker
@@ -108,10 +107,12 @@ class DynamicWorkers(object):
         return self.__workers_by_api_key[api_key]
 
     def values(self):
-        return self.__workers_by_id.values()
+        with self.__worker_lock:
+            return self.__workers_by_id.values()
 
     def items(self):
-        return self.__workers_by_id.items()
+        with self.__worker_lock:
+            return self.__workers_by_id.items()
 
     def __next_id(self):
         self.__last_id += 1
@@ -411,7 +412,16 @@ class PathWorkerIdDict(object):
     def copy(self):
         # type: () -> PathWorkerIdDict
         result = PathWorkerIdDict()
-        result.__paths=self.__paths.copy()
+
+        # Deeper copy up to the level of the value, which is shallow copied.
+        result.__paths= {
+            path: {
+                worker_id: item
+                for worker_id, item in worker_dict.items()
+            }
+            for path, worker_dict in self.__paths.items()
+        }
+
         return result
 
     def items(self):

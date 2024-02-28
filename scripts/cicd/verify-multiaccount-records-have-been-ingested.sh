@@ -1,4 +1,23 @@
-#!/usr/bin/env bash
+#!/bin/bash
+# Copyright 2024 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Utility script which calls scalyr query tools and exists with non in case the provided query
+# returns no results after maximum number of retry attempts has been reached. We perform multiple
+# retries to make the build process more robust and less flakey and to account for delayed
+# ingestion for any reason.
+
 
 echo_with_date() {
     date +"[%Y-%m-%d %H:%M:%S] $*"
@@ -7,7 +26,7 @@ echo_with_date() {
 function validate_var_exists() {
   VAR_NAME=$1
   eval VALUE=\$$VAR_NAME
-  if [ -z "${VALUE}" ]; then
+  if [ -z "${!VAR_NAME}" ]; then
       echo_with_date "$VAR_NAME is unset or set to the empty string"
       exit 1
   fi
