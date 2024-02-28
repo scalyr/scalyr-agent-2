@@ -406,6 +406,8 @@ jobs:
           kubectl apply -f tests/e2e/k8s_events_monitor/cronjob_v1.yaml
 
           kubectl get cronjob -A
+      - name: Wait random time to make it easier for the cloud github runners
+        run: sleep $((RANDOM % 60))
 
       - name: Create scalyr-agent-2 daemonset
         uses: ./.github/actions/install-k8s-agent/
