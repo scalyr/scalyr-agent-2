@@ -3459,9 +3459,10 @@ class ContainerChecker(object):
             api_keys = self.__container_api_keys_from_annotations(k8s_cache, pod_namespace, pod_name, container_annotations, all_annotations)
 
             if api_keys:
+                # Multiple matching api keys will result in multiple log configs, which will differ in the api_key field only.
                 results = [
                     {**result, "api_key": api_key}
-                    for api_key in list(filter(lambda api_key: api_key is not None, api_keys))
+                    for api_key in api_keys
                 ]
 
         return results
@@ -3517,7 +3518,7 @@ class ContainerChecker(object):
             for secret_name in secret_names
         ]
 
-        return api_keys
+        return filter(lambda api_key: api_key is not None, api_keys)
 
     def __get_docker_logs(self, containers, k8s_cache):
         # type: (Dict, KubernetesCache) -> List[DockerLog]

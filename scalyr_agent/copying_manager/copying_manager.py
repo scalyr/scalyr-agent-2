@@ -412,15 +412,8 @@ class PathWorkerIdDict(object):
     def copy(self):
         # type: () -> PathWorkerIdDict
         result = PathWorkerIdDict()
-
-        # Deeper copy up to the level of the value, which is shallow copied.
-        result.__paths= {
-            path: {
-                worker_id: item
-                for worker_id, item in worker_dict.items()
-            }
-            for path, worker_dict in self.__paths.items()
-        }
+        for (path, worker_id), value in self.items():
+            result.set(path, worker_id, value)
 
         return result
 
