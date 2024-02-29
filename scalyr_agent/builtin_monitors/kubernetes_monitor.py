@@ -3518,7 +3518,7 @@ class ContainerChecker(object):
             for secret_name in secret_names
         ]
 
-        return filter(lambda api_key: api_key is not None, api_keys)
+        return list(filter(lambda api_key: api_key is not None, api_keys))
 
     def __get_docker_logs(self, containers, k8s_cache):
         # type: (Dict, KubernetesCache) -> List[DockerLog]
