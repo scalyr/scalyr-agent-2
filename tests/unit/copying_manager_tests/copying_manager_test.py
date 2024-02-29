@@ -33,6 +33,9 @@ import os
 import re
 
 import pytest
+import mock
+
+from scalyr_agent.copying_manager.copying_manager import DynamicWorkers, CopyingManagerWorker, PathWorkerIdDict
 
 root = logging.getLogger()
 root.setLevel(logging.DEBUG)
@@ -106,6 +109,133 @@ def _write_bad_checkpoint_file(path):
     fp = open(path, "w")
     fp.write(scalyr_util.json_encode("}data{,:,,{}"))
     fp.close()
+
+
+class TestPathWorkerIdDict(object):
+    def test_path_worker_id_dict(self):
+        d = PathWorkerIdDict()
+        d.set("path1", "worker_id1", "value1")
+        d.set("path2", "worker_id2", "value2")
+        d.set("path1", "worker_id3", "value3")
+
+        assert d.get("path1", "worker_id1") == "value1"
+        assert d.get("path1", "worker_id3") == "value3"
+        assert d.get("path2", "worker_id2") == "value2"
+
+        assert list(d.get_path("path1")) == [
+            ("worker_id1", "value1"), ("worker_id3", "value3")
+        ]
+
+        assert list(d.get_path("path2")) == [
+            ("worker_id2", "value2")
+        ]
+
+        assert d.complement_keys("path1", ["worker_id3"]) == [("path1", "worker_id1")]
+        assert d.complement_keys("path2", ["worker_id2"]) == []
+
+        assert list(d.items()) == [
+            (("path1", "worker_id1"), "value1"),
+            (("path1", "worker_id3"), "value3"),
+            (("path2", "worker_id2"), "value2"),
+        ]
+
+        assert list(d.keys()) == [
+            ("path1", "worker_id1"),
+            ("path1", "worker_id3"),
+            ("path2", "worker_id2")
+        ]
+
+        assert list(d.copy().items()) == [
+            (("path1", "worker_id1"), "value1"),
+            (("path1", "worker_id3"), "value3"),
+            (("path2", "worker_id2"), "value2"),
+        ]
+
+        assert len(d) == 3
+
+        assert d.pop("path1", "worker_id1") == "value1"
+
+        assert len(d) == 2
+
+        assert d.pop("path1", "worker_id1") is None
+
+        assert d.get("path1", "worker_id1") is None
+
+
+class TestDynamicWorkers():
+
+    API_KEYS = ["API_1", "API_2"]
+
+    class FakeWorker:
+        def __init__(self, worker_id):
+            self.worker_id = worker_id
+            self.start_sessions_and_block_until_copying = mock.MagicMock()
+
+    class FakeConfig(object):
+        def __init__(self):
+            self.default_sessions_per_worker = 1
+            self.scalyr_server = "https://www.scalyr.com"
+
+    def test_empty(self):
+
+        dynamic_workers = DynamicWorkers()
+
+        with pytest.raises(KeyError):
+            dynamic_workers.get_worker("test")
+
+        assert len(list(dynamic_workers.values())) == 0
+        assert len(list(dynamic_workers.items())) == 0
+
+    @mock.patch("scalyr_agent.copying_manager.copying_manager.CopyingManagerWorker", autospec=False)
+    def test_create_and_reuse_worker(self, MockCopyingManagerWorker):
+        dynamic_workers = DynamicWorkers()
+
+        MockCopyingManagerWorker.side_effect = [
+            TestDynamicWorkers.FakeWorker("dynamic_1"),
+            TestDynamicWorkers.FakeWorker("dynamic_2")
+        ]
+
+        # Create two workers and check if they are created with proper parameters.
+        mock_config = TestDynamicWorkers.FakeConfig()
+
+        worker_1 = dynamic_workers.get_or_create_worker(TestDynamicWorkers.API_KEYS[0], mock_config)
+
+        MockCopyingManagerWorker.assert_called_with(
+            mock_config, {
+            "id": "dynamic_1",
+            "api_key": TestDynamicWorkers.API_KEYS[0],
+            "sessions": mock_config.default_sessions_per_worker,
+            "server_url": mock_config.scalyr_server
+        })
+
+        worker_2 = dynamic_workers.get_or_create_worker(TestDynamicWorkers.API_KEYS[1], mock_config)
+
+        MockCopyingManagerWorker.assert_called_with(
+            mock_config, {
+                "id": "dynamic_2",
+                "api_key": TestDynamicWorkers.API_KEYS[1],
+                "sessions": mock_config.default_sessions_per_worker,
+                "server_url": mock_config.scalyr_server
+            })
+
+        # Check if workers are different.
+        assert worker_1 is not worker_2
+
+        # Check if workers are reused.
+        assert worker_1 is dynamic_workers.get_or_create_worker(TestDynamicWorkers.API_KEYS[0], mock_config)
+        assert worker_2 is dynamic_workers.get_or_create_worker(TestDynamicWorkers.API_KEYS[1], mock_config)
+
+        # Check get access methods
+        assert worker_1 in dynamic_workers.values()
+        assert worker_2 in dynamic_workers.values()
+
+        assert ("dynamic_1", worker_1) in dynamic_workers.items()
+        assert ("dynamic_2", worker_2) in dynamic_workers.items()
+
+        assert dynamic_workers.get_worker("dynamic_1") is worker_1
+        assert dynamic_workers.get_worker("dynamic_2") is worker_2
+
+        worker_1.start_sessions_and_block_until_copying.assert_called_once()
 
 
 class TestCopyingManagerEnd2End(CopyingManagerTest):
