@@ -1,6 +1,15 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+
+## 2.2.12 "Gizmo" - Feb 29, 2024
+<!---
+Packaged by Ales Novak <ales.novak@sentinelone.com> on Feb 29, 2024 00:00 -0800
+--->
+
+Feature:
+* Support sending events to multiple Dataset accounts via K8s annotations. See [kubernetes_monitor.md](docs/monitors/kubernetes_monitor.md) for documentation.
+
 ## 2.2.11 "Maxson" - Feb 7, 2024
 <!---
 Packaged by Ales Novak <ales.novak@sentinelone.com> on Feb 7, 2024 00:00 -0800
