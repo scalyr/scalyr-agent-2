@@ -102,6 +102,11 @@ _OBJECT_ENDPOINTS = {
         "list": Template("/api/v1/namespaces/${namespace}/pods"),
         "list-all": "/api/v1/pods",
     },
+    "Node": {
+        "single": Template("/api/v1/nodes/${name}"),
+        "list": Template("/api/v1/nodes"),
+        "list-all": "/api/v1/nodes",
+    },
     "Secret": {
         "single": Template("/api/v1/namespaces/${namespace}/secrets/${name}"),
         "list": Template("/api/v1/namespaces/${namespace}/secrets"),
@@ -1451,7 +1456,7 @@ class KubernetesCache(object):
             finally:
                 self._lock.release()
 
-    def _get_runtime(self, k8s):
+    def __get_runtime_from_pod(self, k8s):
         pod_name = k8s.get_pod_name()
         pod = k8s.query_pod(k8s.namespace, pod_name)
         if pod is None:
@@ -1462,9 +1467,25 @@ class KubernetesCache(object):
                 limit_key="k8s_cri_no_pod",
             )
             return None
+        status = pod.get("status")
 
-        status = pod.get("status", {})
+        if not status:
+            global_log.warning(
+                "Coud not determine K8s CRI because pod %s status field is empty: %s"
+                % (pod_name, pod),
+                limit_once_per_x_secs=300,
+                limit_key="k8s_cri_unmatched_container_id",
+            )
+
         containers = status.get("containerStatuses", [])
+        if not containers:
+            global_log.warning(
+                "Coud not determine K8s CRI because pod %s containers field is empty: %s"
+                % (pod_name, pod),
+                limit_once_per_x_secs=300,
+                limit_key="k8s_cri_unmatched_container_id",
+            )
+
         for container in containers:
             name = container.get("name")
             if name and name == "scalyr-agent":
@@ -1489,11 +1510,70 @@ class KubernetesCache(object):
                     return None
 
         global_log.warning(
-            "Coud not determine K8s CRI because could not find agent container in pod.",
+            "Coud not determine K8s CRI because could not find agent container in pod %s, containerStatuses=%s." % (
+            pod_name, containers),
             limit_once_per_x_secs=300,
             limit_key="k8s_cri_no_agent_container",
         )
-        return None
+
+    def __get_runtime_from_node(self, k8s):
+        node_name = k8s.get_node_name()
+
+        if not node_name:
+            global_log.warning(
+                "Coud not determine K8s node name",
+                limit_once_per_x_secs=300,
+                limit_key="k8s_cri_no_agent_container",
+            )
+            return None
+
+        node = k8s.query_node(node_name)
+
+        if node is None:
+            global_log.warning(
+                "Coud not determine K8s CRI because could not find agent node: %s"
+                % node_name,
+                limit_once_per_x_secs=300,
+                limit_key="k8s_cri_no_pod",
+            )
+            return None
+
+        try:
+            container_runtime_version = node["status"]["nodeInfo"]["containerRuntimeVersion"]
+        except KeyError:
+            global_log.warning(
+                "Coud not determine K8s CRI because agent node .status.nodeInfo.containerRuntimeVersion field is missing in node: %s"
+                % node,
+                limit_once_per_x_secs=300,
+                limit_key="k8s_cri_unmatched_container_id",
+            )
+            return None
+
+        m = _CID_RE.match(container_runtime_version)
+        if m:
+            return m.group(1)
+        else:
+            global_log.warning(
+                "Coud not determine K8s CRI because agent node .status.nodeInfo.containerRuntimeVersion did not match expected format: %s"
+                % container_runtime_version,
+                limit_once_per_x_secs=300,
+                limit_key="k8s_cri_unmatched_container_id",
+            )
+
+            return None
+
+    def _get_runtime(self, k8s):
+        global_log.warning(
+            "Get runtime from POD: " + self.__get_runtime_from_pod(k8s)
+        )
+        global_log.warning(
+            "Get runtime from NODE: " + self.__get_runtime_from_node(k8s)
+        )
+        runtime = self.__get_runtime_from_pod(k8s)
+        if not runtime:
+            runtime = self.__get_runtime_from_node(k8s)
+
+        return runtime
 
     def update_cache(self, run_state):
         """
@@ -1678,7 +1758,7 @@ class KubernetesCache(object):
             kind="Secret",
             allow_expired=allow_expired
         )
-        global_log.info("Secret %s/%s: %s" % (namespace, name, result.data))
+
         return result
 
     def pod(
@@ -2029,14 +2109,16 @@ class KubernetesApi(object):
             "HOSTNAME"
         )
 
-    def get_node_name(self, pod_name):
+    def get_node_name(self):
         """Gets the node name of the node running the agent"""
         # 2->TODO in python2 os.environ returns 'str' type. Convert it to unicode.
         node = os_environ_unicode.get("SCALYR_K8S_NODE_NAME")
         if not node:
-            pod = self.query_pod(self.namespace, pod_name)
-            spec = pod.get("spec", {})
-            node = spec.get("nodeName")
+            pod_name = self.get_pod_name()
+            if pod_name:
+                pod = self.query_pod(self.namespace, pod_name)
+                spec = pod.get("spec", {})
+                node = spec.get("nodeName")
         return node
 
     def get_api_server_version(self):
@@ -2525,6 +2607,10 @@ class KubernetesApi(object):
     def query_pods(self, namespace=None, filter=None):
         """Convenience method for query a single pod"""
         return self.query_objects("Pod", namespace, filter)
+
+    def query_node(self, name):
+        """Convenience method for query a single pod"""
+        return self.query_object(kind="Node", namespace=None, name=name)
 
     def query_namespaces(self):
         """Wrapper to query all namespaces"""
