@@ -100,7 +100,7 @@ def create_otlp_client(config, worker_config, server_url=None):
         if "server_url" in worker_config:
             su = worker_config["server_url"]
     log.setLevel(config.debug_level)
-    return OTLPClientSession(config, su)
+    return OTLPClientSession(config, worker_config, su)
 
 class ScalyrClientSessionStatus(object):
     def __init__(self):
@@ -115,7 +115,7 @@ class ScalyrClientSessionStatus(object):
 
 
 class OTLPClientSession(object):
-    def __init__(self, configuration, server_url):
+    def __init__(self, configuration, worker_config, server_url):
         parsed_url = parse_url(server_url + OTLP_LOGS_PATH)
         self.address = parsed_url.scheme + "://" + parsed_url.hostname
         # Append Explicit Port
@@ -128,6 +128,11 @@ class OTLPClientSession(object):
         self.__request_deadline = 60.0
         self.__intermediate_certs_file = str(configuration.intermediate_certs_path)
         self.__use_requests = True
+        self.__override_logfile = False
+        if "rename_logfile" in worker_config:
+            self.__override_logfile = True
+            self.logfile = worker_config["rename_logfile"]
+
         self.headers = {
             "Connection": "Keep-Alive",
             "Accept": "application/json, application/x-protobuf",
@@ -229,6 +234,8 @@ class OTLPClientSession(object):
         return LogsData(resource_logs=[rl]).SerializeToString()
 
     def __event_to_log_record(self, event):
+        if self.__override_logfile: # Override Logfile (k8s monitor)
+            event.attrs["logfile"] = self.logfile
         return LogRecord(time_unix_nano=event.timestamp,
                          body=PB2AnyValue(string_value=event.message),
                          attributes=_encode_attributes(event.attrs))
