@@ -65,7 +65,7 @@ data:
 ```
 
 
-#### Example:
+### Example:
 
 #### Configuration:
 
