@@ -140,6 +140,39 @@ jobs:
           steps: ${{ toJson(steps) }}
           channel: '#eng-dataset-cloud-tech'
 
+  memory-usage:
+    name: Memory Usage - Python ${{ matrix.python-version }}
+    runs-on: ubuntu-20.04
+    timeout-minutes: 10
+
+    needs: pre_job
+    # NOTE: We always want to run job on master branch
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref_name == 'master' }}
+
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+          - "2.7"
+          - "3.8"
+          - "3.9"
+          - "3.10"
+          - "3.11"
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
+      - name: Install loggen
+        run: apt install -y syslog-ng-core
+      - name: Run memory test
+        run: |
+          ./scripts/cicd/test_syslog_monitor_memory_usage/run_test.sh
+        env:
+          SCALYR_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
+          
+
   monitor-smoketests:
     name: Monitor Smoketests - Python ${{ matrix.python-version }}
     runs-on: ubuntu-20.04

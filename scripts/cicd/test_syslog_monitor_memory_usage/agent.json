@@ -1,0 +1,38 @@
+{
+  scalyr_server: "agent.scalyr.com",
+  api_key: "$SCALYR_API_KEY",
+
+  server_attributes: {
+     serverHost: "github-action-test",
+
+  },
+  monitors: [
+     {
+      module:                    "scalyr_agent.builtin_monitors.syslog_monitor",
+      protocols:                 "tcp:1601, udp:1514",
+      accept_remote_connections: true,
+      message_log: "AZTEMFWs.log",
+      parser: "paloalto.conf",
+    },
+    {
+      module:                    "scalyr_agent.builtin_monitors.syslog_monitor",
+      protocols:                 "tcp:1602, udp:1515",
+      accept_remote_connections: true,
+      message_log: "AZTUCFWs.log",
+      parser: "paloalto.conf",
+    },
+    {
+      module:                    "scalyr_agent.builtin_monitors.syslog_monitor",
+      protocols:                 "tcp:1603, udp:1516",
+      accept_remote_connections: true,
+      message_log: "CerberusFTP.log",
+    },
+    {
+      module:                    "scalyr_agent.builtin_monitors.syslog_monitor",
+      protocols:                 "tcp:1604, udp:1517",
+      accept_remote_connections: true,
+      message_log: "Meraki.log",
+      parser: "meraki-sundt.conf",
+    }
+  ]
+}
