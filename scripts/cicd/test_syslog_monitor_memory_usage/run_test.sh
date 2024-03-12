@@ -6,7 +6,7 @@ python scalyr_agent/agent_main.py --config agent.json start
 pids=()
 for PORT in 1601 1602 1603 1604;
 do
-	loggen --rate 1000 --interval 30 --stream --active-connections=5 -Q localhost $PORT &
+	loggen --rate 1000 --interval 60 --stream --active-connections=5 -Q localhost $PORT &
 	pids+=($!)
 done
 
