@@ -6,7 +6,7 @@ python scalyr_agent/agent_main.py --config agent.json start
 pids=()
 for PORT in 1601 1602 1603 1604;
 do
-	loggen --rate 1000 --interval 120 --stream --active-connections=5 -Q localhost $PORT &
+	loggen --rate 1000 --interval 30 --stream --active-connections=5 -Q localhost $PORT &
 	pids+=($!)
 done
 
@@ -21,6 +21,12 @@ MEM_ALLOWED=$((1*1024*1024)) #1Gb
 PID=`cat ~/scalyr-agent-dev/log/agent.pid`
 MEM_USED=`cat /proc/$PID/status | grep VmRSS | awk '{print $2}'`
 
-python scalyr-agent/agent_main.py --config scripts/cicd/test_syslog_monitor_memory_usage.json stop
+python scalyr_agent/agent_main.py --config agent.json stop
 
-([ $MEM_USED -gt $MEM_ALLOWED ] && echo "Mem used: $MEM_USED kB => FAIL!" && exit 1) || echo "Mem used: $MEM_USED kB => OK"
+if [ $MEM_USED -gt $MEM_ALLOWED ]
+then
+  echo "Mem used: $MEM_USED kB > $MEM_ALLOWED kB => FAIL!"
+  exit 1
+else
+  echo "Mem used: $MEM_USED kB <= $MEM_ALLOWED kB => OK"
+fi
