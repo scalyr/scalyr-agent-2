@@ -32,23 +32,221 @@ fields behave differently when configured via k8s annotations:
 
 ### Configuring multiple accounts per container
 
-Containers can be assigned one or more Scalyr API keys by specifying the `log.config.scalyr.com/{container_name}.teams.{team_number}.secret` annotation.  
-The `container_name` is the name of the container as specified in the pod spec, and the `team_number` is a unique number for each team.  
-The `secret` is the name of the secret holding the Scalyr API key for the team.  
-A default fallback api key can be specified by using the `log.config.scalyr.com/teams.{team_number}.secret` annotation.
-The monitor first looks into the container specific annotation, and if not found, it falls back to the default annotation or the global configuration api key.
-For example, if you had a pod with three containers `cont1`, `cont2` and `cont3` and you wanted to assign different Scalyr API keys to each container, 
-you could specify the following annotations:
+Besides the default API key stored in the scalyr/scalyr-api-key secret, the user can specify API keys for namespaces, pods and containers using annotations.
 
-        log.config.scalyr.com/teams.1.secret: "scalyr-api-key-team-2"
-        log.config.scalyr.com/cont1.teams.2.secret: "scalyr-api-key-team-3"
-        log.config.scalyr.com/cont2.teams.1.secret: "scalyr-api-key-team-3"
-        log.config.scalyr.com/cont2.teams.2.secret: "scalyr-api-key-team-4"
+#### Namespace level API keys
+```log.config.scalyr.com/teams.{team_number}.secret: {secret_name}```
 
-In this example
-* `cont1` would use the api key from `scalyr-api-key-team-3` secret
-* `cont2` would be sending the data to two teams accessible by api keys stored in `scalyr-api-key-team-3` and `scalyr-api-key-team-4` secrets.
-* `cont3` would use the default api key from `scalyr-api-key-team-2` secret
+Overrides the default API key for all pods in the namespace. 
+The `secret_name` is the name of the secret (stored in the same namespace) holding the Scalyr API key.
+The `teams_number` is an arbitrary unique number.
+
+#### Pod level API keys
+```log.config.scalyr.com/teams.{team_number}.secret: {secret_name}```
+
+Overrides the default API key and the namespace API key for all containers in the pod.
+The `secret_name` is the name of the secret (stored in the same namespace as the pod) holding the Scalyr API key.
+The `teams_number` is an arbitrary unique number.
+
+#### Container level API keys
+```log.config.scalyr.com/{container_name}.teams.{team_number}.secret: {secret_name}```
+
+Overrides the default API key, the namespace API key and the pod API keys for all containers in the pod.
+The `secret_name` is the name of the secret (stored in the same namespace as the pod) holding the Scalyr API key.
+The `teams_number` is an arbitrary unique number.
+
+#### API Key Secret structure
+
+```yaml
+apiVersion: v1
+kind: Secret
+data:
+  scalyr-api-key: <b64 encoded API key>
+```
+
+
+#### Example:
+
+#### Configuration:
+
+##### Default API key for the Scalyr Agent
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: scalyr-api-key
+  namespace: scalyr
+data:
+  scalyr-api-key: <b64 encoded SCALYR_API_KEY_WRITE_TEAM_1>
+```
+
+##### Workload Namespaces
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: workload-namespace-1
+  annotations:
+    log.config.scalyr.com/teams.1.secret: scalyr-api-key-team-2
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: workload-namespace-2
+```
+
+##### API keys in the workload-namespace-1 Namespace
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: scalyr-api-key-team-2
+  namespace: workload-namespace-1
+data:
+  scalyr-api-key: <b64 encoded SCALYR_API_KEY_WRITE_TEAM_2>
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: scalyr-api-key-team-3
+data:
+  scalyr-api-key: <b64 encoded SCALYR_API_KEY_WRITE_TEAM_3>
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: scalyr-api-key-team-4
+data:
+  scalyr-api-key: <b64 encoded SCALYR_API_KEY_WRITE_TEAM_4>
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: scalyr-api-key-team-5
+data:
+  scalyr-api-key: <b64 encoded SCALYR_API_KEY_WRITE_TEAM_5>
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: scalyr-api-key-team-6
+data:
+  scalyr-api-key: <b64 encoded SCALYR_API_KEY_WRITE_TEAM_6>
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: scalyr-api-key-team-7
+data:
+  scalyr-api-key: <b64 encoded SCALYR_API_KEY_WRITE_TEAM_7>
+```
+
+#### Workload Pods in the workload-namespace Namespace
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: multi-account-test
+  name: workload-pod-1
+  namespace: workload-namespace-1
+  annotations:
+    log.config.scalyr.com/teams.1.secret: "scalyr-api-key-team-3"
+    log.config.scalyr.com/teams.5.secret: "scalyr-api-key-team-4"
+    log.config.scalyr.com/workload-pod-1-container-1.teams.1.secret: "scalyr-api-key-team-5"
+    log.config.scalyr.com/workload-pod-1-container-2.teams.1.secret: "scalyr-api-key-team-6"
+    log.config.scalyr.com/workload-pod-1-container-2.teams.2.secret: "scalyr-api-key-team-7"
+spec:
+  containers:
+  - name: workload-pod-1-container-1
+    image: busybox
+    command:
+        - /bin/sh
+        - -c
+        - while true; do echo workload-pod-1-container-1; sleep 1; done
+  - name: workload-pod-1-container-2
+    image: busybox
+    command:
+        - /bin/sh
+        - -c
+        - while true; do echo workload-pod-1-container-2; sleep 1; done
+  - name: workload-pod-1-container-3
+    image: busybox
+    command:
+        - /bin/sh
+        - -c
+        - while true; do echo workload-pod-1-container-3; sleep 1; done
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: multi-account-test
+  name: workload-pod-2
+  namespace: workload-namespace-1
+spec:
+  containers:
+  - name: workload-pod-2-container-1
+    image: busybox
+    command:
+        - /bin/sh
+        - -c
+        - while true; do echo workload-pod-2-container-1; sleep 1; done
+```
+
+##### Workload Pod in workload-namespace-2 Namespace
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: multi-account-test
+  name: workload-pod-3
+  namespace: workload-namespace-2
+spec:
+  containers:
+  - name: workload-pod-3-container-1
+    image: busybox
+    command:
+        - /bin/sh
+        - -c
+        - while true; do echo workload-pod-3-container-1; sleep 1; done
+```
+
+#### Ingested data:
+
+
+| Container Name | API keys used to ingest logs                             | Note                        |
+| --- |----------------------------------------------------------|-----------------------------|
+| workload-pod-1-container-1 | SCALYR_API_KEY_WRITE_TEAM_4                              | Container specific api keys |
+| workload-pod-1-container-2 | SCALYR_API_KEY_WRITE_TEAM_5, SCALYR_API_KEY_WRITE_TEAM_6 | Container specific api keys |
+| workload-pod-1-container-3 | SCALYR_API_KEY_WRITE_TEAM_3, SCALYR_API_KEY_WRITE_TEAM_4 | Pod default api keys        |
+| workload-pod-2-container-1 | SCALYR_API_KEY_WRITE_TEAM_2                              | Namespace default api key   |
+| workload-pod-3-container-1 | SCALYR_API_KEY_WRITE_TEAM_1                              | Agent default api key       |
+
+
+#### Querying the data:
+
+```bash
+scalyr_readlog_token=SCALYR_API_KEY_WRITE_TEAM_1 scalyr query 'app="multi-account-test"' --columns=message
+# workload-pod-3-container-1
+
+scalyr_readlog_token=SCALYR_API_KEY_WRITE_TEAM_2 scalyr query 'app="multi-account-test"' --columns=message
+# workload-pod-2-container-1
+
+scalyr_readlog_token=SCALYR_API_KEY_WRITE_TEAM_3 scalyr query 'app="multi-account-test"' --columns=message
+# workload-pod-1-container-3
+
+scalyr_readlog_token=SCALYR_API_KEY_WRITE_TEAM_4 scalyr query 'app="multi-account-test"' --columns=message
+# workload-pod-1-container-3
+# workload-pod-1-container-1
+
+scalyr_readlog_token=SCALYR_API_KEY_WRITE_TEAM_5 scalyr query 'app="multi-account-test"' --columns=message
+# workload-pod-1-container-2
+
+scalyr_readlog_token=SCALYR_API_KEY_WRITE_TEAM_6 scalyr query 'app="multi-account-test"' --columns=message
+# workload-pod-1-container-2
+```
 
 ### Excluding Logs
 
