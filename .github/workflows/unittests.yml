@@ -165,7 +165,9 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
       - name: Install loggen
-        run: apt install -y syslog-ng-core
+        run: |
+          sudo apt update
+          sudo apt install -y syslog-ng-core
       - name: Run memory test
         run: |
           ./scripts/cicd/test_syslog_monitor_memory_usage/run_test.sh
