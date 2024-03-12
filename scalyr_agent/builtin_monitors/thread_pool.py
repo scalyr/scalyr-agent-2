@@ -43,11 +43,9 @@ class ExecutorMixIn:
             self._shutdown_grace_period = 5
 
         self._request_reading_executor = ThreadPoolExecutor(max_workers=reading_threads, thread_name_prefix="request_reading_executor")
-        self._request_processing_executor = ThreadPoolExecutor(max_workers=processing_threads, thread_name_prefix="request_processing_executor")
 
         # Since the older versions of python use daemon threads, we need to let the pool create the threads this constructor's thread.
         self.__warmup_thread_pool(self._request_reading_executor)
-        self.__warmup_thread_pool(self._request_processing_executor)
 
     def __warmup_thread_pool(self, thread_pool):
         # Warmup the thread pool
@@ -68,7 +66,7 @@ class ExecutorMixIn:
             self.shutdown_request(request)
 
     def process_request(self, request, client_address):
-        if not self._request_processing_executor:
+        if not self._request_reading_executor:
            raise ValueError(str(self.__class__) + " is not initialized properly")
 
         """Start a new thread to process the request."""
@@ -79,14 +77,13 @@ class ExecutorMixIn:
     def server_close(self):
         super().server_close()
 
-        self.__wait_for_tasks_to_complete(self._request_reading_executor, self._request_processing_executor, timeout=self._shutdown_grace_period)
+        self.__wait_for_tasks_to_complete(self._request_reading_executor, timeout=self._shutdown_grace_period)
 
         shutdown_args = {"wait": False}
         if sys.version_info[0:2] >= (3, 9):
             shutdown_args["cancel_futures"] = True
 
         self._request_reading_executor.shutdown(**shutdown_args)
-        self._request_processing_executor.shutdown(**shutdown_args)
 
     @staticmethod
     def __wait_for_tasks_to_complete(*executors, timeout):
