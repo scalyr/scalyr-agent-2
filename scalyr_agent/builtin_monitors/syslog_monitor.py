@@ -586,18 +586,16 @@ class SyslogUDPHandler(six.moves.socketserver.BaseRequestHandler):
     a protocol neutral handler
     """
 
-    def __init__(self, request_processing_executor, request, client_address, server):
-        self.__request_processing_executor = request_processing_executor
-
+    def __init__(self, request, client_address, server):
         if six.PY3:
             super(SyslogUDPHandler, self).__init__(request, client_address, server)
         else:
             six.moves.socketserver.BaseRequestHandler.__init__(self, request, client_address, server)
 
     @staticmethod
-    def factory_method(request_processing_executor):
+    def factory_method():
         def create_handler(request, client_address, server):
-            return SyslogUDPHandler(request_processing_executor, request, client_address, server)
+            return SyslogUDPHandler(request, client_address, server)
 
         return create_handler
 
@@ -610,12 +608,7 @@ class SyslogUDPHandler(six.moves.socketserver.BaseRequestHandler):
             "destport": self.server.server_address[1],
         }
 
-        if self.__request_processing_executor:
-            self.__request_processing_executor.submit(
-                self.server.syslog_handler.handle, data, extra
-            )
-        else:
-            self.server.syslog_handler.handle(data, extra)
+        self.server.syslog_handler.handle(data, extra)
 
 
 
@@ -996,8 +989,6 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
             return "PreviousMessageHandlingError: " + self.message
 
     def __init__(self, *args, **kwargs):
-        self.__request_processing_executor = kwargs.pop("request_processing_executor", None)
-
         self.request_parser = kwargs.pop("request_parser", "default")
         self.incomplete_frame_timeout = kwargs.pop("incomplete_frame_timeout", None)
         self.message_delimiter = kwargs.pop("message_delimiter", "\n")
@@ -1090,8 +1081,6 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
                         six.text_type(e),
                         traceback.format_exc(),
                     )
-
-
         except Exception as e:
             global_log.warning(
                 "Error reading request: %s\n\t%s",
@@ -1118,7 +1107,7 @@ class SyslogUDPServer(
         ExecutorMixIn.__init__(self, global_config=global_config)
 
         self.allow_reuse_address = True
-        six.moves.socketserver.UDPServer.__init__(self, address, SyslogUDPHandler.factory_method(self._request_processing_executor))
+        six.moves.socketserver.UDPServer.__init__(self, address, SyslogUDPHandler.factory_method())
 
     def verify_request(self, request, client_address):
         return self.__verifier.verify_request(client_address)
@@ -1162,7 +1151,6 @@ class SyslogTCPServer(
         ExecutorMixIn.__init__(self, global_config=global_config)
         handler_cls = functools.partial(
             SyslogTCPHandler,
-            request_processing_executor=self._request_processing_executor,
             request_parser=request_parser,
             incomplete_frame_timeout=incomplete_frame_timeout,
             message_delimiter=message_delimiter,
