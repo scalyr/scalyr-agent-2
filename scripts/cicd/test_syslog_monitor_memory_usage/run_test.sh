@@ -1,5 +1,9 @@
 #! /bin/bash
 
+echo_with_date() {
+    date +"[%Y-%m-%d %H:%M:%S] $*"
+}
+
 cat scripts/cicd/test_syslog_monitor_memory_usage/agent.json | envsubst > agent.json
 python scalyr_agent/agent_main.py --config agent.json start
 
@@ -19,12 +23,12 @@ for A in `seq $INTERVAL`; do
   MEM_USED=`cat /proc/$PID/status | grep VmRSS | awk '{print $2}'`
   if [ $MEM_USED -gt $MEM_ALLOWED ]
   then
-    echo "Mem used: $MEM_USED kB > $MEM_ALLOWED kB => FAIL!"
+    echo_with_date "Mem used: $MEM_USED kB > $MEM_ALLOWED kB => FAIL!"
   #  exit 1
   else
-    echo "Mem used: $MEM_USED kB <= $MEM_ALLOWED kB => OK"
+    echo_with_date "Mem used: $MEM_USED kB <= $MEM_ALLOWED kB => OK"
   fi
-  sleep 1
+  sleep 10
 done
 
 echo Waiting for loggen processes to finish ...
