@@ -32,13 +32,14 @@ class ExecutorMixIn:
         # Using 8 threads for processing requests, because of GIL and CPU bound tasks higher number would not help process the data faster.
         # The reason for multiple threads is to avoid deadlock in an unexpected situation before waiting for previous data
         # on a single request being processed fails and it's not caught do to a bug.
-        processing_threads = 8
         # Let the ThreadPoolExecutor decide how many threads to use based the numbre of logical CPUs
         reading_threads = None
 
+        self.__is_shutdown = False
+        self.__shutdown_lock = threading.Lock()
+
         if global_config:
             reading_threads = global_config.syslog_socket_thread_count
-            processing_threads = global_config.syslog_processing_thread_count
             self._shutdown_grace_period = global_config.syslog_monitors_shutdown_grace_period
         else:
             self._shutdown_grace_period = 5
@@ -73,20 +74,29 @@ class ExecutorMixIn:
            raise ValueError(str(self.__class__) + " is not initialized properly")
 
         """Start a new thread to process the request."""
-        self._request_reading_executor.submit(
-            self.process_request_thread, request, client_address
-        )
+        try:
+            self._request_reading_executor.submit(
+                self.process_request_thread, request, client_address
+            )
+        except:
+            global_log.exception("Error submitting request to executor")
 
-    def server_close(self):
-        super().server_close()
+    def shutdown(self):
+        with self.__shutdown_lock:
+            if self.__is_shutdown:
+                return
 
-        self.__wait_for_tasks_to_complete(self._request_reading_executor, timeout=self._shutdown_grace_period)
+            self.__is_shutdown = True
 
-        shutdown_args = {"wait": False}
-        if sys.version_info[0:2] >= (3, 9):
-            shutdown_args["cancel_futures"] = True
+            super().shutdown()
 
-        self._request_reading_executor.shutdown(**shutdown_args)
+            self.__wait_for_tasks_to_complete(self._request_reading_executor, timeout=self._shutdown_grace_period)
+
+            shutdown_args = {"wait": False}
+            if sys.version_info[0:2] >= (3, 9):
+                shutdown_args["cancel_futures"] = True
+
+            self._request_reading_executor.shutdown(**shutdown_args)
 
     @staticmethod
     def __wait_for_tasks_to_complete(*executors, timeout):
