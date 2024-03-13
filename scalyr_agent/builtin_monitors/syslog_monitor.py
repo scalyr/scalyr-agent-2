@@ -1070,7 +1070,6 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
             "SyslogTCPHandler.handle - created syslog_parser. Thread: %d",
             threading.current_thread().ident,
         )
-
         try:
             for data in self.__request_stream_read(syslog_request, self.server.is_running):
                 try:
