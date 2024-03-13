@@ -7,7 +7,7 @@ echo_with_date() {
 cat scripts/cicd/test_syslog_monitor_memory_usage/agent.json | envsubst > agent.json
 python scalyr_agent/agent_main.py --config agent.json start
 
-INTERVAL=600
+INTERVAL=120
 MEM_ALLOWED=$((1*1024*1024)) #1Gb
 
 pids=()
