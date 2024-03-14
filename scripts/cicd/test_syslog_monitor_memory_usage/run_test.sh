@@ -20,11 +20,12 @@ done
 PID=`cat ~/scalyr-agent-dev/log/agent.pid`
 
 for A in `seq $INTERVAL`; do
+  cat /proc/meminfo
   MEM_USED=`cat /proc/$PID/status | grep VmRSS | awk '{print $2}'`
   if [ $MEM_USED -gt $MEM_ALLOWED ]
   then
     echo_with_date "Mem used: $MEM_USED kB > $MEM_ALLOWED kB => FAIL!"
-  #  exit 1
+    exit 1
   else
     echo_with_date "Mem used: $MEM_USED kB <= $MEM_ALLOWED kB => OK"
   fi
