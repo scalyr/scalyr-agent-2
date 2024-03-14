@@ -143,7 +143,6 @@ jobs:
   memory-usage:
     name: Memory Usage - Python ${{ matrix.python-version }}
     runs-on: ubuntu-20.04
-    timeout-minutes: 10
 
     needs: pre_job
     # NOTE: We always want to run job on master branch
