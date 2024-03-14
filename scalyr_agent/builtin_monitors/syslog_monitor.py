@@ -25,14 +25,12 @@ from __future__ import absolute_import
 
 from __future__ import print_function
 
-from queue import Queue
 
 from scalyr_agent import compat
 
 __author__ = "scalyr@sentinelone.com"
 
 import errno
-import random
 from fnmatch import fnmatch
 import glob
 import json
@@ -592,14 +590,6 @@ class SyslogUDPHandler(six.moves.socketserver.BaseRequestHandler):
         else:
             six.moves.socketserver.BaseRequestHandler.__init__(self, request, client_address, server)
 
-    @staticmethod
-    def factory_method():
-        def create_handler(request, client_address, server):
-            return SyslogUDPHandler(request, client_address, server)
-
-        return create_handler
-
-
     def handle(self):
         data = six.ensure_text(self.request[0].strip(), "utf-8", errors="ignore")
         extra = {
@@ -1106,7 +1096,7 @@ class SyslogUDPServer(
         ExecutorMixIn.__init__(self, global_config=global_config)
 
         self.allow_reuse_address = True
-        six.moves.socketserver.UDPServer.__init__(self, address, SyslogUDPHandler.factory_method())
+        six.moves.socketserver.UDPServer.__init__(self, address, SyslogUDPHandler)
 
     def verify_request(self, request, client_address):
         return self.__verifier.verify_request(client_address)
