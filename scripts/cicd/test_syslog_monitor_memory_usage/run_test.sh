@@ -8,6 +8,7 @@ cat scripts/cicd/test_syslog_monitor_memory_usage/agent.json | envsubst > agent.
 python scalyr_agent/agent_main.py --config agent.json start
 
 INTERVAL=120
+MONITOR_INTERVAL=10
 MEM_ALLOWED=$((1*1024*1024)) #1Gb
 
 pids=()
@@ -19,8 +20,7 @@ done
 
 PID=`cat ~/scalyr-agent-dev/log/agent.pid`
 
-for A in `seq $INTERVAL`; do
-  cat /proc/meminfo
+for A in `seq $(($INTERVAL/$MONITOR_INTERVAL))`; do
   MEM_USED=`cat /proc/$PID/status | grep VmRSS | awk '{print $2}'`
   if [ $MEM_USED -gt $MEM_ALLOWED ]
   then
@@ -29,7 +29,7 @@ for A in `seq $INTERVAL`; do
   else
     echo_with_date "Mem used: $MEM_USED kB <= $MEM_ALLOWED kB => OK"
   fi
-  sleep 10
+  sleep $MONITOR_INTERVAL
 done
 
 echo Waiting for loggen processes to finish ...
