@@ -128,10 +128,6 @@ class OTLPClientSession(object):
         self.__request_deadline = 60.0
         self.__intermediate_certs_file = str(configuration.intermediate_certs_path)
         self.__use_requests = True
-        self.__override_logfile = False
-        if "rename_logfile" in worker_config:
-            self.__override_logfile = True
-            self.logfile = worker_config["rename_logfile"]
 
         self.headers = {
             "Connection": "Keep-Alive",
@@ -228,14 +224,13 @@ class OTLPClientSession(object):
         rl = ResourceLogs()
         sl = ScopeLogs()
         for event in add_events_request.events:
-            log_record = self.__event_to_log_record(event)
+            log_record = self.__event_to_log_record(add_events_request, event)
             sl.log_records.append(log_record)
         rl.scope_logs.append(sl)
         return LogsData(resource_logs=[rl]).SerializeToString()
 
-    def __event_to_log_record(self, event):
-        if self.__override_logfile: # Override Logfile (k8s monitor)
-            event.attrs["logfile"] = self.logfile
+    def __event_to_log_record(self, add_events_request, event):
+        event.attrs.update(add_events_request.log_attrs)
         return LogRecord(time_unix_nano=event.timestamp,
                          body=PB2AnyValue(string_value=event.message),
                          attributes=_encode_attributes(event.attrs))
