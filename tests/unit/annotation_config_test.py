@@ -20,6 +20,7 @@ from __future__ import absolute_import
 
 __author__ = "imron@scalyr.com"
 
+from scalyr_agent.json_lib import JsonObject, JsonArray
 from scalyr_agent.monitor_utils.annotation_config import process_annotations
 
 from scalyr_agent.test_base import ScalyrTestCase
@@ -51,6 +52,34 @@ class TestAnnotationConfig(ScalyrTestCase):
         self.assertEquals("item1", result["item1"])
         self.assertEquals("item2", result["item2"])
         self.assertEquals("item3", result["item3"])
+
+    def test_annotation_object_random_order_array(self):
+        annotations = {
+            "log.config.scalyr.com/attributes.parser": "test-parser-1",
+            "log.config.scalyr.com/teams.1.secret": "scalyr-api-key-team-1",
+            "log.config.scalyr.com/teams.5.secret": "scalyr-api-key-team-5",
+            "log.config.scalyr.com/teams.2.secret": "scalyr-api-key-team-2",
+            "log.config.scalyr.com/cont1.teams.2.secret": "scalyr-api-key-team-2",
+            "log.config.scalyr.com/cont2.teams.1.secret": "scalyr-api-key-team-1",
+            "log.config.scalyr.com/cont2.teams.2.secret": "scalyr-api-key-team-2"
+        }
+
+        result = process_annotations(annotations)
+        self.assertEquals(4, len(list(result.keys())))
+        self.assertEquals(JsonObject({"parser": "test-parser-1"}), result["attributes"])
+        self.assertEquals(3, len(list(result["teams"])))
+        self.assertEquals(JsonArray(
+            JsonObject({"secret": "scalyr-api-key-team-1"}),
+            JsonObject({"secret": "scalyr-api-key-team-2"}),
+            JsonObject({"secret": "scalyr-api-key-team-5"}),
+        ), result["teams"])
+        self.assertEquals(JsonArray(
+            JsonObject({"secret": "scalyr-api-key-team-2"})
+        ), result["cont1"]["teams"])
+        self.assertEquals(JsonArray(
+            JsonObject({"secret": "scalyr-api-key-team-1"}),
+            JsonObject({"secret": "scalyr-api-key-team-2"})
+        ), result["cont2"]["teams"])
 
     def test_annotation_nested_object(self):
         annotations = {

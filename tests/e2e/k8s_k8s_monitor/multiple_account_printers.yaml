@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: multiple-account-printer
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: multiple-account-printer
+  template:
+    metadata:
+      labels:
+        app: multiple-account-printer
+      annotations:
+        log.config.scalyr.com/attributes.parser: "test-parser-1"
+        log.config.scalyr.com/teams.1.secret: "scalyr-api-key-team-2"
+        log.config.scalyr.com/cont1.teams.2.secret: "scalyr-api-key-team-3"
+        log.config.scalyr.com/cont2.teams.1.secret: "scalyr-api-key-team-3"
+        log.config.scalyr.com/cont2.teams.2.secret: "scalyr-api-key-team-4"
+    spec:
+      containers:
+      - name: cont1
+        image: docker.io/library/busybox:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c", "while true; do echo MULTIPLE_ACCOUNT_TEST_CONTAINER_NAME:$MULTIPLE_ACCOUNT_TEST_CONTAINER_NAME; sleep 1; done"]
+        env:
+          - name: MULTIPLE_ACCOUNT_TEST_CONTAINER_NAME
+            value: "cont1"
+      - name: cont2
+        image: docker.io/library/busybox:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c", "while true; do echo MULTIPLE_ACCOUNT_TEST_CONTAINER_NAME:$MULTIPLE_ACCOUNT_TEST_CONTAINER_NAME; sleep 1; done"]
+        env:
+          - name: MULTIPLE_ACCOUNT_TEST_CONTAINER_NAME
+            value: "cont2"
+      - name: cont3
+        image: docker.io/library/busybox:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c", "while true; do echo MULTIPLE_ACCOUNT_TEST_CONTAINER_NAME:$MULTIPLE_ACCOUNT_TEST_CONTAINER_NAME; sleep 1; done"]
+        env:
+          - name: MULTIPLE_ACCOUNT_TEST_CONTAINER_NAME
+            value: "cont3"
+      nodeSelector:
+        kubernetes.io/os: linux

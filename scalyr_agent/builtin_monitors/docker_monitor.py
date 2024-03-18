@@ -1483,6 +1483,7 @@ class ContainerChecker(StoppableThread):
             name,
             stream,
             log["log_config"]["path"],
+            log["log_config"],
             self._config,
             last_request,
         )
@@ -1504,6 +1505,7 @@ class DockerLogger(object):
         name,
         stream,
         log_path,
+        log_config,
         config,
         last_request=None,
         max_log_size=20 * 1024 * 1024,
@@ -1516,6 +1518,7 @@ class DockerLogger(object):
         # stderr or stdout
         self.stream = stream
         self.log_path = log_path
+        self.log_config = log_config
         self.stream_name = name + "-" + stream
 
         self.__max_previous_lines = config.get("max_previous_lines")

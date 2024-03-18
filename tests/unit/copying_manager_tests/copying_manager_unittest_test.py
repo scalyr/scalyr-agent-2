@@ -124,6 +124,13 @@ class TestDynamicLogPathTest(BaseTest):
             _, responder_callback = self._manager.wait_for_rpc()
             responder_callback(response)
 
+    def matchers_paths_contain_only(self, *paths_with_worker_ids):
+        matchers = self._manager.log_matchers
+        self.assertEquals(len(paths_with_worker_ids), len(matchers))
+        return set(
+            (matcher.log_path, matcher.worker_id) for matcher in matchers
+        ) == set(paths_with_worker_ids)
+
     def create_copying_manager(self, config, monitor_agent_log=False):
 
         if "api_key" not in config:
@@ -155,11 +162,205 @@ class TestDynamicLogPathTest(BaseTest):
 
         log_config = {"path": path}
 
-        self._manager.add_log_config("unittest", log_config)
+        log_config = self._manager.add_log_config("unittest", log_config)
+
+        assert log_config["worker_id"] == "default"
+
         self.fake_scan()
         matchers = self._manager.log_matchers
         self.assertEquals(1, len(matchers))
         self.assertEquals(path, matchers[0].log_path)
+
+    def test_schedule_log_path_for_removal_with_api_key(self):
+        config = {}
+        self.create_copying_manager(config)
+        self.fake_scan()
+
+        API_KEYS = ["fake1", "fake2", "fake3", "fake4"]
+
+        path = os.path.join(self._log_dir, "newlog.log")
+        path2 = os.path.join(self._log_dir, "newlog2.log")
+
+        log_config1 = self._manager.add_log_config("unittest", {
+            "path": path,
+            "api_key": API_KEYS[0]
+        })
+        assert log_config1["worker_id"] == "dynamic_1"
+
+        log_config2 = self._manager.add_log_config("unittest", {
+            "path": path,
+            "api_key": API_KEYS[1]
+        })
+        assert log_config2["worker_id"] == "dynamic_2"
+
+        log_config3 = self._manager.add_log_config("unittest", {
+            "path": path,
+            "api_key": API_KEYS[2]
+        })
+        assert log_config3["worker_id"] == "dynamic_3"
+
+        log_config4 = self._manager.add_log_config("unittest", {
+            "path": path2,
+            "api_key": API_KEYS[0]
+        })
+        assert log_config4["worker_id"] == "dynamic_1"
+
+        self.fake_scan()
+
+        self.matchers_paths_contain_only(
+            ("dynamic_1", path),
+            ("dynamic_2", path),
+            ("dynamic_3", path),
+            ("dynamic_1", path2)
+        )
+
+        self._manager.schedule_log_config_for_removal("unittest", log_config2)
+        assert list(self._get_manager_log_pending_removal().keys()) == [(path, "dynamic_2")]
+
+        self._manager.schedule_log_path_for_removal("unittest", path)
+
+        assert sorted(list(self._get_manager_log_pending_removal().keys())) == sorted([
+            (path, "dynamic_1"),
+            (path, "dynamic_2"),
+            (path, "dynamic_3")
+        ])
+
+    def test_add_remove_update_path_with_api_key(self):
+        config = {}
+        self.create_copying_manager(config)
+        self.fake_scan()
+
+        API_KEYS = ["fake1", "fake2", "fake3", "fake4"]
+
+        path = os.path.join(self._log_dir, "newlog.log")
+        path2 = os.path.join(self._log_dir, "newlog2.log")
+
+        log_config1 = self._manager.add_log_config("unittest", {
+            "path": path,
+            "api_key": API_KEYS[0]
+        })
+        assert log_config1["worker_id"] == "dynamic_1"
+
+        log_config2 = self._manager.add_log_config("unittest", {
+            "path": path,
+            "api_key": API_KEYS[1]
+        })
+        assert log_config2["worker_id"] == "dynamic_2"
+
+        log_config3 = self._manager.add_log_config("unittest", {
+            "path": path2,
+            "api_key": API_KEYS[0]
+        })
+        assert log_config3["worker_id"] == "dynamic_1"
+
+        self.fake_scan()
+
+        self.matchers_paths_contain_only(
+            ("dynamic_1", path),
+            ("dynamic_2", path),
+            ("dynamic_1", path2)
+        )
+
+        path_log_configs = self._manager.update_log_configs_on_path(
+            path,"unittest",
+            [{
+                "path": path,
+                "api_key": API_KEYS[1]
+            },
+                {
+                    "path": path,
+                    "api_key": API_KEYS[2]
+                },
+                {
+                    "path": path,
+                    "api_key": API_KEYS[3]
+                }
+            ])
+
+        assert path_log_configs[0]["worker_id"] == "dynamic_2"
+        assert path_log_configs[1]["worker_id"] == "dynamic_3"
+        assert path_log_configs[2]["worker_id"] == "dynamic_4"
+
+        self.fake_scan()
+
+        self.matchers_paths_contain_only(
+            ("dynamic_2", path),
+            ("dynamic_3", path),
+            ("dynamic_4", path),
+            ("dynamic_1", path2)
+        )
+
+        self._manager.remove_log_path("unittest", path)
+
+        self.matchers_paths_contain_only(
+            ("dynamic_1", path2)
+        )
+
+        path_log_configs = self._manager.update_log_configs_on_path(
+            path, "unittest",
+            [{
+                "path": path,
+                "api_key": API_KEYS[1]
+            },
+                {
+                    "path": path,
+                    "api_key": API_KEYS[2]
+                },
+                {
+                    "path": path,
+                    "api_key": API_KEYS[3]
+                }
+            ])
+
+        assert path_log_configs[0]["worker_id"] == "dynamic_2"
+        assert path_log_configs[1]["worker_id"] == "dynamic_3"
+        assert path_log_configs[2]["worker_id"] == "dynamic_4"
+
+        self.fake_scan()
+
+        self.matchers_paths_contain_only(
+            ("dynamic_2", path),
+            ("dynamic_3", path),
+            ("dynamic_4", path),
+            ("dynamic_1", path2)
+        )
+
+        path_log_configs = self._manager.update_log_configs_on_path(
+            path, "unittest",
+            [{
+                "path": path
+            }]
+        )
+
+        assert path_log_configs[0]["worker_id"] == "default"
+
+        self.fake_scan()
+
+        self.matchers_paths_contain_only(
+            ("default", path),
+            ("dynamic_1", path2)
+        )
+
+        log_config4 = self._manager.add_log_config("unittest", {
+            "path": path2,
+            "api_key": API_KEYS[3]
+        })
+        assert log_config4["worker_id"] == "dynamic_4"
+
+        self.fake_scan()
+
+        self.matchers_paths_contain_only(
+            ("default", path),
+            ("dynamic_1", path2),
+            ("dynamic_4", path2)
+        )
+
+        self._manager.remove_log_config("unittest", log_config3)
+
+        self.matchers_paths_contain_only(
+            ("default", path),
+            ("dynamic_4", path2)
+        )
 
     def test_add_duplicate_path_same_monitor(self):
         config = {}
@@ -272,21 +473,22 @@ class TestDynamicLogPathTest(BaseTest):
         matchers = self._manager.log_matchers
         self.assertEquals(1, len(matchers))
         self.assertEquals(path, matchers[0].log_path)
+        worker_id = matchers[0].worker_id
 
-        assert path not in self._get_manager_log_pending_removal()
+        assert not self._get_manager_log_pending_removal().contains(path, worker_id)
 
         self._manager.schedule_log_path_for_removal("unittest", path)
-        assert path in self._get_manager_log_pending_removal()
+        assert self._get_manager_log_pending_removal().contains(path, worker_id)
 
         # We use force_add=True when adding the log file which means scheduled removal should be
         # canceled / removed
         self._manager.add_log_config("unittest", log_config, force_add=True)
-        assert path not in self._get_manager_log_pending_removal()
+        assert not self._get_manager_log_pending_removal().contains(path, worker_id)
 
         self.fake_scan()
         self.fake_scan()
 
-        assert path not in self._get_manager_log_pending_removal()
+        assert not self._get_manager_log_pending_removal().contains(path, worker_id)
 
         # Matcher should still be there since removal should have been canceled
         matchers = self._manager.log_matchers

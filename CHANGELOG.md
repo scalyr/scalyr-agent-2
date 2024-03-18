@@ -1,6 +1,34 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+
+## 2.2.12 "Gizmo" - Feb 29, 2024
+<!---
+Packaged by Ales Novak <ales.novak@sentinelone.com> on Feb 29, 2024 00:00 -0800
+--->
+
+Feature:
+* Support sending events to multiple Dataset accounts via K8s annotations. See [kubernetes_monitor.md](docs/monitors/kubernetes_monitor.md) for documentation.
+
+## 2.2.11 "Maxson" - Feb 7, 2024
+<!---
+Packaged by Ales Novak <ales.novak@sentinelone.com> on Feb 7, 2024 00:00 -0800
+--->
+
+Security fix:
+* Alpine image upgraded to 3.19.1 to mitigate [CVE-2023-7104](https://www.cve.org/CVERecord?id=CVE-2023-7104) and [CVE-2023-5363](https://www.cve.org/CVERecord?id=CVE-2023-5363)
+
+## 2.2.10 "Aradesh" - Feb 5, 2024
+<!---
+Packaged by Ales Novak <ales.novak@sentinelone.com> on Feb 5, 2024 00:00 -0800
+--->
+
+Improvement:
+* Windows Event Log Monitor - EventID field has been expanded into three fields. Until now EventID from the Windows Event Log was represented only by EventID field computed the following way win32api.MAKELONG(EventID, EventIDQualifiers). EventID and EventIDQualifiers now hold the values from the Windows Event Log without any modification and InstanceID is computed from EventID and EventIDQualifiers as described above.
+
+Fix:
+* Missing monitor field added to the event data sent by Syslog Monitor. The following field was added - ‘monitor’:'agentSyslog'.
+
 ## 2.2.9 "Tandi" - Jan 11, 2024
 <!---
 Packaged by Ales Novak <ales.novak@sentinelone.com> on Jan 11, 2024 00:00 -0800

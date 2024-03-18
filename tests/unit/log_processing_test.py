@@ -33,6 +33,7 @@ from io import open
 import pytest
 
 import scalyr_agent.util as scalyr_util
+from scalyr_agent.copying_manager.copying_manager import PathWorkerIdDict
 
 from scalyr_agent.scalyr_client import EventSequencer
 from scalyr_agent.line_matcher import LineMatcher
@@ -3113,14 +3114,14 @@ class TestLogMatcher(ScalyrTestCase):
 
     def test_matches_glob(self):
         matcher = LogMatcher(self.__config, self._create_log_config(self.__glob_one))
-        processors = matcher.find_matches(dict(), dict())
+        processors = matcher.find_matches("WORKER_ID_0", PathWorkerIdDict(), dict())
         self.assertEqual(len(processors), 2)
 
         self._close_processors(processors)
 
     def test_matches_restricted_glob(self):
         matcher = LogMatcher(self.__config, self._create_log_config(self.__glob_two))
-        processors = matcher.find_matches(dict(), dict())
+        processors = matcher.find_matches("WORKER_ID_0", PathWorkerIdDict(), dict())
         self.assertEqual(len(processors), 1)
 
         self._close_processors(processors)
@@ -3130,7 +3131,7 @@ class TestLogMatcher(ScalyrTestCase):
         matcher = LogMatcher(
             self.__config, self._create_log_config(self.__glob_recursive)
         )
-        processors = matcher.find_matches(dict(), dict())
+        processors = matcher.find_matches("WORKER_ID_0", PathWorkerIdDict(), dict())
         self.assertEqual(len(processors), 2)
         self.assertEqual(processors[0].get_log_path(), self.__path_three)
         self.assertEqual(processors[1].get_log_path(), self.__path_four)
@@ -3153,7 +3154,7 @@ class TestLogMatcher(ScalyrTestCase):
                 staleness_threshold_secs=staleness_threshold,
             ),
         )
-        processors = matcher.find_matches(dict(), dict())
+        processors = matcher.find_matches("WORKER_ID_0", PathWorkerIdDict(), dict())
         self.assertEqual(len(processors), 1)
 
         self._close_processors(processors)
@@ -3164,7 +3165,7 @@ class TestLogMatcher(ScalyrTestCase):
 
         matcher = LogMatcher(self.__config, config)
 
-        processors = matcher.find_matches(dict(), dict())
+        processors = matcher.find_matches("WORKER_ID_0", PathWorkerIdDict(), dict())
         self.assertEqual(len(processors), 1)
 
         attrs = processors[0]._LogFileProcessor__base_event.attrs
@@ -3178,7 +3179,7 @@ class TestLogMatcher(ScalyrTestCase):
 
         matcher = LogMatcher(self.__config, config)
 
-        processors = matcher.find_matches(dict(), dict())
+        processors = matcher.find_matches("WORKER_ID_0", PathWorkerIdDict(), dict())
         self.assertEqual(len(processors), 1)
 
         attrs = processors[0]._LogFileProcessor__base_event.attrs
@@ -3194,7 +3195,7 @@ class TestLogMatcher(ScalyrTestCase):
 
         matcher = LogMatcher(self.__config, config)
 
-        processors = matcher.find_matches(dict(), dict())
+        processors = matcher.find_matches("WORKER_ID_0", PathWorkerIdDict(), dict())
         self.assertEqual(len(processors), 1)
 
         attrs = processors[0]._LogFileProcessor__base_event.attrs
@@ -3210,7 +3211,7 @@ class TestLogMatcher(ScalyrTestCase):
 
         matcher = LogMatcher(self.__config, config)
 
-        processors = matcher.find_matches(dict(), dict())
+        processors = matcher.find_matches("WORKER_ID_0", PathWorkerIdDict(), dict())
         self.assertEqual(len(processors), 1)
 
         attrs = processors[0]._LogFileProcessor__base_event.attrs
@@ -3227,7 +3228,7 @@ class TestLogMatcher(ScalyrTestCase):
 
         matcher = LogMatcher(self.__config, config)
 
-        processors = matcher.find_matches(dict(), dict())
+        processors = matcher.find_matches("WORKER_ID_0", PathWorkerIdDict(), dict())
         self.assertEqual(len(processors), 1)
 
         attrs = processors[0]._LogFileProcessor__base_event.attrs
@@ -3249,7 +3250,7 @@ class TestLogMatcher(ScalyrTestCase):
 
         matcher = LogMatcher(self.__config, config)
 
-        processors = matcher.find_matches(dict(), dict())
+        processors = matcher.find_matches("WORKER_ID_0", PathWorkerIdDict(), dict())
         self.assertEqual(len(processors), 1)
 
         attrs = processors[0]._LogFileProcessor__base_event.attrs
@@ -3265,7 +3266,7 @@ class TestLogMatcher(ScalyrTestCase):
 
         matcher = LogMatcher(self.__config, config)
 
-        processors = matcher.find_matches(dict(), dict())
+        processors = matcher.find_matches("WORKER_ID_0", PathWorkerIdDict(), dict())
         self.assertEqual(len(processors), 1)
 
         attrs = processors[0]._LogFileProcessor__base_event.attrs
@@ -3278,7 +3279,7 @@ class TestLogMatcher(ScalyrTestCase):
 
         matcher = LogMatcher(self.__config, config)
 
-        processors = matcher.find_matches(dict(), dict())
+        processors = matcher.find_matches("WORKER_ID_0", PathWorkerIdDict(), dict())
         self.assertEqual(len(processors), 1)
 
         attrs = processors[0]._LogFileProcessor__base_event.attrs
@@ -3297,7 +3298,7 @@ class TestLogMatcher(ScalyrTestCase):
         self.append_file(self.__path_one, b"First line\n")
         matcher = LogMatcher(self.__config, config)
         matcher.finish()
-        processors = matcher.find_matches(dict(), dict(), copy_at_index_zero=True)
+        processors = matcher.find_matches("WORKER_ID_0", PathWorkerIdDict(), dict(), copy_at_index_zero=True)
 
         self.assertFalse(matcher.is_finished())
 
@@ -3308,7 +3309,7 @@ class TestLogMatcher(ScalyrTestCase):
         self.append_file(self.__path_one, b"First line\n")
         matcher = LogMatcher(self.__config, config)
         matcher.finish()
-        processors = matcher.find_matches(dict(), dict(), copy_at_index_zero=True)
+        processors = matcher.find_matches("WORKER_ID_0", PathWorkerIdDict(), dict(), copy_at_index_zero=True)
 
         for p in processors:
             p.scan_for_new_bytes()
@@ -3331,7 +3332,7 @@ class TestLogMatcher(ScalyrTestCase):
         self.append_file(self.__path_one, b"First line\n")
         matcher = LogMatcher(self.__config, config)
         matcher.finish()
-        processors = matcher.find_matches(dict(), dict(), copy_at_index_zero=True)
+        processors = matcher.find_matches("WORKER_ID_0", PathWorkerIdDict(), dict(), copy_at_index_zero=True)
 
         for p in processors:
             p.scan_for_new_bytes()
@@ -3347,7 +3348,7 @@ class TestLogMatcher(ScalyrTestCase):
 
         self._close_processors(processors)
 
-        new_processors = matcher.find_matches(dict(), dict(), copy_at_index_zero=True)
+        new_processors = matcher.find_matches("WORKER_ID_0", PathWorkerIdDict(), dict(), copy_at_index_zero=True)
         self.assertEqual(0, len(new_processors))
         self._close_processors(new_processors)
 
@@ -3356,7 +3357,7 @@ class TestLogMatcher(ScalyrTestCase):
         self.append_file(self.__path_one, b"First line\n")
         matcher = LogMatcher(self.__config, config)
         matcher.finish()
-        processors = matcher.find_matches(dict(), dict(), copy_at_index_zero=True)
+        processors = matcher.find_matches("WORKER_ID_0", PathWorkerIdDict(), dict(), copy_at_index_zero=True)
 
         self.assertEqual(0, len(processors))
 
@@ -3368,7 +3369,7 @@ class TestLogMatcher(ScalyrTestCase):
         self.append_file(self.__path_one, b"My line\n")
         matcher = LogMatcher(self.__config, config)
         matcher.finish()
-        processors = matcher.find_matches(dict(), dict(), copy_at_index_zero=True)
+        processors = matcher.find_matches("WORKER_ID_0", PathWorkerIdDict(), dict(), copy_at_index_zero=True)
 
         processor = processors[0]
 
@@ -3394,7 +3395,7 @@ class TestLogMatcher(ScalyrTestCase):
         self.append_file(self.__path_one, b"First line\n", b"Second_line\n")
         matcher = LogMatcher(self.__config, config)
         matcher.finish()
-        processors = matcher.find_matches(dict(), dict(), copy_at_index_zero=True)
+        processors = matcher.find_matches("WORKER_ID_0", PathWorkerIdDict(), dict(), copy_at_index_zero=True)
 
         processor = processors[0]
 
@@ -3420,7 +3421,7 @@ class TestLogMatcher(ScalyrTestCase):
         matcher = LogMatcher(self.__config, config)
         matcher.finish()
 
-        processors = matcher.find_matches(dict(), dict(), copy_at_index_zero=True)
+        processors = matcher.find_matches("WORKER_ID_0", PathWorkerIdDict(), dict(), copy_at_index_zero=True)
 
         status = matcher.generate_status()
 

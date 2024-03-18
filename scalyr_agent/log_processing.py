@@ -3505,8 +3505,8 @@ class LogMatcher(object):
             processor.set_new_scalyr_client(new_scalyr_client)
 
     @property
-    def log_entry_config(self):
-        return self.__log_entry_config
+    def worker_id(self):
+        return self.__log_entry_config["worker_id"]
 
     def update_log_entry_config(self, log_entry_config):
         """
@@ -3649,7 +3649,8 @@ class LogMatcher(object):
 
     def find_matches(
         self,
-        existing_processors,
+        worker_id,
+        existing_processors, # type PathWorkerIdDict
         previous_state,
         copy_at_index_zero=False,
         create_log_processor=LogFileProcessor,
@@ -3657,6 +3658,7 @@ class LogMatcher(object):
         """Determine if there are any files that match the log file for this matcher that are not
         already handled by other processors, and if so, return a processor for it.
 
+        @param worker_id: Worker_id that will be processing the log files.
         @param existing_processors: A dict from file path to the processor currently handling it.  This method will
             not create any new processors for file paths that are keys in this dict.
         @param previous_state: A dict from file path to the serialized checkpoint state last recorded for that
@@ -3674,8 +3676,8 @@ class LogMatcher(object):
         @return: A list of the processors to handle the newly matched files.
         @rtype: list of LogFileProcessor
         """
-        if not self.__is_glob and self.log_path in existing_processors:
-            existing_processors[self.log_path].add_missing_attributes(
+        if not self.__is_glob and existing_processors.contains(self.log_path, worker_id):
+            existing_processors.get(self.log_path, worker_id).add_missing_attributes(
                 self.__log_entry_config["attributes"]
             )
             return []
@@ -3720,7 +3722,7 @@ class LogMatcher(object):
                 if skip:
                     continue
 
-                already_exists = matched_file in existing_processors
+                already_exists = existing_processors.contains(matched_file, worker_id)
                 # Only process it if we have permission to read it and it is not already being processed.
                 # Also check if we should skip over it entirely because it is too stale.
                 if not already_exists and self.__can_read_file_and_not_stale(
