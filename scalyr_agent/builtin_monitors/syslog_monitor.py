@@ -25,6 +25,8 @@ from __future__ import absolute_import
 
 from __future__ import print_function
 
+if False: # NOSONAR
+    from typing import Tuple, Optional
 
 from scalyr_agent import compat
 
@@ -585,6 +587,8 @@ class SyslogUDPHandler(six.moves.socketserver.BaseRequestHandler):
     """
 
     def __init__(self, request, client_address, server):
+        # type: (socket.socket, Tuple[str, int], SyslogUDPServer) -> None
+
         if six.PY3:
             super(SyslogUDPHandler, self).__init__(request, client_address, server)
         else:
@@ -598,6 +602,7 @@ class SyslogUDPHandler(six.moves.socketserver.BaseRequestHandler):
             "destport": self.server.server_address[1],
         }
 
+        # self.server.syslog_handler is of type SyslogHandler
         self.server.syslog_handler.handle(data, extra)
 
 
@@ -971,13 +976,6 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
     # NOTE: Thole whole handler abstraction is not great since it means a new class instance for
     # each new connection.
 
-    class PreviousMessageHandlingError(Exception):
-        def __int__(self, message):
-            self.message = message
-
-        def __repr__(self):
-            return "PreviousMessageHandlingError: " + self.message
-
     def __init__(self, *args, **kwargs):
         self.request_parser = kwargs.pop("request_parser", "default")
         self.incomplete_frame_timeout = kwargs.pop("incomplete_frame_timeout", None)
@@ -1021,6 +1019,7 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
         )
 
     def _syslog_request_parser(self):
+        # self.server.syslog_handler is of type SyslogHandler
         if self.request_parser == "default":
             return SyslogRequestParser(
                 socket_client_address=self.client_address,
@@ -1078,14 +1077,13 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
             )
             return
 
-
 class SyslogUDPServer(
     ExecutorMixIn, six.moves.socketserver.UDPServer
 ):
     """Class that creates a UDP SocketServer on a specified port"""
 
     def __init__(self, port, bind_address, verifier, global_config=None):
-
+        self.syslog_handler = None  # type: Optional[SyslogHandler]
         self.__verifier = verifier
         address = (bind_address, port)
         global_log.log(
@@ -1107,7 +1105,7 @@ class SyslogUDPServer(
 
 
 class SyslogTCPServer(
-    ExecutorMixIn, six.moves.socketserver.TCPServer
+    six.moves.socketserver.TCPServer
 ):
     """Class that creates a TCP SocketServer on a specified port"""
 
@@ -1123,6 +1121,7 @@ class SyslogTCPServer(
         message_delimiter="\n",
         global_config=None
     ):
+        self.syslog_handler = None  # type: Optional[SyslogHandler]
         self.__verifier = verifier
         address = (bind_address, port)
         global_log.log(
@@ -1137,7 +1136,7 @@ class SyslogTCPServer(
         self.request_parser = request_parser
         self.message_delimiter = message_delimiter
 
-        ExecutorMixIn.__init__(self, global_config=global_config)
+        # ExecutorMixIn.__init__(self, global_config=global_config)
         handler_cls = functools.partial(
             SyslogTCPHandler,
             request_parser=request_parser,
@@ -1968,6 +1967,8 @@ class SyslogServer(object):
             )
 
         # create the syslog handler, and add to the list of servers
+        # TODO Setting the property here is very hacky and confusing, hopefully will be refactored one day.
+        # Later it's accessed from the SyslogTCPHandler and SyslogUDPHandler via self.server.syslog_handler
         server.syslog_handler = SyslogHandler(
             logger,
             line_reporter,

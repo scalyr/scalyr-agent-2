@@ -17,45 +17,80 @@
 # @author ales.novak@sentinelone.com
 
 import threading
-from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
+from enum import Enum
+from queue import PriorityQueue
+from typing import Any
 
 from scalyr_agent import scalyr_logging
-import time
-import sys
 
 global_log = scalyr_logging.getLogger(__name__)
 
 
+class PRIORITY(Enum):
+    CMD = 0
+    DATA = 1
+
+
+@dataclass(order=True, frozen=True)
+class PrioritizedItem:
+    priority: int = field(default=PRIORITY.DATA.value, compare=True)
+    request: Any = field(default=None, compare=False)
+    client_address: Any = field(default=None, compare=False)
+    shutdown: bool = field(default=False, compare=False)
+
+
+class WorkQueue():
+    def __init__(self, max_size):
+        self.__queue = PriorityQueue(max_size)
+
+    def submit_request(self, request, client_address):
+        self.__queue.put(PrioritizedItem(request=request, client_address=client_address))
+
+    def shutdown(self, force=False):
+        priority = PRIORITY.CMD.value if force else PRIORITY.DATA.value
+        self.__queue.put(PrioritizedItem(shutdown=True, priority=priority))
+
+    def get(self):
+        return self.__queue.get()
+
+    def __len__(self):
+        return self.__queue.qsize()
+
+
 # A MixIn class used for adding a thread poll processing to a BaseServer (i.e. SyslogTCPServer, SyslogUDPServer)
 class ExecutorMixIn:
-    def __init__(self, global_config):
-        # Using 8 threads for processing requests, because of GIL and CPU bound tasks higher number would not help process the data faster.
-        # The reason for multiple threads is to avoid deadlock in an unexpected situation before waiting for previous data
-        # on a single request being processed fails and it's not caught do to a bug.
-        # Let the ThreadPoolExecutor decide how many threads to use based the numbre of logical CPUs
-        reading_threads = None
 
-        self.__is_shutdown = False
-        self.__shutdown_lock = threading.Lock()
+    # This is a MixIn class used to provide a SyslogUDPServer with a request queue.
+    # Its main purpose is to provide a buffer for UDP requests to handle bursts of requests.
+
+    def __init__(self, global_config):
+        self.__is_closed = False
+        self.__server_close_lock = threading.Lock()
 
         if global_config:
-            reading_threads = global_config.syslog_socket_thread_count
+            request_queue_size = global_config.syslog_socket_request_queue_size
             self._shutdown_grace_period = global_config.syslog_monitors_shutdown_grace_period
         else:
+            request_queue_size = 500_000
             self._shutdown_grace_period = 5
 
-        self._request_reading_executor = ThreadPoolExecutor(max_workers=reading_threads, thread_name_prefix="request_reading_executor")
+        self.__request_queue = WorkQueue(request_queue_size)
 
-        # Since the older versions of python use daemon threads, we need to let the pool create the threads this constructor's thread.
-        self.__warmup_thread_pool(self._request_reading_executor)
+        def read_requests_loop():
+            while not self.__is_closed:
+                try:
+                    # Ignoring the priority here
+                    item = self.__request_queue.get()
+                    if item.shutdown:
+                        break
+                    self.process_request_thread(item.request, item.client_address)
+                except:
+                    global_log.exception("Error reading request from queue")
 
-    def __warmup_thread_pool(self, thread_pool):
-        # Warmup the thread pool
-        for _ in range(thread_pool._max_workers):
-            thread_pool._adjust_thread_count()
+        self.__processing_thread = threading.Thread(target=read_requests_loop)
+        self.__processing_thread.start()
 
-    # Note this is a mixin for use with SocketServer
-    # pylint: disable=no-member
     def process_request_thread(self, request, client_address):
         """Same as in BaseServer but as a thread.
 
@@ -68,45 +103,33 @@ class ExecutorMixIn:
             self.handle_error(request, client_address)
         finally:
             self.shutdown_request(request)
+            # if random.random() > 0.999:
+            #     global_log.info(f"Queue size {threading.current_thread().name}: {len(self.__request_queue)}")
 
     def process_request(self, request, client_address):
-        if not self._request_reading_executor:
-           raise ValueError(str(self.__class__) + " is not initialized properly")
-
         """Start a new thread to process the request."""
         try:
-            self._request_reading_executor.submit(
-                self.process_request_thread, request, client_address
-            )
+            self.__request_queue.submit_request(request=request, client_address=client_address)
         except:
             global_log.exception("Error submitting request to executor")
 
-    def shutdown(self):
-        with self.__shutdown_lock:
-            if self.__is_shutdown:
+    def server_close(self):
+        super().server_close()
+        with self.__server_close_lock:
+            if self.__is_closed:
                 return
 
-            self.__is_shutdown = True
+            self.__is_closed = True
 
-            super().shutdown()
+            self.__gracefully_shutdown_processing_thread()
 
-            self.__wait_for_tasks_to_complete(self._request_reading_executor, timeout=self._shutdown_grace_period)
+    def __gracefully_shutdown_processing_thread(self):
+        self.__request_queue.shutdown(force=False)
+        self.__processing_thread.join(timeout=self._shutdown_grace_period)
 
-            shutdown_args = {"wait": False}
-            if sys.version_info[0:2] >= (3, 9):
-                shutdown_args["cancel_futures"] = True
+        if self.__processing_thread.is_alive():
+            self.__request_queue.shutdown(force=True)
 
-            self._request_reading_executor.shutdown(**shutdown_args)
-
-    @staticmethod
-    def __wait_for_tasks_to_complete(*executors, timeout):
-        semaphore = threading.Semaphore(0)
-        for executor in executors:
-            executor.submit(lambda: semaphore.release())
-
-        time_stop_waiting = time.time() + timeout
-        for _ in executors:
-            if time.time() > time_stop_waiting:
-                break
-            semaphore.acquire(timeout=time_stop_waiting-time.time())
+        self.__processing_thread.join()
+        print("Cus")
 

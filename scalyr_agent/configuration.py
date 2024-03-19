@@ -80,7 +80,6 @@ AGENT_WORKER_SESSION_LOG_NAME_PREFIX = "agent-worker-session-"
 
 DEFAULT_WORKER_ID = "default"
 
-
 def ensure_https_url(server):
     parts = six.moves.urllib.parse.urlparse(server)
 
@@ -93,7 +92,6 @@ def ensure_https_url(server):
         return re.sub("^http://", "https://", server)
     else:
         return server
-
 
 class Configuration(object):
     """Encapsulates the results of a single read of the configuration file.
@@ -569,6 +567,7 @@ class Configuration(object):
         worker_ids = set()
         for worker_config in self.__config.get_json_array("workers"):
             worker_ids.add(worker_config["id"])
+
 
         # get all lists where log files entries may be defined and require worker_id param.
         # __k8s_log_configs is left out because it interferes with the kubernetes monitor container checker and CopyingManager itself sets default worker_id while adding logs.
@@ -1527,11 +1526,9 @@ class Configuration(object):
         )
 
     @property
-    def syslog_socket_thread_count(self):
+    def syslog_socket_request_queue_size(self):
         """Returns the configuration value for 'scalyr_server'."""
-        return self.__get_config().get_int(
-            "syslog_socket_thread_count", none_if_missing=True
-        )
+        return self.__get_config().get_int("syslog_socket_request_queue_size", none_if_missing=True)
 
     @property
     def check_remote_if_no_tty(self):
@@ -2297,6 +2294,10 @@ class Configuration(object):
             description,
             apply_defaults,
             env_aware=True,
+        )
+        # Defaults to about 130MB of memory per Syslog Server
+        self.__verify_or_set_optional_int(
+            config, "syslog_socket_request_queue_size", 100000, description, apply_defaults, env_aware=True
         )
         self.__verify_or_set_optional_bool(
             config,

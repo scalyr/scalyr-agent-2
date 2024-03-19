@@ -1,38 +1,85 @@
 {
+  "import_vars": ["SCALYR_API_KEY"],
   scalyr_server: "agent.scalyr.com",
   api_key: "$SCALYR_API_KEY",
+  "log_rotation_max_bytes": "1073741824",
 
   server_attributes: {
-     serverHost: "github-action-test",
+     serverHost: "github-action-memory-test"
 
   },
   monitors: [
      {
       module:                    "scalyr_agent.builtin_monitors.syslog_monitor",
-      protocols:                 "tcp:1601, udp:1514",
+      protocols:                 "tcp:1601",
       accept_remote_connections: true,
-      message_log: "AZTEMFWs.log",
-      parser: "paloalto.conf",
+      message_log: "tcp_1.log"
     },
     {
       module:                    "scalyr_agent.builtin_monitors.syslog_monitor",
-      protocols:                 "tcp:1602, udp:1515",
+      protocols:                 "tcp:1602",
       accept_remote_connections: true,
-      message_log: "AZTUCFWs.log",
-      parser: "paloalto.conf",
+      message_log: "tcp_2.log"
     },
     {
       module:                    "scalyr_agent.builtin_monitors.syslog_monitor",
-      protocols:                 "tcp:1603, udp:1516",
+      protocols:                 "tcp:1603",
       accept_remote_connections: true,
-      message_log: "CerberusFTP.log",
+      message_log: "tcp_3.log"
     },
     {
       module:                    "scalyr_agent.builtin_monitors.syslog_monitor",
-      protocols:                 "tcp:1604, udp:1517",
+      protocols:                 "tcp:1604",
       accept_remote_connections: true,
-      message_log: "Meraki.log",
-      parser: "meraki-sundt.conf",
+      message_log: "tcp_4.log"
+    },
+    {
+      module:                    "scalyr_agent.builtin_monitors.syslog_monitor",
+      protocols:                 "tcp:1605",
+      accept_remote_connections: true,
+      message_log: "tcp_5.log"
+    },
+    {
+      module:                    "scalyr_agent.builtin_monitors.syslog_monitor",
+      protocols:                 "tcp:1606",
+      accept_remote_connections: true,
+      message_log: "tcp_6.log"
+    },
+    {
+      module:                    "scalyr_agent.builtin_monitors.syslog_monitor",
+      protocols:                 "tcp:1607",
+      accept_remote_connections: true,
+      message_log: "tcp_7.log"
+    },
+    {
+      module:                    "scalyr_agent.builtin_monitors.syslog_monitor",
+      protocols:                 "tcp:1608",
+      accept_remote_connections: true,
+      message_log: "tcp_8.log"
+    },
+    {
+      module:                    "scalyr_agent.builtin_monitors.syslog_monitor",
+      protocols:                 "udp:1501",
+      accept_remote_connections: true,
+      message_log: "udp_1.log"
+    },
+    {
+      module:                    "scalyr_agent.builtin_monitors.syslog_monitor",
+      protocols:                 "udp:1502",
+      accept_remote_connections: true,
+      message_log: "udp_2.log"
+    },
+    {
+      module:                    "scalyr_agent.builtin_monitors.syslog_monitor",
+      protocols:                 "udp:1503",
+      accept_remote_connections: true,
+      message_log: "udp_3.log"
+    },
+    {
+      module:                    "scalyr_agent.builtin_monitors.syslog_monitor",
+      protocols:                 "udp:1504",
+      accept_remote_connections: true,
+      message_log: "udp_4.log"
     }
   ]
 }

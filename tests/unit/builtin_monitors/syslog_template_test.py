@@ -91,10 +91,6 @@ class ConfigurationMock(Configuration):
         return 4
 
     @property
-    def syslog_socket_thread_count(self):
-        return 4
-
-    @property
     def syslog_monitors_shutdown_grace_period(self):
         return 1
 

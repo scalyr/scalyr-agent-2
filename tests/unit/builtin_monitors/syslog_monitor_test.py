@@ -189,8 +189,8 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
 
     class MockConfig():
         def __init__(self):
-            self.syslog_socket_thread_count = 4
             self.syslog_monitors_shutdown_grace_period = 1
+            self.syslog_socket_request_queue_size = 10000
 
     def __tcp_server(self, port, handling_time, global_config):
         server = SyslogTCPServer(
@@ -284,7 +284,7 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
 
     @skipIf(sys.version_info < (3, 9, 0), "Skipping tests under Python 3.9")
     def test_shutdown_with_pending_requests(self):
-        HANDLING_TIME = 0.1
+        HANDLING_TIME = 0.01
         mock_config = self.MockConfig()
         with self.start_servers(udp_servers_count=0, tcp_servers_count=1, handling_time=HANDLING_TIME, global_config=mock_config) as (udp_servers, tcp_servers):
             for server in tcp_servers:
