@@ -22,6 +22,8 @@ import platform
 import mock
 import sys
 
+from scalyr_agent.copying_manager.copying_manager import PathWorkerIdDict
+
 if False:
     from typing import Tuple
     from typing import Optional
@@ -210,7 +212,8 @@ class CopyingManagerWorkerTest(CopyingManagerCommonTest):
             checkpoints = {}
 
         processors = matcher.find_matches(
-            existing_processors=[],
+            "WORKER_ID_0",
+            existing_processors=PathWorkerIdDict(),
             previous_state=checkpoints,
             copy_at_index_zero=copy_at_index_zero,
             create_log_processor=self._instance.create_and_schedule_new_log_processor,

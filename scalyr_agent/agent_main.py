@@ -1877,6 +1877,7 @@ class ScalyrAgent(object):
         @rtype: AgentStatus
         """
         # Basic agent stats first.
+
         result = AgentStatus()
         result.launch_time = self.__start_time
         result.user = self.__controller.get_current_user()
@@ -1892,7 +1893,6 @@ class ScalyrAgent(object):
         # Describe the status of the configuration file.
         config_result = ConfigStatus()
         result.config_status = config_result
-
         config_result.last_check_time = self.__last_config_check_time
         if self.__current_bad_config is not None:
             config_result.path = self.__current_bad_config.file_path
@@ -2274,15 +2274,14 @@ class ScalyrAgent(object):
             # We do a little dance to write the status.  We write it to a temporary file first, and then
             # move it into the real location after the write has finished.  This way, the process watching
             # the file we are writing does not accidentally read it when it is only partially written.
+
             tmp_file_path = os.path.join(
                 self.__config.agent_data_path, "last_status.tmp"
             )
             final_file_path = os.path.join(self.__config.agent_data_path, "last_status")
-
             if os.path.isfile(final_file_path):
                 os.remove(final_file_path)
             tmp_file = open(tmp_file_path, "w")
-
             agent_status = self.__generate_status()
 
             if not status_format or status_format == "text":

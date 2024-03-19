@@ -78,6 +78,7 @@ MASKED_CONFIG_ITEM_VALUE = "********** MASKED **********"
 # prefix for the worker session log file name.
 AGENT_WORKER_SESSION_LOG_NAME_PREFIX = "agent-worker-session-"
 
+DEFAULT_WORKER_ID = "default"
 
 def ensure_https_url(server):
     parts = six.moves.urllib.parse.urlparse(server)
@@ -546,10 +547,10 @@ class Configuration(object):
             else:
                 unique_worker_ids[worker_id] = worker_entry
 
-        default_worker_entry = unique_worker_ids.get("default")
+        default_worker_entry = unique_worker_ids.get(DEFAULT_WORKER_ID)
 
         if default_worker_entry is None:
-            default_worker_entry = JsonObject(api_key=self.api_key, id="default")
+            default_worker_entry = JsonObject(api_key=self.api_key, id=DEFAULT_WORKER_ID)
             self.__verify_workers_entry_and_set_defaults(default_worker_entry)
             workers.insert(0, default_worker_entry)
             self.__config.put("workers", JsonArray(*workers))
@@ -580,7 +581,7 @@ class Configuration(object):
 
                 if worker_id is None:
                     # set a default worker if worker_id is not specified.
-                    log_file_config["worker_id"] = "default"
+                    log_file_config["worker_id"] = DEFAULT_WORKER_ID
                 else:
                     # if log file entry has worker_id which is not defined in the 'workers' list, then throw an error.
                     if worker_id not in worker_ids:
@@ -3924,7 +3925,7 @@ class Configuration(object):
         self.__verify_or_set_optional_string(
             log_entry,
             "worker_id",
-            "default",
+            DEFAULT_WORKER_ID,
             description,
         )
 
@@ -4170,7 +4171,7 @@ class Configuration(object):
         # but we make an exception for the "default" worker.
         # The worker entry with "default" id may not have a "api_key" field and it will be the same as main api_key.
         worker_id = worker_entry.get("id")
-        if worker_id == "default":
+        if worker_id == DEFAULT_WORKER_ID:
             api_key = worker_entry.get("api_key", none_if_missing=True)
             if api_key is not None and api_key != self.api_key:
                 raise BadConfiguration(
