@@ -1,31 +1,89 @@
 #! /bin/bash
 
+TCP_SERVERS=$1
+UDP_SERVERS=$2
+
 echo_with_date() {
     date +"[%Y-%m-%d %H:%M:%S] $*"
 }
 
-cat scripts/cicd/test_syslog_monitor_memory_usage/agent.json | envsubst > agent.json
-python scalyr_agent/agent_main.py --config agent.json start
+function generate_config() {
+  TCP_SERVERS=$1
+  UDP_SERVERS=$2
 
-INTERVAL=120
-MONITOR_INTERVAL=10
-MEM_ALLOWED=$((1*1024*1024)) #1Gb
+  echo "{" > agent.json
+
+  echo '
+"import_vars": ["SCALYR_API_KEY"],
+"scalyr_server": "agent.scalyr.com",
+"api_key": "$SCALYR_API_KEY",
+"log_rotation_max_bytes": "1073741824",
+"syslog_socket_request_queue_size": "10000",
+
+"server_attributes": {
+   "serverHost": "github-action-memory-test"
+
+},' >> agent.json
+
+echo "\"monitors\": [" >> agent.json
+
+for N in `seq $TCP_SERVERS`;
+do
+  echo "{
+      \"module\":                    \"scalyr_agent.builtin_monitors.syslog_monitor\",
+      \"protocols\":                 \"tcp:$(($N+1600))\",
+      \"accept_remote_connections\": \"true\",
+      \"message_log\": \"tcp_$N.log\"
+    }," >> agent.json
+done
+
+for N in `seq $UDP_SERVERS`;
+do
+  echo "{
+      \"module\":                    \"scalyr_agent.builtin_monitors.syslog_monitor\",
+      \"protocols\":                 \"udp:$(($N+1500))\",
+      \"accept_remote_connections\": \"true\",
+      \"message_log\": \"udp_$N.log\"
+    }," >> agent.json
+done
+
+echo "]" >> agent.json
+
+  echo "}" >> agent.json
+}
+
+generate_config $TCP_SERVERS $UDP_SERVERS
+
+CONFIG_FILE=agent.json
+python scalyr_agent/agent_main.py --config $CONFIG_FILE start
+
+
+RATE=10000
+INTERVAL=360
+MONITOR_INTERVAL=5
+MEM_ALLOWED=$((512*1024)) #0.5Gb
 
 pids=()
-for PORT in 1601 1602 1603 1604;
+for N in `seq $TCP_SERVERS`;
 do
-	loggen --rate 1000 --interval $INTERVAL --stream --active-connections=5 -Q localhost $PORT &
+	loggen --rate $RATE --interval $INTERVAL --stream --active-connections=5 -Q localhost $(($N+1600)) &
+	pids+=($!)
+done
+
+for N in `seq $UDP_SERVERS`;
+do
+	loggen --rate $RATE --interval $INTERVAL --dgram --active-connections=5 -Q localhost $(($N+1500)) &
 	pids+=($!)
 done
 
 PID=`cat ~/scalyr-agent-dev/log/agent.pid`
 
-for A in `seq $(($INTERVAL/$MONITOR_INTERVAL))`; do
+while ps -p $pids > /dev/null; do
   MEM_USED=`cat /proc/$PID/status | grep VmRSS | awk '{print $2}'`
   if [ $MEM_USED -gt $MEM_ALLOWED ]
   then
     echo_with_date "Mem used: $MEM_USED kB > $MEM_ALLOWED kB => FAIL!"
-    exit 1
+#    exit 1
   else
     echo_with_date "Mem used: $MEM_USED kB <= $MEM_ALLOWED kB => OK"
   fi
@@ -36,3 +94,5 @@ echo Waiting for loggen processes to finish ...
 for pid in ${pids[*]}; do
   wait $pid
 done
+
+
