@@ -52,8 +52,7 @@ class EC2BackedRemoteBuildxBuilderWrapper:
 
         self.ec2_instance: Optional[EC2InstanceWrapper] = None
 
-    def initialize(self):
-
+    def __docker_builder_exists(self, name):
         try:
             subprocess.run(
                 ["docker", "buildx", "rm", "-f", self.name],
@@ -61,10 +60,26 @@ class EC2BackedRemoteBuildxBuilderWrapper:
                 capture_output=True,
                 timeout=60,
             )
+            return True
+        except subprocess.SubprocessError as e:
+            logger.info(f"Builder {name} does not exist, stderr: {e.stderr.decode()}")
+            return False
+
+    def __remove_builder(self, name):
+        try:
+            subprocess.run(
+                ["docker", "buildx", "rm", "-f", name],
+                check=True,
+                capture_output=True,
+                timeout=60,
+            )
         except subprocess.SubprocessError as e:
             stderr = e.stderr.decode()
-            if stderr != f'ERROR: no builder "{self.name}" found\n':
-                raise Exception(f"Can not inspect builder. Stderr: {stderr}")
+            raise Exception(f"Cannot remove builder. Stderr: {stderr}")
+
+    def initialize(self):
+        if self.__docker_builder_exists(self.name):
+            self.__remove_builder(self.name)
 
         buildkit_tunneled_local_port = self.start_buildkit_container()
 
