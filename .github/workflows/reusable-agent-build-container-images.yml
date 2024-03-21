@@ -281,15 +281,15 @@ jobs:
         k8s_version:
           # NOTE: We don't test under very old versions where CronJob was part of v2alpha1 since in
           # those versions CronJobs are not enabled by default and need to be installed extra
-          - { "version": "v1.17.17", "driver": "", "runtime": "docker", "run_cronjob_checks": false, "run_short_lived_jobs_test": false }
-          - { "version": "v1.20.15", "driver": "", "runtime": "docker", "run_cronjob_checks": false, "run_short_lived_jobs_test": false }
-          - { "version": "v1.21.10", "driver": "", "runtime": "docker", "run_cronjob_checks": true, "run_short_lived_jobs_test": false }
-          - { "version": "v1.22.7", "driver": "", "runtime": "docker", "run_cronjob_checks": true, "run_short_lived_jobs_test": false }
+          - { "version": "v1.17.17", "driver": "", "runtime": "docker", "run_cronjob_checks": false }
+          - { "version": "v1.20.15", "driver": "", "runtime": "docker", "run_cronjob_checks": false }
+          - { "version": "v1.21.10", "driver": "", "runtime": "docker", "run_cronjob_checks": true }
+          - { "version": "v1.22.7", "driver": "", "runtime": "docker", "run_cronjob_checks": true }
           # NOTE: Using containerd runtime in minikube on GHA only works with docker driver
-          - { "version": "v1.23.17", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true, "run_short_lived_jobs_test": true }
-          - { "version": "v1.24.14", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true, "run_short_lived_jobs_test": true }
-          - { "version": "v1.25.10", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true, "run_short_lived_jobs_test": true }
-          - { "version": "v1.26.5", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true, "run_short_lived_jobs_test": true }
+          - { "version": "v1.23.17", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true }
+          - { "version": "v1.24.14", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true }
+          - { "version": "v1.25.10", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true }
+          - { "version": "v1.26.5", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true }
           # CRI-O
           - { "version": "v1.27.4", "driver": "docker", "runtime": "cri-o", "run_cronjob_checks": true }
 
@@ -422,7 +422,6 @@ jobs:
           main_yaml_path: "tests/e2e/scalyr-agent-2-daemonset.yaml"
 
       - name: Create mock Jobs
-        if: ${{ matrix.k8s_version.run_short_lived_jobs_test }}
         run: |
           kubectl apply -f tests/e2e/k8s_k8s_monitor/short-lived-jobs.yaml
           kubectl get job -A
@@ -547,8 +546,8 @@ jobs:
           
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" "Hello from the Kubernetes cluster"'
 
-      - name: Check the short lived pods logs are ingested
-        if: ${{ matrix.k8s_version.run_short_lived_jobs_test }}
+      - name: Check the short lived pods logs are ingested - 404 response handling
+        if: ${{ matrix.k8s_version.runtime != 'docker' }}
         env:
           # Needed for scalyr-tool
           scalyr_readlog_token: "${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}"
@@ -558,6 +557,12 @@ jobs:
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" message matches "Pod default/short-lived-job-2.* not found in K8s API. Including pod based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS=true."'
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" message matches "Pod default/short-lived-job-3.* not found in K8s API. Including pod based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS=true."'
           
+      - name: Check the short lived pods logs are ingested - log message
+        env:
+          # Needed for scalyr-tool
+          scalyr_readlog_token: "${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}"
+          SCALYR_AGENT_POD_NAME: "${{ env.SCALYR_AGENT_POD_NAME }}"
+        run: |
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" "Message from short-lived-container-1"'
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" "Message from short-lived-container-2"'
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" "Message from short-lived-container-3"'
