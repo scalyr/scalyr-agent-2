@@ -59,7 +59,7 @@ class WorkQueue():
 
 
 # A MixIn class used for adding a thread poll processing to a BaseServer (i.e. SyslogTCPServer, SyslogUDPServer)
-class ExecutorMixIn:
+class QueueMixin:
 
     # This is a MixIn class used to provide a SyslogUDPServer with a request queue.
     # Its main purpose is to provide a buffer for UDP requests to handle bursts of requests.
@@ -69,7 +69,7 @@ class ExecutorMixIn:
         self.__server_close_lock = threading.Lock()
 
         if global_config:
-            request_queue_size = global_config.syslog_socket_request_queue_size
+            request_queue_size = global_config.syslog_udp_socket_request_queue_size
             self._shutdown_grace_period = global_config.syslog_monitors_shutdown_grace_period
         else:
             request_queue_size = 500_000
