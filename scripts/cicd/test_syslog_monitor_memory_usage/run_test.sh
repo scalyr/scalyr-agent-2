@@ -2,6 +2,7 @@
 
 TCP_SERVERS=$1
 UDP_SERVERS=$2
+INTERVAL=$3
 
 echo_with_date() {
     date +"[%Y-%m-%d %H:%M:%S] $*"
@@ -18,7 +19,7 @@ function generate_config() {
 "scalyr_server": "agent.scalyr.com",
 "api_key": "$SCALYR_API_KEY",
 "log_rotation_max_bytes": "1073741824",
-"syslog_socket_request_queue_size": "10000",
+"syslog_udp_socket_request_queue_size": "100000",
 
 "server_attributes": {
    "serverHost": "github-action-memory-test"
@@ -58,21 +59,20 @@ CONFIG_FILE=agent.json
 python scalyr_agent/agent_main.py --config $CONFIG_FILE start
 
 
-RATE=10000
-INTERVAL=360
+RATE=2000
 MONITOR_INTERVAL=5
-MEM_ALLOWED=$((512*1024)) #0.5Gb
+MEM_ALLOWED=$((256*1024*$UDP_SERVERS)) # 256Mb per UDP server
 
 pids=()
 for N in `seq $TCP_SERVERS`;
 do
-	loggen --rate $RATE --interval $INTERVAL --stream --active-connections=5 -Q localhost $(($N+1600)) &
+	loggen --rate $(($RATE/$TCP_SERVERS)) --interval $INTERVAL --stream --active-connections=5 -Q localhost $(($N+1600)) &
 	pids+=($!)
 done
 
 for N in `seq $UDP_SERVERS`;
 do
-	loggen --rate $RATE --interval $INTERVAL --dgram --active-connections=5 -Q localhost $(($N+1500)) &
+	loggen --rate $(($RATE/$UDP_SERVERS)) --interval $INTERVAL --dgram --active-connections=5 -Q localhost $(($N+1500)) &
 	pids+=($!)
 done
 
@@ -83,7 +83,7 @@ while ps -p $pids > /dev/null; do
   if [ $MEM_USED -gt $MEM_ALLOWED ]
   then
     echo_with_date "Mem used: $MEM_USED kB > $MEM_ALLOWED kB => FAIL!"
-#    exit 1
+    exit 1
   else
     echo_with_date "Mem used: $MEM_USED kB <= $MEM_ALLOWED kB => OK"
   fi

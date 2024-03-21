@@ -56,10 +56,9 @@ from six.moves import range
 import six.moves.socketserver
 
 if six.PY2:
-    from scalyr_agent.builtin_monitors.thread_pool_dummy import ExecutorMixIn
+    from scalyr_agent.builtin_monitors.thread_pool_dummy import QueueMixin
 else:
-    import concurrent.futures
-    from scalyr_agent.builtin_monitors.thread_pool import ExecutorMixIn
+    from scalyr_agent.builtin_monitors.thread_pool import QueueMixin
 
 try:
     # Only available for python >= 3.6
@@ -1078,7 +1077,7 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
             return
 
 class SyslogUDPServer(
-    ExecutorMixIn, six.moves.socketserver.UDPServer
+    QueueMixin, six.moves.socketserver.UDPServer
 ):
     """Class that creates a UDP SocketServer on a specified port"""
 
@@ -1091,7 +1090,7 @@ class SyslogUDPServer(
             "UDP Server: binding socket to %s" % six.text_type(address),
         )
 
-        ExecutorMixIn.__init__(self, global_config=global_config)
+        QueueMixin.__init__(self, global_config=global_config)
 
         self.allow_reuse_address = True
         six.moves.socketserver.UDPServer.__init__(self, address, SyslogUDPHandler)
@@ -1105,7 +1104,7 @@ class SyslogUDPServer(
 
 
 class SyslogTCPServer(
-    six.moves.socketserver.TCPServer
+     six.moves.socketserver.TCPServer
 ):
     """Class that creates a TCP SocketServer on a specified port"""
 
@@ -1136,7 +1135,6 @@ class SyslogTCPServer(
         self.request_parser = request_parser
         self.message_delimiter = message_delimiter
 
-        # ExecutorMixIn.__init__(self, global_config=global_config)
         handler_cls = functools.partial(
             SyslogTCPHandler,
             request_parser=request_parser,

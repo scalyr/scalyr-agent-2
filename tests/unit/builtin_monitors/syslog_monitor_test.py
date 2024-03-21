@@ -190,7 +190,7 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
     class MockConfig():
         def __init__(self):
             self.syslog_monitors_shutdown_grace_period = 1
-            self.syslog_socket_request_queue_size = 10000
+            self.syslog_udp_socket_request_queue_size = 10000
 
     def __tcp_server(self, port, handling_time, global_config):
         server = SyslogTCPServer(

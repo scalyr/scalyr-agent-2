@@ -1526,9 +1526,9 @@ class Configuration(object):
         )
 
     @property
-    def syslog_socket_request_queue_size(self):
+    def syslog_udp_socket_request_queue_size(self):
         """Returns the configuration value for 'scalyr_server'."""
-        return self.__get_config().get_int("syslog_socket_request_queue_size", none_if_missing=True)
+        return self.__get_config().get_int("syslog_udp_socket_request_queue_size", none_if_missing=True)
 
     @property
     def check_remote_if_no_tty(self):
@@ -2297,7 +2297,7 @@ class Configuration(object):
         )
         # Defaults to about 130MB of memory per Syslog Server
         self.__verify_or_set_optional_int(
-            config, "syslog_socket_request_queue_size", 100000, description, apply_defaults, env_aware=True
+            config, "syslog_udp_socket_request_queue_size", 100000, description, apply_defaults, env_aware=True
         )
         self.__verify_or_set_optional_bool(
             config,
