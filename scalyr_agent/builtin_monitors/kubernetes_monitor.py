@@ -2291,9 +2291,7 @@ class CRIEnumerator(ContainerEnumerator):
                                 include_message = "Excluding pod based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS=false."
                             global_log.info(
                                 "Pod %s/%s not found in K8s API. %s"
-                                % (pod_namespace, pod_name, include_message),
-                                limit_once_per_x_secs=300,
-                                limit_key="404-include-by-default-" + str(k8s_include_by_default) + "-" + pod_name
+                                % (pod_namespace, pod_name, include_message)
                             )
                         else:
                             global_log.error(
