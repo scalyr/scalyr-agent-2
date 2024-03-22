@@ -30,7 +30,7 @@ jobs:
           github_token: ${{ github.token }}
 
   memory-usage:
-    name: Memory Usage - Python ${{ matrix.python-version }}
+    name: Memory Usage - Syslog Monitor - Python ${{ matrix.python-version }}
     runs-on: ubuntu-20.04
 
     needs: pre_job
