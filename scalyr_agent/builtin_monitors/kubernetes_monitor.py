@@ -2293,7 +2293,7 @@ class CRIEnumerator(ContainerEnumerator):
                                 "Pod %s/%s not found in K8s API. %s"
                                 % (pod_namespace, pod_name, include_message),
                                 limit_once_per_x_secs=300,
-                                limit_key=pod_name,
+                                limit_key="404-include-by-default-" + str(k8s_include_by_default) + "-" + pod_name
                             )
                         else:
                             global_log.error(

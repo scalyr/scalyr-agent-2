@@ -1494,9 +1494,9 @@ class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
         assert_has_calls_non_consecutive(
             logger,
             [
-                mock.call.info(StringMatcher("Excluding pod based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS=false.")),
+                mock.call.info(StringMatcher("Excluding pod based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS=false."), limit_key=mock.ANY, limit_once_per_x_secs=mock.ANY),
                 mock.call.error(mock.ANY, exc_info=self.K8sApiExceptionMatcher(401)),
-                mock.call.info(StringMatcher("Including pod based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS=true.")),
+                mock.call.info(StringMatcher("Including pod based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS=true."), limit_key=mock.ANY, limit_once_per_x_secs=mock.ANY),
                 mock.call.error(mock.ANY, exc_info=self.K8sApiExceptionMatcher(401)),
             ],
         )
