@@ -64,6 +64,8 @@ has the same effect as
 
     log.config.scalyr.com/include: false
 
+In an edge case when a short-lived container metadata is not available anymore via K8s API and some logs are found, they will be collected based on `k8s_include_all_containers` flag.
+
 By default the agent monitors the logs of all pods/containers, and you have to manually exclude
 pods/containers you don't want.  You can also set `k8s_include_all_containers: false` in the
 kubernetes_monitor monitor config section of `agent.d/docker.json`, in which case all containers are

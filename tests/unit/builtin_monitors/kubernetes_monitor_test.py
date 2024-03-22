@@ -77,6 +77,17 @@ from mock import patch
 from six.moves import range
 
 
+class StringMatcher():
+    def __init__(self, substring):
+        self.substring = substring
+
+    def __eq__(self, other):
+        return self.substring in other
+
+    def __repr__(self):
+        return "Contains \"%s\"" % self.substring
+
+
 class KubernetesMonitorTest(ScalyrTestCase):
     """Exercises various different user-agent fragments returned by KubernetesMonitor.
     Also captures the situation where the monitor is polled before the k8s cache has obtained a version,
@@ -1385,6 +1396,7 @@ class KubernetesContainerMetricsTest(ScalyrTestCase):
 
 
 class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
+
     class K8sApiExceptionMatcher:
         def __init__(self, status_code):
             self.status_code = status_code
@@ -1413,13 +1425,22 @@ class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
         global_config = self._create_test_configuration_instance()
         global_config.parse()
 
-        POD_NAME = "loggen-58c5486566-fdmzf"
-        NAMESPACE = "default"
-        CONTAINER_NAME = "random-logger"
-        CONTAINER_ID = "cont-1"
+        POD_NAME_1 = "loggen-58c5486566-fdmzf"
+        NAMESPACE_1 = "default"
+        CONTAINER_NAME_1 = "random-logger"
+        CONTAINER_ID_1 = "cont-1"
+
+        POD_NAME_2 = "loggen-58c5486566-xdegb"
+        NAMESPACE_2 = "default"
+        CONTAINER_NAME_2 = "random-logger"
+        CONTAINER_ID_2 = "cont-2"
+
 
         def mock_get_containers_from_filesystem(k8s_namespaces_to_include=None):
-            return [(POD_NAME, NAMESPACE, CONTAINER_NAME, CONTAINER_ID)] * 2
+            return [
+                (POD_NAME_1, NAMESPACE_1, CONTAINER_NAME_1, CONTAINER_ID_1),
+                (POD_NAME_2, NAMESPACE_2, CONTAINER_NAME_2, CONTAINER_ID_2)
+            ]
 
         k8s_cache = mock.Mock()
         k8s_cache.pod.side_effect = [
@@ -1446,29 +1467,36 @@ class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
         )
 
         assert (
-            cri.get_containers(k8s_cache=k8s_cache, k8s_include_by_default=True) == {}
+            CONTAINER_ID_1 in cri.get_containers(k8s_cache=k8s_cache, k8s_include_by_default=True)
         )
 
         assert (
             k8s_cache.pod.call_args_list
             == [
                 mock.call(
-                    NAMESPACE,
-                    POD_NAME,
+                    NAMESPACE_1,
+                    POD_NAME_1,
+                    mock.ANY,
+                    allow_expired=False,
+                    ignore_k8s_api_exception=False,
+                ),
+                mock.call(
+                    NAMESPACE_2,
+                    POD_NAME_2,
                     mock.ANY,
                     allow_expired=False,
                     ignore_k8s_api_exception=False,
                 )
             ]
-            * 4
+            * 2
         )
 
         assert_has_calls_non_consecutive(
             logger,
             [
-                mock.call.warning(mock.ANY, exc_info=self.K8sApiExceptionMatcher(404)),
+                mock.call.info(StringMatcher("Excluding pod based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS=false."), limit_key=mock.ANY, limit_once_per_x_secs=mock.ANY),
                 mock.call.error(mock.ANY, exc_info=self.K8sApiExceptionMatcher(401)),
-                mock.call.warning(mock.ANY, exc_info=self.K8sApiExceptionMatcher(404)),
+                mock.call.info(StringMatcher("Including pod based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS=true."), limit_key=mock.ANY, limit_once_per_x_secs=mock.ANY),
                 mock.call.error(mock.ANY, exc_info=self.K8sApiExceptionMatcher(401)),
             ],
         )

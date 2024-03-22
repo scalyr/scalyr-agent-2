@@ -2281,14 +2281,17 @@ class CRIEnumerator(ContainerEnumerator):
                         )
                     except k8s_utils.K8sApiException as e:
                         # If the pod details cannot be retrieved from the K8s API:
-                        # 404 - log warning
+                        # 404 - log warning, include based on k8s_include_by_default
                         # Otherwise (401 as per K8s Api documentation) - log error
                         # Exclude the pod
                         if e.status_code == 404:
-                            global_log.warning(
-                                "Pod %s/%s not found in K8s API. Excluding pod from collection."
-                                % (pod_namespace, pod_name),
-                                exc_info=e,
+                            if k8s_include_by_default:
+                                include_message = "Including pod based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS=true."
+                            else:
+                                include_message = "Excluding pod based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS=false."
+                            global_log.info(
+                                "Pod %s/%s not found in K8s API. %s"
+                                % (pod_namespace, pod_name, include_message)
                             )
                         else:
                             global_log.error(
@@ -2297,7 +2300,7 @@ class CRIEnumerator(ContainerEnumerator):
                                 exc_info=e,
                             )
 
-                        continue
+                            continue
 
                     if pod:
                         # check to see if we should exclude this container
@@ -2326,6 +2329,11 @@ class CRIEnumerator(ContainerEnumerator):
 
                         k8s_info["pod_info"] = pod
                         k8s_info["pod_uid"] = pod.uid
+                    else:
+                        # Pod not found by the API, including based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS
+                        if not k8s_include_by_default:
+                            continue
+
 
                 # add this container to the list of results
                 result[cid] = {
