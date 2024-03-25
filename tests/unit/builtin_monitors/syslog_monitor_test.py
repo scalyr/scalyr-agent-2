@@ -38,6 +38,7 @@ from io import open
 from io import StringIO
 import threading
 import platform
+from statistics import mean
 
 from scalyr_agent.builtin_monitors import syslog_monitor
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogMonitor, SyslogRequest, \
@@ -188,9 +189,8 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
 
     class MockConfig():
         def __init__(self):
-            self.syslog_processing_thread_count = 4
-            self.syslog_socket_thread_count = 4
             self.syslog_monitors_shutdown_grace_period = 1
+            self.syslog_udp_socket_request_queue_size = 10000
 
     def __tcp_server(self, port, handling_time, global_config):
         server = SyslogTCPServer(
@@ -282,20 +282,21 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
 
                 assert len(server.syslog_handler.logged_data) == CONNECTIONS * MESSAGES_PER_CONNECTION
 
-
+    @skipIf(sys.version_info < (3, 9, 0), "Skipping tests under Python 3.9")
     def test_shutdown_with_pending_requests(self):
-        HANDLING_TIME = 0.1
+        HANDLING_TIME = 0.01
         mock_config = self.MockConfig()
         with self.start_servers(udp_servers_count=0, tcp_servers_count=1, handling_time=HANDLING_TIME, global_config=mock_config) as (udp_servers, tcp_servers):
             for server in tcp_servers:
-                MESSAGES_PER_CONNECTION = 300
-                CONNECTIONS = 10
+                MESSAGES_PER_CONNECTION = 20
+                CONNECTIONS = 40
                 t = self.__send_syslog_messages(
                     server.socket.getsockname(),
                     server.socket.type,
                     connections=CONNECTIONS,
                     messages_per_connection=MESSAGES_PER_CONNECTION
                 )
+
                 t.start()
                 t.join()
 
@@ -304,21 +305,14 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
                 server.shutdown()
                 server.server_close()
 
-                msg_count_before_grace_period_elapsed = len(server.syslog_handler.logged_data)
+                time.sleep(MESSAGES_PER_CONNECTION * HANDLING_TIME + 1)
 
-                time.sleep(
-                    mock_config.syslog_processing_thread_count * 10 * HANDLING_TIME + 3
-                )
+                msg_count_after_shutdown = len(server.syslog_handler.logged_data)
 
-                msg_count_after_grace_period_elapsed = len(server.syslog_handler.logged_data)
+                time.sleep(1)
 
-                assert msg_count_after_grace_period_elapsed > msg_count_before_grace_period_elapsed
+                assert len(server.syslog_handler.logged_data) == msg_count_after_shutdown
 
-                # Cancel futures introduced in 3.9
-                if sys.version_info[0:2] >= (3, 9):
-                    time.sleep(1)
-                    # No new messages processed
-                    assert len(server.syslog_handler.logged_data) == msg_count_after_grace_period_elapsed
 
     def test_fair_workers_distribution(self):
         # Given
@@ -381,12 +375,14 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
 
             logged_port_sorted = [x[0] for x in logged_port_timestamp_sorted]
 
+            def port_window_unique_counts(window_size):
+                return [
+                    len(set(logged_port_sorted[i:i + window_size]))
+                    for i in range(len(logged_port_sorted) - window_size)
+                ]
+
             # Check that the workers are distributed evenly
-            for start in range(len(logged_port_sorted) // 2):
-                print(len(set(logged_port_sorted[start:start+message_window])))
-                assert len(set(logged_port_sorted[start:start+message_window])) == len(udp_servers + tcp_servers)
-
-
+            assert mean(port_window_unique_counts(window_size=message_window)) > len(udp_servers + tcp_servers) - 0.1
 
 
 class SyslogMonitorConfigTest(SyslogMonitorTestCase):

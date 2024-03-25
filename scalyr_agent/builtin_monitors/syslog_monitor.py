@@ -25,6 +25,8 @@ from __future__ import absolute_import
 
 from __future__ import print_function
 
+if False: # NOSONAR
+    from typing import Tuple, Optional
 
 from scalyr_agent import compat
 
@@ -54,10 +56,9 @@ from six.moves import range
 import six.moves.socketserver
 
 if six.PY2:
-    from scalyr_agent.builtin_monitors.thread_pool_dummy import ExecutorMixIn
+    from scalyr_agent.builtin_monitors.thread_pool_dummy import QueueMixin
 else:
-    import concurrent.futures
-    from scalyr_agent.builtin_monitors.thread_pool import ExecutorMixIn
+    from scalyr_agent.builtin_monitors.thread_pool import QueueMixin
 
 try:
     # Only available for python >= 3.6
@@ -584,21 +585,13 @@ class SyslogUDPHandler(six.moves.socketserver.BaseRequestHandler):
     a protocol neutral handler
     """
 
-    def __init__(self, request_processing_executor, request, client_address, server):
-        self.__request_processing_executor = request_processing_executor
+    def __init__(self, request, client_address, server):
+        # type: (socket.socket, Tuple[str, int], SyslogUDPServer) -> None
 
         if six.PY3:
             super(SyslogUDPHandler, self).__init__(request, client_address, server)
         else:
             six.moves.socketserver.BaseRequestHandler.__init__(self, request, client_address, server)
-
-    @staticmethod
-    def factory_method(request_processing_executor):
-        def create_handler(request, client_address, server):
-            return SyslogUDPHandler(request_processing_executor, request, client_address, server)
-
-        return create_handler
-
 
     def handle(self):
         data = six.ensure_text(self.request[0].strip(), "utf-8", errors="ignore")
@@ -608,12 +601,8 @@ class SyslogUDPHandler(six.moves.socketserver.BaseRequestHandler):
             "destport": self.server.server_address[1],
         }
 
-        if self.__request_processing_executor:
-            self.__request_processing_executor.submit(
-                self.server.syslog_handler.handle, data, extra
-            )
-        else:
-            self.server.syslog_handler.handle(data, extra)
+        # self.server.syslog_handler is of type SyslogHandler
+        self.server.syslog_handler.handle(data, extra)
 
 
 
@@ -986,16 +975,7 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
     # NOTE: Thole whole handler abstraction is not great since it means a new class instance for
     # each new connection.
 
-    class PreviousMessageHandlingError(Exception):
-        def __int__(self, message):
-            self.message = message
-
-        def __repr__(self):
-            return "PreviousMessageHandlingError: " + self.message
-
     def __init__(self, *args, **kwargs):
-        self.__request_processing_executor = kwargs.pop("request_processing_executor", None)
-
         self.request_parser = kwargs.pop("request_parser", "default")
         self.incomplete_frame_timeout = kwargs.pop("incomplete_frame_timeout", None)
         self.message_delimiter = kwargs.pop("message_delimiter", "\n")
@@ -1038,6 +1018,7 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
         )
 
     def _syslog_request_parser(self):
+        # self.server.syslog_handler is of type SyslogHandler
         if self.request_parser == "default":
             return SyslogRequestParser(
                 socket_client_address=self.client_address,
@@ -1065,36 +1046,6 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
         else:
             raise ValueError("Invalid request parser: %s" % (self.request_parser))
 
-    @staticmethod
-    def __worker(data_processor, data, last_processing_future):
-        # Hardcoded timeout total time to stop populating Thread Pool in case of a bug or an unexpected error
-        TIMEOUT_TOTAL_TIME = 10
-        CANCEL_FURTHER_PROCESSING_MSG = "Cancelling further processing for this request."
-        TIMEOUT_ERROR_MSG = "Timeout error while waiting for previous message being parsed. If the server is not shutting down, this may be a bug or an unexpected error." + " " + CANCEL_FURTHER_PROCESSING_MSG
-        CANCELLED_ERROR_MSG = "Future of the previous message parser cancelled. The server is probably shutting down. " + " " + CANCEL_FURTHER_PROCESSING_MSG
-        PREVIOUS_CANCELLED_ERROR_MSG = "Previous message parser encountered an error. " + " " + CANCEL_FURTHER_PROCESSING_MSG
-        GENERIC_EXCEPTION_MSG = "Exception from the previous message handler. " + " " + CANCEL_FURTHER_PROCESSING_MSG
-
-        try:
-            if last_processing_future:
-                try:
-                    last_processing_future.result(timeout=TIMEOUT_TOTAL_TIME)
-                except concurrent.futures.TimeoutError as e:
-                    global_log.warn(TIMEOUT_ERROR_MSG)
-                    raise SyslogTCPHandler.PreviousMessageHandlingError(TIMEOUT_ERROR_MSG)
-                except concurrent.futures.CancelledError as e:
-                    global_log.warn(CANCELLED_ERROR_MSG)
-                    raise SyslogTCPHandler.PreviousMessageHandlingError(CANCELLED_ERROR_MSG)
-                except SyslogTCPHandler.PreviousMessageHandlingError as e:
-                    global_log.debug(PREVIOUS_CANCELLED_ERROR_MSG, exc_info=e)
-                    raise SyslogTCPHandler.PreviousMessageHandlingError(PREVIOUS_CANCELLED_ERROR_MSG)
-                except Exception as e:
-                    global_log.error(GENERIC_EXCEPTION_MSG, exc_info=e)
-                    raise SyslogTCPHandler.PreviousMessageHandlingError(GENERIC_EXCEPTION_MSG)
-            data_processor(data)
-        except Exception as e:
-            global_log.error("Error in syslog handler worker: %s", six.text_type(e), exc_info=e)
-
     def handle(self):
         syslog_request = SyslogRequest(
             socket=self.request,
@@ -1107,30 +1058,16 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
             "SyslogTCPHandler.handle - created syslog_parser. Thread: %d",
             threading.current_thread().ident,
         )
-
         try:
-            if self.__request_processing_executor:
-                # Using last_future to ensure the data from one requests is processed in the same order as it was received
-                last_future = None
-                for data in self.__request_stream_read(syslog_request, self.server.is_running):
-                    try:
-                        last_future = self.__request_processing_executor.submit(self.__worker, syslog_parser.process, data, last_future)
-                    except RuntimeError:
-                        # There's no way of telling what happened to the executor, it does not have a specific exception class for this case.
-                        global_log.warn("Cannot submit futher data for processing. The server is probably shutting down.")
-                        break
-            else:
-                for data in self.__request_stream_read(syslog_request, self.server.is_running):
-                    try:
-                        syslog_parser.process(data)
-                    except Exception as e:
-                        global_log.warning(
-                            "Error processing request: %s\n\t%s",
-                            six.text_type(e),
-                            traceback.format_exc(),
-                        )
-
-
+            for data in self.__request_stream_read(syslog_request, self.server.is_running):
+                try:
+                    syslog_parser.process(data)
+                except Exception as e:
+                    global_log.warning(
+                        "Error processing request: %s\n\t%s",
+                        six.text_type(e),
+                        traceback.format_exc(),
+                    )
         except Exception as e:
             global_log.warning(
                 "Error reading request: %s\n\t%s",
@@ -1139,14 +1076,13 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
             )
             return
 
-
 class SyslogUDPServer(
-    ExecutorMixIn, six.moves.socketserver.UDPServer
+    QueueMixin, six.moves.socketserver.UDPServer
 ):
     """Class that creates a UDP SocketServer on a specified port"""
 
     def __init__(self, port, bind_address, verifier, global_config=None):
-
+        self.syslog_handler = None  # type: Optional[SyslogHandler]
         self.__verifier = verifier
         address = (bind_address, port)
         global_log.log(
@@ -1154,10 +1090,10 @@ class SyslogUDPServer(
             "UDP Server: binding socket to %s" % six.text_type(address),
         )
 
-        ExecutorMixIn.__init__(self, global_config=global_config)
+        QueueMixin.__init__(self, global_config=global_config)
 
         self.allow_reuse_address = True
-        six.moves.socketserver.UDPServer.__init__(self, address, SyslogUDPHandler.factory_method(self._request_processing_executor))
+        six.moves.socketserver.UDPServer.__init__(self, address, SyslogUDPHandler)
 
     def verify_request(self, request, client_address):
         return self.__verifier.verify_request(client_address)
@@ -1168,7 +1104,7 @@ class SyslogUDPServer(
 
 
 class SyslogTCPServer(
-    ExecutorMixIn, six.moves.socketserver.TCPServer
+     six.moves.socketserver.TCPServer
 ):
     """Class that creates a TCP SocketServer on a specified port"""
 
@@ -1184,6 +1120,7 @@ class SyslogTCPServer(
         message_delimiter="\n",
         global_config=None
     ):
+        self.syslog_handler = None  # type: Optional[SyslogHandler]
         self.__verifier = verifier
         address = (bind_address, port)
         global_log.log(
@@ -1198,10 +1135,8 @@ class SyslogTCPServer(
         self.request_parser = request_parser
         self.message_delimiter = message_delimiter
 
-        ExecutorMixIn.__init__(self, global_config=global_config)
         handler_cls = functools.partial(
             SyslogTCPHandler,
-            request_processing_executor=self._request_processing_executor,
             request_parser=request_parser,
             incomplete_frame_timeout=incomplete_frame_timeout,
             message_delimiter=message_delimiter,
@@ -2030,6 +1965,8 @@ class SyslogServer(object):
             )
 
         # create the syslog handler, and add to the list of servers
+        # TODO Setting the property here is very hacky and confusing, hopefully will be refactored one day.
+        # Later it's accessed from the SyslogTCPHandler and SyslogUDPHandler via self.server.syslog_handler
         server.syslog_handler = SyslogHandler(
             logger,
             line_reporter,
