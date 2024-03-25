@@ -25,6 +25,8 @@ from __future__ import absolute_import
 
 import uuid
 
+from scalyr_agent.json_lib import JsonObject
+
 __author__ = "czerwin@scalyr.com"
 
 import platform
@@ -187,7 +189,10 @@ class NewScalyrClientSession(object):
                 cert_path=str(configuration.ca_cert_path),
                 use_tls=configuration.new_ingestion_use_tls,
             )
-            manager_address = self._control_plane_client.send_client_hello()
+            (
+                manager_address,
+                self._line_matcher_config,
+            ) = self._control_plane_client.send_client_hello()
 
             self._data_plane_client = DataPlaneAPIClient(
                 api_token=str(configuration.api_key),
@@ -204,6 +209,11 @@ class NewScalyrClientSession(object):
             sequence_range_start=sequence_range_start,
             sequence_range_end=sequence_range_end,
         )
+
+    def get_line_matcher_config(self):
+        if self._line_matcher_config:
+            return JsonObject(self._line_matcher_config)
+        return JsonObject({})
 
 
 class ScalyrClientSession(object):
