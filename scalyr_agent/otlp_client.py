@@ -74,13 +74,17 @@ def _encode_value(value: Any) -> PB2AnyValue:
 def _encode_key_value(key: str, value: Any) -> PB2KeyValue:
     return PB2KeyValue(key=key, value=_encode_value(value))
 
-def _encode_attributes(attributes) -> Optional[List[PB2KeyValue]]:
+def _encode_attributes(attributes, log_attrs, session_info) -> Optional[List[PB2KeyValue]]:
+    pb2_attributes = []
     if attributes:
-        pb2_attributes = []
         for key, value in attributes.items():
             pb2_attributes.append(_encode_key_value(key, value))
-    else:
-        pb2_attributes = None
+    if log_attrs:
+        for key, value in log_attrs.items():
+            pb2_attributes.append(_encode_key_value(key, value))
+    if session_info:
+        for key, value in session_info.items():
+            pb2_attributes.append(_encode_key_value(key, value))
     return pb2_attributes
 
 
@@ -172,7 +176,7 @@ class OTLPClientSession(object):
         pass
 
     def add_events_request(self, session_info=None, max_size=1 * 1024 * 1024 * 1024):
-        return OTLPAddEventsRequest()
+        return OTLPAddEventsRequest(session_info, max_size)
 
     def send(self, add_events_request, block_on_response=True):
         try:
@@ -233,7 +237,7 @@ class OTLPClientSession(object):
         event.attrs.update(add_events_request.log_attrs)
         return LogRecord(time_unix_nano=event.timestamp,
                          body=PB2AnyValue(string_value=event.message),
-                         attributes=_encode_attributes(event.attrs))
+                         attributes=_encode_attributes(event.attrs, add_events_request.log_attrs, add_events_request.session_info))
 
 class OTLPResponse(object):
     def __init__(self, result):
@@ -243,7 +247,9 @@ class OTLPResponse(object):
         return (result, 0, result)
 
 class OTLPAddEventsRequest(object):
-    def __init__(self):
+    def __init__(self, session_info, max_size):
+        self.session_info = session_info
+        self.max_size = max_size
         self.current_size = 0
         self.total_events = 0
         self.thread_id = None
