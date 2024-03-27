@@ -30,14 +30,11 @@ __author__ = "czerwin@scalyr.com"
 import platform
 import re
 import socket
-import sys
 import time
 import io
-import ssl
 import os
 
 import six
-from six.moves import map
 from six.moves import range
 import six.moves.http_client
 
@@ -302,8 +299,8 @@ class ScalyrClientSession(object):
         self.__standard_headers = {
             "Connection": "Keep-Alive",
             "Accept": "application/json",
-            "User-Agent": self.__get_user_agent(
-                agent_version, sessions_api_keys_tuple=sessions_api_keys_tuple
+            "User-Agent": scalyr_util.get_user_agent(
+                agent_version, use_requests_lib, sessions_api_keys_tuple=sessions_api_keys_tuple
             ),
         }
 
@@ -392,8 +389,8 @@ class ScalyrClientSession(object):
         @param fragments String fragments to append (in order) to the standard user agent data
         @type fragments: List of six.text_type
         """
-        self.__standard_headers["User-Agent"] = self.__get_user_agent(
-            self.__agent_version, fragments
+        self.__standard_headers["User-Agent"] = scalyr_util.get_user_agent(
+            self.__agent_version, self.__use_requests, fragments
         )
 
     @property
@@ -451,7 +448,7 @@ class ScalyrClientSession(object):
             self.__last_connection_close is not None
             and current_time - self.__last_connection_close < 30
         ):
-            return self.__wrap_response_if_necessary(
+            return scalyr_util.wrap_response_if_necessary(
                 "client/connectionClosed", 0, "", block_on_response
             )
 
@@ -478,7 +475,7 @@ class ScalyrClientSession(object):
                     getattr(e, "error_code", "client/connectionFailed")
                     or "client/connectionFailed"
                 )
-                return self.__wrap_response_if_necessary(
+                return scalyr_util.wrap_response_if_necessary(
                     error_code, 0, "", block_on_response
                 )
 
@@ -591,7 +588,7 @@ class ScalyrClientSession(object):
                         "Failed to send request due to exception.  Closing connection, will re-attempt",
                         error_code="requestFailed",
                     )
-                return self.__wrap_response_if_necessary(
+                return scalyr_util.wrap_response_if_necessary(
                     "requestFailed", len(body_str), "", block_on_response
                 )
 
@@ -763,43 +760,6 @@ class ScalyrClientSession(object):
                 self.close(current_time=send_time)
             self.total_response_bytes_received += bytes_received
 
-    def __wrap_response_if_necessary(
-        self, status_message, bytes_sent, response, block_on_response
-    ):
-        """Wraps the response as appropriate based on whether or not the caller is expecting to block on the
-        response or not.
-
-        If the caller requested to not block on the response, then they are expecting a function to be returned
-        that, when invoked, will block and return the result.  If the caller did requested to block on the response,
-        then the response should be returned directly.
-
-        This is used to cover cases where there was an error and we do not have to block on the response from
-        the server.  Instead, we already have the response to return.  However, we still need to return the
-        right type of object to the caller.
-
-        @param status_message: The status message for the response.
-        @param bytes_sent: The number of bytes that were sent.
-        @param response: The response to return.
-        @param block_on_response: Whether or not the caller requested to block, waiting for the response.  This controls
-            whether or not a function is returned or just the response tuple directly.
-
-        @type status_message: str
-        @type bytes_sent: int
-        @type response: str
-        @type block_on_response: bool
-
-        @return: Either a func or a response tuple (status message, num of bytes sent, response body) depending on
-            the value of ``block_on_response``.
-        @rtype: func or (str, int, str)
-        """
-        if block_on_response:
-            return status_message, bytes_sent, response
-
-        def wrap():
-            return status_message, bytes_sent, response
-
-        return wrap
-
     def send(self, add_events_request, block_on_response=True):
         """Sends an AddEventsRequest to Scalyr.
 
@@ -877,151 +837,6 @@ class ScalyrClientSession(object):
             disable_logfile_addevents_format=self.__disable_logfile_addevents_format,
             enforce_monotonic_timestamps=self.__enforce_monotonic_timestamps,
         )
-
-    def __get_user_agent(
-        self, agent_version, fragments=None, sessions_api_keys_tuple=None
-    ):
-        """Determine the user agent to report in the request headers.
-
-        We construct an agent that gives Scalyr some information about the platform the customer is running on,
-        the Python version, and a few other tidbits.  This is used to make decisions about support issues.
-
-        @param agent_version: The agent version number.
-        @param fragments: Additional strings to be appended. Each will be preceded by a semicolon
-        @type agent_version: six.text_type
-        @type fragments: List of six.text_type
-
-        @return: The user agent string.
-        @rtype: six.text_type
-        """
-        # We will construct our agent string to look something like:
-        # Linux-redhat-7.0;python-2.7.2;agent-2.0.1;ssllib
-        # And for requests using requests library:
-        # Linux-redhat-7.0;python-2.7.2;agent-2.0.1;ssllib;requests-2.22.0
-
-        python_version = sys.version_info
-        if len(python_version) >= 5:
-            python_version_str = "python-%s.%s.%s" % (
-                python_version[0],
-                python_version[1],
-                python_version[2],
-            )
-        else:
-            python_version_str = "python-unknown"
-
-        # Try for a linux distribution first.  This doesn't seem to work for Amazon AMIs, but for most
-        # distributions it hopefully will provide something readable.
-        platform_value = None
-        # noinspection PyBroadException
-        try:
-            distribution = platform.dist()  # pylint: disable=no-member
-            if len(distribution[0]) > 0:
-                platform_value = "Linux-%s-%s" % (distribution[0], distribution[1])
-        except Exception:
-            platform_value = None
-
-        # Try Mac
-        if platform_value is None:
-            # noinspection PyBroadException
-            try:
-                mac_ver = platform.mac_ver()[0]
-                if len(mac_ver) > 0:
-                    platform_value = "MacOS-%s" % mac_ver
-            except Exception:
-                platform_value = None
-
-        # Fall back for all others.  This should print out something reasonable for
-        # Windows.
-        if platform_value is None:
-            platform_value = platform.platform(terse=1)
-
-        # Include openssl version if available
-        # Returns a tuple like this: (1, 1, 1, 8, 15)
-        openssl_version = getattr(ssl, "OPENSSL_VERSION_INFO", None)
-        if openssl_version:
-            try:
-                openssl_version_string = (
-                    ".".join([str(v) for v in openssl_version[:3]])
-                    + "-"
-                    + str(openssl_version[3])
-                )
-                openssl_version_string = "o-%s" % (openssl_version_string)
-            except Exception:
-                openssl_version_string = None
-        else:
-            openssl_version_string = None
-
-        # Include a string which indicates if the agent is running admin / root user
-        from scalyr_agent.platform_controller import PlatformController
-
-        try:
-            platform_controller = PlatformController.new_platform()
-            current_user = platform_controller.get_current_user()
-        except Exception:
-            # In some tests on Windows this can throw inside the tests so we ignore the error
-            current_user = "unknown"
-
-        if current_user in ["root", "Administrator"] or current_user.endswith(
-            "\\Administrators"
-        ):
-            # Indicates agent running as a privileged / admin user
-            user_string = "a-1"
-        else:
-            # Indicates agent running as a regular user
-            user_string = "a-0"
-
-        sharded_copy_manager_string = ""
-
-        # Possible values for this header fragment:
-        # mw-0 - Sharded copy manager functionality is disabled
-        # mw-1|<num_sessions>|<num_api_keys> - Functionality is enabled and there are <num_sessions>
-        # thread based sessions configured with <num_api_keys> unique API keys.
-        # mw-2|<num_sessions>|<num_api_keys> - Functionality is enabled and there are <num_sessions>
-        # process based sessions configured with <num_api_keys> unique API keys.
-        if (
-            sessions_api_keys_tuple
-            and isinstance(sessions_api_keys_tuple, tuple)
-            and len(sessions_api_keys_tuple) == 3
-            and sessions_api_keys_tuple[1] > 1
-        ):
-            (
-                worker_type,
-                workers_count,
-                api_keys_count,
-            ) = sessions_api_keys_tuple
-
-            if worker_type == "multiprocess":
-                sharded_copy_manager_string = "mw-2|"
-            else:
-                sharded_copy_manager_string = "mw-1|"
-
-            sharded_copy_manager_string += "%s|%s" % (workers_count, api_keys_count)
-        else:
-            sharded_copy_manager_string = "mw-0"
-
-        parts = [
-            platform_value,
-            python_version_str,
-            "agent-%s" % agent_version,
-        ]
-
-        if openssl_version_string:
-            parts.append(openssl_version_string)
-
-        if user_string:
-            parts.append(user_string)
-
-        if sharded_copy_manager_string:
-            parts.append(sharded_copy_manager_string)
-
-        if self.__use_requests:
-            import requests
-
-            parts.append("requests-%s" % (requests.__version__))
-
-        if fragments:
-            parts.extend(fragments)
-        return ";".join(map(six.text_type, parts))
 
     def perform_agent_version_check(self, track="stable"):
         """Query the Scalyr API to determine if a newer version is available"""

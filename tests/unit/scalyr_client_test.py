@@ -1017,7 +1017,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
 
     @skipIf(sys.version_info < (3, 7), "Only for Python >= 3.7")
     def test_get_user_agent_includes_requests_version(self):
-        scalyr_agent.scalyr_client.ssl.OPENSSL_VERSION_INFO = (1, 0, 2, 13, 13)
+        scalyr_agent.util.ssl.OPENSSL_VERSION_INFO = (1, 0, 2, 13, 13)
 
         # without requests
         session = ScalyrClientSession(

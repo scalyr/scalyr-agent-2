@@ -848,6 +848,10 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
             SOURCE_ROOT / "scalyr_agent/third_party/tcollector",
             third_party_libs_dir / "tcollector",
         )
+        shutil.copytree(
+            SOURCE_ROOT / "scalyr_agent/third_party/opentelemetry",
+            third_party_libs_dir / "opentelemetry",
+        )
         shutil.copy2(
             SOURCE_ROOT / "scalyr_agent/third_party/__init__.py",
             third_party_libs_dir / "__init__.py",

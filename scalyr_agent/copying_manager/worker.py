@@ -212,7 +212,8 @@ class AddEventsTask(object):
         # If there is a AddEventsTask object already created for the next request due to pipelining, this is set to it.
         # This must be the next request if this request is successful, otherwise, we will lose bytes.
         self.next_pipelined_task = None
-
+        # last status
+        self.receive_response_status = ()
 
 class CopyingManagerWorkerSessionInterface(six.with_metaclass(ABCMeta)):
     """
@@ -489,9 +490,10 @@ class CopyingManagerWorkerSession(
                         # on the ground and advance.
                         if current_time - last_success > self.__config.max_retry_time:
                             if self.__pending_add_events_task is not None:
+
                                 if (
                                     "parseResponseFailed"
-                                    in self.__pending_add_events_task.__receive_response_status
+                                    in self.__pending_add_events_task.receive_response_status
                                 ):
                                     log.error(
                                         "Repeatedly failed to parse response due to exception.  Dropping events",
@@ -586,7 +588,7 @@ class CopyingManagerWorkerSession(
                                 full_response = ""
                             else:
                                 (result, bytes_sent, full_response) = get_response()
-                                self.__pending_add_events_task.__receive_response_status = (
+                                self.__pending_add_events_task.receive_response_status = (
                                     result
                                 )
                             blocking_response_time_end = time.time()
@@ -1226,8 +1228,12 @@ class CopyingManagerWorkerSession(
         """
         api_key = self.__worker_config_entry["api_key"]
         if self.__config.use_new_ingestion:
-
             self.__new_scalyr_client = create_new_client(self.__config, api_key=api_key)
+        elif self.__config.transport == "otlp":
+            from scalyr_agent.otlp_client import (
+                create_otlp_client,
+            )
+            self.__scalyr_client = create_otlp_client(self.__config, self.__worker_config_entry)
         else:
             self.__scalyr_client = create_client(
                 self.__config,
