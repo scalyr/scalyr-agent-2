@@ -70,6 +70,7 @@ class ContainerisedAgentBuilder(Builder):
 
     BASE_DISTRO: str
     TAG_SUFFIXES: List[str]
+    AGENT_REQUIREMENTS_EXCLUDE = []
 
     def __init__(self, base_image):
         super(ContainerisedAgentBuilder, self).__init__()
@@ -107,6 +108,15 @@ class ContainerisedAgentBuilder(Builder):
             capture_output=True,
             build_args=self.__build_args
         )
+
+    def __agent_requirements(self):
+        return "\n".join([
+            dependency
+            for dependency in AGENT_REQUIREMENTS.split("\n")
+            if not any(
+                dependency.startswith(excluded) for excluded in self.__class__.AGENT_REQUIREMENTS_EXCLUDE
+            )
+        ])
 
     def build_requirement_libs(
             self,
@@ -154,7 +164,7 @@ class ContainerisedAgentBuilder(Builder):
             context_path=_PARENT_DIR,
             architectures=[architecture],
             build_args={
-                "AGENT_REQUIREMENTS": AGENT_REQUIREMENTS,
+                "AGENT_REQUIREMENTS": self.__agent_requirements(),
                 "TEST_REQUIREMENTS": test_requirements,
             },
             build_contexts={
@@ -493,6 +503,9 @@ def _arch_to_target_arch_and_variant(architecture: CpuArch):
 # Create all image builder classes and make them available from this global collection.
 CONTAINERISED_AGENT_BUILDERS: Dict[str, Type[ContainerisedAgentBuilder]] = {}
 
+requirement_libs_exclude = {
+    "alpine": ["orjson", "lz4", "zstandard"]
+}
 
 for base_distro in ["ubuntu", "alpine"]:
     tag_suffixes = [f"-{base_distro}"]
@@ -505,6 +518,8 @@ for base_distro in ["ubuntu", "alpine"]:
         NAME = name
         BASE_DISTRO = base_distro
         TAG_SUFFIXES = tag_suffixes[:]
+        AGENT_REQUIREMENTS_EXCLUDE = requirement_libs_exclude.get(base_distro, [])
+
 
     CONTAINERISED_AGENT_BUILDERS[name] = _ContainerisedAgentBuilder
 
