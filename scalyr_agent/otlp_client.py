@@ -79,11 +79,11 @@ def _encode_attributes(attributes, log_attrs, session_info) -> Optional[List[PB2
     if attributes:
         for key, value in attributes.items():
             pb2_attributes.append(_encode_key_value(key, value))
-    if log_attrs:
-        for key, value in log_attrs.items():
-            pb2_attributes.append(_encode_key_value(key, value))
     if session_info:
         for key, value in session_info.items():
+            pb2_attributes.append(_encode_key_value(key, value))
+    if log_attrs:
+        for key, value in log_attrs.items():
             pb2_attributes.append(_encode_key_value(key, value))
 
     return pb2_attributes
