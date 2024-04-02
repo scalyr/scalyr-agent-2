@@ -1,6 +1,14 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.2.13 "Killian" - Mar 30, 2024
+<!---
+Packaged by Ales Novak <ales.novak@sentinelone.com> on Mar 30, 2024 00:00 -0800
+--->
+
+Feature:
+* Kubernetes Monitor - when K8s Pod API returnes 404, the logs are ingested based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS regardless of pods annotations. Short-lived pods are usually affected.
+
 
 ## 2.2.12 "Gizmo" - Feb 29, 2024
 <!---

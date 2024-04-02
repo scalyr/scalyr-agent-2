@@ -3,8 +3,6 @@ RUN python3 -m pip install --upgrade setuptools pip --root /tmp/requrements_root
 RUN cp -a /tmp/requrements_root/. /
 ARG AGENT_REQUIREMENTS
 RUN echo "${AGENT_REQUIREMENTS}" > /tmp/requirements.txt
-RUN echo Installing Agent requirements for platfor_system:
-RUN python3 -c "import platform; print(platform.system())"
 RUN python3 -m pip install -r /tmp/requirements.txt --root /tmp/requrements_root
 ARG TEST_REQUIREMENTS
 RUN echo "${TEST_REQUIREMENTS}" > /tmp/test_requirments.txt
