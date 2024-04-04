@@ -75,17 +75,16 @@ def _encode_key_value(key: str, value: Any) -> PB2KeyValue:
     return PB2KeyValue(key=key, value=_encode_value(value))
 
 def _encode_attributes(attributes, log_attrs, session_info) -> Optional[List[PB2KeyValue]]:
-    pb2_attributes = []
+    attrs_to_send = {}
     if attributes:
-        for key, value in attributes.items():
-            pb2_attributes.append(_encode_key_value(key, value))
+        attrs_to_send.update(attributes)
     if session_info:
-        for key, value in session_info.items():
-            pb2_attributes.append(_encode_key_value(key, value))
+        attrs_to_send.update(session_info)
     if log_attrs:
-        for key, value in log_attrs.items():
-            pb2_attributes.append(_encode_key_value(key, value))
-
+        attrs_to_send.update(log_attrs)
+    pb2_attributes = []
+    for key, value in attrs_to_send.items():
+        pb2_attributes.append(_encode_key_value(key, value))
     return pb2_attributes
 
 
