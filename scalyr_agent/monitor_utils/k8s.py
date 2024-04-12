@@ -819,12 +819,12 @@ class _K8sCache(object):
         )
         if result:
             global_log.log(
-                scalyr_logging.DEBUG_LEVEL_0,
+                scalyr_logging.DEBUG_LEVEL_2,
                 "cache hit for %s %s/%s (allow_expired=%s)"
                 % (kind, namespace, name, allow_expired),
             )
             global_log.log(
-                scalyr_logging.DEBUG_LEVEL_0,
+                scalyr_logging.DEBUG_LEVEL_2,
                 "cache value for %s %s/%s: %s (allow_expired=%s)"
                 % (kind, namespace, name, result, allow_expired),
             )
@@ -832,7 +832,7 @@ class _K8sCache(object):
 
         # we have a cache miss so query the object individually
         global_log.log(
-            scalyr_logging.DEBUG_LEVEL_0,
+            scalyr_logging.DEBUG_LEVEL_2,
             "cache miss for %s %s/%s" % (kind, namespace, name),
         )
 
