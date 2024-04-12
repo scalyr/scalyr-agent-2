@@ -615,7 +615,7 @@ jobs:
           SCALYR_API_KEY_READ_TEAM_5: "${{ secrets.SCALYR_API_KEY_READ_5 }}"
           SCALYR_API_KEY_READ_TEAM_6: "${{ secrets.SCALYR_API_KEY_READ_6 }}"
           SCALYR_API_KEY_READ_TEAM_7: "${{ secrets.SCALYR_API_KEY_READ_7 }}"
-          SERVER_HOST_NAME: "${{ env.SCALYR_AGENT_POD_NAME }}"
+          SERVER_HOST: "${{ env.SCALYR_AGENT_POD_NAME }}"
           ACCOUNT_NAME_1: "cloudtech-testing@scalyr.com"
           ACCOUNT_NAME_2: "cloudtech-testing-2@scalyr.com"
           ACCOUNT_NAME_3: "cloudtech-testing-3@scalyr.com"
