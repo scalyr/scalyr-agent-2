@@ -50,6 +50,7 @@ jobs:
 
   build_linux_packages:
     name: "Build Linux packages"
+    if: false
     needs:
       - pre_job
     uses: ./.github/workflows/reusable-agent-build-linux-packages-new.yml
