@@ -436,6 +436,15 @@ define_config_option(
     default=False,
 )
 
+define_config_option(
+    __monitor__,
+    "k8s_omit_labels",
+    "Optional, (defaults to False). Specifies a list of K8s labels to be ignored and not added to logs.",
+    convert_to=ArrayOfStrings,
+    default=["com.scalyr.config.*"],
+    env_aware=True,
+)
+
 # for now, always log timestamps to help prevent a race condition
 # define_config_option( __monitor__, 'log_timestamps',
 #                     'Optional (defaults to False). If true, stdout/stderr logs will contain docker timestamps at the beginning of the line\n',
