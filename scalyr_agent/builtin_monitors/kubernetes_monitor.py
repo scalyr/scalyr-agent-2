@@ -18,6 +18,7 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 
 import base64
+from dataclasses import field
 
 if False:  # NOSONAR
     from typing import Dict, List, Optional
@@ -2979,6 +2980,7 @@ class ContainerChecker(object):
         # store the digests from the previous iteration of the main loop to see
         # if any pod information has changed
         prev_digests = {}
+        prev_digests_namespaces = {}
         base_attributes = self.__get_base_attributes()
         previous_time = time.time() - self._config.get(
             "initial_stopped_container_collection_window"
@@ -2988,7 +2990,7 @@ class ContainerChecker(object):
             try:
 
                 self._logger.log(
-                    scalyr_logging.DEBUG_LEVEL_2,
+                    scalyr_logging.DEBUG_LEVEL_0,
                     "Attempting to retrieve list of containers:",
                 )
 
@@ -3010,67 +3012,100 @@ class ContainerChecker(object):
                 # continue using the previous list of containers
                 if running_containers is None:
                     self._logger.log(
-                        scalyr_logging.DEBUG_LEVEL_2, "Failed to get list of containers"
+                        scalyr_logging.DEBUG_LEVEL_0, "Failed to get list of containers"
                     )
                     running_containers = self.containers
 
                 self._logger.log(
-                    scalyr_logging.DEBUG_LEVEL_2,
+                    scalyr_logging.DEBUG_LEVEL_0,
                     "Found %d containers" % len(running_containers),
                 )
                 # get the containers that have started since the last sample
                 starting = {}
                 changed = {}
                 digests = {}
+                digests_namespaces = {}
 
                 for cid, info in six.iteritems(running_containers):
+                    self._logger.log(
+                        scalyr_logging.DEBUG_LEVEL_0,
+                        "Processing CID %s" % str(cid)
+                    )
+
                     pod = None
+                    namespace = None
                     if "k8s_info" in info:
+                        self._logger.log(
+                            scalyr_logging.DEBUG_LEVEL_0,
+                            "k8s_info present for container %s" % cid,
+                        )
+
                         pod = info["k8s_info"].get("pod_info", None)
+
+                        pod_namespace = info["k8s_info"].get(
+                            "pod_namespace", "invalid_namespace"
+                        )
+
+                        if pod:
+                            self._logger.log(
+                                scalyr_logging.DEBUG_LEVEL_0,
+                                "Pod digest %s" % str(pod.digest),
+                            )
 
                         if not pod:
                             # For now this message is only logged under debug and not warning
                             pod_name = info["k8s_info"].get("pod_name", "invalid_pod")
-                            pod_namespace = info["k8s_info"].get(
-                                "pod_namespace", "invalid_namespace"
-                            )
                             # NOTE(Tomaz): To avoid logger key cache from growing very large we
                             # should likely periodically remove old entries.
                             self._logger.log(
-                                scalyr_logging.DEBUG_LEVEL_2,
+                                scalyr_logging.DEBUG_LEVEL_0,
                                 "No pod info for container %s.  pod: '%s/%s'"
                                 % (_get_short_cid(cid), pod_namespace, pod_name),
                                 limit_once_per_x_secs=300,
                                 limit_key="check-container-pod-info-%s" % cid,
                             )
 
+                        namespace = self.k8s_cache.namespace(pod_namespace, current_time=current_time, allow_expired=False)
+                        if namespace:
+                            self._logger.log(
+                                scalyr_logging.DEBUG_LEVEL_0,
+                                "!! Namespace %s digest %s" % (pod_namespace, str(namespace.digest)),
+                            )
+                        else:
+                            self._logger.log(
+                                scalyr_logging.DEBUG_LEVEL_0,
+                                "Namespace %s not found" % str(pod_namespace),
+                            )
+
                     # start the container if have a container that wasn't running
                     if cid not in self.containers:
                         self._logger.log(
-                            scalyr_logging.DEBUG_LEVEL_1,
+                            scalyr_logging.DEBUG_LEVEL_0,
                             "Starting loggers for container '%s'" % info["name"],
                         )
                         starting[cid] = info
-                    elif cid in prev_digests:
+                    elif cid in prev_digests or cid in prev_digests_namespaces:
                         # container was running and it exists in the previous digest dict, so see if
                         # it has changed
-                        if pod and prev_digests[cid] != pod.digest:
+                        if pod and prev_digests[cid] != pod.digest or namespace and prev_digests_namespaces[cid] != namespace.digest:
                             self._logger.log(
-                                scalyr_logging.DEBUG_LEVEL_1,
-                                "Pod digest changed for '%s'" % info["name"],
+                                scalyr_logging.DEBUG_LEVEL_0,
+                                "!!!!!!! Pod or namespace digest changed for '%s/%s'" % (namespace.name, info["name"]),
                             )
                             changed[cid] = info
 
                     # store the digest from this iteration of the loop
                     if pod:
                         digests[cid] = pod.digest
+                    if namespace:
+                        digests_namespaces[cid] = namespace.digest
 
                 # get the containers that have stopped
                 stopping = {}
                 for cid, info in six.iteritems(self.containers):
                     if cid not in running_containers:
                         self._logger.log(
-                            scalyr_logging.DEBUG_LEVEL_1,
+                            scalyr_logging.DEBUG_LEVEL_0,
                             "Stopping logger for container '%s' (%s)"
                             % (info["name"], cid[:6]),
                         )
@@ -3088,6 +3123,7 @@ class ContainerChecker(object):
                 self.__start_loggers(starting, self.k8s_cache)
 
                 prev_digests = digests
+                prev_digests_namespaces = digests_namespaces
 
                 # update the log config for any changed containers
                 if self.__log_watcher:
@@ -3111,7 +3147,7 @@ class ContainerChecker(object):
                         "log watcher not set, can't update log config for changed containers",
                     )
             except Exception as e:
-                self._logger.warn(
+                self._logger.exception(
                     "Exception occurred when checking containers %s\n%s"
                     % (six.text_type(e), traceback.format_exc())
                 )
@@ -3254,10 +3290,14 @@ class ContainerChecker(object):
         }
 
         k8s_info = info.get("k8s_info", {})
+        namespace_annotations = {}
 
         if k8s_info:
             pod_name = k8s_info.get("pod_name", "invalid_pod")
             pod_namespace = k8s_info.get("pod_namespace", "invalid_namespace")
+
+            namespace_annotations = k8s_cache.namespace(pod_namespace).annotations
+
             self._logger.log(
                 scalyr_logging.DEBUG_LEVEL_1,
                 "got k8s info for container %s, '%s/%s'"
@@ -3431,6 +3471,8 @@ class ContainerChecker(object):
             # everything else is added to the log_config result as is
             result[key] = value
 
+
+
         # Perform variable substitution for rename_logfile
         if "rename_logfile" in result:
             template = Template(result["rename_logfile"])
@@ -3463,8 +3505,41 @@ class ContainerChecker(object):
 
         # Based on the pod annotations in a format {container_name}.{team}.secret={secret_name}
         # we might want to add api_keys parameter
-        if container_annotations or all_annotations:
-            api_keys = self.__container_api_keys_from_annotations(k8s_cache, pod_namespace, pod_name, container_annotations, all_annotations)
+
+        if container_annotations or all_annotations or namespace_annotations:
+
+            api_keys = self.__container_api_keys_from_annotations(k8s_cache, pod_namespace, container_annotations)
+            self._logger.log(
+                scalyr_logging.DEBUG_LEVEL_2,
+                "Found %d api keys for '%s/%s' pod based on container level annotations."
+                % (
+                    len(api_keys or []),
+                    pod_namespace,
+                    pod_name
+                ),
+            )
+            if not api_keys:
+                api_keys = self.__container_api_keys_from_annotations(k8s_cache, pod_namespace, all_annotations)
+                self._logger.log(
+                    scalyr_logging.DEBUG_LEVEL_2,
+                    "Found %d api keys for '%s/%s' pod based on pod level annotations."
+                    % (
+                        len(api_keys or []),
+                        pod_namespace,
+                        pod_name
+                    ),
+                )
+            if not api_keys:
+                api_keys = self.__container_api_keys_from_annotations(k8s_cache, pod_namespace, namespace_annotations)
+                self._logger.log(
+                    scalyr_logging.DEBUG_LEVEL_2,
+                    "Found %d api keys for '%s/%s' pod based on namespace level annotations."
+                    % (
+                        len(api_keys or []),
+                        pod_namespace,
+                        pod_name
+                    ),
+                )
 
             if api_keys:
                 # Multiple matching api keys will result in multiple log configs, which will differ in the api_key field only.
@@ -3475,58 +3550,54 @@ class ContainerChecker(object):
 
         return results
 
-    def __container_api_keys_from_annotations(self, k8s_cache, pod_namespace, pod_name, container_annotations, all_annotations):
+    def __container_api_keys_from_annotations(self, k8s_cache, namespace, annotations):
         def fetch_secret(name):
-            secret = k8s_cache.secret(self.__agent_pod.namespace, name, time.time())
-            if secret:
-                return secret
+            if not name:
+                return None
+            try:
+                secret = k8s_cache.secret(namespace, name, time.time())
+                if secret:
+                    return secret
+            except k8s_utils.K8sApiNotFoundException as e:
+                self._logger.warning(
+                    "Failed to fetch secret '%s/%s' (API returned Not found) ignoring."
+                    % (namespace, name),
+                    limit_once_per_x_secs=300,
+                    limit_key="k8s-fetch-secret-%s/%s" % (namespace, name),
+                )
 
             self._logger.warning(
-                "Failed to fetch secret '%s' for pod '%s/%s', ignoring."
-                % (name, pod_namespace, pod_name),
+                "Failed to fetch secret '%s/%s', ignoring."
+                % (namespace, name),
                 limit_once_per_x_secs=300,
-                limit_key="k8s-fetch-secret-%s" % name,
+                limit_key="k8s-fetch-secret-%s/%s" % (namespace, name),
             )
 
         def get_secret_api_key(secret):
+            if not secret:
+                return None
             api_key = base64.b64decode(secret.data.get("scalyr-api-key")).decode("utf-8")
 
             if not api_key:
                 self._logger.warning(
                     "Secret '%s/%s' does not contain a scalyr-api-key field, ingoring."
-                    % (pod_namespace, secret.name),
+                    % (namespace, secret.name),
                     limit_once_per_x_secs=300,
                     limit_key="k8s-fetch-secret-%s" % secret.name
                 )
 
             return api_key
 
-        container_teams = container_annotations.get("teams", {})
-        default_teams = all_annotations.get("teams", {})
-
-        secret_names = [
-            team["secret"]
-            for team in container_teams
-            if "secret" in team
-        ]
-
-        if not secret_names:
-            secret_names = [
-                team["secret"]
-                for team in default_teams
-                if "secret" in team
-            ]
-
         api_keys = [
-            get_secret_api_key(
-                fetch_secret(
-                    secret_name
-                )
-            )
-            for secret_name in secret_names
+            get_secret_api_key(fetch_secret(team.get("secret")))
+            for team in annotations.get("teams", {})
         ]
 
-        return list(filter(lambda api_key: api_key is not None, api_keys))
+        return [
+            api_key
+            for api_key in api_keys
+            if api_key
+        ]
 
     def __get_docker_logs(self, containers, k8s_cache):
         # type: (Dict, KubernetesCache) -> List[DockerLog]

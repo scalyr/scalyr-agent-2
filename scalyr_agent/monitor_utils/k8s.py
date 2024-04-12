@@ -102,6 +102,13 @@ _OBJECT_ENDPOINTS = {
         "list": Template("/api/v1/namespaces/${namespace}/pods"),
         "list-all": "/api/v1/pods",
     },
+    "Namespace": {
+        "single": Template(
+            "/api/v1/namespaces/${namespace}"
+        ),
+        "list": "/api/v1/namespaces",
+        "list-all": "/api/v1/namespaces",
+    },
     "Secret": {
         "single": Template("/api/v1/namespaces/${namespace}/secrets/${name}"),
         "list": Template("/api/v1/namespaces/${namespace}/secrets"),
@@ -812,12 +819,12 @@ class _K8sCache(object):
         )
         if result:
             global_log.log(
-                scalyr_logging.DEBUG_LEVEL_2,
+                scalyr_logging.DEBUG_LEVEL_0,
                 "cache hit for %s %s/%s (allow_expired=%s)"
                 % (kind, namespace, name, allow_expired),
             )
             global_log.log(
-                scalyr_logging.DEBUG_LEVEL_2,
+                scalyr_logging.DEBUG_LEVEL_0,
                 "cache value for %s %s/%s: %s (allow_expired=%s)"
                 % (kind, namespace, name, result, allow_expired),
             )
@@ -825,7 +832,7 @@ class _K8sCache(object):
 
         # we have a cache miss so query the object individually
         global_log.log(
-            scalyr_logging.DEBUG_LEVEL_2,
+            scalyr_logging.DEBUG_LEVEL_0,
             "cache miss for %s %s/%s" % (kind, namespace, name),
         )
 
@@ -875,6 +882,90 @@ class _K8sProcessor(object):
         @return a python object relevant to the
         """
         raise NotImplementedError("process_object not implemented for _K8sProcessor")
+
+
+class NamespaceInfo():
+
+    @staticmethod
+    def __flatten_dict(dict_to_flatten):
+        flattened = []
+        for key in sorted(dict_to_flatten.keys()):
+            flattened.append(key)
+            flattened.append(six.text_type(dict_to_flatten[key]))
+
+        return "".join(flattened)
+    def __init__(self, name, uid, labels, annotations, spec):
+        self.name = name
+        self.namespace = name
+        self.uid = uid
+        self.labels = labels
+        self.annotations = annotations
+        self.spec = spec
+
+        md5 = hashlib.md5()
+        md5.update(name.encode("utf-8"))
+        md5.update(uid.encode("utf-8"))
+
+        md5.update(self.__flatten_dict(labels).encode("utf-8"))
+        md5.update(self.__flatten_dict(annotations).encode("utf-8"))
+
+        self.digest = md5.digest()
+
+
+class NamespaceProcessor(_K8sProcessor):
+    def __init__(self, controllers):
+        super(NamespaceProcessor, self).__init__()
+
+    def process_object(self, k8s, obj, query_options=None):
+        """Generate a NamespaceInfo object from a JSON object
+        @param k8s: a KubernetesApi object
+        @param obj: The JSON object returned as a response to querying
+            a specific namespace from the k8s API
+
+        @return A NamespaceInfo object
+        """
+        metadata = obj.get("metadata", {})
+        spec = obj.get("spec", {})
+        labels = metadata.get("labels", {})
+        annotations = metadata.get("annotations", {})
+        namespace_name = metadata.get("name", "")
+
+        global_log.log(
+            scalyr_logging.DEBUG_LEVEL_0,
+            "!! Processing Namespace %s" % namespace_name
+        )
+
+        global_log.log(
+            scalyr_logging.DEBUG_LEVEL_2,
+            "Namespace %s metadata: %s" % (namespace_name, six.text_type(metadata)),
+        )
+
+        try:
+            annotations = annotation_config.process_annotations(annotations)
+        except BadAnnotationConfig as e:
+            global_log.warning(
+                "Bad Annotation config for %s.  All annotations ignored. %s"
+                % (namespace_name, six.text_type(e)),
+                limit_once_per_x_secs=300,
+                limit_key="bad-annotation-config-%s"
+                          % metadata.get("uid", "invalid-uid"),
+            )
+            annotations = JsonObject()
+
+        global_log.log(
+            scalyr_logging.DEBUG_LEVEL_2,
+            "Processed annotations: %s" % (six.text_type(annotations)),
+        )
+
+        # create the NamespaceInfo
+        result = NamespaceInfo(
+            name=namespace_name,
+            uid=metadata.get("uid", ""),
+            labels=labels,
+            annotations=annotations,
+            spec=spec
+        )
+        return result
 
 
 class PodProcessor(_K8sProcessor):
@@ -982,6 +1073,12 @@ class PodProcessor(_K8sProcessor):
 
         pod_name = metadata.get("name", "")
         namespace = metadata.get("namespace", "")
+
+
+        global_log.log(
+            scalyr_logging.DEBUG_LEVEL_0,
+            "!!! Processing POD %s" % pod_name,
+        )
 
         controller = self._get_controller_from_owners(
             k8s, owners, namespace, query_options=query_options
@@ -1320,6 +1417,9 @@ class KubernetesCache(object):
         self._pod_processor = PodProcessor(self._controllers)
         self._pods_cache = _K8sCache(self._pod_processor, "Pod")
 
+        # create the namespace cache
+        self._namespace_cache = _K8sCache(NamespaceProcessor(self._controllers), "Namespace")
+
         # create the secret cache
         self._secret_processor = SecretProcessor()
         self._secrets_cache = _K8sCache(self._secret_processor, "Secret")
@@ -1604,6 +1704,7 @@ class KubernetesCache(object):
                 )
                 self._pods_cache.mark_as_expired(current_time)
                 self._secrets_cache.mark_as_expired(current_time)
+                self._namespace_cache.mark_as_expired(current_time)
 
                 self._update_cluster_name(local_state.k8s)
                 self._update_api_server_version_if_necessary(
@@ -1620,6 +1721,8 @@ class KubernetesCache(object):
                     # purge any pods that haven't been queried within the cache_purge_secs
                     global_log.log(scalyr_logging.DEBUG_LEVEL_1, "Purging stale pods")
                     self._pods_cache.purge_unused(last_purge)
+                    self._secrets_cache.purge_unused(last_purge)
+                    self._namespace_cache.purge_unused(last_purge)
                     last_purge = current_time
 
             except K8sApiException as e:
@@ -1678,7 +1781,6 @@ class KubernetesCache(object):
             kind="Secret",
             allow_expired=allow_expired
         )
-        global_log.info("Secret %s/%s: %s" % (namespace, name, result.data))
         return result
 
     def pod(
@@ -1712,6 +1814,41 @@ class KubernetesCache(object):
             namespace,
             name,
             kind="Pod",
+            allow_expired=allow_expired,
+            query_options=query_options,
+            ignore_k8s_api_exception=ignore_k8s_api_exception,
+        )
+
+    def namespace(
+        self,
+        name,
+        current_time=None,
+        allow_expired=True,
+        query_options=None,
+        ignore_k8s_api_exception=False,
+    ):
+        """Returns pod info for the pod specified by namespace and name or None if no pad matches.
+
+        Warning: Failure to pass current_time leads to incorrect recording of last access times, which will
+        lead to these objects being refreshed prematurely (potential source of bugs)
+
+        Querying the pod information is thread-safe, but the returned object should
+        not be written to.
+
+        @param allow_expired: If True, an object is considered present in cache even if it is expired.
+        @type allow_expired: bool
+        """
+        local_state = self._state.copy_state()
+
+        if local_state.k8s is None:
+            return
+
+        return self._namespace_cache.lookup(
+            local_state.k8s,
+            current_time,
+            name,
+            name,
+            kind="Namespace",
             allow_expired=allow_expired,
             query_options=query_options,
             ignore_k8s_api_exception=ignore_k8s_api_exception,

@@ -1,0 +1,7 @@
+apiVersion: v2
+name: multi-account-test-chart
+description: A Helm chart for Multi Account Test
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+

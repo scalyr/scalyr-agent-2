@@ -381,7 +381,6 @@ jobs:
           minikube image ls
           kubectl apply -f tests/e2e/k8s_k8s_monitor/std_printer_deployment.yaml
           kubectl apply -f tests/e2e/k8s_k8s_monitor/long_message_printer_deployment.yaml
-          kubectl apply -f tests/e2e/k8s_k8s_monitor/multiple_account_printers.yaml
           
           kubectl wait --for=condition=ready pod -l app=std-printer
           kubectl wait --for=condition=ready pod -l app=long-message-printer
@@ -394,7 +393,11 @@ jobs:
 
           echo ""
           kubectl logs "${APP_POD_NAME}"
-          echo ""
+          echo "" 
+
+      - name: Create mock pods for multi account printer
+        run: |
+          tests/e2e/k8s_k8s_monitor/multiple_account_printers/deploy.sh
 
       # We create mock CronJob so we can assert that Kubernetes Events monitor correctly handles
       # CronJob and Job Events.

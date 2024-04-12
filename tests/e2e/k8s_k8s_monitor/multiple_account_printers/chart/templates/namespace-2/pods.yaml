@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: multi-account-test
+  name: workload-pod-3
+  namespace: workload-namespace-2
+spec:
+  containers:
+  - name: workload-pod-3-container-1
+    image: docker.io/library/busybox:1.28
+    imagePullPolicy: Never
+    command:
+        - /bin/sh
+        - -c
+        - while true; do echo workload-pod-3-container-1; sleep 1; done

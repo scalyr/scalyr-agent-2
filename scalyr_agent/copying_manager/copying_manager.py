@@ -669,7 +669,7 @@ class CopyingManager(StoppableThread, LogWatcher):
             self.__pending_log_matchers.append(matcher)
             log.log(
                 scalyr_logging.DEBUG_LEVEL_0,
-                "Adding new log file '%s' for monitor '%s'" % (path, monitor_name),
+                "Adding new log file path='%s', worker_id='%s' for monitor '%s'" % (path, worker_id, monitor_name),
             )
 
             # If the log was previously pending removal, cancel the pending removal
@@ -712,8 +712,8 @@ class CopyingManager(StoppableThread, LogWatcher):
             if not self.__dynamic_paths.contains(path, worker_id):
                 log.log(
                     scalyr_logging.DEBUG_LEVEL_0,
-                    "Tried to updating a log file '%s' for monitor '%s', but it is not being monitored"
-                    % (path, monitor_name),
+                    "Tried to updating a log file ( log_path='%s', worker_id='%s' ) for monitor '%s', but it is not being monitored"
+                    % (path, worker_id, monitor_name),
                 )
                 return
 
@@ -724,15 +724,15 @@ class CopyingManager(StoppableThread, LogWatcher):
             ):
                 log.log(
                     scalyr_logging.DEBUG_LEVEL_0,
-                    "Tried to updating a log file '%s' for monitor '%s', but it is currently being monitored by '%s'"
-                    % (path, monitor_name, self.__dynamic_paths.get(path, worker_id)),
+                    "Tried to updating a log file ( log_path='%s', worker_id='%s' ) for monitor '%s', but it is currently being monitored by '%s'"
+                    % (path, worker_id, monitor_name, self.__dynamic_paths.get(path, worker_id)),
                 )
                 return
 
             log.log(
                 scalyr_logging.DEBUG_LEVEL_0,
-                "Updating config for log file '%s' for monitor '%s'"
-                % (path, monitor_name),
+                "Updating config for log file ( log_path='%s', worker_id='%s' ) for monitor '%s'"
+                % (path, worker_id, monitor_name),
             )
             self.__logs_pending_reload.set(path, worker_id, log_config)
             return log_config
@@ -759,8 +759,8 @@ class CopyingManager(StoppableThread, LogWatcher):
             if not self.__dynamic_paths.contains(log_path, worker_id):
                 log.log(
                     scalyr_logging.DEBUG_LEVEL_0,
-                    "Tried removing a log file '%s' for monitor '%s', but it is not being monitored"
-                    % (log_path, monitor_name),
+                    "Tried removing a log file ( log_path='%s', worker_id='%s' ) for monitor '%s', but it is not being monitored"
+                    % (log_path, worker_id, monitor_name),
                 )
                 return
 
@@ -772,14 +772,14 @@ class CopyingManager(StoppableThread, LogWatcher):
             ):
                 log.log(
                     scalyr_logging.DEBUG_LEVEL_0,
-                    "Tried removing a log file (log_path='%s', worker_id='%s') for monitor '%s', but it is currently being monitored by '%s'"
+                    "Tried removing a log file ( log_path='%s', worker_id='%s' ) for monitor '%s', but it is currently being monitored by '%s'"
                     % (log_path, worker_id, monitor_name, self.__dynamic_paths.get(log_path, worker_id)),
                 )
                 return
 
             log.log(
                 scalyr_logging.DEBUG_LEVEL_0,
-                "Removing log file '%s' for '%s'" % (log_path, monitor_name),
+                "Removing log file ( log_path='%s', worker_id='%s' ) for '%s'" % (log_path, worker_id, monitor_name),
             )
             # do the removals
             matchers = []
@@ -822,8 +822,8 @@ class CopyingManager(StoppableThread, LogWatcher):
             if not self.__dynamic_paths.contains(log_path, worker_id):
                 log.log(
                     scalyr_logging.DEBUG_LEVEL_0,
-                    "Tried scheduling the removal of log file '%s' for monitor '%s', but it is not being monitored"
-                    % (log_path, monitor_name),
+                    "Tried scheduling the removal of log file ( log_path='%s', worker_id='%s' ) for monitor '%s', but it is not being monitored"
+                    % (log_path, worker_id, monitor_name),
                 )
                 return
 
@@ -834,7 +834,7 @@ class CopyingManager(StoppableThread, LogWatcher):
             ):
                 log.log(
                     scalyr_logging.DEBUG_LEVEL_0,
-                    "Tried scheduling the removal of log file (path='%s', worker_id='%s') for monitor '%s', but it is currently being monitored by '%s'"
+                    "Tried scheduling the removal of log file ( log_path='%s', worker_id='%s' ) for monitor '%s', but it is currently being monitored by '%s'"
                     % (log_path, worker_id, monitor_name, self.__dynamic_paths.get(log_path, worker_id))
                 )
                 return
@@ -843,8 +843,8 @@ class CopyingManager(StoppableThread, LogWatcher):
                 self.__logs_pending_removal.set(log_path, worker_id, True)
                 log.log(
                     scalyr_logging.DEBUG_LEVEL_0,
-                    "log path '%s' for monitor '%s' is pending removal"
-                    % (log_path, monitor_name),
+                    "Log ( log_path='%s', worker_id='%s' ) for monitor '%s' is pending removal"
+                    % (log_path, worker_id, monitor_name),
                 )
         finally:
             self.__lock.release()

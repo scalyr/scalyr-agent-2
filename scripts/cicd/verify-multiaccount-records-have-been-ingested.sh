@@ -58,74 +58,81 @@ function assert_multiple_account_ingested() {
   scalyr_readlog_token=${scalyr_readlog_token} RETRY_ATTEMPTS=1 ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" app="multiple-account-printer" "MULTIPLE_ACCOUNT_TEST_CONTAINER_NAME:'$CONT_NAME'"'
 }
 
-# See tests/e2e/k8s_k8s_monitor/multiple_account_printers.yaml:16 for the following annotations:
-# log.config.scalyr.com/teams.1.secret: "scalyr-api-key-team-2"
-# log.config.scalyr.com/cont1.teams.2.secret: "scalyr-api-key-team-3"
-# log.config.scalyr.com/cont2.teams.2.secret: "scalyr-api-key-team-3"
-# log.config.scalyr.com/cont2.teams.3.secret: "scalyr-api-key-team-4"
+# workload-pod-1 annotations:
+#log.config.scalyr.com/teams.1.secret: "scalyr-api-key-team-3"
+#log.config.scalyr.com/teams.5.secret: "scalyr-api-key-team-4"
+#log.config.scalyr.com/workload-pod-1-container-1.teams.1.secret: "scalyr-api-key-team-5"
+#log.config.scalyr.com/workload-pod-1-container-2.teams.1.secret: "scalyr-api-key-team-6"
+#log.config.scalyr.com/workload-pod-1-container-2.teams.2.secret: "scalyr-api-key-team-7"
 
-# Container 1 log is ingested with the scalyr-api-key-team-3 only
-assert_multiple_account_not_ingested ${ACCOUNT_NAME} ${scalyr_api_key_team} cont1
-assert_multiple_account_not_ingested ${ACCOUNT_NAME_2} ${scalyr_api_key_team_2} cont1
-assert_multiple_account_ingested ${ACCOUNT_NAME_3} ${scalyr_api_key_team_3} cont1
-assert_multiple_account_not_ingested ${ACCOUNT_NAME_4} ${scalyr_api_key_team_4} cont1
+#| Container Name | API keys used to ingest logs                                         | Note                        |
+#| -------------- |----------------------------------------------------------------------|-----------------------------|
+#| workload-pod-1-container-1 | SCALYR_API_KEY_WRITE_TEAM_4                              | Container specific api keys |
+#| workload-pod-1-container-2 | SCALYR_API_KEY_WRITE_TEAM_5, SCALYR_API_KEY_WRITE_TEAM_6 | Container specific api keys |
+#| workload-pod-1-container-3 | SCALYR_API_KEY_WRITE_TEAM_3, SCALYR_API_KEY_WRITE_TEAM_4 | Pod default api keys        |
+#| workload-pod-2-container-1 | SCALYR_API_KEY_WRITE_TEAM_2                              | Namespace default api key   |
+#| workload-pod-3-container-1 | SCALYR_API_KEY_WRITE_TEAM_1                              | Agent default api key       |
 
-# Container 2 log is ingested with the scalyr-api-key-team-3 and scalyr-api-key-team-4 only
-assert_multiple_account_not_ingested ${ACCOUNT_NAME} ${scalyr_api_key_team} cont2
-assert_multiple_account_not_ingested ${ACCOUNT_NAME_2} ${scalyr_api_key_team_2} cont2
-assert_multiple_account_ingested ${ACCOUNT_NAME_3} ${scalyr_api_key_team_3} cont2
-assert_multiple_account_ingested ${ACCOUNT_NAME_4} ${scalyr_api_key_team_4} cont2
+# workload-pod-1-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME} ${scalyr_api_key_team} workload-pod-1-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_2} ${scalyr_api_key_team_2} workload-pod-1-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_3} ${scalyr_api_key_team_3} workload-pod-1-container-1
+assert_multiple_account_ingested ${ACCOUNT_NAME_4} ${scalyr_api_key_team_4} workload-pod-1-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_5} ${scalyr_api_key_team_5} workload-pod-1-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_6} ${scalyr_api_key_team_6} workload-pod-1-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_7} ${scalyr_api_key_team_7} workload-pod-1-container-1
 
-# Container 3 log is ingested with the scalyr-api-key-team-2 only
-assert_multiple_account_not_ingested ${ACCOUNT_NAME} ${scalyr_api_key_team} cont3
-assert_multiple_account_ingested ${ACCOUNT_NAME_2} ${scalyr_api_key_team_2} cont3
-assert_multiple_account_not_ingested ${ACCOUNT_NAME_3} ${scalyr_api_key_team_3} cont3
-assert_multiple_account_not_ingested ${ACCOUNT_NAME_4} ${scalyr_api_key_team_4} cont3
+# workload-pod-1-container-2
+assert_multiple_account_not_ingested ${ACCOUNT_NAME} ${scalyr_api_key_team} workload-pod-1-container-2
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_2} ${scalyr_api_key_team_2} workload-pod-1-container-2
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_3} ${scalyr_api_key_team_3} workload-pod-1-container-2
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_4} ${scalyr_api_key_team_4} workload-pod-1-container-2
+assert_multiple_account_ingested ${ACCOUNT_NAME_5} ${scalyr_api_key_team_5} workload-pod-1-container-2
+assert_multiple_account_ingested ${ACCOUNT_NAME_6} ${scalyr_api_key_team_6} workload-pod-1-container-2
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_7} ${scalyr_api_key_team_7} workload-pod-1-container-2
 
-export STATUS=`kubectl exec --namespace scalyr ${SCALYR_AGENT_POD_NAME} -- scalyr-agent-2 status -v --format json`
-export WORKER_ID_DEFAULT="default"
-export WORKER_ID_API_KEY_2=`echo $STATUS | jq -r -c '.copying_manager_status.workers[] | select (.sessions[].log_processors[].log_path | strings | test("cont3")) | .worker_id'`
-export WORKER_ID_API_KEY_3=`echo $STATUS | jq -r -c '.copying_manager_status.workers[] | select(.sessions[].log_processors[].log_path | test("cont2")) | select (.sessions[].log_processors | length == 2) | .worker_id'`
-export WORKER_ID_API_KEY_4=`echo $STATUS | jq -r -c '.copying_manager_status.workers[] | select(.sessions[].log_processors[].log_path | test("cont2")) | select (.sessions[].log_processors | length == 1) | .worker_id'`
+# workload-pod-1-container-3
+assert_multiple_account_not_ingested ${ACCOUNT_NAME} ${scalyr_api_key_team} workload-pod-1-container-3
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_2} ${scalyr_api_key_team_2} workload-pod-1-container-3
+assert_multiple_account_ingested ${ACCOUNT_NAME_3} ${scalyr_api_key_team_3} workload-pod-1-container-3
+assert_multiple_account_ingested ${ACCOUNT_NAME_4} ${scalyr_api_key_team_4} workload-pod-1-container-3
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_5} ${scalyr_api_key_team_5} workload-pod-1-container-3
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_6} ${scalyr_api_key_team_6} workload-pod-1-container-3
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_7} ${scalyr_api_key_team_7} workload-pod-1-container-3
 
-function assert_worker_files_count() {
-  API_KEY_NAME=$1; shift;
-  WORKER_ID=$1; shift;
-  EXPECTED_COUNT=$1;
+# workload-pod-2-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME} ${scalyr_api_key_team} workload-pod-2-container-1
+assert_multiple_account_ingested ${ACCOUNT_NAME_2} ${scalyr_api_key_team_2} workload-pod-2-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_3} ${scalyr_api_key_team_3} workload-pod-2-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_4} ${scalyr_api_key_team_4} workload-pod-2-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_5} ${scalyr_api_key_team_5} workload-pod-2-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_6} ${scalyr_api_key_team_6} workload-pod-2-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_7} ${scalyr_api_key_team_7} workload-pod-2-container-1
 
-  echo_with_date "Fetching agent status"
-  echo_with_date "Checking worker $WORKER_ID (using $API_KEY_NAME) files count"
+# workload-pod-3-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME} ${scalyr_api_key_team} workload-pod-3-container-1
+assert_multiple_account_ingested ${ACCOUNT_NAME_2} ${scalyr_api_key_team_2} workload-pod-3-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_3} ${scalyr_api_key_team_3} workload-pod-3-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_4} ${scalyr_api_key_team_4} workload-pod-3-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_5} ${scalyr_api_key_team_5} workload-pod-3-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_6} ${scalyr_api_key_team_6} workload-pod-3-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_7} ${scalyr_api_key_team_7} workload-pod-3-container-1
 
-  STATUS=`kubectl exec --namespace scalyr ${SCALYR_AGENT_POD_NAME} -- scalyr-agent-2 status -v --format json`
-
-  COUNT=`echo $STATUS | jq -c ".copying_manager_status.workers[] | select (.worker_id==\"$WORKER_ID\") | .sessions[0].log_processors | length"`
-
-  if [ "$COUNT" != "$EXPECTED_COUNT" ]; then
-    echo $STATUS | jq -c ".copying_manager_status.workers[] | select (.worker_id==\"$WORKER_ID\")"
-    echo_with_date "FAIL: Expected $EXPECTED_COUNT files, got $COUNT. See worker status json above."
-    exit 1
-  fi
-}
-
-
-assert_worker_files_count scalyr-api-key-2 $WORKER_ID_API_KEY_2 1
-assert_worker_files_count scalyr-api-key-3 $WORKER_ID_API_KEY_3 2
-assert_worker_files_count scalyr-api-key-4 $WORKER_ID_API_KEY_4 1
 
 echo
 echo_with_date "Changing the multiple-account-printer POD team api key annotations and observing the logs (I)"
 echo
 
-export MULTIPLE_ACCOUNT_PRINTER_POD_NAME=$(kubectl get pod --namespace=default --selector=app=multiple-account-printer -o jsonpath="{.items[0].metadata.name}")
+export MULTIPLE_ACCOUNT_PRINTER_POD_NAME=workload-pod-1
 
 echo_with_date "Current Pod description:"
 kubectl describe pod ${MULTIPLE_ACCOUNT_PRINTER_POD_NAME}
 echo
 
-kubectl annotate --overwrite pods ${MULTIPLE_ACCOUNT_PRINTER_POD_NAME} log.config.scalyr.com/cont3.teams.1.secret="scalyr-api-key-team-3"
-kubectl annotate pods ${MULTIPLE_ACCOUNT_PRINTER_POD_NAME} log.config.scalyr.com/cont2.teams.2.secret-
-kubectl annotate pods ${MULTIPLE_ACCOUNT_PRINTER_POD_NAME} log.config.scalyr.com/cont2.teams.1.secret-
-kubectl annotate pods ${MULTIPLE_ACCOUNT_PRINTER_POD_NAME} log.config.scalyr.com/cont1.teams.2.secret-
+kubectl annotate --overwrite pods ${MULTIPLE_ACCOUNT_PRINTER_POD_NAME} log.config.scalyr.com/workload-pod-1-container-3.teams.1.secret="scalyr-api-key-team-3"
+kubectl annotate pods ${MULTIPLE_ACCOUNT_PRINTER_POD_NAME} log.config.scalyr.com/workload-pod-1-container-1.teams.1.secret-
+kubectl annotate pods ${MULTIPLE_ACCOUNT_PRINTER_POD_NAME} log.config.scalyr.com/workload-pod-1-container-2.teams.1.secret-
+kubectl annotate pods ${MULTIPLE_ACCOUNT_PRINTER_POD_NAME} log.config.scalyr.com/workload-pod-1-container-2.teams.2.secret-
 
 echo
 echo_with_date "New Pod description:"
@@ -140,32 +147,64 @@ sleep 90
 
 export START_TIME="1m"
 
-# Pod annotations are changed to:
-# log.config.scalyr.com/teams.1.secret: "scalyr-api-key-team-2"
-# log.config.scalyr.com/cont3.teams.1.secret: "scalyr-api-key-team-3"
+# workload-pod-1 annotations:
+#log.config.scalyr.com/teams.1.secret: "scalyr-api-key-team-3"
+#log.config.scalyr.com/teams.5.secret: "scalyr-api-key-team-4"
+#log.config.scalyr.com/cont3.teams.1.secret: "scalyr-api-key-team-3"
 
-# Container 1 log is ingested with the scalyr-api-key-team-3 only
-assert_multiple_account_not_ingested ${ACCOUNT_NAME} ${scalyr_api_key_team} cont1
-assert_multiple_account_ingested ${ACCOUNT_NAME_2} ${scalyr_api_key_team_2} cont1
-assert_multiple_account_not_ingested ${ACCOUNT_NAME_3} ${scalyr_api_key_team_3} cont1
-assert_multiple_account_not_ingested ${ACCOUNT_NAME_4} ${scalyr_api_key_team_4} cont1
+#| Container Name | API keys used to ingest logs                                         | Note                        |
+#| -------------- |----------------------------------------------------------------------|-----------------------------|
+#| workload-pod-1-container-1 | SCALYR_API_KEY_WRITE_TEAM_2                              | Namespace default api key   |
+#| workload-pod-1-container-2 | SCALYR_API_KEY_WRITE_TEAM_2                              | Namespace default api key   |
+#| workload-pod-1-container-3 | SCALYR_API_KEY_WRITE_TEAM_3                              | Pod default api keys        |
+#| workload-pod-2-container-1 | SCALYR_API_KEY_WRITE_TEAM_2                              | Namespace default api key   |
+#| workload-pod-3-container-1 | SCALYR_API_KEY_WRITE_TEAM_1                              | Agent default api key       |
 
-# Container 2 log is ingested with the scalyr-api-key-team-2 only
-assert_multiple_account_not_ingested ${ACCOUNT_NAME} ${scalyr_api_key_team} cont2
-assert_multiple_account_ingested ${ACCOUNT_NAME_2} ${scalyr_api_key_team_2} cont2
-assert_multiple_account_not_ingested ${ACCOUNT_NAME_3} ${scalyr_api_key_team_3} cont2
-assert_multiple_account_not_ingested ${ACCOUNT_NAME_4} ${scalyr_api_key_team_4} cont2
+# workload-pod-1-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME} ${scalyr_api_key_team} workload-pod-1-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_2} ${scalyr_api_key_team_2} workload-pod-1-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_3} ${scalyr_api_key_team_3} workload-pod-1-container-1
+assert_multiple_account_ingested ${ACCOUNT_NAME_4} ${scalyr_api_key_team_4} workload-pod-1-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_5} ${scalyr_api_key_team_5} workload-pod-1-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_6} ${scalyr_api_key_team_6} workload-pod-1-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_7} ${scalyr_api_key_team_7} workload-pod-1-container-1
 
-# Container 3 log is ingested with the scalyr-api-key-team-3 only
-assert_multiple_account_not_ingested ${ACCOUNT_NAME} ${scalyr_api_key_team} cont3
-assert_multiple_account_not_ingested ${ACCOUNT_NAME_2} ${scalyr_api_key_team_2} cont3
-assert_multiple_account_ingested ${ACCOUNT_NAME_3} ${scalyr_api_key_team_3} cont3
-assert_multiple_account_not_ingested ${ACCOUNT_NAME_4} ${scalyr_api_key_team_4} cont3
+# workload-pod-1-container-2
+assert_multiple_account_not_ingested ${ACCOUNT_NAME} ${scalyr_api_key_team} workload-pod-1-container-2
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_2} ${scalyr_api_key_team_2} workload-pod-1-container-2
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_3} ${scalyr_api_key_team_3} workload-pod-1-container-2
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_4} ${scalyr_api_key_team_4} workload-pod-1-container-2
+assert_multiple_account_ingested ${ACCOUNT_NAME_5} ${scalyr_api_key_team_5} workload-pod-1-container-2
+assert_multiple_account_ingested ${ACCOUNT_NAME_6} ${scalyr_api_key_team_6} workload-pod-1-container-2
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_7} ${scalyr_api_key_team_7} workload-pod-1-container-2
 
+# workload-pod-1-container-3
+assert_multiple_account_not_ingested ${ACCOUNT_NAME} ${scalyr_api_key_team} workload-pod-1-container-3
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_2} ${scalyr_api_key_team_2} workload-pod-1-container-3
+assert_multiple_account_ingested ${ACCOUNT_NAME_3} ${scalyr_api_key_team_3} workload-pod-1-container-3
+assert_multiple_account_ingested ${ACCOUNT_NAME_4} ${scalyr_api_key_team_4} workload-pod-1-container-3
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_5} ${scalyr_api_key_team_5} workload-pod-1-container-3
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_6} ${scalyr_api_key_team_6} workload-pod-1-container-3
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_7} ${scalyr_api_key_team_7} workload-pod-1-container-3
 
-assert_worker_files_count scalyr-api-key-2 $WORKER_ID_API_KEY_2 2
-assert_worker_files_count scalyr-api-key-3 $WORKER_ID_API_KEY_3 1
-assert_worker_files_count scalyr-api-key-4 $WORKER_ID_API_KEY_4 0
+# workload-pod-2-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME} ${scalyr_api_key_team} workload-pod-2-container-1
+assert_multiple_account_ingested ${ACCOUNT_NAME_2} ${scalyr_api_key_team_2} workload-pod-2-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_3} ${scalyr_api_key_team_3} workload-pod-2-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_4} ${scalyr_api_key_team_4} workload-pod-2-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_5} ${scalyr_api_key_team_5} workload-pod-2-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_6} ${scalyr_api_key_team_6} workload-pod-2-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_7} ${scalyr_api_key_team_7} workload-pod-2-container-1
+
+# workload-pod-3-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME} ${scalyr_api_key_team} workload-pod-3-container-1
+assert_multiple_account_ingested ${ACCOUNT_NAME_2} ${scalyr_api_key_team_2} workload-pod-3-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_3} ${scalyr_api_key_team_3} workload-pod-3-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_4} ${scalyr_api_key_team_4} workload-pod-3-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_5} ${scalyr_api_key_team_5} workload-pod-3-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_6} ${scalyr_api_key_team_6} workload-pod-3-container-1
+assert_multiple_account_not_ingested ${ACCOUNT_NAME_7} ${scalyr_api_key_team_7} workload-pod-3-container-1
+
 
 echo
 echo_with_date "Changing the multiple-account-printer POD team api key annotations and observing the logs (II)"
@@ -206,9 +245,5 @@ assert_multiple_account_not_ingested ${ACCOUNT_NAME} ${scalyr_api_key_team} cont
 assert_multiple_account_not_ingested ${ACCOUNT_NAME_2} ${scalyr_api_key_team_2} cont3
 assert_multiple_account_ingested ${ACCOUNT_NAME_3} ${scalyr_api_key_team_3} cont3
 assert_multiple_account_not_ingested ${ACCOUNT_NAME_4} ${scalyr_api_key_team_4} cont3
-
-assert_worker_files_count scalyr-api-key-2 $WORKER_ID_API_KEY_2 0
-assert_worker_files_count scalyr-api-key-3 $WORKER_ID_API_KEY_3 1
-assert_worker_files_count scalyr-api-key-4 $WORKER_ID_API_KEY_4 0
 
 echo
