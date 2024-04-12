@@ -942,6 +942,15 @@ class ContainerCheckerTest(TestConfigurationBase):
                 container_names=["one", "two"],
             )
 
+        def _namespace(name, **kwargs):
+            return mock.MagicMock(
+                name=name,
+                namespace=name,
+                uid="fsdfds",
+                labels={},
+                annotations={}
+            )
+
         result = cc._ContainerChecker__get_log_config_for_container(
             "12345",
             info={
@@ -949,7 +958,7 @@ class ContainerCheckerTest(TestConfigurationBase):
                 "k8s_info": self.k8s_info,
                 "log_path": "/var/log/test.log",
             },
-            k8s_cache=mock.Mock(pod=_pod),
+            k8s_cache=mock.Mock(pod=_pod, namespace=_namespace),
             base_attributes=cc._ContainerChecker__get_base_attributes(),
         )
         assert "zzz_templ_container_name" in result[0]["attributes"]

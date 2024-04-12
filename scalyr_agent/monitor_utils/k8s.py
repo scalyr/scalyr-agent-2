@@ -1074,12 +1074,6 @@ class PodProcessor(_K8sProcessor):
         pod_name = metadata.get("name", "")
         namespace = metadata.get("namespace", "")
 
-
-        global_log.log(
-            scalyr_logging.DEBUG_LEVEL_0,
-            "!!! Processing POD %s" % pod_name,
-        )
-
         controller = self._get_controller_from_owners(
             k8s, owners, namespace, query_options=query_options
         )
