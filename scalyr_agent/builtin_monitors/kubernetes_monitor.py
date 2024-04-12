@@ -438,7 +438,7 @@ define_config_option(
 
 define_config_option(
     __monitor__,
-    "k8s_omit_labels",
+    "k8s_label_exclude_globs",
     "Optional, (defaults to False). Specifies a list of K8s labels to be ignored and not added to logs.",
     convert_to=ArrayOfStrings,
     default=["com.scalyr.config.*"],
