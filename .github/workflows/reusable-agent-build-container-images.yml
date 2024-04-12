@@ -1,4 +1,4 @@
-python_versionname: "Kubernetes End to End Tests"
+name: "Kubernetes End to End Tests"
 
 on:
   workflow_call:
