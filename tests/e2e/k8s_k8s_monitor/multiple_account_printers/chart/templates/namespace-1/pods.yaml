@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: multi-account-test
+  name: workload-pod-1
+  namespace: workload-namespace-1
+  annotations:
+    log.config.scalyr.com/teams.1.secret: "scalyr-api-key-team-3"
+    log.config.scalyr.com/teams.5.secret: "scalyr-api-key-team-4"
+    log.config.scalyr.com/workload-pod-1-container-1.teams.1.secret: "scalyr-api-key-team-5"
+    log.config.scalyr.com/workload-pod-1-container-2.teams.1.secret: "scalyr-api-key-team-6"
+    log.config.scalyr.com/workload-pod-1-container-2.teams.2.secret: "scalyr-api-key-team-7"
+spec:
+  containers:
+  - name: workload-pod-1-container-1
+    image: docker.io/library/busybox:1.28
+    imagePullPolicy: Never
+    command:
+        - /bin/sh
+        - -c
+        - while true; do echo workload-pod-1-container-1; sleep 1; done
+  - name: workload-pod-1-container-2
+    image: docker.io/library/busybox:1.28
+    imagePullPolicy: Never
+    command:
+        - /bin/sh
+        - -c
+        - while true; do echo workload-pod-1-container-2; sleep 1; done
+  - name: workload-pod-1-container-3
+    image: docker.io/library/busybox:1.28
+    imagePullPolicy: Never
+    command:
+        - /bin/sh
+        - -c
+        - while true; do echo workload-pod-1-container-3; sleep 1; done
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: multi-account-test
+  name: workload-pod-2
+  namespace: workload-namespace-1
+spec:
+  containers:
+  - name: workload-pod-2-container-1
+    image: docker.io/library/busybox:1.28
+    imagePullPolicy: Never
+    command:
+        - /bin/sh
+        - -c
+        - while true; do echo workload-pod-2-container-1; sleep 1; done
