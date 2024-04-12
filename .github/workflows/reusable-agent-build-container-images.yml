@@ -50,11 +50,23 @@ on:
         required: true
       SCALYR_API_KEY_READ_4:
         required: true
+      SCALYR_API_KEY_READ_5:
+        required: true
+      SCALYR_API_KEY_READ_6:
+        required: true
+      SCALYR_API_KEY_READ_7:
+        required: true
       SCALYR_API_KEY_WRITE_2:
         required: true
       SCALYR_API_KEY_WRITE_3:
         required: true
       SCALYR_API_KEY_WRITE_4:
+        required: true
+      SCALYR_API_KEY_WRITE_5:
+        required: true
+      SCALYR_API_KEY_WRITE_6:
+        required: true
+      SCALYR_API_KEY_WRITE_7:
         required: true
       PULL_REGISTRY_USERNAME:
         required: true
