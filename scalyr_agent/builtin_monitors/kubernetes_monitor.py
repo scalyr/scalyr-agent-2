@@ -3059,7 +3059,7 @@ class ContainerChecker(object):
                     elif cid in prev_digests or cid in prev_digests_namespaces:
                         # container was running and it exists in the previous digest dict, so see if
                         # it has changed
-                        if pod and prev_digests[cid] != pod.digest or namespace and prev_digests_namespaces[cid] != namespace.digest:
+                        if (pod and prev_digests[cid] != pod.digest) or (namespace and prev_digests_namespaces[cid] != namespace.digest):
                             self._logger.log(
                                 scalyr_logging.DEBUG_LEVEL_1,
                                 "Pod or namespace digest changed for '%s/%s'" % (namespace.name, info["name"]),

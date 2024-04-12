@@ -72,7 +72,8 @@ def query(token: str, server_host: str, time_start: str, retries: int):
             json={
                 "startTime": time_start,
                 "filter": f"app=\"multi-account-test\" serverHost=\"{server_host}\"",
-            }
+            },
+            timeout=20
         )
 
     def retry_request():
