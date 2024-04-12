@@ -930,16 +930,6 @@ class NamespaceProcessor(_K8sProcessor):
         annotations = metadata.get("annotations", {})
         namespace_name = metadata.get("name", "")
 
-        global_log.log(
-            scalyr_logging.DEBUG_LEVEL_0,
-            "!! Processing Namespace %s" % namespace_name
-        )
-
-        global_log.log(
-            scalyr_logging.DEBUG_LEVEL_2,
-            "Namespace %s metadata: %s" % (namespace_name, six.text_type(metadata)),
-        )
-
         try:
             annotations = annotation_config.process_annotations(annotations)
         except BadAnnotationConfig as e:

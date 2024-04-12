@@ -29,16 +29,6 @@ def assert_env_non_empty(name):
         print(f"ERROR: Environment variable {name} is not set or empty.")
         sys.exit(1)
 
-# curl -X POST https://app.scalyr.com/api/query \
-#     -H "Authorization: Bearer {token}"  \
-#     -H "Content-Type: application/json" \
-#     -d '{
-#       "queryType": "log",
-#       "filter":    "serverHost contains \"frontend\"",
-#       "startTime": "10/27 1 PM",
-#       "endTime":   "10/27 4 PM"
-#     }'
-
 
 ENV_TOKENS = [
     "SCALYR_API_KEY_READ_TEAM_1",
@@ -280,43 +270,6 @@ def main():
             }
         }
     )
-
-
-
-    #     A 1 - P2-C1 - KEY 2
-    #     A 2 - P1-C1 - KEY 5
-    #     A 3 - P1-C2 - KEY 6/7
-    #     A 4 - P1-C2 - KEY 6/7
-    #     A d - P3-C1 - KEY 1
-    #     A 5 - P1-C3 - KEY 3/4
-    #     A 6 - P1-C3 - KEY 3/4
-
-    #     U 2 - P1-C1
-    #     U 4 - P1-C2
-    #     A 5 - P1-C2 - KEY 3
-    #     R 3 - P1-C2 - KEY 6
-    #     A 1 - P1-C3 - KEY
-
-    # New K8s annotations:
-
-    # namespaces-1 annotations:
-    #  log.config.scalyr.com/teams.1.secret: scalyr-api-key-team-3
-
-    # namespaces-2 annotations:
-    #  log.config.scalyr.com/teams.66.secret: scalyr-api-key-team-4
-
-    # workload-pod-1 annotations:
-    #  log.config.scalyr.com/workload-pod-1-container-1.teams.1.secret: scalyr-api-key-team-5
-    #  log.config.scalyr.com/workload-pod-1-container-2.teams.11.secret: scalyr-api-key-team-3
-    #  log.config.scalyr.com/workload-pod-1-container-2.teams.2.secret: scalyr-api-key-team-7
-
-    # | Container Name             | API keys used to ingest logs                             | Note                        |
-    # | -------------------------- |----------------------------------------------------------|-----------------------------|
-    # | workload-pod-1-container-1 | SCALYR_API_KEY_READ_TEAM_5                               | Container specific api keys |
-    # | workload-pod-1-container-2 | SCALYR_API_KEY_READ_TEAM_3, SCALYR_API_KEY_READ_TEAM_7   | Container specific api keys |
-    # | workload-pod-1-container-3 | SCALYR_API_KEY_READ_TEAM_3                               | Namespace default api key   |
-    # | workload-pod-2-container-1 | SCALYR_API_KEY_READ_TEAM_3                               | Namespace default api key   |
-    # | workload-pod-3-container-1 | SCALYR_API_KEY_READ_TEAM_4                               | Namespace default api key   |
 
     # Wait for configuration to be reloaded and 1 minute for logs to be ingested
     print("Change pods and namespace annotations.")
