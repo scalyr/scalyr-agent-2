@@ -1,4 +1,4 @@
-#!/usr/bin/env python3 -u
+#!/usr/bin/env -S python3 -u
 # Copyright 2024 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
