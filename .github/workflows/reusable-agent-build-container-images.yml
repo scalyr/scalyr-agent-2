@@ -1,4 +1,4 @@
-name: "Kubernetes End to End Tests"
+python_versionname: "Kubernetes End to End Tests"
 
 on:
   workflow_call:
@@ -316,6 +316,12 @@ jobs:
         with:
           driver-opts: network=host
 
+      - name: Login to DockerHub
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3
+        with:
+          username: ${{ secrets.PULL_REGISTRY_USERNAME }}
+          password: ${{ secrets.PULL_REGISTRY_PASSWORD }}
+
       - name: Install Scalyr tool
         run: |
           curl https://raw.githubusercontent.com/scalyr/scalyr-tool/master/scalyr > scalyr
@@ -329,6 +335,13 @@ jobs:
           minikube_driver: "${{ matrix.k8s_version.driver }}"
           container_runtime: "${{ matrix.k8s_version.runtime }}"
           github_token: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Preload minikube images
+        run: |
+          # Since the minikube runtimes we use cannot be reasonably configured to use custom credentials for docker hub, 
+          # we need to pull the images and load them into minikube.
+          docker pull busybox:1.28
+          minikube image load busybox:1.28
 
       - name: Download OCI tarball of the built image.
         uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3
@@ -396,6 +409,13 @@ jobs:
           echo "" 
 
       - name: Create mock pods for multi account printer
+        env:
+          scalyr_api_key_write_team_2: "${{ secrets.SCALYR_API_KEY_WRITE_2 }}"
+          scalyr_api_key_write_team_3: "${{ secrets.SCALYR_API_KEY_WRITE_3 }}"
+          scalyr_api_key_write_team_4: "${{ secrets.SCALYR_API_KEY_WRITE_4 }}"
+          scalyr_api_key_write_team_5: "${{ secrets.SCALYR_API_KEY_WRITE_5 }}"
+          scalyr_api_key_write_team_6: "${{ secrets.SCALYR_API_KEY_WRITE_6 }}"
+          scalyr_api_key_write_team_7: "${{ secrets.SCALYR_API_KEY_WRITE_7 }}"
         run: |
           tests/e2e/k8s_k8s_monitor/multiple_account_printers/deploy.sh
 
@@ -570,22 +590,32 @@ jobs:
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" "Message from short-lived-container-2"'
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" "Message from short-lived-container-3"'
 
+      - name: Install Testing Python Packages
+        run: |
+          python3 -m pip install kubernetes tabulate
+
       - name: Verify multiaccount records have been ingested
         timeout-minutes: 14
         env:
-          scalyr_api_key_team: "${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}"
-          scalyr_api_key_team_2: "${{ secrets.SCALYR_API_KEY_READ_2 }}"
-          scalyr_api_key_team_3: "${{ secrets.SCALYR_API_KEY_READ_3 }}"
-          scalyr_api_key_team_4: "${{ secrets.SCALYR_API_KEY_READ_4 }}"
-          SCALYR_AGENT_POD_NAME: "${{ env.SCALYR_AGENT_POD_NAME }}"
-          ACCOUNT_NAME: "cloudtech-testing@scalyr.com"
+          SCALYR_API_KEY_READ_TEAM_1: "${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}"
+          SCALYR_API_KEY_READ_TEAM_2: "${{ secrets.SCALYR_API_KEY_READ_2 }}"
+          SCALYR_API_KEY_READ_TEAM_3: "${{ secrets.SCALYR_API_KEY_READ_3 }}"
+          SCALYR_API_KEY_READ_TEAM_4: "${{ secrets.SCALYR_API_KEY_READ_4 }}"
+          SCALYR_API_KEY_READ_TEAM_5: "${{ secrets.SCALYR_API_KEY_READ_5 }}"
+          SCALYR_API_KEY_READ_TEAM_6: "${{ secrets.SCALYR_API_KEY_READ_6 }}"
+          SCALYR_API_KEY_READ_TEAM_7: "${{ secrets.SCALYR_API_KEY_READ_7 }}"
+          SERVER_HOST_NAME: "${{ env.SCALYR_AGENT_POD_NAME }}"
+          ACCOUNT_NAME_1: "cloudtech-testing@scalyr.com"
           ACCOUNT_NAME_2: "cloudtech-testing-2@scalyr.com"
           ACCOUNT_NAME_3: "cloudtech-testing-3@scalyr.com"
           ACCOUNT_NAME_4: "cloudtech-testing-4@scalyr.com"
+          ACCOUNT_NAME_5: "cloudtech-testing-5@scalyr.com"
+          ACCOUNT_NAME_6: "cloudtech-testing-6@scalyr.com"
+          ACCOUNT_NAME_7: "cloudtech-testing-7@scalyr.com"
         run: |
           echo 'Looking for multiple account logs'
           
-          ./scripts/cicd/verify-multiaccount-records-have-been-ingested.sh
+          ./scripts/cicd/verify-multiaccount-records-have-been-ingested.py
 
       - name: Notify Slack on Failure
         if: ${{ failure() && github.ref_name == 'master' }}
