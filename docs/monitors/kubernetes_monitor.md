@@ -67,6 +67,9 @@ data:
 
 #### Simple visual example of Secret key annotation priority
 
+> [!NOTE]  
+> Highlights information that users should take into account, even when skimming.
+
 ![Annotation Priority](kubernetes_monitor_annotations_priority.png)
 
 
