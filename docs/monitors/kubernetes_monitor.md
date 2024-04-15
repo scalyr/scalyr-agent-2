@@ -65,6 +65,11 @@ data:
 ```
 
 
+#### Simple visual example of Secret key annotation priority
+
+![Annotation Priority](kubernetes_monitor_annotations_priority.png)
+
+
 #### Example:
 
 #### Configuration:
