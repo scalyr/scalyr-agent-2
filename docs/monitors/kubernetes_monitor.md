@@ -68,7 +68,7 @@ data:
 #### Simple visual example of Secret key annotation priority
 
 > [!NOTE]  
-> Highlights information that users should take into account, even when skimming.
+> When no annotation is present for either the namespace or pod, the default secret _scalyr/scalyr-api-key_ is used.
 
 ![Annotation Priority](kubernetes_monitor_annotations_priority.png)
 
