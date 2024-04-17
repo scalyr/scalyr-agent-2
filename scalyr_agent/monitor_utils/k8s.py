@@ -37,7 +37,6 @@ from scalyr_agent.configuration import Configuration
 from urllib3.exceptions import (  # pylint: disable=import-error
     InsecureRequestWarning as InsecureRequestWarningAlias,
 )
-import json
 
 global_log = scalyr_logging.getLogger(__name__)
 
@@ -886,6 +885,15 @@ class _K8sProcessor(object):
 
 
 class NamespaceInfo():
+
+    @staticmethod
+    def __flatten_dict(dict_to_flatten):
+        flattened = []
+        for key in sorted(dict_to_flatten.keys()):
+            flattened.append(key)
+            flattened.append(six.text_type(dict_to_flatten[key]))
+
+        return "".join(flattened)
     def __init__(self, name, uid, labels, annotations, spec):
         self.name = name
         self.namespace = name
@@ -898,8 +906,8 @@ class NamespaceInfo():
         md5.update(name.encode("utf-8"))
         md5.update(uid.encode("utf-8"))
 
-        md5.update(json.dumps(labels).encode("utf-8"))
-        md5.update(json.dumps(annotations).encode("utf-8"))
+        md5.update(self.__flatten_dict(labels).encode("utf-8"))
+        md5.update(self.__flatten_dict(annotations).encode("utf-8"))
 
         self.digest = md5.digest()
 
