@@ -438,10 +438,19 @@ define_config_option(
 
 define_config_option(
     __monitor__,
+    "k8s_label_include_globs",
+    "Optional, (defaults to False). Specifies a list of K8s labels to be ignored and not added to logs.",
+    convert_to=ArrayOfStrings,
+    default=["*"],
+    env_aware=True,
+)
+
+define_config_option(
+    __monitor__,
     "k8s_label_exclude_globs",
     "Optional, (defaults to False). Specifies a list of K8s labels to be ignored and not added to logs.",
     convert_to=ArrayOfStrings,
-    default=["com.scalyr.config.*"],
+    default=[],
     env_aware=True,
 )
 
@@ -3240,6 +3249,16 @@ class ContainerChecker(object):
             raise
 
         return attributes
+
+    def __is_label_allowed(self, label_name):
+        return any(
+            fnmatch.fnmatch(label_name, glob)
+            for glob in self._config.get("k8s_label_include_globs")
+        ) and not any(
+            fnmatch.fnmatch(label_name, glob)
+            for glob in self._config.get("k8s_label_exclude_globs")
+        )
+
 
     def __get_log_config_for_container(self, cid, info, k8s_cache, base_attributes):
         # type: (str, dict, KubernetesCache, JsonObject) -> List[Dict]
