@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: scalyr-api-key-team-2
+  namespace: workload-namespace-1
+data:
+  scalyr-api-key: {{ .Values.scalyr_api_key_write_team_2 | b64enc }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: scalyr-api-key-team-3
+  namespace: workload-namespace-1
+data:
+  scalyr-api-key: {{ .Values.scalyr_api_key_write_team_3 | b64enc }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: scalyr-api-key-team-4
+  namespace: workload-namespace-1
+data:
+  scalyr-api-key: {{ .Values.scalyr_api_key_write_team_4 | b64enc }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: scalyr-api-key-team-5
+  namespace: workload-namespace-1
+data:
+  scalyr-api-key: {{ .Values.scalyr_api_key_write_team_5 | b64enc }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: scalyr-api-key-team-6
+  namespace: workload-namespace-1
+data:
+  scalyr-api-key: {{ .Values.scalyr_api_key_write_team_6 | b64enc }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: scalyr-api-key-team-7
+  namespace: workload-namespace-1
+data:
+  scalyr-api-key: {{ .Values.scalyr_api_key_write_team_7 | b64enc }}

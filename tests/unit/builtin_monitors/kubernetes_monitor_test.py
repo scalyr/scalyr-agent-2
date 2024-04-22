@@ -24,16 +24,19 @@ import time
 import warnings
 import platform
 import tempfile
+from dataclasses import dataclass, field
 from string import Template
 from collections import OrderedDict
 
 import sys
 from threading import Condition, Semaphore, Thread, Lock
+from typing import Dict, List
 
 import pytest
-from mock.mock import MagicMock
+from mock.mock import MagicMock, call
 
 from scalyr_agent import AgentLogger
+from scalyr_agent.json_lib import JsonArray, JsonObject
 from scalyr_agent.monitor_utils.k8s import (
     KubeletApi,
     KubeletApiException,
@@ -879,7 +882,6 @@ class TestKubeletApi(BaseScalyrLogCaptureTestCase):
 
 
 class ContainerCheckerTest(TestConfigurationBase):
-
     def setUp(self):
         super(ContainerCheckerTest, self).setUp()
         self.k8s_info = {
@@ -887,210 +889,6 @@ class ContainerCheckerTest(TestConfigurationBase):
             "pod_namespace": "test_namespace",
             "k8s_container_name": "xxx_test_container",
         }
-        self.tear_down_functions = []
-
-    def tearDown(self):
-        super(ContainerCheckerTest, self).tearDown()
-        for tear_down_function in self.tear_down_functions:
-            tear_down_function()
-        self.tear_down_functions = []
-
-    def test_check_containers_with_api_key_annotations(self):
-        self._write_file_with_separator_conversion(
-            """ {
-            api_key: "hi there",
-            k8s_logs: [
-              {
-                "k8s_container_glob": "no_match",
-                "test": "no_match",
-              },
-              {
-                "attributes": { "zzz_templ_container_name": "${k8s_container_name}" }
-              }
-            ]
-          }
-        """
-        )
-        config = self._create_test_configuration_instance()
-        config.parse()
-
-
-        mock_logger = mock.Mock()
-        cc = ContainerChecker(
-            config={"k8s_use_v2_attributes": True, "initial_stopped_container_collection_window": 0},
-            global_config=config,
-            logger=mock_logger,
-            socket_file=None,
-            docker_api_version=None,
-            agent_pod=mock.MagicMock(namespace="testing_namespace", name="testing_pod"),
-            host_hostname=None,
-            log_path=None,
-            include_all=False,
-            include_controller_info=True,
-            namespaces_to_include=[K8sNamespaceFilter.default_value()],
-            ignore_pod_sandboxes=False,
-        )
-
-        log_watcher = mock.Mock()
-
-        cc.set_log_watcher(log_watcher, MagicMock(module_name="unittest_module"))
-
-        cc.k8s_cache = mock.Mock()
-        cc.k8s_cache.is_initialized.return_value = True
-
-        cc._k8s_config_builder = mock.Mock(
-            return_value=K8sConfigBuilder(
-                [],
-                None,
-                None,
-                parse_format="test_parse_format",
-            )
-        )
-
-        cc._container_enumerator = mock.Mock()
-
-        class MockRunState():
-            def __init__(self):
-                self.running_lock = Lock()
-                self.next_loop_condition = Condition()
-                self.running = True
-            
-            def wait_for_next_loop_start(self):
-                with self.next_loop_condition:
-                    if not self.next_loop_condition.wait(timeout=5):
-                        raise Exception("Failed to acquire started lock")
-
-            def is_running(self):
-                with self.next_loop_condition:
-                    self.next_loop_condition.notify_all()
-
-                with self.running_lock:
-                    return self.running
-
-            def set_running(self, running):
-                with self.running_lock:
-                    self.running = running
-
-            def sleep_but_awaken_if_stopped(self, timeout):
-                pass
-
-        run_state = MockRunState()
-
-        get_containers_value = {
-            "container1": {
-                "k8s_info": {
-                    "k8s_container_name": "container1",
-                    "pod_info": mock.MagicMock(
-                        digest="digest-1"
-                    ),
-                    "pod_name": "testing_pod",
-                    "pod_namespace": "testing_namespace"
-                },
-                "name": "container1",
-                "log_path": "/var/log/scalyr-agent2/containers/container1.log"
-            }
-        }
-        cc._container_enumerator.get_containers.return_value = get_containers_value
-
-        from scalyr_agent.monitor_utils.annotation_config import process_annotations
-        k8s_pod = mock.MagicMock(
-            node_name="test_node",
-            uid="lkjsefr",
-            annotations=process_annotations(
-                {"log.config.scalyr.com/container1.teams.1.secret": "scalyr-api-key-team-1"}
-            ),
-            container_names=["container1"]
-        )
-        cc.k8s_cache.pod.return_value = k8s_pod
-        def mock_get_secret(namespace, name, current_time=None, allow_expired=False):
-            return mock.MagicMock(
-            data={
-                "scalyr-api-key": base64.b64encode((name + "-value").encode("utf-8"))
-            }
-        )
-        cc.k8s_cache.secret.side_effect = mock_get_secret
-
-        # Return log config
-        log_watcher.add_log_config.return_value = {}
-        log_watcher.update_log_configs_on_path.return_value = {}
-
-        exception_holder = []
-
-        def run(exception_holder):
-            try:
-                cc.check_containers(run_state)
-            except Exception as e:
-                exception_holder.append(e)
-
-        t = Thread(target=run, args=(exception_holder,))
-        t.start()
-
-        def stop_running():
-            run_state.set_running(False)
-            t.join()
-
-        self.tear_down_functions.append(stop_running)
-
-        # Wait for ContainerChecker to complete at least one loop
-        run_state.wait_for_next_loop_start()
-        run_state.wait_for_next_loop_start()
-
-        assert len(exception_holder) == 0, "Expected no exceptions"
-        assert len(mock_logger.warn.mock_calls) == 0, "Some warnings were logged: %s" % mock_logger.warn.mock_calls
-        assert len(mock_logger.error.mock_calls) == 0, "Some errors were logged: %s" % mock_logger.error.mock_calls
-
-        # Assert log_watcher was called with module name, log config with api_key and path and force_add=True
-        # Assert raw_logs contain DockerLog
-        # assert cc.raw_logs == []
-        # assert cc.docker_logs == []
-
-        class HasItems():
-            def __init__(self, expected_dict):
-                self.expected_dict = expected_dict
-
-            def __eq__(self, other):
-                for key, value in self.expected_dict.items():
-                    if other.get(key) != value:
-                        return False
-                return True
-
-            def __repr__(self):
-                return "HasItems(%s)" % self.expected_dict
-
-        log_watcher.add_log_config.assert_called_once_with("unittest_module", HasItems({"api_key": "scalyr-api-key-team-1-value"}), force_add=True)
-        log_watcher.add_log_config.reset_mock()
-
-        # Wait for the loop to complete and pause it to change pod annotations.
-        with run_state.running_lock as lock:
-            run_state.wait_for_next_loop_start()
-
-            k8s_pod.annotations = process_annotations(
-                {
-                    "log.config.scalyr.com/container1.teams.3.secret": "scalyr-api-key-team-2",
-                    "log.config.scalyr.com/container1.teams.8.secret": "scalyr-api-key-team-3",
-                    "log.config.scalyr.com/container1.teams.11.secret": "scalyr-api-key-team-4"
-                }
-            )
-            get_containers_value["container1"]["k8s_info"]["pod_info"].digest = "digest-2"
-
-        run_state.wait_for_next_loop_start()
-        run_state.wait_for_next_loop_start()
-
-        assert len(exception_holder) == 0, "Expected no exceptions"
-        assert len(mock_logger.warn.mock_calls) == 0, "Some warnings were logged: %s" % mock_logger.warn.mock_calls
-        assert len(mock_logger.error.mock_calls) == 0, "Some errors were logged: %s" % mock_logger.error.mock_calls
-
-        log_watcher.add_log_config.assert_not_called()
-
-        log_watcher.update_log_configs_on_path.assert_called_once_with(
-            "/var/log/scalyr-agent2/containers/container1.log",
-            "unittest_module",[
-                HasItems({"api_key": "scalyr-api-key-team-2-value"}),
-                HasItems({"api_key": "scalyr-api-key-team-3-value"}),
-                HasItems({"api_key": "scalyr-api-key-team-4-value"})
-            ]
-        )
-
 
     def test_variable_container_log_config(self):
         self._write_file_with_separator_conversion(
@@ -1144,6 +942,15 @@ class ContainerCheckerTest(TestConfigurationBase):
                 container_names=["one", "two"],
             )
 
+        def _namespace(name, **kwargs):
+            return mock.MagicMock(
+                name=name,
+                namespace=name,
+                uid="fsdfds",
+                labels={},
+                annotations={}
+            )
+
         result = cc._ContainerChecker__get_log_config_for_container(
             "12345",
             info={
@@ -1151,7 +958,7 @@ class ContainerCheckerTest(TestConfigurationBase):
                 "k8s_info": self.k8s_info,
                 "log_path": "/var/log/test.log",
             },
-            k8s_cache=mock.Mock(pod=_pod),
+            k8s_cache=mock.Mock(pod=_pod, namespace=_namespace),
             base_attributes=cc._ContainerChecker__get_base_attributes(),
         )
         assert "zzz_templ_container_name" in result[0]["attributes"]

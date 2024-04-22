@@ -47,6 +47,8 @@ spec:
             fieldRef:
               apiVersion: v1
               fieldPath: status.hostIP
+        - name: SCALYR_DEBUG_LEVEL
+          value: "5"
         envFrom:
         - configMapRef:
             name: scalyr-config

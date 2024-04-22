@@ -8,7 +8,8 @@ spec:
     spec:
       containers:
       - name: short-lived-container-1
-        image: busybox:1.28
+        image: docker.io/library/busybox:1.28
+        imagePullPolicy: Never
         command:
           - /bin/sh
           - -c
@@ -20,12 +21,13 @@ kind: Job
 metadata:
   name: short-lived-job-2
 spec:
-  ttlSecondsAfterFinished: 3
+  ttlSecondsAfterFinished: 6
   template:
     spec:
       containers:
       - name: short-lived-container-2
-        image: busybox:1.28
+        image: docker.io/library/busybox:1.28
+        imagePullPolicy: Never
         command:
           - /bin/sh
           - -c
@@ -37,12 +39,13 @@ kind: Job
 metadata:
   name: short-lived-job-3
 spec:
-  ttlSecondsAfterFinished: 3
+  ttlSecondsAfterFinished: 9
   template:
     spec:
       containers:
       - name: short-lived-container-3
-        image: busybox:1.28
+        image: docker.io/library/busybox:1.28
+        imagePullPolicy: Never
         command:
           - /bin/sh
           - -c
