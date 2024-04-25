@@ -3476,13 +3476,18 @@ class ContainerChecker(object):
         # Based on the pod annotations in a format {container_name}.{team}.secret={secret_name}
         # we might want to add api_keys parameter
 
-        if container_annotations or all_annotations or namespace_annotations:
+        self._logger.log(
+            scalyr_logging.DEBUG_LEVEL_0,
+            "log_config_for_container Checking for teams in annotations for container %s(%s), pod %s, namespace %s. Container annotations = %s, Pod annotations = %s, Namespace annotations = %s  " \
+            % (info["name"], short_cid, pod_name, pod_namespace, container_annotations, all_annotations, namespace_annotations)
+        )
 
-            api_keys = self.__container_api_keys_from_annotations(k8s_cache, pod_namespace, container_annotations)
+        if container_annotations or all_annotations or namespace_annotations:
+            api_keys = self.__container_api_keys_from_annotations(k8s_cache, pod_namespace, container_annotations, "container", info["name"])
             if not api_keys:
-                api_keys = self.__container_api_keys_from_annotations(k8s_cache, pod_namespace, all_annotations)
+                api_keys = self.__container_api_keys_from_annotations(k8s_cache, pod_namespace, all_annotations, "pod", info["name"])
             if not api_keys:
-                api_keys = self.__container_api_keys_from_annotations(k8s_cache, pod_namespace, namespace_annotations)
+                api_keys = self.__container_api_keys_from_annotations(k8s_cache, pod_namespace, namespace_annotations, "namespace", info["name"])
             if api_keys:
                 # Multiple matching api keys will result in multiple log configs, which will differ in the api_key field only.
                 results = [
@@ -3492,7 +3497,7 @@ class ContainerChecker(object):
 
         return results
 
-    def __container_api_keys_from_annotations(self, k8s_cache, namespace, annotations):
+    def __container_api_keys_from_annotations(self, k8s_cache, namespace, annotations, annotation_kind, container_name):
         def fetch_secret(name):
             if not name:
                 return None
@@ -3530,16 +3535,30 @@ class ContainerChecker(object):
 
             return api_key
 
-        api_keys = [
-            get_secret_api_key(fetch_secret(team.get("secret")))
+        secrets_names = [
+            team.get("secret")
             for team in annotations.get("teams", [])
         ]
 
-        return [
+        secrets = [
+            secret
+            for secret in map(fetch_secret, secrets_names)
+            if secret
+        ]
+
+        api_keys = [
             api_key
-            for api_key in api_keys
+            for api_key in map(get_secret_api_key, secrets)
             if api_key
         ]
+
+        self._logger.log(
+            scalyr_logging.DEBUG_LEVEL_0,
+            "log_config_for_container From %s annotations of container %s and namespace %s, got %d non-empty api keys, %d secrets for secret names %s" \
+            % (annotation_kind, container_name, namespace, len(api_keys), len(secrets), ",".join(secrets_names))
+        )
+
+        return api_keys
 
     def __get_docker_logs(self, containers, k8s_cache):
         # type: (Dict, KubernetesCache) -> List[DockerLog]

@@ -609,11 +609,32 @@ class CopyingManager(StoppableThread, LogWatcher):
     def __worker_id_from_log_config(self, log_config):
         # type: (Dict) -> six.text_type
 
+        log.log(
+            scalyr_logging.DEBUG_LEVEL_0,
+            f"Finding suitable worker for path {log_config.get('path')}, worker_id={log_config.get('worker_id')}, log_config_keys={log_config.keys()}"
+        )
+
         if "worker_id" in log_config:
+            log.info(
+                f"Using worker_id {log_config['worker_id']} from log_config for path {log_config.get('path')}."
+            )
+
             return log_config["worker_id"]
 
         if "api_key" in log_config:
-            return self.__dynamic_workers.get_or_create_worker(log_config["api_key"], self.__config).worker_id
+            worker_id = self.__dynamic_workers.get_or_create_worker(log_config["api_key"], self.__config).worker_id
+
+            log.log(
+                scalyr_logging.DEBUG_LEVEL_0,
+                f"Using dynamic worker {worker_id} based on api_key from log_config for path {log_config.get('path')}."
+            )
+
+            return worker_id
+
+        log.log(
+            scalyr_logging.DEBUG_LEVEL_0,
+            f"Fallback to default worker_id {DEFAULT_WORKER_ID} for path {log_config.get('path')}."
+        )
 
         return DEFAULT_WORKER_ID
 
@@ -628,6 +649,12 @@ class CopyingManager(StoppableThread, LogWatcher):
         the container restart where the log file is not immediately removed.
         returns: an updated log_config object
         """
+
+        log.log(
+            scalyr_logging.DEBUG_LEVEL_0,
+            f"log_config_for_container add_log_config path={log_config.get('path')} worker_id={log_config.get('worker_id')} monitor_name={monitor_name} force_add={force_add}, log_config_keys={log_config.keys()}"
+        )
+
         worker_id = self.__worker_id_from_log_config(log_config)
         log_config["worker_id"] = worker_id
         log_config = self.__config.parse_log_config(
@@ -681,6 +708,11 @@ class CopyingManager(StoppableThread, LogWatcher):
         return log_config
 
     def update_log_configs_on_path(self, path, monitor_name, log_configs):
+        log.log(
+            scalyr_logging.DEBUG_LEVEL_0,
+            f"log_config_for_container update_log_configs_on_path path={path} monitor_name={monitor_name} log_configs={len(log_configs)}"
+        )
+
         worker_ids = []
         new_log_configs = []
         for log_config in log_configs:
