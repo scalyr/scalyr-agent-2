@@ -611,12 +611,18 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         log.log(
             scalyr_logging.DEBUG_LEVEL_0,
-            f"Finding suitable worker for path {log_config.get('path')}, worker_id={log_config.get('worker_id')}, log_config_keys={log_config.keys()}"
+            (
+                "Finding suitable worker for path %s, worker_id=%s, log_config_keys=%s"
+                % (log_config.get("path"), log_config.get("worker_id"), log_config.keys())
+            )
         )
 
         if "worker_id" in log_config:
             log.info(
-                f"Using worker_id {log_config['worker_id']} from log_config for path {log_config.get('path')}."
+                (
+                    "Using worker_id %s from log_config for path %s."
+                    % (log_config['worker_id'], log_config.get('path'))
+                )
             )
 
             return log_config["worker_id"]
@@ -626,14 +632,20 @@ class CopyingManager(StoppableThread, LogWatcher):
 
             log.log(
                 scalyr_logging.DEBUG_LEVEL_0,
-                f"Using dynamic worker {worker_id} based on api_key from log_config for path {log_config.get('path')}."
+                (
+                    "Using dynamic worker %s based on api_key from log_config for path %s."
+                    % (worker_id, log_config.get('path'))
+                )
             )
 
             return worker_id
 
         log.log(
             scalyr_logging.DEBUG_LEVEL_0,
-            f"Fallback to default worker_id {DEFAULT_WORKER_ID} for path {log_config.get('path')}."
+            (
+                "Fallback to default worker_id %s for path %s."
+                % (DEFAULT_WORKER_ID, log_config.get('path'))
+            )
         )
 
         return DEFAULT_WORKER_ID
@@ -652,7 +664,10 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         log.log(
             scalyr_logging.DEBUG_LEVEL_0,
-            f"log_config_for_container add_log_config path={log_config.get('path')} worker_id={log_config.get('worker_id')} monitor_name={monitor_name} force_add={force_add}, log_config_keys={log_config.keys()}"
+            (
+                "add_log_config path=%s worker_id=%s monitor_name=%s force_add=%s, log_config_keys=%s"
+                % (log_config.get('path'), log_config.get('worker_id'), monitor_name, force_add, log_config.keys())
+            )
         )
 
         worker_id = self.__worker_id_from_log_config(log_config)
@@ -710,7 +725,10 @@ class CopyingManager(StoppableThread, LogWatcher):
     def update_log_configs_on_path(self, path, monitor_name, log_configs):
         log.log(
             scalyr_logging.DEBUG_LEVEL_0,
-            f"log_config_for_container update_log_configs_on_path path={path} monitor_name={monitor_name} log_configs={len(log_configs)}"
+            (
+                "log_config_for_container update_log_configs_on_path path=%s monitor_name=%s log_configs=%s"
+                % (path, monitor_name, len(log_configs))
+            )
         )
 
         worker_ids = []
