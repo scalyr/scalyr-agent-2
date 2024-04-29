@@ -612,8 +612,8 @@ class CopyingManager(StoppableThread, LogWatcher):
         log.log(
             scalyr_logging.DEBUG_LEVEL_0,
             (
-                "Finding suitable worker for path %s, worker_id=%s, log_config_keys=%s"
-                % (log_config.get("path"), log_config.get("worker_id"), log_config.keys())
+                "Finding suitable worker for path %s, log_config_keys=%s"
+                % (log_config.get("path"), log_config.keys())
             )
         )
 
@@ -661,14 +661,6 @@ class CopyingManager(StoppableThread, LogWatcher):
         the container restart where the log file is not immediately removed.
         returns: an updated log_config object
         """
-
-        log.log(
-            scalyr_logging.DEBUG_LEVEL_0,
-            (
-                "add_log_config path=%s worker_id=%s monitor_name=%s force_add=%s, log_config_keys=%s"
-                % (log_config.get('path'), log_config.get('worker_id'), monitor_name, force_add, log_config.keys())
-            )
-        )
 
         worker_id = self.__worker_id_from_log_config(log_config)
         log_config["worker_id"] = worker_id
