@@ -441,6 +441,24 @@ define_config_option(
 #                     'Optional (defaults to False). If true, stdout/stderr logs will contain docker timestamps at the beginning of the line\n',
 #                     convert_to=bool, default=False)
 
+define_config_option(
+    __monitor__,
+    "k8s_label_include_globs",
+    "Optional, (defaults to False). Specifies a list of K8s labels to be ignored and not added to logs.",
+    convert_to=ArrayOfStrings,
+    default=["*"],
+    env_aware=True,
+)
+
+define_config_option(
+    __monitor__,
+    "k8s_label_exclude_globs",
+    "Optional, (defaults to False). Specifies a list of K8s labels to be ignored and not added to logs.",
+    convert_to=ArrayOfStrings,
+    default=[],
+    env_aware=True,
+)
+
 define_metric(
     __monitor__,
     "docker.net.rx_bytes",
@@ -3232,6 +3250,15 @@ class ContainerChecker(object):
 
         return attributes
 
+    def __is_label_allowed(self, label_name):
+        return any(
+            fnmatch.fnmatch(label_name, glob)
+            for glob in self._config.get("k8s_label_include_globs")
+        ) and not any(
+            fnmatch.fnmatch(label_name, glob)
+            for glob in self._config.get("k8s_label_exclude_globs")
+        )
+
     def __get_log_config_for_container(self, cid, info, k8s_cache, base_attributes):
         # type: (str, dict, KubernetesCache, JsonObject) -> List[Dict]
 
@@ -3300,7 +3327,8 @@ class ContainerChecker(object):
                     container_attributes["k8s_node"] = pod.node_name
 
                 for label, value in six.iteritems(pod.labels):
-                    container_attributes[label] = value
+                    if self.__is_label_allowed(label):
+                        container_attributes[label] = value
 
                 if "parser" in pod.labels:
                     parser = pod.labels["parser"]
@@ -3321,7 +3349,11 @@ class ContainerChecker(object):
                         # field `_k8s_ck`
                         container_attributes["_k8s_dn"] = controller.name
                         # `_k8s_dl` is translated to `k8s-labels`
-                        container_attributes["_k8s_dl"] = controller.flat_labels
+                        container_attributes["_k8s_dl"] = ",".join(
+                            f"{label}={value}"
+                            for label, value in controller.labels.items()
+                            if self.__is_label_allowed(label)
+                        )
                         # `_k8s_ck` is translated into the field key for
                         # `_k8s_dn`. Here are some examples: `k8s-deployment`,
                         # `k8s-daemon-set`, `k8s-stateful-set`, etc. If the
