@@ -568,6 +568,18 @@ class Configuration(object):
         for worker_config in self.__config.get_json_array("workers"):
             worker_ids.add(worker_config["id"])
 
+
+        # get all lists where log files entries may be defined and require worker_id param.
+        # __k8s_log_configs is left out because it interferes with the kubernetes monitor container checker and CopyingManager itself sets default worker_id while adding logs.
+        log_config_lists_worker_id_required = [
+            self.__log_configs,
+            self.__journald_log_configs,
+        ]
+
+        for log_config_list in log_config_lists_worker_id_required:
+            for log_file_config in log_config_list:
+                log_file_config["worker_id"] = log_file_config.get("worker_id", default_value=DEFAULT_WORKER_ID)
+
         # get all lists where log files entries may be defined.
         log_config_lists = [
             self.__log_configs,
@@ -578,11 +590,7 @@ class Configuration(object):
         for log_config_list in log_config_lists:
             for log_file_config in log_config_list:
                 worker_id = log_file_config.get("worker_id", none_if_missing=True)
-
-                if worker_id is None:
-                    # set a default worker if worker_id is not specified.
-                    log_file_config["worker_id"] = DEFAULT_WORKER_ID
-                else:
+                if worker_id is not None:
                     # if log file entry has worker_id which is not defined in the 'workers' list, then throw an error.
                     if worker_id not in worker_ids:
                         valid_worker_ids = ", ".join(sorted(worker_ids))

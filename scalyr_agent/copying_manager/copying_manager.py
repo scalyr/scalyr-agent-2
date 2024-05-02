@@ -609,11 +609,44 @@ class CopyingManager(StoppableThread, LogWatcher):
     def __worker_id_from_log_config(self, log_config):
         # type: (Dict) -> six.text_type
 
+        log.log(
+            scalyr_logging.DEBUG_LEVEL_0,
+            (
+                "Finding suitable worker for path %s, log_config_keys=%s"
+                % (log_config.get("path"), log_config.keys())
+            )
+        )
+
         if "worker_id" in log_config:
+            log.info(
+                (
+                    "Using worker_id %s from log_config for path %s."
+                    % (log_config['worker_id'], log_config.get('path'))
+                )
+            )
+
             return log_config["worker_id"]
 
         if "api_key" in log_config:
-            return self.__dynamic_workers.get_or_create_worker(log_config["api_key"], self.__config).worker_id
+            worker_id = self.__dynamic_workers.get_or_create_worker(log_config["api_key"], self.__config).worker_id
+
+            log.log(
+                scalyr_logging.DEBUG_LEVEL_0,
+                (
+                    "Using dynamic worker %s based on api_key from log_config for path %s."
+                    % (worker_id, log_config.get('path'))
+                )
+            )
+
+            return worker_id
+
+        log.log(
+            scalyr_logging.DEBUG_LEVEL_0,
+            (
+                "Fallback to default worker_id %s for path %s."
+                % (DEFAULT_WORKER_ID, log_config.get('path'))
+            )
+        )
 
         return DEFAULT_WORKER_ID
 
@@ -628,6 +661,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         the container restart where the log file is not immediately removed.
         returns: an updated log_config object
         """
+
         worker_id = self.__worker_id_from_log_config(log_config)
         log_config["worker_id"] = worker_id
         log_config = self.__config.parse_log_config(
@@ -681,6 +715,14 @@ class CopyingManager(StoppableThread, LogWatcher):
         return log_config
 
     def update_log_configs_on_path(self, path, monitor_name, log_configs):
+        log.log(
+            scalyr_logging.DEBUG_LEVEL_0,
+            (
+                "log_config_for_container update_log_configs_on_path path=%s monitor_name=%s log_configs=%s"
+                % (path, monitor_name, len(log_configs))
+            )
+        )
+
         worker_ids = []
         new_log_configs = []
         for log_config in log_configs:
