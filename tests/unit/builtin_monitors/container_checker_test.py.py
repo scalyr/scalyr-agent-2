@@ -15,7 +15,7 @@ from scalyr_agent.monitor_utils.k8s import (
 )
 from scalyr_agent.monitor_utils.annotation_config import process_annotations
 
-__author__ = "echee@scalyr.com"
+__author__ = "ales.novak@scalyr.com"
 
 
 from scalyr_agent.builtin_monitors.kubernetes_monitor import (
