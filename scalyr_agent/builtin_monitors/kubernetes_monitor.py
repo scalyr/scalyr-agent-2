@@ -444,7 +444,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "k8s_label_include_globs",
-    "Optional, (defaults to False). Specifies a list of K8s labels to be ignored and not added to logs.",
+    "Optional, (defaults to ['*']). Specifies a list of K8s labels to be added to logs.",
     convert_to=ArrayOfStrings,
     default=["*"],
     env_aware=True,
@@ -453,7 +453,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "k8s_label_exclude_globs",
-    "Optional, (defaults to False). Specifies a list of K8s labels to be ignored and not added to logs.",
+    "Optional, (defaults to []]). Specifies a list of K8s labels to be ignored and not added to logs.",
     convert_to=ArrayOfStrings,
     default=[],
     env_aware=True,

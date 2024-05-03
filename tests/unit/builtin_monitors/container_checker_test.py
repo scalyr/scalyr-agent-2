@@ -83,7 +83,18 @@ class ContainerCheckerTest(TestConfigurationBase):
         self.tear_down_functions = []
 
         self._write_file_with_separator_conversion(
-            json.dumps(self._container_checker_config_dict(), indent=4)
+            """{
+            "api_key": "hi there",
+            "k8s_logs": [
+              {
+                "k8s_container_glob": "no_match",
+                "test": "no_match",
+              },
+              {
+                "attributes": { "container_name": "${k8s_container_name}" }
+              }
+            ]
+          }"""
         )
         self.config = self._create_test_configuration_instance()
         self.config.parse()
@@ -95,7 +106,7 @@ class ContainerCheckerTest(TestConfigurationBase):
         self.log_watcher.update_log_configs_on_path.return_value = {}
 
         self.container_checker = ContainerChecker(
-            config={"k8s_use_v2_attributes": True, "initial_stopped_container_collection_window": 0},
+            config=self._container_checker_config(),
             global_config=self.config,
             logger=self.mock_logger,
             socket_file=None,
@@ -137,21 +148,21 @@ class ContainerCheckerTest(TestConfigurationBase):
             tear_down_function()
         self.tear_down_functions = []
 
-    def _container_checker_config_dict(self):
-        return {
-            "api_key": "hi there",
-            "k8s_logs": [
-              {
-                "k8s_container_glob": "no_match",
-                "test": "no_match",
-              },
-              {
-                "attributes": { "container_name": "${k8s_container_name}" }
-              }
-            ]
-          }
+    def _flatten_labels(self, labels):
+        return ",".join(
+            f"{label}={value}"
+            for label, value in labels.items()
+        )
 
-    def __start_check_containers_thread(self):
+    def _container_checker_config(self):
+        return {
+            "k8s_use_v2_attributes": True,
+            "initial_stopped_container_collection_window": 0,
+            "k8s_label_include_globs": ["*"],
+            "k8s_label_exclude_globs": []
+        }
+
+    def _start_check_containers_thread(self):
 
         exception_holder = []
         run_state = MockRunState()
@@ -174,7 +185,7 @@ class ContainerCheckerTest(TestConfigurationBase):
 
         return run_state, exception_holder
 
-    def __get_containers_value_from_pods(self, pods):
+    def _get_containers_value_from_pods(self, pods):
         return {
             container_name: {
                 "k8s_info": {
@@ -192,13 +203,13 @@ class ContainerCheckerTest(TestConfigurationBase):
             for container_name in k8s_pod.container_names
         }
 
-    def __mock_get_containers_value(self, value):
+    def _mock_get_containers_value(self, value):
         self.container_checker._container_enumerator.get_containers.return_value = value
         return value
 
-    def __set_mocked_k8s_objects(self, k8s_pods, k8s_namespaces):
-        get_containers_value = self.__mock_get_containers_value(
-            self.__get_containers_value_from_pods(k8s_pods)
+    def _set_mocked_k8s_objects(self, k8s_pods, k8s_namespaces):
+        get_containers_value = self._mock_get_containers_value(
+            self._get_containers_value_from_pods(k8s_pods)
         )
 
         def mocked_pod(
@@ -262,13 +273,13 @@ class ContainerCheckerMultiAccountTest(ContainerCheckerTest):
             controller=Controller(
                 name="controller_name_k8s_pod_1_namespace_1",
                 kind="controller_kind_k8s_pod_1_namespace_1",
-                flat_labels="controller_labels_k8s_pod_1_namespace_1:value",
+                labels={"controller_labels_k8s_pod_1_namespace_1": "value"}
             )
         )
 
-        self.__set_mocked_k8s_objects([k8s_pod], [k8s_namespace])
+        self._set_mocked_k8s_objects([k8s_pod], [k8s_namespace])
 
-        run_state, exception_holder = self.__start_check_containers_thread()
+        run_state, exception_holder = self._start_check_containers_thread()
 
         # Wait for ContainerChecker to complete at least one loop
         run_state.wait_for_next_loop_start()
@@ -344,7 +355,7 @@ class ContainerCheckerMultiAccountTest(ContainerCheckerTest):
             controller = Controller(
                 name = "controller_name_k8s_pod_1_namespace_1",
                 kind = "controller_kind_k8s_pod_1_namespace_1",
-                flat_labels = "controller_labels_k8s_pod_1_namespace_1:value",
+                labels = {"controller_labels_k8s_pod_1_namespace_1": "value"}
             )
         )
 
@@ -360,7 +371,7 @@ class ContainerCheckerMultiAccountTest(ContainerCheckerTest):
             controller=Controller(
                 name="controller_name_k8s_pod_2_namespace_1",
                 kind="controller_kind_k8s_pod_2_namespace_1",
-                flat_labels="controller_labels_k8s_pod_2_namespace_1:value",
+                labels={"controller_labels_k8s_pod_2_namespace_1": "value"}
             )
         )
 
@@ -378,13 +389,13 @@ class ContainerCheckerMultiAccountTest(ContainerCheckerTest):
             controller=Controller(
                 name="controller_name_k8s_pod_3_namespace_2",
                 kind="controller_kind_k8s_pod_3_namespace_2",
-                flat_labels="controller_labels_k8s_pod_3_namespace_2:value",
+                labels={"controller_labels_k8s_pod_3_namespace_2": "value"}
             )
         )
 
-        get_containers_value = self.__set_mocked_k8s_objects([k8s_pod_1_namespace_1, k8s_pod_2_namespace_1, k8s_pod_3_namespace_2], [k8s_namespace_1, k8s_namespace_2])
+        get_containers_value = self._set_mocked_k8s_objects([k8s_pod_1_namespace_1, k8s_pod_2_namespace_1, k8s_pod_3_namespace_2], [k8s_namespace_1, k8s_namespace_2])
 
-        run_state, exception_holder = self.__start_check_containers_thread()
+        run_state, exception_holder = self._start_check_containers_thread()
 
         # Wait for ContainerChecker to complete at least one loop
         run_state.wait_for_next_loop_start()
@@ -413,7 +424,7 @@ class ContainerCheckerMultiAccountTest(ContainerCheckerTest):
                     'pod_uid': pod.uid,
                     'k8s_node': 'test_node',
                     '_k8s_dn': pod.controller.name,
-                    '_k8s_dl': pod.controller.flat_labels,
+                    '_k8s_dl': self._flatten_labels(pod.controller.labels),
                     '_k8s_ck': pod.controller.kind
                 }),
                 'k8s_pod_glob': '*', 'k8s_namespace_glob': '*', 'k8s_container_glob': '*', 'lineGroupers': JsonArray(),
@@ -515,8 +526,8 @@ class ContainerCheckerMultiAccountTest(ContainerCheckerTest):
 
 class ContainerCheckerFilterLabelsTest(ContainerCheckerTest):
 
-    def _container_checker_config_dict(self):
-        config = super()._container_checker_config_dict()
+    def _container_checker_config(self):
+        config = super()._container_checker_config()
 
         config["k8s_label_include_globs"] = ["*include_this_label*", "wanted_label"]
         config["k8s_label_exclude_globs"] = ["*garbage*","*exclude*"]
@@ -587,18 +598,17 @@ class ContainerCheckerFilterLabelsTest(ContainerCheckerTest):
             "unwanted_label": "unwanted_value" # Not matching include glob
         }
 
-        INCLUDED_CONTROLLER_LABELS = ",".join(
-            f"{label}={value}"
-            for label, value in {
+        INCLUDED_CONTROLLER_LABELS = self._flatten_labels(
+            {
                 "include_this_label": "include_this_value",
                 "controller_include_this_label": "controller_include_this_value",
                 "wanted_label": "wanted_value"
-            }.items()
+            }
         )
 
-        get_containers_value = self.__set_mocked_k8s_objects([k8s_pod], [k8s_namespace])
+        get_containers_value = self._set_mocked_k8s_objects([k8s_pod], [k8s_namespace])
 
-        run_state, exception_holder = self.__start_check_containers_thread()
+        run_state, exception_holder = self._start_check_containers_thread()
 
         # Wait for ContainerChecker to complete at least one loop
         run_state.wait_for_next_loop_start()

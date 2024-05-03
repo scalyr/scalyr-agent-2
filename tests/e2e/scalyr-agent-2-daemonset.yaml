@@ -9,7 +9,8 @@ data:
       "k8s_logs": [
         {
           "attributes": {
-            "container_name": "${k8s_container_name}"}
+            "container_name": "${k8s_container_name}"
+          }
         }
       ]
     }
@@ -31,7 +32,9 @@ data:
       "monitors":[
         {
           "module": "scalyr_agent.builtin_monitors.kubernetes_monitor",
-          "stop_agent_on_failure": true
+          "stop_agent_on_failure": true,
+          "k8s_label_include_globs": ["app", "*include_this_label*", "wanted_label"],
+          "k8s_label_exclude_globs": ["*garbage*","*exclude*"]
         }
       ]
     }
