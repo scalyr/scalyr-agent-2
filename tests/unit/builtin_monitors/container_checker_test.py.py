@@ -26,7 +26,8 @@ from tests.unit.configuration_test import TestConfigurationBase
 
 import mock
 
-class MockRunState():
+
+class MockRunState:
     def __init__(self):
         self.running_lock = Lock()
         self.next_loop_condition = Condition()
@@ -53,21 +54,21 @@ class MockRunState():
 
 
 @dataclass
-class MockNamespace():
+class MockNamespace:
     name: str
     annotations: Dict
     digest: bytes = b""
 
 
 @dataclass
-class MockController():
+class MockController:
     name: str
     kind: str
     flat_labels: str
 
 
 @dataclass
-class MockPod():
+class MockPod:
     namespace: str
     name: str
     node_name: str
@@ -79,7 +80,7 @@ class MockPod():
 
 
 @dataclass
-class MockPodInfo():
+class MockPodInfo:
     digest: str
 
 
@@ -113,7 +114,10 @@ class ContainerCheckerTest(TestConfigurationBase):
         self.log_watcher.update_log_configs_on_path.return_value = {}
 
         self.container_checker = ContainerChecker(
-            config={"k8s_use_v2_attributes": True, "initial_stopped_container_collection_window": 0},
+            config={
+                "k8s_use_v2_attributes": True,
+                "initial_stopped_container_collection_window": 0,
+            },
             global_config=self.config,
             logger=self.mock_logger,
             socket_file=None,
@@ -128,7 +132,9 @@ class ContainerCheckerTest(TestConfigurationBase):
         )
 
         self.container_checker.get_cluster_name = lambda *_: "the-cluster-name"
-        self.container_checker.set_log_watcher(self.log_watcher, MagicMock(module_name="unittest_module"))
+        self.container_checker.set_log_watcher(
+            self.log_watcher, MagicMock(module_name="unittest_module")
+        )
         self.container_checker._k8s_config_builder = mock.Mock(
             return_value=K8sConfigBuilder(
                 self.config.k8s_log_configs,
@@ -143,10 +149,13 @@ class ContainerCheckerTest(TestConfigurationBase):
 
         def mock_get_secret(namespace, name, current_time=None, allow_expired=False):
             return mock.MagicMock(
-            data={
-                "scalyr-api-key": base64.b64encode((name + "-value").encode("utf-8"))
-            }
-        )
+                data={
+                    "scalyr-api-key": base64.b64encode(
+                        (name + "-value").encode("utf-8")
+                    )
+                }
+            )
+
         self.container_checker.k8s_cache.secret.side_effect = mock_get_secret
 
     def tearDown(self):
@@ -183,14 +192,12 @@ class ContainerCheckerTest(TestConfigurationBase):
             container_name: {
                 "k8s_info": {
                     "k8s_container_name": container_name,
-                    "pod_info": MockPodInfo(
-                        digest=f"{k8s_pod.name}-digest-1"
-                    ),
+                    "pod_info": MockPodInfo(digest=f"{k8s_pod.name}-digest-1"),
                     "pod_name": k8s_pod.name,
-                    "pod_namespace": k8s_pod.namespace
+                    "pod_namespace": k8s_pod.namespace,
                 },
                 "name": container_name,
-                "log_path": f"/var/log/scalyr-agent2/containers/{container_name}.log"
+                "log_path": f"/var/log/scalyr-agent2/containers/{container_name}.log",
             }
             for k8s_pod in pods
             for container_name in k8s_pod.container_names
@@ -211,38 +218,35 @@ class ContainerCheckerTest(TestConfigurationBase):
             current_time=None,
             allow_expired=True,
             query_options=None,
-            ignore_k8s_api_exception=False):
-            return {
-                pod.name: pod
-                for pod in k8s_pods
-            }[name]
+            ignore_k8s_api_exception=False,
+        ):
+            return {pod.name: pod for pod in k8s_pods}[name]
 
         self.container_checker.k8s_cache.pod.side_effect = mocked_pod
 
         def namespace(
-                name,
-                current_time=None,
-                allow_expired=True,
-                query_options=None,
-                ignore_k8s_api_exception=False,
+            name,
+            current_time=None,
+            allow_expired=True,
+            query_options=None,
+            ignore_k8s_api_exception=False,
         ):
-            return {
-                namespace.name: namespace
-                for namespace in k8s_namespaces
-            }[name]
+            return {namespace.name: namespace for namespace in k8s_namespaces}[name]
 
         self.container_checker.k8s_cache.namespace.side_effect = namespace
 
         return get_containers_value
 
-
     def __assert_mock_logger_no_severe_messages(self):
-        assert len(
-            self.mock_logger.exception.mock_calls) == 0, "Some exceptions were logged: %s" % self.mock_logger.exception.mock_calls
-        assert len(
-            self.mock_logger.warn.mock_calls) == 0, "Some warnings were logged: %s" % self.mock_logger.warn.mock_calls
-        assert len(
-            self.mock_logger.error.mock_calls) == 0, "Some errors were logged: %s" % self.mock_logger.error.mock_calls
+        assert len(self.mock_logger.exception.mock_calls) == 0, (
+            "Some exceptions were logged: %s" % self.mock_logger.exception.mock_calls
+        )
+        assert len(self.mock_logger.warn.mock_calls) == 0, (
+            "Some warnings were logged: %s" % self.mock_logger.warn.mock_calls
+        )
+        assert len(self.mock_logger.error.mock_calls) == 0, (
+            "Some errors were logged: %s" % self.mock_logger.error.mock_calls
+        )
 
     def test_check_namespace_change(self):
         k8s_namespace = MockNamespace(
@@ -250,7 +254,7 @@ class ContainerCheckerTest(TestConfigurationBase):
             annotations=process_annotations(
                 {"log.config.scalyr.com/teams.1.secret": "scalyr-api-key-team-2"}
             ),
-            digest=b"digest-1"
+            digest=b"digest-1",
         )
         k8s_pod = MockPod(
             namespace=k8s_namespace.name,
@@ -258,14 +262,12 @@ class ContainerCheckerTest(TestConfigurationBase):
             node_name="test_node",
             uid="lkjsefr",
             annotations=process_annotations({}),
-            container_names=[
-                "work-container"
-            ],
+            container_names=["work-container"],
             controller=MockController(
                 name="controller_name_k8s_pod_1_namespace_1",
                 kind="controller_kind_k8s_pod_1_namespace_1",
                 flat_labels="controller_labels_k8s_pod_1_namespace_1:value",
-            )
+            ),
         )
 
         self.__set_mocked_k8s_objects([k8s_pod], [k8s_namespace])
@@ -281,8 +283,14 @@ class ContainerCheckerTest(TestConfigurationBase):
 
         assert len(self.log_watcher.add_log_config.call_args_list) == 1
 
-        assert self.log_watcher.add_log_config.call_args_list[0].args[1]["path"] == '/var/log/scalyr-agent2/containers/work-container.log'
-        assert self.log_watcher.add_log_config.call_args_list[0].args[1]["api_key"] == 'scalyr-api-key-team-2-value'
+        assert (
+            self.log_watcher.add_log_config.call_args_list[0].args[1]["path"]
+            == "/var/log/scalyr-agent2/containers/work-container.log"
+        )
+        assert (
+            self.log_watcher.add_log_config.call_args_list[0].args[1]["api_key"]
+            == "scalyr-api-key-team-2-value"
+        )
 
         self.log_watcher.add_log_config.reset_mock()
 
@@ -303,12 +311,26 @@ class ContainerCheckerTest(TestConfigurationBase):
 
         self.log_watcher.add_log_config.assert_not_called()
 
-        assert self.log_watcher.update_log_configs_on_path.call_args_list[0].args[0] == '/var/log/scalyr-agent2/containers/work-container.log'
-        assert self.log_watcher.update_log_configs_on_path.call_args_list[0].args[1] == 'unittest_module'
+        assert (
+            self.log_watcher.update_log_configs_on_path.call_args_list[0].args[0]
+            == "/var/log/scalyr-agent2/containers/work-container.log"
+        )
+        assert (
+            self.log_watcher.update_log_configs_on_path.call_args_list[0].args[1]
+            == "unittest_module"
+        )
 
-        assert len(self.log_watcher.update_log_configs_on_path.call_args_list[0].args[2]) == 1
+        assert (
+            len(self.log_watcher.update_log_configs_on_path.call_args_list[0].args[2])
+            == 1
+        )
 
-        assert self.log_watcher.update_log_configs_on_path.call_args_list[0].args[2][0]["api_key"] == 'scalyr-api-key-team-3-value'
+        assert (
+            self.log_watcher.update_log_configs_on_path.call_args_list[0].args[2][0][
+                "api_key"
+            ]
+            == "scalyr-api-key-team-3-value"
+        )
 
     def test_check_containers_with_api_key_annotations(self):
         WORKLOAD_POD_1_CONTAINER_3 = "workload-pod-1-container-3"
@@ -321,7 +343,7 @@ class ContainerCheckerTest(TestConfigurationBase):
             name="namespace-1",
             annotations=process_annotations(
                 {"log.config.scalyr.com/teams.1.secret": "scalyr-api-key-team-2"}
-            )
+            ),
         )
 
         k8s_pod_1_namespace_1 = MockPod(
@@ -335,7 +357,7 @@ class ContainerCheckerTest(TestConfigurationBase):
                     "log.config.scalyr.com/teams.5.secret": "scalyr-api-key-team-4",
                     "log.config.scalyr.com/workload-pod-1-container-1.teams.1.secret": "scalyr-api-key-team-5",
                     "log.config.scalyr.com/workload-pod-1-container-2.teams.1.secret": "scalyr-api-key-team-6",
-                    "log.config.scalyr.com/workload-pod-1-container-2.teams.2.secret": "scalyr-api-key-team-7"
+                    "log.config.scalyr.com/workload-pod-1-container-2.teams.2.secret": "scalyr-api-key-team-7",
                 }
             ),
             container_names=[
@@ -343,11 +365,11 @@ class ContainerCheckerTest(TestConfigurationBase):
                 WORKLOAD_POD_1_CONTAINER_2,
                 WORKLOAD_POD_1_CONTAINER_3,
             ],
-            controller = MockController(
-                name = "controller_name_k8s_pod_1_namespace_1",
-                kind = "controller_kind_k8s_pod_1_namespace_1",
-                flat_labels = "controller_labels_k8s_pod_1_namespace_1:value",
-            )
+            controller=MockController(
+                name="controller_name_k8s_pod_1_namespace_1",
+                kind="controller_kind_k8s_pod_1_namespace_1",
+                flat_labels="controller_labels_k8s_pod_1_namespace_1:value",
+            ),
         )
 
         k8s_pod_2_namespace_1 = MockPod(
@@ -363,12 +385,11 @@ class ContainerCheckerTest(TestConfigurationBase):
                 name="controller_name_k8s_pod_2_namespace_1",
                 kind="controller_kind_k8s_pod_2_namespace_1",
                 flat_labels="controller_labels_k8s_pod_2_namespace_1:value",
-            )
+            ),
         )
 
         k8s_namespace_2 = MockNamespace(
-            name="namespace-2",
-            annotations=process_annotations({})
+            name="namespace-2", annotations=process_annotations({})
         )
         k8s_pod_3_namespace_2 = MockPod(
             namespace=k8s_namespace_2.name,
@@ -381,10 +402,13 @@ class ContainerCheckerTest(TestConfigurationBase):
                 name="controller_name_k8s_pod_3_namespace_2",
                 kind="controller_kind_k8s_pod_3_namespace_2",
                 flat_labels="controller_labels_k8s_pod_3_namespace_2:value",
-            )
+            ),
         )
 
-        get_containers_value = self.__set_mocked_k8s_objects([k8s_pod_1_namespace_1, k8s_pod_2_namespace_1, k8s_pod_3_namespace_2], [k8s_namespace_1, k8s_namespace_2])
+        get_containers_value = self.__set_mocked_k8s_objects(
+            [k8s_pod_1_namespace_1, k8s_pod_2_namespace_1, k8s_pod_3_namespace_2],
+            [k8s_namespace_1, k8s_namespace_2],
+        )
 
         run_state, exception_holder = self.__start_check_containers_thread()
 
@@ -393,82 +417,126 @@ class ContainerCheckerTest(TestConfigurationBase):
         run_state.wait_for_next_loop_start()
 
         assert len(exception_holder) == 0, "Expected no exceptions"
-        assert len(self.mock_logger.exception.mock_calls) == 0, "Some exceptions were logged: %s" % self.mock_logger.exception.mock_calls
-        assert len(self.mock_logger.warn.mock_calls) == 0, "Some warnings were logged: %s" % self.mock_logger.warn.mock_calls
-        assert len(self.mock_logger.error.mock_calls) == 0, "Some errors were logged: %s" % self.mock_logger.error.mock_calls
+        assert len(self.mock_logger.exception.mock_calls) == 0, (
+            "Some exceptions were logged: %s" % self.mock_logger.exception.mock_calls
+        )
+        assert len(self.mock_logger.warn.mock_calls) == 0, (
+            "Some warnings were logged: %s" % self.mock_logger.warn.mock_calls
+        )
+        assert len(self.mock_logger.error.mock_calls) == 0, (
+            "Some errors were logged: %s" % self.mock_logger.error.mock_calls
+        )
 
-        def expected_log_config(pod: MockPod, container_name: str, api_key: str, teams: List[str]):
+        def expected_log_config(
+            pod: MockPod, container_name: str, api_key: str, teams: List[str]
+        ):
             log_config = {
-                'parser': 'docker',
-                'path': f'/var/log/scalyr-agent2/containers/{container_name}.log',
-                'parse_format': 'test_parse_format',
-                'rename_logfile': f'/unknown/{container_name}.log',
-                'rename_no_original': None,
-                'attributes': JsonObject({
-                    'container_name': container_name,
-                    'monitor': 'agentKubernetes',
-                    'container_id': container_name,
-                    'pod_name': pod.name,
-                    'pod_namespace': pod.namespace,
-                    '_k8s_cn': 'the-cluster-name',
-                    'scalyr-category': 'log',
-                    'pod_uid': pod.uid,
-                    'k8s_node': 'test_node',
-                    '_k8s_dn': pod.controller.name,
-                    '_k8s_dl': pod.controller.flat_labels,
-                    '_k8s_ck': pod.controller.kind
-                }),
-                'k8s_pod_glob': '*', 'k8s_namespace_glob': '*', 'k8s_container_glob': '*', 'lineGroupers': JsonArray(),
-                'sampling_rules': JsonArray(), 'redaction_rules': JsonArray()
+                "parser": "docker",
+                "path": f"/var/log/scalyr-agent2/containers/{container_name}.log",
+                "parse_format": "test_parse_format",
+                "rename_logfile": f"/unknown/{container_name}.log",
+                "rename_no_original": None,
+                "attributes": JsonObject(
+                    {
+                        "container_name": container_name,
+                        "monitor": "agentKubernetes",
+                        "container_id": container_name,
+                        "pod_name": pod.name,
+                        "pod_namespace": pod.namespace,
+                        "_k8s_cn": "the-cluster-name",
+                        "scalyr-category": "log",
+                        "pod_uid": pod.uid,
+                        "k8s_node": "test_node",
+                        "_k8s_dn": pod.controller.name,
+                        "_k8s_dl": pod.controller.flat_labels,
+                        "_k8s_ck": pod.controller.kind,
+                    }
+                ),
+                "k8s_pod_glob": "*",
+                "k8s_namespace_glob": "*",
+                "k8s_container_glob": "*",
+                "lineGroupers": JsonArray(),
+                "sampling_rules": JsonArray(),
+                "redaction_rules": JsonArray(),
             }
             if teams:
-                log_config['teams'] = JsonArray(*[JsonObject({'secret': team}) for team in teams])
+                log_config["teams"] = JsonArray(
+                    *[JsonObject({"secret": team}) for team in teams]
+                )
             if api_key:
-                log_config['api_key'] = api_key
+                log_config["api_key"] = api_key
 
             return log_config
 
         assert self.log_watcher.add_log_config.call_args_list == [
             call(
-            'unittest_module',
-                expected_log_config(k8s_pod_1_namespace_1, WORKLOAD_POD_1_CONTAINER_1, 'scalyr-api-key-team-5-value', ['scalyr-api-key-team-5']),
-                force_add=True
+                "unittest_module",
+                expected_log_config(
+                    k8s_pod_1_namespace_1,
+                    WORKLOAD_POD_1_CONTAINER_1,
+                    "scalyr-api-key-team-5-value",
+                    ["scalyr-api-key-team-5"],
+                ),
+                force_add=True,
             ),
             call(
-                'unittest_module',
-                expected_log_config(k8s_pod_1_namespace_1, WORKLOAD_POD_1_CONTAINER_2, 'scalyr-api-key-team-6-value',
-                                    ['scalyr-api-key-team-6', 'scalyr-api-key-team-7']),
-                force_add=True
+                "unittest_module",
+                expected_log_config(
+                    k8s_pod_1_namespace_1,
+                    WORKLOAD_POD_1_CONTAINER_2,
+                    "scalyr-api-key-team-6-value",
+                    ["scalyr-api-key-team-6", "scalyr-api-key-team-7"],
+                ),
+                force_add=True,
             ),
             call(
-                'unittest_module',
-                expected_log_config(k8s_pod_1_namespace_1, WORKLOAD_POD_1_CONTAINER_2, 'scalyr-api-key-team-7-value',
-                                    ['scalyr-api-key-team-6', 'scalyr-api-key-team-7']),
-                force_add=True
+                "unittest_module",
+                expected_log_config(
+                    k8s_pod_1_namespace_1,
+                    WORKLOAD_POD_1_CONTAINER_2,
+                    "scalyr-api-key-team-7-value",
+                    ["scalyr-api-key-team-6", "scalyr-api-key-team-7"],
+                ),
+                force_add=True,
             ),
             call(
-                'unittest_module',
-                expected_log_config(k8s_pod_1_namespace_1, WORKLOAD_POD_1_CONTAINER_3, 'scalyr-api-key-team-3-value',
-                                    ['scalyr-api-key-team-3', 'scalyr-api-key-team-4']),
-                force_add=True
+                "unittest_module",
+                expected_log_config(
+                    k8s_pod_1_namespace_1,
+                    WORKLOAD_POD_1_CONTAINER_3,
+                    "scalyr-api-key-team-3-value",
+                    ["scalyr-api-key-team-3", "scalyr-api-key-team-4"],
+                ),
+                force_add=True,
             ),
             call(
-                'unittest_module',
-                expected_log_config(k8s_pod_1_namespace_1, WORKLOAD_POD_1_CONTAINER_3, 'scalyr-api-key-team-4-value',
-                                    ['scalyr-api-key-team-3', 'scalyr-api-key-team-4']),
-                force_add=True
+                "unittest_module",
+                expected_log_config(
+                    k8s_pod_1_namespace_1,
+                    WORKLOAD_POD_1_CONTAINER_3,
+                    "scalyr-api-key-team-4-value",
+                    ["scalyr-api-key-team-3", "scalyr-api-key-team-4"],
+                ),
+                force_add=True,
             ),
             call(
-                'unittest_module',
-                expected_log_config(k8s_pod_2_namespace_1, WORKLOAD_POD_2_CONTAINER_1, 'scalyr-api-key-team-2-value', None),
-                force_add=True
+                "unittest_module",
+                expected_log_config(
+                    k8s_pod_2_namespace_1,
+                    WORKLOAD_POD_2_CONTAINER_1,
+                    "scalyr-api-key-team-2-value",
+                    None,
+                ),
+                force_add=True,
             ),
             call(
-                'unittest_module',
-                expected_log_config(k8s_pod_3_namespace_2, WORKLOAD_POD_3_CONTAINER_1, None,
-                                    None),
-                force_add=True
-            )]
+                "unittest_module",
+                expected_log_config(
+                    k8s_pod_3_namespace_2, WORKLOAD_POD_3_CONTAINER_1, None, None
+                ),
+                force_add=True,
+            ),
+        ]
 
         self.log_watcher.add_log_config.reset_mock()
 
@@ -483,33 +551,55 @@ class ContainerCheckerTest(TestConfigurationBase):
                     "log.config.scalyr.com/workload-pod-1-container-3.teams.1.secret": "scalyr-api-key-team-12",
                 }
             )
-            get_containers_value[WORKLOAD_POD_1_CONTAINER_1]["k8s_info"]["pod_info"].digest = "digest-2"
-            get_containers_value[WORKLOAD_POD_1_CONTAINER_3]["k8s_info"]["pod_info"].digest = "digest-2"
+            get_containers_value[WORKLOAD_POD_1_CONTAINER_1]["k8s_info"][
+                "pod_info"
+            ].digest = "digest-2"
+            get_containers_value[WORKLOAD_POD_1_CONTAINER_3]["k8s_info"][
+                "pod_info"
+            ].digest = "digest-2"
 
         run_state.wait_for_next_loop_start()
         run_state.wait_for_next_loop_start()
 
         assert len(exception_holder) == 0, "Expected no exceptions"
-        assert len(self.mock_logger.warn.mock_calls) == 0, "Some warnings were logged: %s" % self.mock_logger.warn.mock_calls
-        assert len(self.mock_logger.error.mock_calls) == 0, "Some errors were logged: %s" % self.mock_logger.error.mock_calls
+        assert len(self.mock_logger.warn.mock_calls) == 0, (
+            "Some warnings were logged: %s" % self.mock_logger.warn.mock_calls
+        )
+        assert len(self.mock_logger.error.mock_calls) == 0, (
+            "Some errors were logged: %s" % self.mock_logger.error.mock_calls
+        )
 
         self.log_watcher.add_log_config.assert_not_called()
 
         assert self.log_watcher.update_log_configs_on_path.call_args_list == [
             call(
                 "/var/log/scalyr-agent2/containers/workload-pod-1-container-1.log",
-                'unittest_module',
+                "unittest_module",
                 [
-                    expected_log_config(k8s_pod_1_namespace_1, WORKLOAD_POD_1_CONTAINER_1, 'scalyr-api-key-team-10-value',
-                                        ['scalyr-api-key-team-10', 'scalyr-api-key-team-11']),
-                    expected_log_config(k8s_pod_1_namespace_1, WORKLOAD_POD_1_CONTAINER_1,'scalyr-api-key-team-11-value',
-                                        ['scalyr-api-key-team-10', 'scalyr-api-key-team-11']),
-                ]
+                    expected_log_config(
+                        k8s_pod_1_namespace_1,
+                        WORKLOAD_POD_1_CONTAINER_1,
+                        "scalyr-api-key-team-10-value",
+                        ["scalyr-api-key-team-10", "scalyr-api-key-team-11"],
+                    ),
+                    expected_log_config(
+                        k8s_pod_1_namespace_1,
+                        WORKLOAD_POD_1_CONTAINER_1,
+                        "scalyr-api-key-team-11-value",
+                        ["scalyr-api-key-team-10", "scalyr-api-key-team-11"],
+                    ),
+                ],
             ),
-            call("/var/log/scalyr-agent2/containers/workload-pod-1-container-3.log", "unittest_module",
-                 [
-                        expected_log_config(k8s_pod_1_namespace_1, WORKLOAD_POD_1_CONTAINER_3, 'scalyr-api-key-team-12-value',
-                                            ['scalyr-api-key-team-12']),
-                 ]
-             )
+            call(
+                "/var/log/scalyr-agent2/containers/workload-pod-1-container-3.log",
+                "unittest_module",
+                [
+                    expected_log_config(
+                        k8s_pod_1_namespace_1,
+                        WORKLOAD_POD_1_CONTAINER_3,
+                        "scalyr-api-key-team-12-value",
+                        ["scalyr-api-key-team-12"],
+                    ),
+                ],
+            ),
         ]
