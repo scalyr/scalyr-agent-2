@@ -25,6 +25,7 @@ import sys
 
 global_log = scalyr_logging.getLogger(__name__)
 
+
 # A MixIn class used for adding a thread poll processing to a BaseServer (i.e. SyslogTCPServer, SyslogUDPServer)
 class ExecutorMixIn:
     def __init__(self, global_config):

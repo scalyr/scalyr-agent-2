@@ -96,9 +96,9 @@ class DynamicWorkers(object):
         """
         Add worker.
         """
-        if not api_key in self.__workers_by_api_key:
+        if api_key not in self.__workers_by_api_key:
             with self.__worker_lock:
-                if not api_key in self.__workers_by_api_key:
+                if api_key not in self.__workers_by_api_key:
                     worker = self.__create_worker(api_key, global_config)
                     self.__workers_by_api_key[api_key] = worker
                     self.__workers_by_id[worker.worker_id] = worker

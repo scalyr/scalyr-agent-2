@@ -15,7 +15,7 @@
 
 import pathlib as pl
 import subprocess
-from typing import Type, Callable
+from typing import Callable
 
 from agent_build_refactored.utils.constants import CpuArch
 from agent_build_refactored.utils.docker.common import delete_container

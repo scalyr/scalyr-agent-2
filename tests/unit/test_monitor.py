@@ -53,5 +53,6 @@ define_config_option(
 )
 
 
+# pylint: disable=monitor-not-included-for-win32
 class TestMonitor(ScalyrMonitor):
     pass
