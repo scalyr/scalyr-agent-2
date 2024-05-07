@@ -37,10 +37,6 @@ EXPECTED_HEADER_NAMES_401 = [
     "Date",
     "Content-Type",
     "Content-Length",
-    "Access-Control-Allow-Credentials",
-    "Access-Control-Allow-Headers",
-    "Access-Control-Allow-Methods",
-    "Access-Control-Max-Age",
 ]
 
 EXPECTED_HEADER_NAMES_200 = [
@@ -48,10 +44,6 @@ EXPECTED_HEADER_NAMES_200 = [
     "Date",
     "Content-Type",
     "Content-Length",
-    "Access-Control-Allow-Credentials",
-    "Access-Control-Allow-Headers",
-    "Access-Control-Allow-Methods",
-    "Access-Control-Max-Age",
 ]
 
 # List of API urls to test
@@ -103,7 +95,14 @@ def verify_api_response_headers_and_status_code(
         )
 
     expected_headers = sorted([key.lower() for key in expected_headers])
-    actual_header_names = sorted([key.lower() for key in list(resp.headers.keys())])
+    actual_header_names = sorted(
+        [
+            key
+            for key in [key.lower() for key in list(resp.headers.keys())]
+            # The environments are not consistent with Access-Control-* headers
+            if not key.startswith("access-control-")
+        ]
+    )
 
     if set(actual_header_names) != set(expected_headers):
         raise ValueError(
