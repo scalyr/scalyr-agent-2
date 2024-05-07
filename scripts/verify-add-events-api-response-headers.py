@@ -131,16 +131,10 @@ def main():
         print("Unauthenticated checks (expecting status code 401)")
         print("")
 
-        # Looks like logstaging.eu stopped returning Connection header at some point so for now we
-        # just skip this check
         if "staging.eu" in url:
             expected_headers_401 = EXPECTED_HEADER_NAMES_401.copy()
             expected_headers_400 = EXPECTED_HEADER_NAMES_401.copy()
             expected_headers_200 = EXPECTED_HEADER_NAMES_200.copy()
-            expected_headers_401.remove("Connection")
-            expected_headers_400.remove("Connection")
-            expected_headers_200.remove("Connection")
-            expected_headers_200.remove("Cache-Control")
         else:
             expected_headers_401 = EXPECTED_HEADER_NAMES_401
             expected_headers_400 = EXPECTED_HEADER_NAMES_401
