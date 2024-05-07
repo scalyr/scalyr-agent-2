@@ -3672,6 +3672,64 @@ fields behave differently when configured via k8s annotations:
 * lineGroupers (not supported at all)
 * path (the path is always fixed for k8s container logs)
 
+### Configuring multiple accounts per container
+
+Besides the default API key stored in the scalyr/scalyr-api-key secret, the user can specify API keys for namespaces, pods and containers using annotations.
+
+#### Namespace level API keys
+```log.config.scalyr.com/teams.{team_number}.secret: {secret_name}```
+
+Overrides the default API key for all pods in the namespace.
+The `secret_name` is the name of the secret (stored in the same namespace) holding the Scalyr API key.
+The `teams_number` is an arbitrary unique number.
+
+#### Pod level API keys
+```log.config.scalyr.com/teams.{team_number}.secret: {secret_name}```
+
+Overrides the default API key and the namespace API key for all containers in the pod.
+The `secret_name` is the name of the secret (stored in the same namespace as the pod) holding the Scalyr API key.
+The `teams_number` is an arbitrary unique number.
+
+#### Container level API keys
+```log.config.scalyr.com/{container_name}.teams.{team_number}.secret: {secret_name}```
+
+Overrides the default API key, the namespace API key and the pod API keys for all containers in the pod.
+The `secret_name` is the name of the secret (stored in the same namespace as the pod) holding the Scalyr API key.
+The `teams_number` is an arbitrary unique number.
+
+#### API Key Secret structure
+
+```yaml
+apiVersion: v1
+kind: Secret
+data:
+  scalyr-api-key: <b64 encoded API key>
+```
+
+
+#### Simple visual example of Secret key annotation priority
+
+> [!NOTE]
+> When no annotation is present for either the namespace or pod, the default secret _scalyr/scalyr-api-key_ is used.
+
+![Annotation Priority](kubernetes_monitor_annotations_priority.png)
+
+
+#### Example:
+
+#### Configuration:
+
+##### Default API key for the Scalyr Agent
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: scalyr-api-key
+  namespace: scalyr
+data:
+  scalyr-api-key: <b64 encoded SCALYR_API_KEY_WRITE_TEAM_1>
+```
+
 ### Excluding Logs
 
 Containers and pods can be specifically included/excluded from having their logs collected and
