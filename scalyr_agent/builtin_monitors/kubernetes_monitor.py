@@ -1,4 +1,4 @@
-# Copyright 2018 Scalyr Inc.
+# Copyright 2018-2024 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,8 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# ------------------------------------------------------------------------
-# author:  Imron Alston <imron@scalyr.com>
 
 from __future__ import unicode_literals
 from __future__ import absolute_import
@@ -22,10 +20,7 @@ import base64
 if False:  # NOSONAR
     from typing import Dict, List, Optional
 
-__author__ = "imron@scalyr.com"
-
 import six
-
 
 import datetime
 import docker
@@ -2280,11 +2275,15 @@ class CRIEnumerator(ContainerEnumerator):
                             ignore_k8s_api_exception=False,
                         )
                     except k8s_utils.K8sApiException as e:
-                        # If the pod details cannot be retrieved from the K8s API:
-                        # 404 - log warning, include based on k8s_include_by_default
-                        # Otherwise (401 as per K8s Api documentation) - log error
-                        # Exclude the pod
+                        # If the pod details cannot be retrieved from the api
+                        # - Due to a 404 then conditionally include and log behavior
+                        #   - Do not include if querying the container list by filesystem,
+                        #     since dead containers may not be cleaned up for some time
+                        #     (and would fill up the cache with unneeded entries)
+                        # - Due to another status code then log the error
                         if e.status_code == 404:
+                            if self._query_filesystem:
+                                continue
                             if k8s_include_by_default:
                                 include_message = "Including pod based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS=true."
                             else:

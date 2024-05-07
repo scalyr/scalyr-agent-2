@@ -587,6 +587,8 @@ class ApiQueryOptions(object):
         )
 
 
+# TODO Add a limit to the size (and convert to a LRU cache).
+#      This is important for caching pod info on a busy cluster.
 class _K8sCache(object):
     """
     A cached store of objects from a k8s api query
