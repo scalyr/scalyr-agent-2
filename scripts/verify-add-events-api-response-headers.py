@@ -37,7 +37,10 @@ EXPECTED_HEADER_NAMES_401 = [
     "Date",
     "Content-Type",
     "Content-Length",
-    "Connection",
+    "Access-Control-Allow-Credentials",
+    "Access-Control-Allow-Headers",
+    "Access-Control-Allow-Methods",
+    "Access-Control-Max-Age",
 ]
 
 EXPECTED_HEADER_NAMES_200 = [
