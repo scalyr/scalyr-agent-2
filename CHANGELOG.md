@@ -1,6 +1,15 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.2.14 "Tycho" - May 6, 2024
+<!---
+Packaged by Ales Novak <ales.novak@sentinelone.com> on May 6, 2024 00:00 -0800
+--->
+
+Changes:
+Support sending events to multiple Dataset accounts via K8s annotations. This feature was updated to use secrets from the same namespace as the pod and hierarchy of default secrets were added: default secret -> namespace secret -> pod secret -> container secret.
+See [kubernetes_monitor.md](docs/monitors/kubernetes_monitor.md) for documentation.
+
 ## 2.2.13 "Killian" - Mar 30, 2024
 <!---
 Packaged by Ales Novak <ales.novak@sentinelone.com> on Mar 30, 2024 00:00 -0800

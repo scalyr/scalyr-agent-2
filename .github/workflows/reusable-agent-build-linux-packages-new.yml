@@ -106,24 +106,25 @@ jobs:
 
   build_packages:
     name: Build package ${{ matrix.variant.builder_name }}-${{ matrix.variant.package_type }}
-    runs-on: ${{ vars.RUNNER }}
+    runs-on: ${{ matrix.variant.runner }}
     needs:
       - build_dependencies
     strategy:
       matrix:
         variant:
-          - { "builder_name": "aio-x86_64",  "package_type": "deb" }
-          - { "builder_name": "aio-x86_64",  "package_type": "rpm" }
-          - { "builder_name": "aio-aarch64", "package_type": "deb" }
-          - { "builder_name": "aio-aarch64", "package_type": "rpm" }
-          - { "builder_name": "non-aio",     "package_type": "deb" }
-          - { "builder_name": "non-aio",     "package_type": "rpm" }
+          - { "builder_name": "aio-x86_64",  "package_type": "deb", runner: "ubuntu-22.04" }
+          - { "builder_name": "aio-x86_64",  "package_type": "rpm", runner: "ubuntu-22.04" }
+          - { "builder_name": "aio-aarch64", "package_type": "deb", runner: "aws-aarch64" }
+          - { "builder_name": "aio-aarch64", "package_type": "rpm", runner: "aws-aarch64" }
+          - { "builder_name": "non-aio",     "package_type": "deb", runner: "ubuntu-22.04" }
+          - { "builder_name": "non-aio",     "package_type": "rpm", runner: "ubuntu-22.04" }
     steps:
       - name: Checkout repository
         uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
 
       - name: install python and requirements
-        uses: ./.github/actions/install_python_and_requirements
+        uses: actions/setup-python@v4
+        continue-on-error: true
         with:
           python_version: ${{ inputs.python_version }}
 
