@@ -10,6 +10,7 @@ runs:
   steps:
     - name: Install python
       uses: actions/setup-python@v4
+      continue-on-error: true
       with:
         python-version: ${{ inputs.python_version }}
 
