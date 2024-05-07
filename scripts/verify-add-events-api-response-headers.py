@@ -48,8 +48,10 @@ EXPECTED_HEADER_NAMES_200 = [
     "Date",
     "Content-Type",
     "Content-Length",
-    "Cache-Control",
-    "Connection",
+    "Access-Control-Allow-Credentials",
+    "Access-Control-Allow-Headers",
+    "Access-Control-Allow-Methods",
+    "Access-Control-Max-Age",
 ]
 
 # List of API urls to test
