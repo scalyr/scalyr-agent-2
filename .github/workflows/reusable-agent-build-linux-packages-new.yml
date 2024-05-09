@@ -181,19 +181,19 @@ jobs:
           - { "package_type": "deb", "builder": "aio-x86_64",  "arch": "x86_64", "distro-name": "ubuntu2004",    "remote-machine-type": "ec2", runner: "ubuntu-22.04" }
           - { "package_type": "deb", "builder": "aio-x86_64",  "arch": "x86_64", "distro-name": "ubuntu1804",    "remote-machine-type": "ec2", runner: "ubuntu-22.04" }
           - { "package_type": "deb", "builder": "aio-x86_64",  "arch": "x86_64", "distro-name": "ubuntu1604",    "remote-machine-type": "ec2", runner: "ubuntu-22.04" }
-          - { "package_type": "deb", "builder": "aio-x86_64",  "arch": "x86_64", "distro-name": "ubuntu1404",    "remote-machine-type": "ec2", runner: "ubuntu-22.04" }
+          - { "package_type": "deb", "builder": "aio-x86_64",  "arch": "x86_64", "distro-name": "ubuntu1404",    "remote-machine-type": "docker", runner: "ubuntu-22.04" }
           - { "package_type": "deb", "builder": "aio-x86_64",  "arch": "x86_64", "distro-name": "debian10",      "remote-machine-type": "ec2", runner: "ubuntu-22.04" }
-          - { "package_type": "deb", "builder": "aio-x86_64",  "arch": "x86_64", "distro-name": "debian11",      "remote-machine-type": "ec2", runner: "ubuntu-22.04" }
-          - { "package_type": "rpm", "builder": "aio-x86_64",  "arch": "x86_64", "distro-name": "centos8",       "remote-machine-type": "ec2", runner: "ubuntu-22.04" }
+          - { "package_type": "deb", "builder": "aio-x86_64",  "arch": "x86_64", "distro-name": "debian11",      "remote-machine-type": "docker", runner: "ubuntu-22.04" }
+          - { "package_type": "rpm", "builder": "aio-x86_64",  "arch": "x86_64", "distro-name": "centos8",       "remote-machine-type": "docker", runner: "ubuntu-22.04" }
           - { "package_type": "rpm", "builder": "aio-x86_64",  "arch": "x86_64", "distro-name": "centos7",       "remote-machine-type": "ec2", runner: "ubuntu-22.04" }
-          - { "package_type": "rpm", "builder": "aio-x86_64",  "arch": "x86_64", "distro-name": "centos6",       "remote-machine-type": "ec2", runner: "ubuntu-22.04" }
+          - { "package_type": "rpm", "builder": "aio-x86_64",  "arch": "x86_64", "distro-name": "centos6",       "remote-machine-type": "docker", runner: "ubuntu-22.04" }
           - { "package_type": "rpm", "builder": "aio-x86_64",  "arch": "x86_64", "distro-name": "amazonlinux2",  "remote-machine-type": "ec2", runner: "ubuntu-22.04" }
-          - { "package_type": "deb", "builder": "aio-aarch64", "arch": "arm64",  "distro-name": "ubuntu1404",    "remote-machine-type": "ec2", runner: "aws-aarch64" }
-          - { "package_type": "rpm", "builder": "aio-aarch64", "arch": "arm64",  "distro-name": "centos7",       "remote-machine-type": "ec2", runner: "aws-aarch64" }
+          - { "package_type": "deb", "builder": "aio-aarch64", "arch": "arm64",  "distro-name": "ubuntu1404",    "remote-machine-type": "docker", runner: "aws-aarch64" }
+          - { "package_type": "rpm", "builder": "aio-aarch64", "arch": "arm64",  "distro-name": "centos7",       "remote-machine-type": "docker", runner: "aws-aarch64" }
             # - { "package_type": "deb", "builder": "non-aio",     "arch": "x86_64", "distro-name": "ubuntu1404",    "remote-machine-type": "ec2", runner: "ubuntu-22.04" }
-          - { "package_type": "deb", "builder": "non-aio",     "arch": "x86_64", "distro-name": "ubuntu2204",    "remote-machine-type": "ec2", runner: "ubuntu-22.04" }
+          - { "package_type": "deb", "builder": "non-aio",     "arch": "x86_64", "distro-name": "ubuntu2204",    "remote-machine-type": "docker", runner: "ubuntu-22.04" }
             # - { "package_type": "rpm", "builder": "non-aio",     "arch": "x86_64", "distro-name": "centos7",       "remote-machine-type": "ec2", runner: "ubuntu-22.04" }
-          - { "package_type": "rpm", "builder": "non-aio",     "arch": "x86_64", "distro-name": "amazonlinux2",  "remote-machine-type": "ec2", runner: "ubuntu-22.04" }
+          - { "package_type": "rpm", "builder": "non-aio",     "arch": "x86_64", "distro-name": "amazonlinux2",  "remote-machine-type": "docker", runner: "ubuntu-22.04" }
     steps:
       - name: Checkout repository
         uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
