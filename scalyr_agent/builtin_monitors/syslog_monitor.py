@@ -821,7 +821,7 @@ class SyslogRawRequestParser(SyslogRequestParser):
             "srcip": self._client_address[0],
             "destport": self._server_address[1],
         }
-        self.handle_frame(data, extra)
+        self._handle_frame(data, extra)
 
 
 class SyslogBatchedRequestParser(SyslogRequestParser):
@@ -992,7 +992,7 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
     # each new connection.
 
     class PreviousMessageHandlingError(Exception):
-        def __int__(self, message):
+        def __init__(self, message):
             self.message = message
 
         def __repr__(self):
