@@ -8,6 +8,12 @@ echo_with_date() {
     date +"[%Y-%m-%d %H:%M:%S] $*"
 }
 
+stop_agent() {
+  python scalyr_agent/agent_main.py --config $CONFIG_FILE stop
+}
+
+trap stop_agent EXIT
+
 function generate_config() {
   TCP_SERVERS=$1
   UDP_SERVERS=$2

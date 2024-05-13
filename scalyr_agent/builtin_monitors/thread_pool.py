@@ -72,7 +72,7 @@ class QueueMixin:
             request_queue_size = global_config.syslog_udp_socket_request_queue_size
             self._shutdown_grace_period = global_config.syslog_monitors_shutdown_grace_period
         else:
-            request_queue_size = 500_000
+            request_queue_size = 100_000
             self._shutdown_grace_period = 5
 
         self.__request_queue = WorkQueue(request_queue_size)
