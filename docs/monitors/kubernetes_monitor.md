@@ -37,7 +37,7 @@ Besides the default API key stored in the scalyr/scalyr-api-key secret, the user
 #### Namespace level API keys
 ```log.config.scalyr.com/teams.{team_number}.secret: {secret_name}```
 
-Overrides the default API key for all pods in the namespace. 
+Overrides the default API key for all pods in the namespace.
 The `secret_name` is the name of the secret (stored in the same namespace) holding the Scalyr API key.
 The `teams_number` is an arbitrary unique number.
 
@@ -67,7 +67,7 @@ data:
 
 #### Simple visual example of Secret key annotation priority
 
-> [!NOTE]  
+> [!NOTE]
 > When no annotation is present for either the namespace or pod, the default secret _scalyr/scalyr-api-key_ is used.
 
 ![Annotation Priority](kubernetes_monitor_annotations_priority.png)
