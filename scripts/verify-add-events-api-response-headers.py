@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright 2014-2020 Scalyr Inc.
+# Copyright 2014-2024 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -37,7 +37,6 @@ EXPECTED_HEADER_NAMES_401 = [
     "Date",
     "Content-Type",
     "Content-Length",
-    "Connection",
 ]
 
 EXPECTED_HEADER_NAMES_200 = [
@@ -45,8 +44,6 @@ EXPECTED_HEADER_NAMES_200 = [
     "Date",
     "Content-Type",
     "Content-Length",
-    "Cache-Control",
-    "Connection",
 ]
 
 # List of API urls to test
@@ -98,7 +95,12 @@ def verify_api_response_headers_and_status_code(
         )
 
     expected_headers = sorted([key.lower() for key in expected_headers])
-    actual_header_names = sorted([key.lower() for key in list(resp.headers.keys())])
+    actual_header_names = sorted(
+        key
+        for key in [key.lower() for key in list(resp.headers.keys())]
+        # The environments are not consistent with Access-Control-* headers
+        if not key.startswith("access-control-")
+    )
 
     if set(actual_header_names) != set(expected_headers):
         raise ValueError(
@@ -126,20 +128,9 @@ def main():
         print("Unauthenticated checks (expecting status code 401)")
         print("")
 
-        # Looks like logstaging.eu stopped returning Connection header at some point so for now we
-        # just skip this check
-        if "staging.eu" in url:
-            expected_headers_401 = EXPECTED_HEADER_NAMES_401.copy()
-            expected_headers_400 = EXPECTED_HEADER_NAMES_401.copy()
-            expected_headers_200 = EXPECTED_HEADER_NAMES_200.copy()
-            expected_headers_401.remove("Connection")
-            expected_headers_400.remove("Connection")
-            expected_headers_200.remove("Connection")
-            expected_headers_200.remove("Cache-Control")
-        else:
-            expected_headers_401 = EXPECTED_HEADER_NAMES_401
-            expected_headers_400 = EXPECTED_HEADER_NAMES_401
-            expected_headers_200 = EXPECTED_HEADER_NAMES_200
+        expected_headers_401 = EXPECTED_HEADER_NAMES_401
+        expected_headers_400 = EXPECTED_HEADER_NAMES_401
+        expected_headers_200 = EXPECTED_HEADER_NAMES_200
 
         verify_api_response_headers_and_status_code(
             url=url,
