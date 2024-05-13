@@ -3573,7 +3573,7 @@ class ContainerChecker(object):
                 secret = k8s_cache.secret(namespace, name, time.time())
                 if secret:
                     return secret
-            except k8s_utils.K8sApiNotFoundException as e:
+            except k8s_utils.K8sApiNotFoundException:
                 self._logger.warning(
                     "Failed to fetch secret '%s/%s' (API returned Not found) ignoring."
                     % (namespace, name),

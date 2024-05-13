@@ -299,7 +299,7 @@ class ContainerCheckerMultiAccountTest(ContainerCheckerTest):
         self.log_watcher.add_log_config.reset_mock()
 
         # Wait for the loop to complete and pause it to change pod annotations.
-        with run_state.running_lock as lock:
+        with run_state.running_lock:
             run_state.wait_for_next_loop_start()
 
             k8s_namespace.annotations = process_annotations(
@@ -545,7 +545,7 @@ class ContainerCheckerMultiAccountTest(ContainerCheckerTest):
         self.log_watcher.add_log_config.reset_mock()
 
         # Wait for the loop to complete and pause it to change pod annotations.
-        with run_state.running_lock as lock:
+        with run_state.running_lock:
             run_state.wait_for_next_loop_start()
 
             k8s_pod_1_namespace_1.annotations = process_annotations(
