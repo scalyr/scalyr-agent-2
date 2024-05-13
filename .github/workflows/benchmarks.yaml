@@ -58,6 +58,6 @@ jobs:
           sudo apt install -y syslog-ng-core
       - name: Run memory test
         run: |
-          ./scripts/cicd/test_syslog_monitor_memory_usage/run_test.sh 10 10 300
+          ./scripts/cicd/test_syslog_monitor_memory_usage/run_test.sh 10 10 600
         env:
           SCALYR_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
