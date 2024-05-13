@@ -181,28 +181,24 @@ class TestDynamicLogPathTest(BaseTest):
         path = os.path.join(self._log_dir, "newlog.log")
         path2 = os.path.join(self._log_dir, "newlog2.log")
 
-        log_config1 = self._manager.add_log_config("unittest", {
-            "path": path,
-            "api_key": API_KEYS[0]
-        })
+        log_config1 = self._manager.add_log_config(
+            "unittest", {"path": path, "api_key": API_KEYS[0]}
+        )
         assert log_config1["worker_id"] == "dynamic_1"
 
-        log_config2 = self._manager.add_log_config("unittest", {
-            "path": path,
-            "api_key": API_KEYS[1]
-        })
+        log_config2 = self._manager.add_log_config(
+            "unittest", {"path": path, "api_key": API_KEYS[1]}
+        )
         assert log_config2["worker_id"] == "dynamic_2"
 
-        log_config3 = self._manager.add_log_config("unittest", {
-            "path": path,
-            "api_key": API_KEYS[2]
-        })
+        log_config3 = self._manager.add_log_config(
+            "unittest", {"path": path, "api_key": API_KEYS[2]}
+        )
         assert log_config3["worker_id"] == "dynamic_3"
 
-        log_config4 = self._manager.add_log_config("unittest", {
-            "path": path2,
-            "api_key": API_KEYS[0]
-        })
+        log_config4 = self._manager.add_log_config(
+            "unittest", {"path": path2, "api_key": API_KEYS[0]}
+        )
         assert log_config4["worker_id"] == "dynamic_1"
 
         self.fake_scan()
@@ -211,19 +207,19 @@ class TestDynamicLogPathTest(BaseTest):
             ("dynamic_1", path),
             ("dynamic_2", path),
             ("dynamic_3", path),
-            ("dynamic_1", path2)
+            ("dynamic_1", path2),
         )
 
         self._manager.schedule_log_config_for_removal("unittest", log_config2)
-        assert list(self._get_manager_log_pending_removal().keys()) == [(path, "dynamic_2")]
+        assert list(self._get_manager_log_pending_removal().keys()) == [
+            (path, "dynamic_2")
+        ]
 
         self._manager.schedule_log_path_for_removal("unittest", path)
 
-        assert sorted(list(self._get_manager_log_pending_removal().keys())) == sorted([
-            (path, "dynamic_1"),
-            (path, "dynamic_2"),
-            (path, "dynamic_3")
-        ])
+        assert sorted(list(self._get_manager_log_pending_removal().keys())) == sorted(
+            [(path, "dynamic_1"), (path, "dynamic_2"), (path, "dynamic_3")]
+        )
 
     def test_add_remove_update_path_with_api_key(self):
         config = {}
@@ -235,47 +231,36 @@ class TestDynamicLogPathTest(BaseTest):
         path = os.path.join(self._log_dir, "newlog.log")
         path2 = os.path.join(self._log_dir, "newlog2.log")
 
-        log_config1 = self._manager.add_log_config("unittest", {
-            "path": path,
-            "api_key": API_KEYS[0]
-        })
+        log_config1 = self._manager.add_log_config(
+            "unittest", {"path": path, "api_key": API_KEYS[0]}
+        )
         assert log_config1["worker_id"] == "dynamic_1"
 
-        log_config2 = self._manager.add_log_config("unittest", {
-            "path": path,
-            "api_key": API_KEYS[1]
-        })
+        log_config2 = self._manager.add_log_config(
+            "unittest", {"path": path, "api_key": API_KEYS[1]}
+        )
         assert log_config2["worker_id"] == "dynamic_2"
 
-        log_config3 = self._manager.add_log_config("unittest", {
-            "path": path2,
-            "api_key": API_KEYS[0]
-        })
+        log_config3 = self._manager.add_log_config(
+            "unittest", {"path": path2, "api_key": API_KEYS[0]}
+        )
         assert log_config3["worker_id"] == "dynamic_1"
 
         self.fake_scan()
 
         self.matchers_paths_contain_only(
-            ("dynamic_1", path),
-            ("dynamic_2", path),
-            ("dynamic_1", path2)
+            ("dynamic_1", path), ("dynamic_2", path), ("dynamic_1", path2)
         )
 
         path_log_configs = self._manager.update_log_configs_on_path(
-            path,"unittest",
-            [{
-                "path": path,
-                "api_key": API_KEYS[1]
-            },
-                {
-                    "path": path,
-                    "api_key": API_KEYS[2]
-                },
-                {
-                    "path": path,
-                    "api_key": API_KEYS[3]
-                }
-            ])
+            path,
+            "unittest",
+            [
+                {"path": path, "api_key": API_KEYS[1]},
+                {"path": path, "api_key": API_KEYS[2]},
+                {"path": path, "api_key": API_KEYS[3]},
+            ],
+        )
 
         assert path_log_configs[0]["worker_id"] == "dynamic_2"
         assert path_log_configs[1]["worker_id"] == "dynamic_3"
@@ -287,30 +272,22 @@ class TestDynamicLogPathTest(BaseTest):
             ("dynamic_2", path),
             ("dynamic_3", path),
             ("dynamic_4", path),
-            ("dynamic_1", path2)
+            ("dynamic_1", path2),
         )
 
         self._manager.remove_log_path("unittest", path)
 
-        self.matchers_paths_contain_only(
-            ("dynamic_1", path2)
-        )
+        self.matchers_paths_contain_only(("dynamic_1", path2))
 
         path_log_configs = self._manager.update_log_configs_on_path(
-            path, "unittest",
-            [{
-                "path": path,
-                "api_key": API_KEYS[1]
-            },
-                {
-                    "path": path,
-                    "api_key": API_KEYS[2]
-                },
-                {
-                    "path": path,
-                    "api_key": API_KEYS[3]
-                }
-            ])
+            path,
+            "unittest",
+            [
+                {"path": path, "api_key": API_KEYS[1]},
+                {"path": path, "api_key": API_KEYS[2]},
+                {"path": path, "api_key": API_KEYS[3]},
+            ],
+        )
 
         assert path_log_configs[0]["worker_id"] == "dynamic_2"
         assert path_log_configs[1]["worker_id"] == "dynamic_3"
@@ -322,45 +299,33 @@ class TestDynamicLogPathTest(BaseTest):
             ("dynamic_2", path),
             ("dynamic_3", path),
             ("dynamic_4", path),
-            ("dynamic_1", path2)
+            ("dynamic_1", path2),
         )
 
         path_log_configs = self._manager.update_log_configs_on_path(
-            path, "unittest",
-            [{
-                "path": path
-            }]
+            path, "unittest", [{"path": path}]
         )
 
         assert path_log_configs[0]["worker_id"] == "default"
 
         self.fake_scan()
 
-        self.matchers_paths_contain_only(
-            ("default", path),
-            ("dynamic_1", path2)
-        )
+        self.matchers_paths_contain_only(("default", path), ("dynamic_1", path2))
 
-        log_config4 = self._manager.add_log_config("unittest", {
-            "path": path2,
-            "api_key": API_KEYS[3]
-        })
+        log_config4 = self._manager.add_log_config(
+            "unittest", {"path": path2, "api_key": API_KEYS[3]}
+        )
         assert log_config4["worker_id"] == "dynamic_4"
 
         self.fake_scan()
 
         self.matchers_paths_contain_only(
-            ("default", path),
-            ("dynamic_1", path2),
-            ("dynamic_4", path2)
+            ("default", path), ("dynamic_1", path2), ("dynamic_4", path2)
         )
 
         self._manager.remove_log_config("unittest", log_config3)
 
-        self.matchers_paths_contain_only(
-            ("default", path),
-            ("dynamic_4", path2)
-        )
+        self.matchers_paths_contain_only(("default", path), ("dynamic_4", path2))
 
     def test_add_duplicate_path_same_monitor(self):
         config = {}

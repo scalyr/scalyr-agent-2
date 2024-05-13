@@ -42,7 +42,9 @@ from scalyr_agent.log_processing import (
     LogLineSampler,
     LogLineRedacter,
     LogFileProcessor,
-    LogMatcher, CRILogLineBuffer, CRIStreamBuffers,
+    LogMatcher,
+    CRILogLineBuffer,
+    CRIStreamBuffers,
 )
 from scalyr_agent.line_matcher import LineGrouper
 from scalyr_agent.log_processing import FileSystem
@@ -61,18 +63,23 @@ from six import unichr
 from six.moves import range
 
 
-class Timestamp():
+class Timestamp:
     def __init__(self, iso, nanos):
         self.iso = iso
         self.nanos = nanos
 
+
 def timestamp_generator(seconds_ago_start):
     now = datetime.now(timezone.utc).astimezone()
     start_timestamp = now - timedelta(minutes=seconds_ago_start)
-    
+
     for seconds_after in range(0, 1000):
         timestamp = start_timestamp + timedelta(seconds=seconds_after)
-        yield Timestamp(bytes(timestamp.isoformat(), "utf-8"), round(timestamp.timestamp() * 1000 * 1000) * 1000)
+        yield Timestamp(
+            bytes(timestamp.isoformat(), "utf-8"),
+            round(timestamp.timestamp() * 1000 * 1000) * 1000,
+        )
+
 
 def assert_line(log_line, line, timestamp, stream):
     assert log_line.line == line
@@ -97,37 +104,65 @@ class TestCRILogLineBuffer(ScalyrTestCase):
 
         assert not buffer.is_partial
 
+
 class TestCRIStreamBuffers(ScalyrTestCase):
     def test_completed_on_empty(self):
-        assert None == CRIStreamBuffers(max_line_size=10, line_completion_wait_time=10).pop_completed(current_time=1)
+        assert None == CRIStreamBuffers(
+            max_line_size=10, line_completion_wait_time=10
+        ).pop_completed(current_time=1)
 
     def test_completed(self):
         buffers = CRIStreamBuffers(max_line_size=100, line_completion_wait_time=10)
-        assert None == buffers.append_log_line(CRILogLine(0, "stdout", ["P"], "line 01 ", None), 0)
-        assert buffers.append_log_line(CRILogLine(1, "stderr", ["F"], "line 02 ", None), 1).build_cri_result(True).line == b"line 02 \n"
+        assert None == buffers.append_log_line(
+            CRILogLine(0, "stdout", ["P"], "line 01 ", None), 0
+        )
+        assert (
+            buffers.append_log_line(CRILogLine(1, "stderr", ["F"], "line 02 ", None), 1)
+            .build_cri_result(True)
+            .line
+            == b"line 02 \n"
+        )
 
         assert None == buffers.pop_completed(current_time=1)
 
-        assert None == buffers.append_log_line(CRILogLine(2, "stderr", ["P"], "line 03 ", None), 2)
-        assert None == buffers.append_log_line(CRILogLine(3, "stdout", ["P"], "line 04 ", None), 3)
-        assert buffers.append_log_line(CRILogLine(4, "stderr", ["F"], "line 05 ", None), 4).build_cri_result(True).line == b"line 03 line 05 \n"
+        assert None == buffers.append_log_line(
+            CRILogLine(2, "stderr", ["P"], "line 03 ", None), 2
+        )
+        assert None == buffers.append_log_line(
+            CRILogLine(3, "stdout", ["P"], "line 04 ", None), 3
+        )
+        assert (
+            buffers.append_log_line(CRILogLine(4, "stderr", ["F"], "line 05 ", None), 4)
+            .build_cri_result(True)
+            .line
+            == b"line 03 line 05 \n"
+        )
 
         assert None == buffers.pop_completed(current_time=5)
 
         assert None == buffers.pop_completed(current_time=10)
-        assert buffers.pop_completed(current_time=11).build_cri_result(True).line == b"line 01 line 04 \n"
+        assert (
+            buffers.pop_completed(current_time=11).build_cri_result(True).line
+            == b"line 01 line 04 \n"
+        )
 
     def test_completed_max_length(self):
         LINE_LEN = len("line 00 ")
 
-        buffers = CRIStreamBuffers(max_line_size=LINE_LEN * 2, line_completion_wait_time=10)
+        buffers = CRIStreamBuffers(
+            max_line_size=LINE_LEN * 2, line_completion_wait_time=10
+        )
         buffers.append_log_line(CRILogLine(0, "stdout", ["P"], "line 00 ", None), 0)
         buffers.append_log_line(CRILogLine(1, "stderr", ["P"], "line 01 ", None), 1)
 
         assert None == buffers.pop_completed(current_time=2)
 
-        assert buffers.append_log_line(CRILogLine(2, "stdout", ["P"], "line 02 ", None), 2).build_cri_result(True).line == b"line 00 line 02 \n"
-
+        assert (
+            buffers.append_log_line(CRILogLine(2, "stdout", ["P"], "line 02 ", None), 2)
+            .build_cri_result(True)
+            .line
+            == b"line 00 line 02 \n"
+        )
 
 
 class TestCRILogParsing(ScalyrTestCase):
@@ -344,7 +379,7 @@ class TestLogFileIterator(ScalyrTestCase):
             next(timestamp_gen).iso + b" stdout F full_content_1\n",
             next(timestamp_gen).iso + b" stdout P partial_content_1\n",
             next(timestamp_gen).iso + b" stdout F -full_content_2\n",
-            next(timestamp_gen).iso + b" stdout F full_content_3\n"
+            next(timestamp_gen).iso + b" stdout F full_content_3\n",
         ]
         self.append_file(self.__path, *lines)
 
@@ -365,7 +400,7 @@ class TestLogFileIterator(ScalyrTestCase):
             next(timestamp_gen).iso + b" stdout F full_content_1\n",
             next(timestamp_gen).iso + b" stdout P \n",
             next(timestamp_gen).iso + b" stdout F full_content_2\n",
-            next(timestamp_gen).iso + b" stdout F \n"
+            next(timestamp_gen).iso + b" stdout F \n",
         ]
         self.append_file(self.__path, *lines)
 
@@ -386,7 +421,7 @@ class TestLogFileIterator(ScalyrTestCase):
             next(timestamp_gen).iso + b" stdout F full_content_1\r\n",
             next(timestamp_gen).iso + b" stdout P partial_content_1\r\n",
             next(timestamp_gen).iso + b" stdout F full_content_2\r\n",
-            next(timestamp_gen).iso + b" stdout F full_content_3\r\n"
+            next(timestamp_gen).iso + b" stdout F full_content_3\r\n",
         ]
         self.append_file(self.__path, *lines)
 
@@ -419,8 +454,18 @@ class TestLogFileIterator(ScalyrTestCase):
 
         assert_line(self.readline(), b"stdout: line 1\n", 1703089121129027195, "stdout")
         assert_line(self.readline(), b"stderr: line 1\n", 1703089121129069776, "stderr")
-        assert_line(self.readline(), b"BEGIN PARTIAL_MESSAGE-END PARTIAL_MESSAGE\n", 1703089121129027195, "stdout")
-        assert_line(self.readline(), b"BEGIN PARTIAL_MESSAGE-MIDDLE OF PARTIAL_MESSAGE-END PARTIAL_MESSAGE\n", 1703089121129069776, "stderr")
+        assert_line(
+            self.readline(),
+            b"BEGIN PARTIAL_MESSAGE-END PARTIAL_MESSAGE\n",
+            1703089121129027195,
+            "stdout",
+        )
+        assert_line(
+            self.readline(),
+            b"BEGIN PARTIAL_MESSAGE-MIDDLE OF PARTIAL_MESSAGE-END PARTIAL_MESSAGE\n",
+            1703089121129069776,
+            "stderr",
+        )
         assert_line(self.readline(), b"stdout: line 2\n", 1703089123194095421, "stdout")
 
     def test_cri_split_messages_mixed_streams_small_page_size(self):
@@ -447,14 +492,24 @@ class TestLogFileIterator(ScalyrTestCase):
 
         assert_line(self.readline(), b"stdout: line 1\n", 1703089121129027195, "stdout")
         assert_line(self.readline(), b"stderr: line 1\n", 1703089121129069776, "stderr")
-        assert_line(self.readline(), b"BEGIN PARTIAL_MESSAGE-MIDDLE OF PARTIAL_MESSAGE-END PARTIAL_MESSAGE\n", 1703089121129027195, "stdout")
-        assert_line(self.readline(), b"BEGIN PARTIAL_MESSAGE-MIDDLE OF PARTIAL_MESSAGE-END PARTIAL_MESSAGE\n", 1703089121129069776, "stderr")
+        assert_line(
+            self.readline(),
+            b"BEGIN PARTIAL_MESSAGE-MIDDLE OF PARTIAL_MESSAGE-END PARTIAL_MESSAGE\n",
+            1703089121129027195,
+            "stdout",
+        )
+        assert_line(
+            self.readline(),
+            b"BEGIN PARTIAL_MESSAGE-MIDDLE OF PARTIAL_MESSAGE-END PARTIAL_MESSAGE\n",
+            1703089121129069776,
+            "stderr",
+        )
         assert_line(self.readline(), b"stdout: line 2\n", 1703089123194095421, "stdout")
 
     def test_line_completion_wait_time(self):
         self.log_file = self._create_iterator(
             log_config={"path": self.__path, "parse_format": "cri"},
-            config=_create_configuration({"line_completion_wait_time": 0.5})
+            config=_create_configuration({"line_completion_wait_time": 0.5}),
         )
         self.scan_for_new_bytes()
 
@@ -484,13 +539,20 @@ class TestLogFileIterator(ScalyrTestCase):
         assert_line(self.readline(), b"line 1\n", 1704198436290902843, "stderr")
         assert_line(self.readline(), b"line 1\n", 1704198436290902843, "stderr")
         assert_line(self.readline(), b"line 1\n", 1704198436290902843, "stderr")
-        assert_line(self.readline(), b"BEGIN PARTIAL MESSAGE-MIDDLE PARTIAL MESSAGE\n", 1704198436290902843, "stdout")
+        assert_line(
+            self.readline(),
+            b"BEGIN PARTIAL MESSAGE-MIDDLE PARTIAL MESSAGE\n",
+            1704198436290902843,
+            "stdout",
+        )
         assert_line(self.readline(), b"line 1\n", 1704198436290902843, "stderr")
         assert_line(self.readline(), b"line 1\n", 1704198436290902843, "stderr")
         assert_line(self.readline(), b"line 1\n", 1704198436290902843, "stderr")
         assert_line(self.readline(), b"line 1\n", 1704198436290902843, "stderr")
         assert_line(self.readline(), b"line 1\n", 1704198436290902843, "stderr")
-        assert_line(self.readline(), b"END PARTIAL MESSAGE\n", 1704198436290902843, "stdout")
+        assert_line(
+            self.readline(), b"END PARTIAL MESSAGE\n", 1704198436290902843, "stdout"
+        )
 
     def test_cri_skip_un_parseable_lines(self):
         self.log_file = self._create_iterator(
@@ -512,11 +574,13 @@ class TestLogFileIterator(ScalyrTestCase):
                 b"stdout P BEGIN PARTIAL_MESSAGE\n",
                 b"BAD_FORMAT\n",
                 b"stdout F -END PARTIAL_MESSAGE\n",
-                b"stderr F -END PARTIAL_MESSAGE\n"
+                b"stderr F -END PARTIAL_MESSAGE\n",
             ]
         ]
 
-        self.append_file(self.__path, *map(lambda line: line[0].iso + b" " + line[1], lines))
+        self.append_file(
+            self.__path, *map(lambda line: line[0].iso + b" " + line[1], lines)
+        )
 
         self.scan_for_new_bytes()
 
@@ -524,8 +588,18 @@ class TestLogFileIterator(ScalyrTestCase):
         assert_line(self.readline(), b"stderr: line 1\n", lines[1][0].nanos, "stderr")
         assert_line(self.readline(), b"stdout: line 2\n", lines[3][0].nanos, "stdout")
         assert_line(self.readline(), b"stderr: line 2\n", lines[4][0].nanos, "stderr")
-        assert_line(self.readline(), b"BEGIN PARTIAL_MESSAGE-END PARTIAL_MESSAGE\n", lines[6][0].nanos, "stdout")
-        assert_line(self.readline(), b"BEGIN PARTIAL_MESSAGE-END PARTIAL_MESSAGE\n", lines[5][0].nanos, "stderr")
+        assert_line(
+            self.readline(),
+            b"BEGIN PARTIAL_MESSAGE-END PARTIAL_MESSAGE\n",
+            lines[6][0].nanos,
+            "stdout",
+        )
+        assert_line(
+            self.readline(),
+            b"BEGIN PARTIAL_MESSAGE-END PARTIAL_MESSAGE\n",
+            lines[5][0].nanos,
+            "stderr",
+        )
 
     def test_multiple_line_groupers(self):
         log_config = {
@@ -3298,7 +3372,9 @@ class TestLogMatcher(ScalyrTestCase):
         self.append_file(self.__path_one, b"First line\n")
         matcher = LogMatcher(self.__config, config)
         matcher.finish()
-        processors = matcher.find_matches("WORKER_ID_0", PathWorkerIdDict(), dict(), copy_at_index_zero=True)
+        processors = matcher.find_matches(
+            "WORKER_ID_0", PathWorkerIdDict(), dict(), copy_at_index_zero=True
+        )
 
         self.assertFalse(matcher.is_finished())
 
@@ -3309,7 +3385,9 @@ class TestLogMatcher(ScalyrTestCase):
         self.append_file(self.__path_one, b"First line\n")
         matcher = LogMatcher(self.__config, config)
         matcher.finish()
-        processors = matcher.find_matches("WORKER_ID_0", PathWorkerIdDict(), dict(), copy_at_index_zero=True)
+        processors = matcher.find_matches(
+            "WORKER_ID_0", PathWorkerIdDict(), dict(), copy_at_index_zero=True
+        )
 
         for p in processors:
             p.scan_for_new_bytes()
@@ -3332,7 +3410,9 @@ class TestLogMatcher(ScalyrTestCase):
         self.append_file(self.__path_one, b"First line\n")
         matcher = LogMatcher(self.__config, config)
         matcher.finish()
-        processors = matcher.find_matches("WORKER_ID_0", PathWorkerIdDict(), dict(), copy_at_index_zero=True)
+        processors = matcher.find_matches(
+            "WORKER_ID_0", PathWorkerIdDict(), dict(), copy_at_index_zero=True
+        )
 
         for p in processors:
             p.scan_for_new_bytes()
@@ -3348,7 +3428,9 @@ class TestLogMatcher(ScalyrTestCase):
 
         self._close_processors(processors)
 
-        new_processors = matcher.find_matches("WORKER_ID_0", PathWorkerIdDict(), dict(), copy_at_index_zero=True)
+        new_processors = matcher.find_matches(
+            "WORKER_ID_0", PathWorkerIdDict(), dict(), copy_at_index_zero=True
+        )
         self.assertEqual(0, len(new_processors))
         self._close_processors(new_processors)
 
@@ -3357,7 +3439,9 @@ class TestLogMatcher(ScalyrTestCase):
         self.append_file(self.__path_one, b"First line\n")
         matcher = LogMatcher(self.__config, config)
         matcher.finish()
-        processors = matcher.find_matches("WORKER_ID_0", PathWorkerIdDict(), dict(), copy_at_index_zero=True)
+        processors = matcher.find_matches(
+            "WORKER_ID_0", PathWorkerIdDict(), dict(), copy_at_index_zero=True
+        )
 
         self.assertEqual(0, len(processors))
 
@@ -3369,7 +3453,9 @@ class TestLogMatcher(ScalyrTestCase):
         self.append_file(self.__path_one, b"My line\n")
         matcher = LogMatcher(self.__config, config)
         matcher.finish()
-        processors = matcher.find_matches("WORKER_ID_0", PathWorkerIdDict(), dict(), copy_at_index_zero=True)
+        processors = matcher.find_matches(
+            "WORKER_ID_0", PathWorkerIdDict(), dict(), copy_at_index_zero=True
+        )
 
         processor = processors[0]
 
@@ -3395,7 +3481,9 @@ class TestLogMatcher(ScalyrTestCase):
         self.append_file(self.__path_one, b"First line\n", b"Second_line\n")
         matcher = LogMatcher(self.__config, config)
         matcher.finish()
-        processors = matcher.find_matches("WORKER_ID_0", PathWorkerIdDict(), dict(), copy_at_index_zero=True)
+        processors = matcher.find_matches(
+            "WORKER_ID_0", PathWorkerIdDict(), dict(), copy_at_index_zero=True
+        )
 
         processor = processors[0]
 
@@ -3421,7 +3509,9 @@ class TestLogMatcher(ScalyrTestCase):
         matcher = LogMatcher(self.__config, config)
         matcher.finish()
 
-        processors = matcher.find_matches("WORKER_ID_0", PathWorkerIdDict(), dict(), copy_at_index_zero=True)
+        processors = matcher.find_matches(
+            "WORKER_ID_0", PathWorkerIdDict(), dict(), copy_at_index_zero=True
+        )
 
         status = matcher.generate_status()
 

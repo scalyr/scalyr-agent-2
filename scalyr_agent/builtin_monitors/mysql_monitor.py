@@ -459,7 +459,9 @@ class MysqlDB(object):
             self._cursor = None
             self._logger.error("Database connect failed: %s" % me)
         except Exception as ex:
-            self._logger.error("Exception trying to connect occured:  %s" % ex, exc_info=ex)
+            self._logger.error(
+                "Exception trying to connect occured:  %s" % ex, exc_info=ex
+            )
             raise Exception("Exception trying to connect:  %s" % ex)
 
     def _close(self):
@@ -1314,7 +1316,7 @@ For help, contact us at [support@scalyr.com](mailto:support@scalyr.com).
                 "Error establishing database connection: %s" % (six.text_type(e)),
                 limit_once_per_x_secs=300,
                 limit_key="mysql_connect_to_db",
-                exc_info=e
+                exc_info=e,
             )
 
     def gather_sample(self):
