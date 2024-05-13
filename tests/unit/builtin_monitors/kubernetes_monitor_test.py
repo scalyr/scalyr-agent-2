@@ -18,25 +18,17 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
-import base64
 import re
 import time
 import warnings
 import platform
 import tempfile
-from dataclasses import dataclass, field
 from string import Template
 from collections import OrderedDict
 
 import sys
-from threading import Condition, Semaphore, Thread, Lock
-from typing import Dict, List
-
-import pytest
-from mock.mock import MagicMock, call
 
 from scalyr_agent import AgentLogger
-from scalyr_agent.json_lib import JsonArray, JsonObject
 from scalyr_agent.monitor_utils.k8s import (
     KubeletApi,
     KubeletApiException,

@@ -1137,7 +1137,6 @@ class SyslogDefaultRequestParserTestCase(SyslogMonitorTestCase):
         self, mock_global_log
     ):
         # Verify internal buffer and offset is reset after handling the frame
-        mock_socket = mock.Mock()
         mock_handle_frame = mock.Mock()
         max_buffer_size = 1024
 
@@ -1162,7 +1161,6 @@ class SyslogDefaultRequestParserTestCase(SyslogMonitorTestCase):
     def test_internal_buffer_and_offset_is_reset_on_handler_method_call_single_complete_message(
         self,
     ):
-        mock_socket = mock.Mock()
         mock_handle_frame = mock.Mock()
         max_buffer_size = 1024
 
@@ -1188,7 +1186,6 @@ class SyslogDefaultRequestParserTestCase(SyslogMonitorTestCase):
         self.assertEqual(parser._offset, 0)
 
     def test_process_success_no_existing_buffer_recv_multiple_complete_messages(self):
-        mock_socket = mock.Mock()
         mock_handle_frame = mock.Mock()
         max_buffer_size = 1024
 
@@ -1218,7 +1215,6 @@ class SyslogDefaultRequestParserTestCase(SyslogMonitorTestCase):
     def test_process_success_no_existing_buffer_recv_multiple_complete_messages_invalid_utf8_data(
         self,
     ):
-        mock_socket = mock.Mock()
         mock_handle_frame = mock.Mock()
         max_buffer_size = 1024
 
@@ -1325,7 +1321,6 @@ class SyslogTCPRequestParserTestCase(SyslogMonitorTestCase):
 class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
     @mock.patch("scalyr_agent.builtin_monitors.syslog_monitor.global_log")
     def test_process_success_no_data(self, mock_global_log):
-        mock_socket = mock.Mock()
         mock_handle_frame = mock.Mock()
         max_buffer_size = 1024
 
@@ -1346,7 +1341,6 @@ class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
     def test_process_success_no_existing_buffer_recv_single_complete_message(self):
         # Here we emulate receving a single message in a single recv call (which is quite unlikely
         # to happen often in real life)
-        mock_socket = mock.Mock()
         mock_handle_frame = mock.Mock()
         max_buffer_size = 1024
 
@@ -1368,7 +1362,6 @@ class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
 
     def test_process_success_no_existing_buffer_recv_multiple_complete_messages(self):
         # Here we emulate multiple complete messages returned in a single recv call
-        mock_socket = mock.Mock()
         mock_handle_frame = mock.Mock()
         max_buffer_size = 1024
 
@@ -1396,7 +1389,6 @@ class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
         self,
     ):
         # Here we emulate recv returning partial data and ensuring it's handled correctly
-        mock_socket = mock.Mock()
         mock_handle_frame = mock.Mock()
         max_buffer_size = 1024
 
@@ -1440,7 +1432,6 @@ class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
 
     @mock.patch("scalyr_agent.builtin_monitors.syslog_monitor.global_log")
     def test_process_no_frame_data_timeout_reached_flush_partial(self, mock_global_log):
-        mock_socket = mock.Mock()
         mock_handle_frame = mock.Mock()
         max_buffer_size = 1024
 
@@ -1477,7 +1468,6 @@ class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
     def test_process_null_character_custom_delimiter(self):
         # Here we emulate recv returning partial data and ensuring it's handled correctly when
         # utilizing a custom delimiter character
-        mock_socket = mock.Mock()
         mock_handle_frame = mock.Mock()
         max_buffer_size = 1024
 
