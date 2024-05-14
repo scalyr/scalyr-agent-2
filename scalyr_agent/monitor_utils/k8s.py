@@ -103,16 +103,14 @@ _OBJECT_ENDPOINTS = {
         "list-all": "/api/v1/pods",
     },
     "Namespace": {
-        "single": Template(
-            "/api/v1/namespaces/${namespace}"
-        ),
+        "single": Template("/api/v1/namespaces/${namespace}"),
         "list": "/api/v1/namespaces",
         "list-all": "/api/v1/namespaces",
     },
     "Secret": {
         "single": Template("/api/v1/namespaces/${namespace}/secrets/${name}"),
         "list": Template("/api/v1/namespaces/${namespace}/secrets"),
-        "list-all": "/api/v1/secrets"
+        "list-all": "/api/v1/secrets",
     },
     "ReplicaSet": {
         "single": Template("/apis/apps/v1/namespaces/${namespace}/replicasets/${name}"),
@@ -880,8 +878,7 @@ class _K8sProcessor(object):
         raise NotImplementedError("process_object not implemented for _K8sProcessor")
 
 
-class NamespaceInfo():
-
+class NamespaceInfo:
     @staticmethod
     def __flatten_dict(dict_to_flatten):
         flattened = []
@@ -890,6 +887,7 @@ class NamespaceInfo():
             flattened.append(six.text_type(dict_to_flatten[key]))
 
         return "".join(flattened)
+
     def __init__(self, name, uid, labels, annotations, spec):
         self.name = name
         self.namespace = name
@@ -934,7 +932,7 @@ class NamespaceProcessor(_K8sProcessor):
                 % (namespace_name, six.text_type(e)),
                 limit_once_per_x_secs=300,
                 limit_key="bad-annotation-config-%s"
-                          % metadata.get("uid", "invalid-uid"),
+                % metadata.get("uid", "invalid-uid"),
             )
             annotations = JsonObject()
 
@@ -949,7 +947,7 @@ class NamespaceProcessor(_K8sProcessor):
             uid=metadata.get("uid", ""),
             labels=labels,
             annotations=annotations,
-            spec=spec
+            spec=spec,
         )
         return result
 
@@ -1398,7 +1396,9 @@ class KubernetesCache(object):
         self._pods_cache = _K8sCache(self._pod_processor, "Pod")
 
         # create the namespace cache
-        self._namespace_cache = _K8sCache(NamespaceProcessor(self._controllers), "Namespace")
+        self._namespace_cache = _K8sCache(
+            NamespaceProcessor(self._controllers), "Namespace"
+        )
 
         # create the secret cache
         self._secret_processor = SecretProcessor()
@@ -1730,13 +1730,7 @@ class KubernetesCache(object):
                 local_state.cache_expiry_secs - fuzz_factor
             )
 
-    def secret(
-        self,
-        namespace,
-        name,
-        current_time=None,
-        allow_expired=False
-    ):
+    def secret(self, namespace, name, current_time=None, allow_expired=False):
         """Returns pod info for the pod specified by namespace and name or None if no pad matches.
 
         Warning: Failure to pass current_time leads to incorrect recording of last access times, which will
@@ -1759,7 +1753,7 @@ class KubernetesCache(object):
             namespace,
             name,
             kind="Secret",
-            allow_expired=allow_expired
+            allow_expired=allow_expired,
         )
         return result
 
