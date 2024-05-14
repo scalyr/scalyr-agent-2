@@ -62,7 +62,33 @@ class ExecutorMixIn:
         for _ in range(thread_pool._max_workers):
             thread_pool._adjust_thread_count()
 
+    # Note this is a mixin for use with SocketServer
+    # pylint: disable=no-member
+    def process_request_thread(self, request, client_address):
+        """Same as in BaseServer but as a thread.
+
+        In addition, exception handling is done here.
+
+        """
+        try:
+            self.finish_request(request, client_address)
+        except Exception:
+            self.handle_error(request, client_address)
+        finally:
+            self.shutdown_request(request)
+
+    def process_request(self, request, client_address):
+        if not self._request_processing_executor:
+            raise ValueError(str(self.__class__) + " is not initialized properly")
+
+        """Start a new thread to process the request."""
+        self._request_reading_executor.submit(
+            self.process_request_thread, request, client_address
+        )
+
     def server_close(self):
+        super().server_close()
+
         self.__wait_for_tasks_to_complete(
             self._request_reading_executor,
             self._request_processing_executor,
