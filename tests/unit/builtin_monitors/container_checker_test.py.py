@@ -2,7 +2,6 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import base64
-import json
 from dataclasses import dataclass, field
 from threading import Condition, Thread, Lock
 from typing import Dict, List
@@ -13,11 +12,10 @@ from scalyr_agent.json_lib import JsonArray, JsonObject
 from scalyr_agent.monitor_utils.k8s import (
     K8sConfigBuilder,
     K8sNamespaceFilter,
-    Controller,
 )
 from scalyr_agent.monitor_utils.annotation_config import process_annotations
 
-__author__ = "ales.novak@scalyr.com"
+__author__ = "echee@scalyr.com"
 
 
 from scalyr_agent.builtin_monitors.kubernetes_monitor import (
@@ -37,7 +35,7 @@ class MockRunState:
 
     def wait_for_next_loop_start(self):
         with self.next_loop_condition:
-            if not self.next_loop_condition.wait(timeout=15):
+            if not self.next_loop_condition.wait(timeout=5):
                 raise Exception("Failed to acquire started lock")
 
     def is_running(self):
@@ -63,6 +61,13 @@ class MockNamespace:
 
 
 @dataclass
+class MockController:
+    name: str
+    kind: str
+    flat_labels: str
+
+
+@dataclass
 class MockPod:
     namespace: str
     name: str
@@ -70,7 +75,7 @@ class MockPod:
     uid: str
     annotations: Dict
     container_names: List[str]
-    controller: Controller
+    controller: MockController
     labels: Dict = field(default_factory=dict)
 
 
@@ -85,9 +90,9 @@ class ContainerCheckerTest(TestConfigurationBase):
         self.tear_down_functions = []
 
         self._write_file_with_separator_conversion(
-            """{
-            "api_key": "hi there",
-            "k8s_logs": [
+            """ {
+            api_key: "hi there",
+            k8s_logs: [
               {
                 "k8s_container_glob": "no_match",
                 "test": "no_match",
@@ -96,7 +101,8 @@ class ContainerCheckerTest(TestConfigurationBase):
                 "attributes": { "container_name": "${k8s_container_name}" }
               }
             ]
-          }"""
+          }
+        """
         )
         self.config = self._create_test_configuration_instance()
         self.config.parse()
@@ -108,7 +114,10 @@ class ContainerCheckerTest(TestConfigurationBase):
         self.log_watcher.update_log_configs_on_path.return_value = {}
 
         self.container_checker = ContainerChecker(
-            config=self._container_checker_config(),
+            config={
+                "k8s_use_v2_attributes": True,
+                "initial_stopped_container_collection_window": 0,
+            },
             global_config=self.config,
             logger=self.mock_logger,
             socket_file=None,
@@ -155,18 +164,7 @@ class ContainerCheckerTest(TestConfigurationBase):
             tear_down_function()
         self.tear_down_functions = []
 
-    def _flatten_labels(self, labels):
-        return ",".join(f"{label}={value}" for label, value in labels.items())
-
-    def _container_checker_config(self):
-        return {
-            "k8s_use_v2_attributes": True,
-            "initial_stopped_container_collection_window": 0,
-            "k8s_label_include_globs": ["*"],
-            "k8s_label_exclude_globs": [],
-        }
-
-    def _start_check_containers_thread(self):
+    def __start_check_containers_thread(self):
 
         exception_holder = []
         run_state = MockRunState()
@@ -189,7 +187,7 @@ class ContainerCheckerTest(TestConfigurationBase):
 
         return run_state, exception_holder
 
-    def _get_containers_value_from_pods(self, pods):
+    def __get_containers_value_from_pods(self, pods):
         return {
             container_name: {
                 "k8s_info": {
@@ -205,13 +203,13 @@ class ContainerCheckerTest(TestConfigurationBase):
             for container_name in k8s_pod.container_names
         }
 
-    def _mock_get_containers_value(self, value):
+    def __mock_get_containers_value(self, value):
         self.container_checker._container_enumerator.get_containers.return_value = value
         return value
 
-    def _set_mocked_k8s_objects(self, k8s_pods, k8s_namespaces):
-        get_containers_value = self._mock_get_containers_value(
-            self._get_containers_value_from_pods(k8s_pods)
+    def __set_mocked_k8s_objects(self, k8s_pods, k8s_namespaces):
+        get_containers_value = self.__mock_get_containers_value(
+            self.__get_containers_value_from_pods(k8s_pods)
         )
 
         def mocked_pod(
@@ -239,7 +237,7 @@ class ContainerCheckerTest(TestConfigurationBase):
 
         return get_containers_value
 
-    def _assert_mock_logger_no_severe_messages(self):
+    def __assert_mock_logger_no_severe_messages(self):
         assert len(self.mock_logger.exception.mock_calls) == 0, (
             "Some exceptions were logged: %s" % self.mock_logger.exception.mock_calls
         )
@@ -250,8 +248,6 @@ class ContainerCheckerTest(TestConfigurationBase):
             "Some errors were logged: %s" % self.mock_logger.error.mock_calls
         )
 
-
-class ContainerCheckerMultiAccountTest(ContainerCheckerTest):
     def test_check_namespace_change(self):
         k8s_namespace = MockNamespace(
             name="namespace",
@@ -267,23 +263,23 @@ class ContainerCheckerMultiAccountTest(ContainerCheckerTest):
             uid="lkjsefr",
             annotations=process_annotations({}),
             container_names=["work-container"],
-            controller=Controller(
+            controller=MockController(
                 name="controller_name_k8s_pod_1_namespace_1",
                 kind="controller_kind_k8s_pod_1_namespace_1",
-                labels={"controller_labels_k8s_pod_1_namespace_1": "value"},
+                flat_labels="controller_labels_k8s_pod_1_namespace_1:value",
             ),
         )
 
-        self._set_mocked_k8s_objects([k8s_pod], [k8s_namespace])
+        self.__set_mocked_k8s_objects([k8s_pod], [k8s_namespace])
 
-        run_state, exception_holder = self._start_check_containers_thread()
+        run_state, exception_holder = self.__start_check_containers_thread()
 
         # Wait for ContainerChecker to complete at least one loop
         run_state.wait_for_next_loop_start()
         run_state.wait_for_next_loop_start()
 
         assert len(exception_holder) == 0, "Expected no exceptions"
-        self._assert_mock_logger_no_severe_messages()
+        self.__assert_mock_logger_no_severe_messages()
 
         assert len(self.log_watcher.add_log_config.call_args_list) == 1
 
@@ -311,7 +307,7 @@ class ContainerCheckerMultiAccountTest(ContainerCheckerTest):
         run_state.wait_for_next_loop_start()
 
         assert len(exception_holder) == 0, "Expected no exceptions"
-        self._assert_mock_logger_no_severe_messages()
+        self.__assert_mock_logger_no_severe_messages()
 
         self.log_watcher.add_log_config.assert_not_called()
 
@@ -369,10 +365,10 @@ class ContainerCheckerMultiAccountTest(ContainerCheckerTest):
                 WORKLOAD_POD_1_CONTAINER_2,
                 WORKLOAD_POD_1_CONTAINER_3,
             ],
-            controller=Controller(
+            controller=MockController(
                 name="controller_name_k8s_pod_1_namespace_1",
                 kind="controller_kind_k8s_pod_1_namespace_1",
-                labels={"controller_labels_k8s_pod_1_namespace_1": "value"},
+                flat_labels="controller_labels_k8s_pod_1_namespace_1:value",
             ),
         )
 
@@ -385,10 +381,10 @@ class ContainerCheckerMultiAccountTest(ContainerCheckerTest):
             container_names=[
                 WORKLOAD_POD_2_CONTAINER_1,
             ],
-            controller=Controller(
+            controller=MockController(
                 name="controller_name_k8s_pod_2_namespace_1",
                 kind="controller_kind_k8s_pod_2_namespace_1",
-                labels={"controller_labels_k8s_pod_2_namespace_1": "value"},
+                flat_labels="controller_labels_k8s_pod_2_namespace_1:value",
             ),
         )
 
@@ -402,19 +398,19 @@ class ContainerCheckerMultiAccountTest(ContainerCheckerTest):
             uid="fsdjlkh",
             annotations=process_annotations({}),
             container_names=[WORKLOAD_POD_3_CONTAINER_1],
-            controller=Controller(
+            controller=MockController(
                 name="controller_name_k8s_pod_3_namespace_2",
                 kind="controller_kind_k8s_pod_3_namespace_2",
-                labels={"controller_labels_k8s_pod_3_namespace_2": "value"},
+                flat_labels="controller_labels_k8s_pod_3_namespace_2:value",
             ),
         )
 
-        get_containers_value = self._set_mocked_k8s_objects(
+        get_containers_value = self.__set_mocked_k8s_objects(
             [k8s_pod_1_namespace_1, k8s_pod_2_namespace_1, k8s_pod_3_namespace_2],
             [k8s_namespace_1, k8s_namespace_2],
         )
 
-        run_state, exception_holder = self._start_check_containers_thread()
+        run_state, exception_holder = self.__start_check_containers_thread()
 
         # Wait for ContainerChecker to complete at least one loop
         run_state.wait_for_next_loop_start()
@@ -452,7 +448,7 @@ class ContainerCheckerMultiAccountTest(ContainerCheckerTest):
                         "pod_uid": pod.uid,
                         "k8s_node": "test_node",
                         "_k8s_dn": pod.controller.name,
-                        "_k8s_dl": self._flatten_labels(pod.controller.labels),
+                        "_k8s_dl": pod.controller.flat_labels,
                         "_k8s_ck": pod.controller.kind,
                     }
                 ),
@@ -607,125 +603,3 @@ class ContainerCheckerMultiAccountTest(ContainerCheckerTest):
                 ],
             ),
         ]
-
-
-class ContainerCheckerFilterLabelsTest(ContainerCheckerTest):
-
-    def _container_checker_config(self):
-        config = super()._container_checker_config()
-
-        config["k8s_label_include_globs"] = ["*include_this_label*", "wanted_label"]
-        config["k8s_label_exclude_globs"] = ["*garbage*", "*exclude*"]
-
-        return config
-
-    def test_included_labels(self):
-        k8s_namespace = MockNamespace(
-            name="namespace", annotations=process_annotations({}), digest=b"digest-1"
-        )
-        k8s_pod = MockPod(
-            namespace=k8s_namespace.name,
-            name="work-pod-name",
-            node_name="test_node",
-            uid="lkjsefr",
-            annotations=process_annotations({}),
-            labels={
-                "pod_label_1": "pod_value_1",
-                "pod_label_2": "pod_value_2",
-                "pod_label_unwanted_label": "unwanted_value",
-                "include_this_label": "include_this_value",
-                "pod_include_this_label_exclude": "pod_include_this_value",
-                "pod_include_this_label": "pod_include_this_value",
-                "pod_include_this_label_garbage": "random_value",
-                "pod_include_this_label_garbage_xxx": "random_value_2",
-                "garbage_pod_include_this_label": "random_value_2",
-                "wanted_label": "wanted_value",
-                "unwanted_label": "unwanted_value",
-            },
-            container_names=["work-container"],
-            controller=Controller(
-                name="controller_name_k8s_pod_1_namespace_1",
-                kind="controller_kind_k8s_pod_1_namespace_1",
-                labels={
-                    "controller_label_1": "controller_value_1",
-                    "controller_label_2": "controller_value_2",
-                    "controller_label_unwanted_label": "unwanted_value",
-                    "include_this_label": "include_this_value",
-                    "controller_include_this_label_exclude": "pod_include_this_value",
-                    "controller_include_this_label": "controller_include_this_value",
-                    "controller_include_this_label_garbage": "random_value",
-                    "controller_include_this_label_garbage_xxx": "random_value_2",
-                    "garbage_controller_include_this_label": "random_value_2",
-                    "wanted_label": "wanted_value",
-                    "unwanted_label": "unwanted_value",
-                },
-            ),
-        )
-
-        INCLUDED_POD_LABELS = {
-            "include_this_label": "include_this_value",
-            "pod_include_this_label": "pod_include_this_value",
-            "wanted_label": "wanted_value",
-        }
-
-        EXCLUDED_POD_LABELS = {
-            "pod_label_1": "pod_value_1",  # Not matching include glob
-            "pod_label_2": "pod_value_2",  # Not matching include glob
-            "pod_label_unwanted_label": "unwanted_value",  # Not matching include glob,
-            "pod_include_this_label_exclude": "pod_include_this_value",  # Matching exclude glob
-            "pod_include_this_label_garbage": "random_value",  # Matching exclude glob
-            "pod_include_this_label_garbage_xxx": "random_value_2",  # Matching exclude glob
-            "garbage_pod_include_this_label": "random_value_2",  # Matching exclude glob
-            "unwanted_label": "unwanted_value",  # Not matching include glob
-        }
-
-        INCLUDED_CONTROLLER_LABELS = self._flatten_labels(
-            {
-                "include_this_label": "include_this_value",
-                "controller_include_this_label": "controller_include_this_value",
-                "wanted_label": "wanted_value",
-            }
-        )
-
-        get_containers_value = self._set_mocked_k8s_objects([k8s_pod], [k8s_namespace])
-
-        run_state, exception_holder = self._start_check_containers_thread()
-
-        # Wait for ContainerChecker to complete at least one loop
-        run_state.wait_for_next_loop_start()
-        run_state.wait_for_next_loop_start()
-
-        assert len(exception_holder) == 0, "Expected no exceptions"
-        self._assert_mock_logger_no_severe_messages()
-
-        assert len(self.log_watcher.add_log_config.call_args_list) == 1
-
-        assert (
-            self.log_watcher.add_log_config.call_args_list[0].args[1]["path"]
-            == "/var/log/scalyr-agent2/containers/work-container.log"
-        )
-
-        for label, value in INCLUDED_POD_LABELS.items():
-            assert (
-                self.log_watcher.add_log_config.call_args_list[0]
-                .args[1]["attributes"]
-                .get(label)
-                == value
-            )
-
-        for label in EXCLUDED_POD_LABELS.keys():
-            assert (
-                label
-                not in self.log_watcher.add_log_config.call_args_list[0].args[1][
-                    "attributes"
-                ]
-            )
-
-        assert (
-            self.log_watcher.add_log_config.call_args_list[0].args[1]["attributes"][
-                "_k8s_dl"
-            ]
-            == INCLUDED_CONTROLLER_LABELS
-        )
-
-        self.log_watcher.add_log_config.reset_mock()
