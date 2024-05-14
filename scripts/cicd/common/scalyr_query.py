@@ -18,7 +18,8 @@ def scalyr_query(token: str, filter: str, time_start: str, retries: int):
             json={
                 "startTime": time_start,
                 "filter": filter
-            }
+            },
+            timeout=10
         )
 
     return query(post_request, retries)
@@ -35,7 +36,8 @@ def power_query(token: str, query_str: str, time_start: str, retries: int):
             json={
                 "startTime": time_start,
                 "query": query_str
-            }
+            },
+            timeout=10
         )
 
     return query(post_request, retries)
