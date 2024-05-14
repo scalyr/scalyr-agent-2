@@ -441,6 +441,24 @@ define_config_option(
 #                     'Optional (defaults to False). If true, stdout/stderr logs will contain docker timestamps at the beginning of the line\n',
 #                     convert_to=bool, default=False)
 
+define_config_option(
+    __monitor__,
+    "k8s_label_include_globs",
+    "Optional, (defaults to ['*']). Specifies a list of K8s labels to be added to logs.",
+    convert_to=ArrayOfStrings,
+    default=["*"],
+    env_aware=True,
+)
+
+define_config_option(
+    __monitor__,
+    "k8s_label_exclude_globs",
+    "Optional, (defaults to []]). Specifies a list of K8s labels to be ignored and not added to logs.",
+    convert_to=ArrayOfStrings,
+    default=[],
+    env_aware=True,
+)
+
 define_metric(
     __monitor__,
     "docker.net.rx_bytes",
@@ -3232,6 +3250,15 @@ class ContainerChecker(object):
 
         return attributes
 
+    def __is_label_allowed(self, label_name):
+        return any(
+            fnmatch.fnmatch(label_name, glob)
+            for glob in self._config.get("k8s_label_include_globs")
+        ) and not any(
+            fnmatch.fnmatch(label_name, glob)
+            for glob in self._config.get("k8s_label_exclude_globs")
+        )
+
     def __get_log_config_for_container(self, cid, info, k8s_cache, base_attributes):
         # type: (str, dict, KubernetesCache, JsonObject) -> List[Dict]
 
@@ -3300,7 +3327,8 @@ class ContainerChecker(object):
                     container_attributes["k8s_node"] = pod.node_name
 
                 for label, value in six.iteritems(pod.labels):
-                    container_attributes[label] = value
+                    if self.__is_label_allowed(label):
+                        container_attributes[label] = value
 
                 if "parser" in pod.labels:
                     parser = pod.labels["parser"]
@@ -3321,7 +3349,11 @@ class ContainerChecker(object):
                         # field `_k8s_ck`
                         container_attributes["_k8s_dn"] = controller.name
                         # `_k8s_dl` is translated to `k8s-labels`
-                        container_attributes["_k8s_dl"] = controller.flat_labels
+                        container_attributes["_k8s_dl"] = ",".join(
+                            f"{label}={value}"
+                            for label, value in controller.labels.items()
+                            if self.__is_label_allowed(label)
+                        )
                         # `_k8s_ck` is translated into the field key for
                         # `_k8s_dn`. Here are some examples: `k8s-deployment`,
                         # `k8s-daemon-set`, `k8s-stateful-set`, etc. If the
@@ -3639,6 +3671,232 @@ fields behave differently when configured via k8s annotations:
 * lineGroupers (not supported at all)
 * path (the path is always fixed for k8s container logs)
 
+### Configuring multiple accounts per container
+
+Besides the default API key stored in the scalyr/scalyr-api-key secret, the user can specify API keys for namespaces, pods and containers using annotations.
+
+#### Namespace level API keys
+```log.config.scalyr.com/teams.{team_number}.secret: {secret_name}```
+
+Overrides the default API key for all pods in the namespace.
+The `secret_name` is the name of the secret (stored in the same namespace) holding the Scalyr API key.
+The `teams_number` is an arbitrary unique number.
+
+#### Pod level API keys
+```log.config.scalyr.com/teams.{team_number}.secret: {secret_name}```
+
+Overrides the default API key and the namespace API key for all containers in the pod.
+The `secret_name` is the name of the secret (stored in the same namespace as the pod) holding the Scalyr API key.
+The `teams_number` is an arbitrary unique number.
+
+#### Container level API keys
+```log.config.scalyr.com/{container_name}.teams.{team_number}.secret: {secret_name}```
+
+Overrides the default API key, the namespace API key and the pod API keys for all containers in the pod.
+The `secret_name` is the name of the secret (stored in the same namespace as the pod) holding the Scalyr API key.
+The `teams_number` is an arbitrary unique number.
+
+#### API Key Secret structure
+
+```yaml
+apiVersion: v1
+kind: Secret
+data:
+  scalyr-api-key: <b64 encoded API key>
+```
+
+
+#### Simple visual example of Secret key annotation priority
+
+> [!NOTE]
+> When no annotation is present for either the namespace or pod, the default secret _scalyr/scalyr-api-key_ is used.
+
+![Annotation Priority](kubernetes_monitor_annotations_priority.png)
+
+
+#### Example:
+
+#### Configuration:
+
+##### Default API key for the Scalyr Agent
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: scalyr-api-key
+  namespace: scalyr
+data:
+  scalyr-api-key: <b64 encoded SCALYR_API_KEY_WRITE_TEAM_1>
+```
+
+##### Workload Namespaces
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: workload-namespace-1
+  annotations:
+    log.config.scalyr.com/teams.1.secret: scalyr-api-key-team-2
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: workload-namespace-2
+```
+
+##### API keys in the workload-namespace-1 Namespace
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: scalyr-api-key-team-2
+  namespace: workload-namespace-1
+data:
+  scalyr-api-key: <b64 encoded SCALYR_API_KEY_WRITE_TEAM_2>
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: scalyr-api-key-team-3
+data:
+  scalyr-api-key: <b64 encoded SCALYR_API_KEY_WRITE_TEAM_3>
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: scalyr-api-key-team-4
+data:
+  scalyr-api-key: <b64 encoded SCALYR_API_KEY_WRITE_TEAM_4>
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: scalyr-api-key-team-5
+data:
+  scalyr-api-key: <b64 encoded SCALYR_API_KEY_WRITE_TEAM_5>
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: scalyr-api-key-team-6
+data:
+  scalyr-api-key: <b64 encoded SCALYR_API_KEY_WRITE_TEAM_6>
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: scalyr-api-key-team-7
+data:
+  scalyr-api-key: <b64 encoded SCALYR_API_KEY_WRITE_TEAM_7>
+```
+
+#### Workload Pods in the workload-namespace Namespace
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: multi-account-test
+  name: workload-pod-1
+  namespace: workload-namespace-1
+  annotations:
+    log.config.scalyr.com/teams.1.secret: "scalyr-api-key-team-3"
+    log.config.scalyr.com/teams.5.secret: "scalyr-api-key-team-4"
+    log.config.scalyr.com/workload-pod-1-container-1.teams.1.secret: "scalyr-api-key-team-5"
+    log.config.scalyr.com/workload-pod-1-container-2.teams.1.secret: "scalyr-api-key-team-6"
+    log.config.scalyr.com/workload-pod-1-container-2.teams.2.secret: "scalyr-api-key-team-7"
+spec:
+  containers:
+  - name: workload-pod-1-container-1
+    image: busybox
+    command:
+        - /bin/sh
+        - -c
+        - while true; do echo workload-pod-1-container-1; sleep 1; done
+  - name: workload-pod-1-container-2
+    image: busybox
+    command:
+        - /bin/sh
+        - -c
+        - while true; do echo workload-pod-1-container-2; sleep 1; done
+  - name: workload-pod-1-container-3
+    image: busybox
+    command:
+        - /bin/sh
+        - -c
+        - while true; do echo workload-pod-1-container-3; sleep 1; done
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: multi-account-test
+  name: workload-pod-2
+  namespace: workload-namespace-1
+spec:
+  containers:
+  - name: workload-pod-2-container-1
+    image: busybox
+    command:
+        - /bin/sh
+        - -c
+        - while true; do echo workload-pod-2-container-1; sleep 1; done
+```
+
+##### Workload Pod in workload-namespace-2 Namespace
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: multi-account-test
+  name: workload-pod-3
+  namespace: workload-namespace-2
+spec:
+  containers:
+  - name: workload-pod-3-container-1
+    image: busybox
+    command:
+        - /bin/sh
+        - -c
+        - while true; do echo workload-pod-3-container-1; sleep 1; done
+```
+
+#### Ingested data:
+
+
+| Container Name | API keys used to ingest logs                             | Note                        |
+| --- |----------------------------------------------------------|-----------------------------|
+| workload-pod-1-container-1 | SCALYR_API_KEY_WRITE_TEAM_4                              | Container specific api keys |
+| workload-pod-1-container-2 | SCALYR_API_KEY_WRITE_TEAM_5, SCALYR_API_KEY_WRITE_TEAM_6 | Container specific api keys |
+| workload-pod-1-container-3 | SCALYR_API_KEY_WRITE_TEAM_3, SCALYR_API_KEY_WRITE_TEAM_4 | Pod default api keys        |
+| workload-pod-2-container-1 | SCALYR_API_KEY_WRITE_TEAM_2                              | Namespace default api key   |
+| workload-pod-3-container-1 | SCALYR_API_KEY_WRITE_TEAM_1                              | Agent default api key       |
+
+
+#### Querying the data:
+
+```bash
+scalyr_readlog_token=SCALYR_API_KEY_WRITE_TEAM_1 scalyr query 'app="multi-account-test"' --columns=message
+# workload-pod-3-container-1
+
+scalyr_readlog_token=SCALYR_API_KEY_WRITE_TEAM_2 scalyr query 'app="multi-account-test"' --columns=message
+# workload-pod-2-container-1
+
+scalyr_readlog_token=SCALYR_API_KEY_WRITE_TEAM_3 scalyr query 'app="multi-account-test"' --columns=message
+# workload-pod-1-container-3
+
+scalyr_readlog_token=SCALYR_API_KEY_WRITE_TEAM_4 scalyr query 'app="multi-account-test"' --columns=message
+# workload-pod-1-container-3
+# workload-pod-1-container-1
+
+scalyr_readlog_token=SCALYR_API_KEY_WRITE_TEAM_5 scalyr query 'app="multi-account-test"' --columns=message
+# workload-pod-1-container-2
+
+scalyr_readlog_token=SCALYR_API_KEY_WRITE_TEAM_6 scalyr query 'app="multi-account-test"' --columns=message
+# workload-pod-1-container-2
+```
+
 ### Excluding Logs
 
 Containers and pods can be specifically included/excluded from having their logs collected and
@@ -3652,6 +3910,8 @@ are set. e.g.
 has the same effect as
 
     log.config.scalyr.com/include: false
+
+In an edge case when a short-lived container metadata is not available anymore via K8s API and some logs are found, they will be collected based on `k8s_include_all_containers` flag.
 
 By default the agent monitors the logs of all pods/containers, and you have to manually exclude
 pods/containers you don't want.  You can also set `k8s_include_all_containers: false` in the
