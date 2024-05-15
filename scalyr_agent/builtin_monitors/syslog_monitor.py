@@ -57,7 +57,10 @@ import six
 from six.moves import range
 import six.moves.socketserver
 
-from scalyr_agent.builtin_monitors.thread_pool import BoundedThreadingMixIn
+if six.PY2:
+    from socketserver import ThreadingMixIn as BoundedThreadingMixIn
+else:
+    from scalyr_agent.builtin_monitors.thread_pool import BoundedThreadingMixIn
 
 try:
     # Only available for python >= 3.6

@@ -38,11 +38,11 @@ class BoundedThreadingMixIn(ThreadingMixIn):
     # pylint: disable=no-member
     def process_request(self, request, client_address):
         self.__threads_sempahore.acquire()
-        super(BoundedThreadingMixIn, self).process_request(request, client_address)
+        super().process_request(request, client_address)
 
     # Note this is a mixin for use with SocketServer
     # pylint: disable=no-member
     def shutdown_request(self, request):
         self.__threads_sempahore.release()
-        super(BoundedThreadingMixIn, self).shutdown_request(request)
+        super().shutdown_request(request)
 
