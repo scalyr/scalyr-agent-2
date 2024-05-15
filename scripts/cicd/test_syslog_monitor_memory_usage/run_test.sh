@@ -64,6 +64,7 @@ generate_config $TCP_SERVERS $UDP_SERVERS
 CONFIG_FILE=agent.json
 python scalyr_agent/agent_main.py --config $CONFIG_FILE start
 
+python scalyr_agent/agent_main.py --config $CONFIG_FILE status -v
 
 RATE=2000
 MONITOR_INTERVAL=5
