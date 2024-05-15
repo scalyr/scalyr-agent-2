@@ -30,7 +30,7 @@ class BoundedThreadingMixIn(ThreadingMixIn):
         if global_config:
             processing_threads = global_config.syslog_processing_thread_count
         else:
-            processing_threads = 1000
+            processing_threads = 16
 
         self.__threads_sempahore = threading.Semaphore(processing_threads)
 
