@@ -45,6 +45,9 @@ import time
 import uuid
 from io import open
 
+if False:  # NOSONAR
+    from typing import Optional, Union
+
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
 
@@ -96,7 +99,7 @@ class CRIParseError(Exception):
         self.line = line
 
     def __repr__(self):
-        return "Error parsing line - %s: %s" % self.message, self.line
+        return "Error parsing line - %s: %s" % (self.message, self.line)
 
 
 class CRILogLine(object):

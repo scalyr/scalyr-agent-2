@@ -107,14 +107,18 @@ class TestCRILogLineBuffer(ScalyrTestCase):
 
 class TestCRIStreamBuffers(ScalyrTestCase):
     def test_completed_on_empty(self):
-        assert None == CRIStreamBuffers(
-            max_line_size=10, line_completion_wait_time=10
-        ).pop_completed(current_time=1)
+        assert (
+            CRIStreamBuffers(
+                max_line_size=10, line_completion_wait_time=10
+            ).pop_completed(current_time=1)
+            is None
+        )
 
     def test_completed(self):
         buffers = CRIStreamBuffers(max_line_size=100, line_completion_wait_time=10)
-        assert None == buffers.append_log_line(
-            CRILogLine(0, "stdout", ["P"], "line 01 ", None), 0
+        assert (
+            buffers.append_log_line(CRILogLine(0, "stdout", ["P"], "line 01 ", None), 0)
+            is None
         )
         assert (
             buffers.append_log_line(CRILogLine(1, "stderr", ["F"], "line 02 ", None), 1)
@@ -123,13 +127,15 @@ class TestCRIStreamBuffers(ScalyrTestCase):
             == b"line 02 \n"
         )
 
-        assert None == buffers.pop_completed(current_time=1)
+        assert buffers.pop_completed(current_time=1) is None
 
-        assert None == buffers.append_log_line(
-            CRILogLine(2, "stderr", ["P"], "line 03 ", None), 2
+        assert (
+            buffers.append_log_line(CRILogLine(2, "stderr", ["P"], "line 03 ", None), 2)
+            is None
         )
-        assert None == buffers.append_log_line(
-            CRILogLine(3, "stdout", ["P"], "line 04 ", None), 3
+        assert (
+            buffers.append_log_line(CRILogLine(3, "stdout", ["P"], "line 04 ", None), 3)
+            is None
         )
         assert (
             buffers.append_log_line(CRILogLine(4, "stderr", ["F"], "line 05 ", None), 4)
@@ -138,9 +144,9 @@ class TestCRIStreamBuffers(ScalyrTestCase):
             == b"line 03 line 05 \n"
         )
 
-        assert None == buffers.pop_completed(current_time=5)
+        assert buffers.pop_completed(current_time=5) is None
 
-        assert None == buffers.pop_completed(current_time=10)
+        assert buffers.pop_completed(current_time=10) is None
         assert (
             buffers.pop_completed(current_time=11).build_cri_result(True).line
             == b"line 01 line 04 \n"
@@ -155,7 +161,7 @@ class TestCRIStreamBuffers(ScalyrTestCase):
         buffers.append_log_line(CRILogLine(0, "stdout", ["P"], "line 00 ", None), 0)
         buffers.append_log_line(CRILogLine(1, "stderr", ["P"], "line 01 ", None), 1)
 
-        assert None == buffers.pop_completed(current_time=2)
+        assert buffers.pop_completed(current_time=2) is None
 
         assert (
             buffers.append_log_line(CRILogLine(2, "stdout", ["P"], "line 02 ", None), 2)

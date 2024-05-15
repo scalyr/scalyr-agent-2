@@ -37,7 +37,6 @@ import mock
 
 from scalyr_agent.copying_manager.copying_manager import (
     DynamicWorkers,
-    CopyingManagerWorker,
     PathWorkerIdDict,
 )
 
