@@ -189,7 +189,6 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
 
     class MockConfig():
         def __init__(self):
-            self.syslog_monitors_shutdown_grace_period = 1
             self.syslog_udp_socket_request_queue_size = 10000
 
     def __tcp_server(self, port, handling_time, global_config):
@@ -320,9 +319,9 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
         tcp_servers_count = 3
         connections = 10
         messages_per_connection = 50
-        handling_time = 0.01
+        handling_time = 0.0001
         advantage_time = handling_time * 10
-        message_window = (udp_servers_count + tcp_servers_count) * 15
+        message_window = (udp_servers_count + tcp_servers_count) * 300
         shutdown_time = connections * messages_per_connection * handling_time + 3
 
         with self.start_servers(udp_servers_count, tcp_servers_count, handling_time, global_config=self.MockConfig()) as (udp_servers, tcp_servers):
@@ -1012,6 +1011,35 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         "scalyr_agent.builtin_monitors.syslog_monitor.SyslogHandler", TestSyslogHandler
     )
     @skipIf(platform.system() == "Windows", "Skipping Linux only tests on Windows")
+    def test_tcp_server_shutdown(self):
+        config = {
+            "module": "scalyr_agent.builtin_monitors.syslog_monitor",
+            "protocols": "tcp:8003",
+            "log_flush_delay": 0.0,
+        }
+        self.monitor = TestSyslogMonitor(
+            config, scalyr_logging.getLogger("syslog_monitor[test]")
+        )
+        self.monitor.open_metric_log()
+
+        self.monitor.start()
+
+        time.sleep(0.05)
+
+        tcp1 = socket.socket()
+        self.sockets.append(tcp1)
+        self.connect(tcp1, ("localhost", 8003))
+
+        expected_tcp1 = "TCP Test\n"
+        self.send_and_wait_for_lines(tcp1, expected_tcp1, timeout=300)
+
+        self.monitor.stop(wait_on_join=False)
+
+
+    @mock.patch(
+        "scalyr_agent.builtin_monitors.syslog_monitor.SyslogHandler", TestSyslogHandler
+    )
+    @skipIf(platform.system() == "Windows", "Skipping Linux only tests on Windows")
     def test_run_multiple_servers(self):
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
@@ -1036,8 +1064,12 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         tcp2 = socket.socket()
         self.sockets.append(tcp2)
 
+        tcp3 = socket.socket()
+        self.sockets.append(tcp3)
+
         self.connect(tcp1, ("localhost", 8001))
         self.connect(tcp2, ("localhost", 8003))
+        self.connect(tcp3, ("localhost", 8003))
 
         expected_udp1 = "UDP Test"
         self.send_and_wait_for_lines(udp, expected_udp1, ("localhost", 8000))
@@ -1050,6 +1082,9 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
 
         expected_tcp2 = "TCP2 Test\n"
         self.send_and_wait_for_lines(tcp2, expected_tcp2)
+
+        expected_tcp3 = "TCP3 Test\n"
+        self.send_and_wait_for_lines(tcp3, expected_tcp3)
 
         # without close, the logger will interfere with other test cases.
         self.monitor.close_metric_log()

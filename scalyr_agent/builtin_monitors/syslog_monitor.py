@@ -25,6 +25,8 @@ from __future__ import absolute_import
 
 from __future__ import print_function
 
+from socketserver import ThreadingMixIn
+
 if False: # NOSONAR
     from typing import Tuple, Optional
 
@@ -55,10 +57,7 @@ import six
 from six.moves import range
 import six.moves.socketserver
 
-if six.PY2:
-    from scalyr_agent.builtin_monitors.thread_pool_dummy import QueueMixin
-else:
-    from scalyr_agent.builtin_monitors.thread_pool import QueueMixin
+from scalyr_agent.builtin_monitors.thread_pool import BoundedThreadingMixIn
 
 try:
     # Only available for python >= 3.6
@@ -621,6 +620,9 @@ class SyslogRequest(object):
         self._socket = socket
         self._max_buffer_size = max_buffer_size
         self._socket.setblocking(True)
+        # A proper way would be using select.poll() over all open sockets,
+        # but that is not compatible with the architecture of BaseServer.
+        self._socket.settimeout(0.1)
         self.is_closed = False
 
     def read(self):
@@ -1077,7 +1079,7 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
             return
 
 class SyslogUDPServer(
-    QueueMixin, six.moves.socketserver.UDPServer
+    BoundedThreadingMixIn, six.moves.socketserver.UDPServer
 ):
     """Class that creates a UDP SocketServer on a specified port"""
 
@@ -1090,7 +1092,7 @@ class SyslogUDPServer(
             "UDP Server: binding socket to %s" % six.text_type(address),
         )
 
-        QueueMixin.__init__(self, global_config=global_config)
+        BoundedThreadingMixIn.__init__(self, global_config)
 
         self.allow_reuse_address = True
         six.moves.socketserver.UDPServer.__init__(self, address, SyslogUDPHandler)
@@ -1104,7 +1106,7 @@ class SyslogUDPServer(
 
 
 class SyslogTCPServer(
-     six.moves.socketserver.TCPServer
+     BoundedThreadingMixIn, six.moves.socketserver.TCPServer
 ):
     """Class that creates a TCP SocketServer on a specified port"""
 
@@ -1134,6 +1136,8 @@ class SyslogTCPServer(
         self.message_size_can_exceed_tcp_buffer = message_size_can_exceed_tcp_buffer
         self.request_parser = request_parser
         self.message_delimiter = message_delimiter
+
+        BoundedThreadingMixIn.__init__(self, global_config)
 
         handler_cls = functools.partial(
             SyslogTCPHandler,

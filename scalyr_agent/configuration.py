@@ -1017,10 +1017,6 @@ class Configuration(object):
         return monitor_config
 
     @property
-    def syslog_monitors_shutdown_grace_period(self):
-        return self.__get_config().get_int("syslog_monitors_shutdown_grace_period")
-
-    @property
     def allow_http_monitors(self):
         return self.__get_config().get_bool("allow_http_monitors")
 
@@ -1522,13 +1518,8 @@ class Configuration(object):
     def syslog_processing_thread_count(self):
         """Returns the configuration value for 'scalyr_server'."""
         return self.__get_config().get_int(
-            "syslog_processing_thread_count", default_value=4
+            "syslog_processing_thread_count", default_value=10000
         )
-
-    @property
-    def syslog_udp_socket_request_queue_size(self):
-        """Returns the configuration value for 'scalyr_server'."""
-        return self.__get_config().get_int("syslog_udp_socket_request_queue_size", none_if_missing=True)
 
     @property
     def check_remote_if_no_tty(self):
@@ -2286,18 +2277,6 @@ class Configuration(object):
             description,
             apply_defaults,
             env_aware=True,
-        )
-        self.__verify_or_set_optional_int(
-            config,
-            "syslog_monitors_shutdown_grace_period",
-            10,
-            description,
-            apply_defaults,
-            env_aware=True,
-        )
-        # Defaults to about 130MB of memory per Syslog Server
-        self.__verify_or_set_optional_int(
-            config, "syslog_udp_socket_request_queue_size", 100000, description, apply_defaults, env_aware=True
         )
         self.__verify_or_set_optional_bool(
             config,
