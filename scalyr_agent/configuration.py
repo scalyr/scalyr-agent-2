@@ -1518,7 +1518,7 @@ class Configuration(object):
     def syslog_processing_thread_count(self):
         """Returns the configuration value for 'scalyr_server'."""
         return self.__get_config().get_int(
-            "syslog_processing_thread_count", default_value=10000
+            "syslog_processing_thread_count", default_value=16
         )
 
     @property
