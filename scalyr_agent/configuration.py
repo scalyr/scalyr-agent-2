@@ -80,7 +80,6 @@ AGENT_WORKER_SESSION_LOG_NAME_PREFIX = "agent-worker-session-"
 
 DEFAULT_WORKER_ID = "default"
 
-
 def ensure_https_url(server):
     parts = six.moves.urllib.parse.urlparse(server)
 
@@ -93,7 +92,6 @@ def ensure_https_url(server):
         return re.sub("^http://", "https://", server)
     else:
         return server
-
 
 class Configuration(object):
     """Encapsulates the results of a single read of the configuration file.
@@ -570,6 +568,7 @@ class Configuration(object):
         for worker_config in self.__config.get_json_array("workers"):
             worker_ids.add(worker_config["id"])
 
+
         # get all lists where log files entries may be defined and require worker_id param.
         # __k8s_log_configs is left out because it interferes with the kubernetes monitor container checker and CopyingManager itself sets default worker_id while adding logs.
         log_config_lists_worker_id_required = [
@@ -1016,10 +1015,6 @@ class Configuration(object):
         )
 
         return monitor_config
-
-    @property
-    def syslog_monitors_shutdown_grace_period(self):
-        return self.__get_config().get_int("syslog_monitors_shutdown_grace_period")
 
     @property
     def allow_http_monitors(self):
@@ -1523,14 +1518,7 @@ class Configuration(object):
     def syslog_processing_thread_count(self):
         """Returns the configuration value for 'scalyr_server'."""
         return self.__get_config().get_int(
-            "syslog_processing_thread_count", default_value=4
-        )
-
-    @property
-    def syslog_socket_thread_count(self):
-        """Returns the configuration value for 'scalyr_server'."""
-        return self.__get_config().get_int(
-            "syslog_socket_thread_count", none_if_missing=True
+            "syslog_processing_thread_count", default_value=16
         )
 
     @property
@@ -2286,14 +2274,6 @@ class Configuration(object):
             config,
             "allow_http_monitors",
             True,
-            description,
-            apply_defaults,
-            env_aware=True,
-        )
-        self.__verify_or_set_optional_int(
-            config,
-            "syslog_monitors_shutdown_grace_period",
-            10,
             description,
             apply_defaults,
             env_aware=True,

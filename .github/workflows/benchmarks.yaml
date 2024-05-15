@@ -1,0 +1,63 @@
+name: Benchmarks
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  schedule:
+    - cron: '0 4 * * *'
+
+jobs:
+  # Special job which automatically cancels old runs for the same branch, prevents runs for the
+  # same file set which has already passed, etc.
+  pre_job:
+    if: github.ref_name != '_release_build' && vars.UNIT_TESTS_DISABLED != 'true'
+    name: Skip Duplicate Jobs Pre Job
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write  # Needed for skip-duplicate-jobs job
+      contents: read
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@12aca0a884f6137d619d6a8a09fcc3406ced5281 # v4.0.0
+        with:
+          cancel_others: 'true'
+          github_token: ${{ github.token }}
+
+  memory-usage:
+    name: Memory Usage - Syslog Monitor - Python ${{ matrix.python-version }}
+    runs-on: ubuntu-20.04
+
+    needs: pre_job
+    # NOTE: We always want to run job on master branch
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref_name == 'master' }}
+
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+          - "2.7"
+          - "3.8"
+          - "3.9"
+          - "3.10"
+          - "3.11"
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
+      - name: Install loggen
+        run: |
+          sudo apt update
+          sudo apt install -y syslog-ng-core
+      - name: Run memory test
+        run: |
+          ./scripts/cicd/test_syslog_monitor_memory_usage/run_test.sh 10 10 600
+        env:
+          SCALYR_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
