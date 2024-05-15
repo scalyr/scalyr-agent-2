@@ -25,7 +25,7 @@ function generate_config() {
 "scalyr_server": "agent.scalyr.com",
 "api_key": "$SCALYR_API_KEY",
 "log_rotation_max_bytes": "1073741824",
-"syslog_processing_thread_count": "100000",
+"syslog_processing_thread_count": "16",
 
 "server_attributes": {
    "serverHost": "github-action-memory-test"
