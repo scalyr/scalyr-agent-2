@@ -67,7 +67,7 @@ python scalyr_agent/agent_main.py --config $CONFIG_FILE start
 
 RATE=2000
 MONITOR_INTERVAL=5
-MEM_ALLOWED=$((256*1024*$UDP_SERVERS)) # 256Mb per UDP server
+MEM_ALLOWED=$((32*1024*($UDP_SERVERS+$TCP_SERVERS))) # 32Mb per server
 
 pids=()
 for N in `seq $TCP_SERVERS`;

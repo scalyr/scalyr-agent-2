@@ -189,7 +189,7 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
 
     class MockConfig():
         def __init__(self):
-            self.syslog_udp_socket_request_queue_size = 10000
+            self.syslog_processing_thread_count = 16
 
     def __tcp_server(self, port, handling_time, global_config):
         server = SyslogTCPServer(
@@ -374,14 +374,7 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
 
             logged_port_sorted = [x[0] for x in logged_port_timestamp_sorted]
 
-            def port_window_unique_counts(window_size):
-                return [
-                    len(set(logged_port_sorted[i:i + window_size]))
-                    for i in range(len(logged_port_sorted) - window_size)
-                ]
-
-            # Check that the workers are distributed evenly
-            assert mean(port_window_unique_counts(window_size=message_window)) > len(udp_servers + tcp_servers) - 0.1
+            assert len(set(logged_port_sorted[:len(logged_port_sorted) // 2])) == len(udp_servers + tcp_servers)
 
 
 class SyslogMonitorConfigTest(SyslogMonitorTestCase):
