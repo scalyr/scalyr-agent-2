@@ -821,7 +821,7 @@ class SyslogRawRequestParser(SyslogRequestParser):
             "srcip": self._client_address[0],
             "destport": self._server_address[1],
         }
-        self.handle_frame(data, extra)
+        self._handle_frame(data, extra)
 
 
 class SyslogBatchedRequestParser(SyslogRequestParser):
@@ -992,7 +992,7 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
     # each new connection.
 
     class PreviousMessageHandlingError(Exception):
-        def __int__(self, message):
+        def __init__(self, message):
             self.message = message
 
         def __repr__(self):
@@ -1027,7 +1027,7 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
                 if count > 1000:
                     check_running = True
                     count = 0
-            except SocketNotReadyException as e:
+            except SocketNotReadyException:
                 time.sleep(0.01)
                 check_running = True
             except SocketClosed:
@@ -1104,12 +1104,12 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
             if last_processing_future:
                 try:
                     last_processing_future.result(timeout=TIMEOUT_TOTAL_TIME)
-                except concurrent.futures.TimeoutError as e:
+                except concurrent.futures.TimeoutError:
                     global_log.warn(TIMEOUT_ERROR_MSG)
                     raise SyslogTCPHandler.PreviousMessageHandlingError(
                         TIMEOUT_ERROR_MSG
                     )
-                except concurrent.futures.CancelledError as e:
+                except concurrent.futures.CancelledError:
                     global_log.warn(CANCELLED_ERROR_MSG)
                     raise SyslogTCPHandler.PreviousMessageHandlingError(
                         CANCELLED_ERROR_MSG

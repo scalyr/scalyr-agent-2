@@ -558,7 +558,11 @@ class Controller(object):
         self.access_time = None
         self.parent_name = parent_name
         self.parent_kind = parent_kind
-        self.labels = labels
+        flat_labels = []
+        for key, value in six.iteritems(labels):
+            flat_labels.append("%s=%s" % (key, value))
+
+        self.flat_labels = ",".join(flat_labels)
 
 
 class ApiQueryOptions(object):
