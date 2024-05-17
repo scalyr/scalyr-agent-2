@@ -1210,8 +1210,8 @@ class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
         """
         Mocking based test case which verifies that CRIEnumerator._get_container() correctly
         Handles the case when the Kubernetes API server returns an invalid status code.
-        404 => Pod not found, Log Warning, excluded
-        401 => Unauthorized, Log Error, excluded
+        404 => Not found, pod excluded
+        401 => Unauthorized, log error, pod excluded
         """
         self._write_file_with_separator_conversion(
             """ {
@@ -1263,9 +1263,9 @@ class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
             cri.get_containers(k8s_cache=k8s_cache, k8s_include_by_default=False) == {}
         )
 
-        assert CONTAINER_ID_1 in cri.get_containers(
+        assert cri.get_containers(
             k8s_cache=k8s_cache, k8s_include_by_default=True
-        )
+        ) == {}
 
         assert (
             k8s_cache.pod.call_args_list
@@ -1291,17 +1291,7 @@ class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
         assert_has_calls_non_consecutive(
             logger,
             [
-                mock.call.info(
-                    StringMatcher(
-                        "Excluding pod based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS=false."
-                    )
-                ),
                 mock.call.error(mock.ANY, exc_info=self.K8sApiExceptionMatcher(401)),
-                mock.call.info(
-                    StringMatcher(
-                        "Including pod based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS=true."
-                    )
-                ),
                 mock.call.error(mock.ANY, exc_info=self.K8sApiExceptionMatcher(401)),
             ],
         )
