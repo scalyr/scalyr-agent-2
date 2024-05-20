@@ -283,17 +283,17 @@ def run_test_in_docker(
         mount_options.extend(["-v", f"{source}:{dst}"])
 
     cmd = [
-        "docker",
-        "run",
-        "-i",
-        *mount_options,
-        "--platform",
-        architecture.as_docker_platform(),
-        docker_image,
-        *_COMMON_CMD_ARGS,
-        *command,
-    ]
-
+            "docker",
+            "run",
+            "-i",
+            *mount_options,
+            "--platform",
+            architecture.as_docker_platform(),
+            docker_image,
+            *_COMMON_CMD_ARGS,
+            *command,
+        ]
+    
     logger.info(f"Running test in docker: {cmd}")
 
     subprocess.run(

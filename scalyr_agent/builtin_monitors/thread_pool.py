@@ -38,19 +38,12 @@ class ExecutorMixIn:
         if global_config:
             reading_threads = global_config.syslog_socket_thread_count
             processing_threads = global_config.syslog_processing_thread_count
-            self._shutdown_grace_period = (
-                global_config.syslog_monitors_shutdown_grace_period
-            )
+            self._shutdown_grace_period = global_config.syslog_monitors_shutdown_grace_period
         else:
             self._shutdown_grace_period = 5
 
-        self._request_reading_executor = ThreadPoolExecutor(
-            max_workers=reading_threads, thread_name_prefix="request_reading_executor"
-        )
-        self._request_processing_executor = ThreadPoolExecutor(
-            max_workers=processing_threads,
-            thread_name_prefix="request_processing_executor",
-        )
+        self._request_reading_executor = ThreadPoolExecutor(max_workers=reading_threads, thread_name_prefix="request_reading_executor")
+        self._request_processing_executor = ThreadPoolExecutor(max_workers=processing_threads, thread_name_prefix="request_processing_executor")
 
         # Since the older versions of python use daemon threads, we need to let the pool create the threads this constructor's thread.
         self.__warmup_thread_pool(self._request_reading_executor)
@@ -76,7 +69,7 @@ class ExecutorMixIn:
 
     def process_request(self, request, client_address):
         if not self._request_processing_executor:
-            raise ValueError(str(self.__class__) + " is not initialized properly")
+           raise ValueError(str(self.__class__) + " is not initialized properly")
 
         """Start a new thread to process the request."""
         self._request_reading_executor.submit(
@@ -86,11 +79,7 @@ class ExecutorMixIn:
     def server_close(self):
         super().server_close()
 
-        self.__wait_for_tasks_to_complete(
-            self._request_reading_executor,
-            self._request_processing_executor,
-            timeout=self._shutdown_grace_period,
-        )
+        self.__wait_for_tasks_to_complete(self._request_reading_executor, self._request_processing_executor, timeout=self._shutdown_grace_period)
 
         shutdown_args = {"wait": False}
         if sys.version_info[0:2] >= (3, 9):
@@ -109,4 +98,5 @@ class ExecutorMixIn:
         for _ in executors:
             if time.time() > time_stop_waiting:
                 break
-            semaphore.acquire(timeout=time_stop_waiting - time.time())
+            semaphore.acquire(timeout=time_stop_waiting-time.time())
+

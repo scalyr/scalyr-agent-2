@@ -61,32 +61,25 @@ class TestAnnotationConfig(ScalyrTestCase):
             "log.config.scalyr.com/teams.2.secret": "scalyr-api-key-team-2",
             "log.config.scalyr.com/cont1.teams.2.secret": "scalyr-api-key-team-2",
             "log.config.scalyr.com/cont2.teams.1.secret": "scalyr-api-key-team-1",
-            "log.config.scalyr.com/cont2.teams.2.secret": "scalyr-api-key-team-2",
+            "log.config.scalyr.com/cont2.teams.2.secret": "scalyr-api-key-team-2"
         }
 
         result = process_annotations(annotations)
         self.assertEquals(4, len(list(result.keys())))
         self.assertEquals(JsonObject({"parser": "test-parser-1"}), result["attributes"])
         self.assertEquals(3, len(list(result["teams"])))
-        self.assertEquals(
-            JsonArray(
-                JsonObject({"secret": "scalyr-api-key-team-1"}),
-                JsonObject({"secret": "scalyr-api-key-team-2"}),
-                JsonObject({"secret": "scalyr-api-key-team-5"}),
-            ),
-            result["teams"],
-        )
-        self.assertEquals(
-            JsonArray(JsonObject({"secret": "scalyr-api-key-team-2"})),
-            result["cont1"]["teams"],
-        )
-        self.assertEquals(
-            JsonArray(
-                JsonObject({"secret": "scalyr-api-key-team-1"}),
-                JsonObject({"secret": "scalyr-api-key-team-2"}),
-            ),
-            result["cont2"]["teams"],
-        )
+        self.assertEquals(JsonArray(
+            JsonObject({"secret": "scalyr-api-key-team-1"}),
+            JsonObject({"secret": "scalyr-api-key-team-2"}),
+            JsonObject({"secret": "scalyr-api-key-team-5"}),
+        ), result["teams"])
+        self.assertEquals(JsonArray(
+            JsonObject({"secret": "scalyr-api-key-team-2"})
+        ), result["cont1"]["teams"])
+        self.assertEquals(JsonArray(
+            JsonObject({"secret": "scalyr-api-key-team-1"}),
+            JsonObject({"secret": "scalyr-api-key-team-2"})
+        ), result["cont2"]["teams"])
 
     def test_annotation_nested_object(self):
         annotations = {

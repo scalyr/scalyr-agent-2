@@ -28,7 +28,7 @@ if sys.platform == "win32":
     )
     import win32api  # pylint: disable=import-error
     import win32con  # pylint: disable=import-error
-    import win32evtlog  # pylint: disable=import-error
+    import win32evtlog # pylint: disable=import-error
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
@@ -43,7 +43,6 @@ def _get_parameter_msg_fixture_path():
         "fixtures",
         "parametermsgfixture.dll",
     )
-
 
 def _get_test_evtx_path():
     # Binary event file. Created by saving a selection of events in the Windows EventViewer.
@@ -127,8 +126,10 @@ def _get_test_evtx_path():
     # 		</RmSessionEvent>
     # 	</UserData>
     # </Event>
-    return os.path.join(os.path.dirname(__file__), "Testing.evtx")
-
+    return os.path.join(
+        os.path.dirname(__file__),
+        "Testing.evtx"
+    )
 
 @pytest.mark.windows_platform
 class WindowsEventLogMonitorTest(ScalyrTestCase):
@@ -338,7 +339,7 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
             "dll_handle_cache_ttl": 100,
             "placeholder_param_cache_size": 100,
             "placeholder_param_cache_ttl": 100,
-            "placeholder_render": True,
+            "placeholder_render": True
         }
         scalyr_agent.builtin_monitors.windows_event_log_monitor.windll = mock.Mock()
         mock_logger = mock.Mock()
@@ -391,7 +392,7 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
             "dll_handle_cache_ttl": 100,
             "placeholder_param_cache_size": 100,
             "placeholder_param_cache_ttl": 100,
-            "placeholder_render": True,
+            "placeholder_render": True
         }
         scalyr_agent.builtin_monitors.windows_event_log_monitor.windll = mock.Mock()
         mock_logger = mock.Mock()
@@ -445,9 +446,7 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
 
     @skipIf(sys.platform != "win32", "Skipping tests under non-Windows platform")
     def test_format_event_as_dict(self):
-        query_handle = win32evtlog.EvtQuery(
-            _get_test_evtx_path(), win32evtlog.EvtQueryFilePath
-        )
+        query_handle = win32evtlog.EvtQuery(_get_test_evtx_path(), win32evtlog.EvtQueryFilePath)
         events = win32evtlog.EvtNext(query_handle, 100)
 
         config = {
@@ -465,10 +464,7 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
         self.assertEqual(vals["EventID"], 1033)
         self.assertEqual(vals["EventIDQualifiers"], 16384)
         self.assertEqual(vals["InstanceID"], (16384 << 16) | 1033)
-        self.assertIn(
-            "These policies are being excluded since they are only defined with override-only attribute.",
-            vals["Message"],
-        )
+        self.assertIn("These policies are being excluded since they are only defined with override-only attribute.", vals["Message"])
         self.assertEqual(vals["Level"], "Information")
         self.assertEqual(vals["Opcode"], 0)
         self.assertEqual(vals["Keywords"], ["Classic"])
@@ -493,10 +489,9 @@ class WindowsEventLogMonitorTest(ScalyrTestCase):
         self.assertIn("Starting session 0", vals["Message"])
         self.assertEqual(vals["Level"], "Information")
         self.assertEqual(vals["Opcode"], "Info")
-        self.assertEqual(vals["Keywords"], "0x8000000000000000")
+        self.assertEqual(vals["Keywords"], '0x8000000000000000')
         self.assertEqual(vals["Channel"], "Application")
         self.assertEqual(vals["ProviderName"], "Microsoft-Windows-RestartManager")
-
 
 @pytest.mark.windows_platform
 class WindowsEventLogMonitorTest2(BaseScalyrLogCaptureTestCase):

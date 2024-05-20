@@ -80,7 +80,6 @@ AGENT_WORKER_SESSION_LOG_NAME_PREFIX = "agent-worker-session-"
 
 DEFAULT_WORKER_ID = "default"
 
-
 def ensure_https_url(server):
     parts = six.moves.urllib.parse.urlparse(server)
 
@@ -93,7 +92,6 @@ def ensure_https_url(server):
         return re.sub("^http://", "https://", server)
     else:
         return server
-
 
 class Configuration(object):
     """Encapsulates the results of a single read of the configuration file.
@@ -511,7 +509,9 @@ class Configuration(object):
     def __get_monitors_config(self):
         monitors_config = list(self.__config.get_json_array("monitors"))
         if not self.allow_http_monitors:
-            return list(map(self.force_http_monitor_config, monitors_config))
+            return list(map(
+                    self.force_http_monitor_config, monitors_config
+            ))
         return monitors_config
 
     @staticmethod
@@ -550,9 +550,7 @@ class Configuration(object):
         default_worker_entry = unique_worker_ids.get(DEFAULT_WORKER_ID)
 
         if default_worker_entry is None:
-            default_worker_entry = JsonObject(
-                api_key=self.api_key, id=DEFAULT_WORKER_ID
-            )
+            default_worker_entry = JsonObject(api_key=self.api_key, id=DEFAULT_WORKER_ID)
             self.__verify_workers_entry_and_set_defaults(default_worker_entry)
             workers.insert(0, default_worker_entry)
             self.__config.put("workers", JsonArray(*workers))
@@ -570,6 +568,7 @@ class Configuration(object):
         for worker_config in self.__config.get_json_array("workers"):
             worker_ids.add(worker_config["id"])
 
+
         # get all lists where log files entries may be defined and require worker_id param.
         # __k8s_log_configs is left out because it interferes with the kubernetes monitor container checker and CopyingManager itself sets default worker_id while adding logs.
         log_config_lists_worker_id_required = [
@@ -579,9 +578,7 @@ class Configuration(object):
 
         for log_config_list in log_config_lists_worker_id_required:
             for log_file_config in log_config_list:
-                log_file_config["worker_id"] = log_file_config.get(
-                    "worker_id", default_value=DEFAULT_WORKER_ID
-                )
+                log_file_config["worker_id"] = log_file_config.get("worker_id", default_value=DEFAULT_WORKER_ID)
 
         # get all lists where log files entries may be defined.
         log_config_lists = [
@@ -1522,16 +1519,12 @@ class Configuration(object):
     @property
     def syslog_processing_thread_count(self):
         """Returns the configuration value for 'scalyr_server'."""
-        return self.__get_config().get_int(
-            "syslog_processing_thread_count", default_value=4
-        )
+        return self.__get_config().get_int("syslog_processing_thread_count", default_value=4)
 
     @property
     def syslog_socket_thread_count(self):
         """Returns the configuration value for 'scalyr_server'."""
-        return self.__get_config().get_int(
-            "syslog_socket_thread_count", none_if_missing=True
-        )
+        return self.__get_config().get_int("syslog_socket_thread_count", none_if_missing=True)
 
     @property
     def check_remote_if_no_tty(self):
@@ -2283,20 +2276,10 @@ class Configuration(object):
             config, "allow_http", False, description, apply_defaults, env_aware=True
         )
         self.__verify_or_set_optional_bool(
-            config,
-            "allow_http_monitors",
-            True,
-            description,
-            apply_defaults,
-            env_aware=True,
+            config, "allow_http_monitors", True, description, apply_defaults, env_aware=True
         )
         self.__verify_or_set_optional_int(
-            config,
-            "syslog_monitors_shutdown_grace_period",
-            10,
-            description,
-            apply_defaults,
-            env_aware=True,
+            config, "syslog_monitors_shutdown_grace_period", 10, description, apply_defaults, env_aware=True
         )
         self.__verify_or_set_optional_bool(
             config,

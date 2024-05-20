@@ -34,7 +34,6 @@ DEFAULT_FILE_PATHS_TO_COPY = [
 
 global_log = scalyr_logging.getLogger(__name__)
 
-
 def dockerized_case(
     builder_cls,
     file_path,
