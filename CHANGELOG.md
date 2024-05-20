@@ -1,6 +1,22 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.2.15 "Jain" - May 20, 2024
+<!---
+Packaged by Ales Novak <ales.novak@sentinelone.com> on May 20, 2024 00:00 -0800
+--->
+
+Features:
+Ability to ignore k8s labels (https://github.com/scalyr/scalyr-agent-2/issues/1213).
+A user can now define glob filters for including and excluding container and controller labels in logs.
+For label to be included it needs to match one of the globs in k8s_label_include_globs and none of the globs in k8s_label_exclude_globs.
+
+From documentation:
+| k8s_label_include_globs | Optional, (defaults to ['*']). Specifies a list of K8s labels to be added to logs. |
+| k8s_label_exclude_globs | Optional, (defaults to []]). Specifies a list of K8s labels to be ignored and not added to logs. |
+
+Follows the same logic as label_include_globs and label_exclude_globs from the docker_monitor.
+
 ## 2.2.14 "Tycho" - May 6, 2024
 <!---
 Packaged by Ales Novak <ales.novak@sentinelone.com> on May 6, 2024 00:00 -0800
