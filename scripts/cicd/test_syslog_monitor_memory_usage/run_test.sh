@@ -86,7 +86,7 @@ done
 PID=`cat ~/scalyr-agent-dev/log/agent.pid`
 
 while ps -p $pids > /dev/null; do
-  MEM_USED=`cat /proc/$PID/status | grep VmRSS | awk '{print $2}'`
+  MEM_USED=`awk '/^VmRSS/ {print $2}' /proc/$PID/status`
   if [ $MEM_USED -gt $MEM_ALLOWED ]
   then
     echo_with_date "Mem used: $MEM_USED kB > $MEM_ALLOWED kB => FAIL!"
