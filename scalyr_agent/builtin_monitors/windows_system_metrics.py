@@ -643,7 +643,7 @@ For help, contact Support.
         try:
             for idx, metric in enumerate(METRICS):
                 metric_name = metric.config["metric_name"]
-                for (metric_value, extra_fields) in metric.dispatch():
+                for metric_value, extra_fields in metric.dispatch():
                     # We might get this metric value if we were doing the io counters metrics and the user has
                     # not turned on disk performance yet.
                     if metric_value == __NO_DISK_PERF__:

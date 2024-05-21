@@ -45,4 +45,3 @@ class BoundedThreadingMixIn(ThreadingMixIn):
     def shutdown_request(self, request):
         self.__threads_sempahore.release()
         super().shutdown_request(request)
-

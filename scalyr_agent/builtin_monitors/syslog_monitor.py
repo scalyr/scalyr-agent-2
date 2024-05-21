@@ -555,7 +555,7 @@ class SyslogFrameParser(object):
                 new_position += offsets[1]
 
                 # return a slice containing the full message
-                return buf[offsets[0]: offsets[1]]
+                return buf[offsets[0] : offsets[1]]
 
             return None
         finally:
@@ -593,7 +593,9 @@ class SyslogUDPHandler(six.moves.socketserver.BaseRequestHandler):
         if six.PY3:
             super(SyslogUDPHandler, self).__init__(request, client_address, server)
         else:
-            six.moves.socketserver.BaseRequestHandler.__init__(self, request, client_address, server)
+            six.moves.socketserver.BaseRequestHandler.__init__(
+                self, request, client_address, server
+            )
 
     def handle(self):
         data = six.ensure_text(self.request[0].strip(), "utf-8", errors="ignore")
@@ -666,12 +668,12 @@ class SyslogRequestParser(object):
     """
 
     def __init__(
-            self,
-            socket_client_address,
-            socket_server_address,
-            max_buffer_size,
-            handle_frame,
-            message_size_can_exceed_tcp_buffer=False
+        self,
+        socket_client_address,
+        socket_server_address,
+        max_buffer_size,
+        handle_frame,
+        message_size_can_exceed_tcp_buffer=False,
     ):
         self._client_address = socket_client_address
         self._server_address = socket_server_address
@@ -720,7 +722,7 @@ class SyslogRequestParser(object):
         while self._offset < size:
             # get the first byte to determine if framed or not
             # 2->TODO use slicing to get bytes in both python versions.
-            c = self._remaining[self._offset: self._offset + 1]
+            c = self._remaining[self._offset : self._offset + 1]
             framed = b"0" <= c <= b"9"
 
             skip = 0  # do we need to skip any bytes at the end of the frame (e.g. newlines)
@@ -730,7 +732,7 @@ class SyslogRequestParser(object):
                 frame_end = -1
                 pos = self._remaining.find(b" ", self._offset)
                 if pos != -1:
-                    frame_size = int(self._remaining[self._offset: pos])
+                    frame_size = int(self._remaining[self._offset : pos])
                     message_offset = pos + 1
                     if size - message_offset >= frame_size:
                         self._offset = message_offset
@@ -744,7 +746,7 @@ class SyslogRequestParser(object):
             # to exit the loop and wait for more data
             if frame_end == -1:
                 if not self._message_size_can_exceed_tcp_buffer and (
-                        size - self._offset >= self._max_buffer_size
+                    size - self._offset >= self._max_buffer_size
                 ):
                     global_log.warning(
                         "Syslog frame exceeded maximum buffer size of %s bytes. You should either "
@@ -773,7 +775,7 @@ class SyslogRequestParser(object):
             frame_length = frame_end - self._offset
 
             frame_data = six.ensure_text(
-                self._remaining[self._offset: frame_end].strip(), "utf-8", "ignore"
+                self._remaining[self._offset : frame_end].strip(), "utf-8", "ignore"
             )
             self._handle_frame(frame_data, extra)
             frames_handled += 1
@@ -787,7 +789,7 @@ class SyslogRequestParser(object):
                 limit_key="syslog-no-frames",
             )
 
-        self._remaining = self._remaining[self._offset:]
+        self._remaining = self._remaining[self._offset :]
         self._offset = 0
 
 
@@ -828,13 +830,13 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
 
     # TODO: Refactor duplicated code and re-use common code between this and base class
     def __init__(
-            self,
-            socket_client_address,
-            socket_server_address,
-            max_buffer_size,
-            handle_frame,
-            incomplete_frame_timeout=None,
-            message_delimiter="\n",
+        self,
+        socket_client_address,
+        socket_server_address,
+        max_buffer_size,
+        handle_frame,
+        incomplete_frame_timeout=None,
+        message_delimiter="\n",
     ):
         self._client_address = socket_client_address
         self._server_address = socket_server_address
@@ -886,7 +888,7 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
             # 2->TODO use slicing to get bytes in both python versions.
             # TODO: This is not really robust, we should make it an explicit config option if
             # we should try to parse messages as framed or new line delimited one.
-            c = self._remaining[self._offset: self._offset + 1]
+            c = self._remaining[self._offset : self._offset + 1]
             framed = b"0" <= c <= b"9"
 
             skip = 0  # do we need to skip any bytes at the end of the frame (e.g. newlines)
@@ -899,7 +901,7 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
                     # NOTE: This could throw in case data was corrupted and we flushed incomplete
                     # message early as part of the previous call so we should handle this scenario
                     # better.
-                    frame_size = int(self._remaining[self._offset: pos])
+                    frame_size = int(self._remaining[self._offset : pos])
                     message_offset = pos + 1
                     if size - message_offset >= frame_size:
                         self._offset = message_offset
@@ -912,9 +914,9 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
             if frame_end == -1:
                 now_ts = int(time.time())
                 if (
-                        self._incomplete_frame_timeout
-                        and (now_ts - self._incomplete_frame_timeout)
-                        > self._last_handle_frame_call_time
+                    self._incomplete_frame_timeout
+                    and (now_ts - self._incomplete_frame_timeout)
+                    > self._last_handle_frame_call_time
                 ):
                     # If we haven't seen a complete frame / line in this amount of seconds, this likely
                     # indicates there we received bad / corrupted data so we just flush what we have
@@ -943,7 +945,7 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
             # the end.
             frame_length = frame_end - self._offset
 
-            frame_data = self._remaining[self._offset: frame_end]
+            frame_data = self._remaining[self._offset : frame_end]
 
             # We add \n which is stripped to ensure line data is correctly written to a file on disk
             # (aka each syslog message is on a separate line)
@@ -968,7 +970,7 @@ class SyslogBatchedRequestParser(SyslogRequestParser):
             data_to_write = bytearray()
 
             self._last_handle_frame_call_time = int(time.time())
-            self._remaining = self._remaining[self._offset:]
+            self._remaining = self._remaining[self._offset :]
             self._offset = 0
 
 
@@ -1030,7 +1032,7 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
                 socket_server_address=self.server.server_address,
                 max_buffer_size=self.server.tcp_buffer_size,
                 handle_frame=self.server.syslog_handler.handle,
-                message_size_can_exceed_tcp_buffer=self.server.message_size_can_exceed_tcp_buffer
+                message_size_can_exceed_tcp_buffer=self.server.message_size_can_exceed_tcp_buffer,
             )
         elif self.request_parser == "batch":
             return SyslogBatchedRequestParser(
@@ -1039,22 +1041,21 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
                 max_buffer_size=self.server.tcp_buffer_size,
                 handle_frame=self.server.syslog_handler.handle,
                 incomplete_frame_timeout=self.incomplete_frame_timeout,
-                message_delimiter=self.message_delimiter
+                message_delimiter=self.message_delimiter,
             )
         elif self.request_parser == "raw":
             return SyslogRawRequestParser(
                 socket_client_address=self.client_address,
                 socket_server_address=self.server.server_address,
                 max_buffer_size=self.server.tcp_buffer_size,
-                handle_frame=self.server.syslog_handler.handle
+                handle_frame=self.server.syslog_handler.handle,
             )
         else:
             raise ValueError("Invalid request parser: %s" % (self.request_parser))
 
     def handle(self):
         syslog_request = SyslogRequest(
-            socket=self.request,
-            max_buffer_size=self.server.tcp_buffer_size
+            socket=self.request, max_buffer_size=self.server.tcp_buffer_size
         )
         syslog_parser = self._syslog_request_parser()
 
@@ -1064,7 +1065,9 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
             threading.current_thread().ident,
         )
         try:
-            for data in self.__request_stream_read(syslog_request, self.server.is_running):
+            for data in self.__request_stream_read(
+                syslog_request, self.server.is_running
+            ):
                 try:
                     syslog_parser.process(data)
                 except Exception as e:
@@ -1082,9 +1085,7 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
             return
 
 
-class SyslogUDPServer(
-    BoundedThreadingMixIn, six.moves.socketserver.UDPServer
-):
+class SyslogUDPServer(BoundedThreadingMixIn, six.moves.socketserver.UDPServer):
     """Class that creates a UDP SocketServer on a specified port"""
 
     def __init__(self, port, bind_address, verifier, global_config=None):
@@ -1109,22 +1110,20 @@ class SyslogUDPServer(
         pass
 
 
-class SyslogTCPServer(
-    BoundedThreadingMixIn, six.moves.socketserver.TCPServer
-):
+class SyslogTCPServer(BoundedThreadingMixIn, six.moves.socketserver.TCPServer):
     """Class that creates a TCP SocketServer on a specified port"""
 
     def __init__(
-            self,
-            port,
-            tcp_buffer_size,
-            bind_address,
-            verifier,
-            message_size_can_exceed_tcp_buffer=False,
-            request_parser="default",
-            incomplete_frame_timeout=None,
-            message_delimiter="\n",
-            global_config=None
+        self,
+        port,
+        tcp_buffer_size,
+        bind_address,
+        verifier,
+        message_size_can_exceed_tcp_buffer=False,
+        request_parser="default",
+        incomplete_frame_timeout=None,
+        message_delimiter="\n",
+        global_config=None,
     ):
         self.syslog_handler = None  # type: Optional[SyslogHandler]
         self.__verifier = verifier
@@ -1168,14 +1167,14 @@ class LogDeleter(object):
     """Deletes unused log files that match a log_file_template"""
 
     def __init__(
-            self,
-            check_interval_mins,
-            delete_interval_hours,
-            check_rotated_timestamps,
-            max_log_rotations,
-            log_path,
-            log_file_template,
-            substitutions=["CID", "CNAME"],
+        self,
+        check_interval_mins,
+        delete_interval_hours,
+        check_rotated_timestamps,
+        max_log_rotations,
+        log_path,
+        log_file_template,
+        substitutions=["CID", "CNAME"],
     ):
         self._check_interval = check_interval_mins * 60
         self._delete_interval = delete_interval_hours * 60 * 60
@@ -1189,7 +1188,7 @@ class LogDeleter(object):
         self._last_check = time.time()
 
     def _get_old_logs_for_glob(
-            self, current_time, glob_pattern, existing_logs, check_rotated, max_rotations
+        self, current_time, glob_pattern, existing_logs, check_rotated, max_rotations
     ):
 
         result = []
@@ -1199,8 +1198,8 @@ class LogDeleter(object):
                 added = False
                 mtime = os.path.getmtime(matching_file)
                 if (
-                        current_time - mtime > self._delete_interval
-                        and matching_file not in existing_logs
+                    current_time - mtime > self._delete_interval
+                    and matching_file not in existing_logs
                 ):
                     result.append(matching_file)
                     added = True
@@ -1273,16 +1272,16 @@ class SyslogHandler(object):
     """
 
     def __init__(
-            self,
-            logger,
-            line_reporter,
-            config,
-            global_config,
-            server_host,
-            log_path,
-            get_log_watcher,
-            rotate_options,
-            docker_options,
+        self,
+        logger,
+        line_reporter,
+        config,
+        global_config,
+        server_host,
+        log_path,
+        get_log_watcher,
+        rotate_options,
+        docker_options,
     ):
 
         docker_logging = config.get("mode") == "docker"
@@ -1494,7 +1493,7 @@ class SyslogHandler(object):
                         six.ensure_text(cname),
                         six.ensure_text(cid),
                         clabels,
-                        six.ensure_text(data[m.end():]),
+                        six.ensure_text(data[m.end() :]),
                     )
 
         if self.__docker_regex_full is not None:
@@ -1509,7 +1508,7 @@ class SyslogHandler(object):
                     six.ensure_text(m.group(1)),
                     six.ensure_text(m.group(2)),
                     {},
-                    six.ensure_text(data[m.end():]),
+                    six.ensure_text(data[m.end() :]),
                 )
 
         regex_str = self.__get_pattern_str(self.__docker_regex)
@@ -1724,7 +1723,7 @@ class SyslogHandler(object):
 
                         log_config = {
                             "parser": log_config_attribs.get("parser")
-                                      or self.__syslog_default_parser,
+                            or self.__syslog_default_parser,
                             "attributes": attribs,
                             "path": path,
                         }
@@ -1861,19 +1860,19 @@ class SyslogServer(object):
     """
 
     def __init__(
-            self,
-            protocol,
-            port,
-            logger,
-            config,
-            global_config,
-            line_reporter,
-            accept_remote=False,
-            server_host=None,
-            log_path=None,
-            get_log_watcher=None,
-            rotate_options=None,
-            docker_options=None,
+        self,
+        protocol,
+        port,
+        logger,
+        config,
+        global_config,
+        line_reporter,
+        accept_remote=False,
+        server_host=None,
+        log_path=None,
+        get_log_watcher=None,
+        rotate_options=None,
+        docker_options=None,
     ):
         server = None
 
@@ -1944,7 +1943,7 @@ class SyslogServer(object):
                     request_parser=request_parser,
                     incomplete_frame_timeout=incomplete_frame_timeout,
                     message_delimiter=message_delimiter,
-                    global_config=global_config
+                    global_config=global_config,
                 )
             elif protocol == "udp":
                 global_log.log(
@@ -1952,8 +1951,10 @@ class SyslogServer(object):
                     "Starting UDP Server (host=%s, port=%s)" % (bind_address, port),
                 )
                 server = SyslogUDPServer(
-                    port, bind_address=bind_address, verifier=verifier,
-                    global_config=global_config
+                    port,
+                    bind_address=bind_address,
+                    verifier=verifier,
+                    global_config=global_config,
                 )
 
         except socket_error as e:
@@ -2021,7 +2022,7 @@ class SyslogServer(object):
         self.__thread = StoppableThread(
             target=self.start,
             name="Syslog monitor thread for %s:%d"
-                 % (self.__server.syslog_transport_protocol, self.__server.syslog_port),
+            % (self.__server.syslog_transport_protocol, self.__server.syslog_port),
         )
         self.__thread.start()
 

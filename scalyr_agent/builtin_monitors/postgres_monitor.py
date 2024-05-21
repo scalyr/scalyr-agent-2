@@ -602,9 +602,9 @@ For help, contact us at [support@scalyr.com](mailto:support@scalyr.com).
                             extra = None
                             if len(self._db._database_stats[table][key]) == 3:
                                 extra = {}
-                                extra[
-                                    self._db._database_stats[table][key][1]
-                                ] = self._db._database_stats[table][key][2]
+                                extra[self._db._database_stats[table][key][1]] = (
+                                    self._db._database_stats[table][key][2]
+                                )
                             self._logger.emit_value(
                                 self._db._database_stats[table][key][0],
                                 dbstats[key],

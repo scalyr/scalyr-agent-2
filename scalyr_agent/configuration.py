@@ -80,6 +80,7 @@ AGENT_WORKER_SESSION_LOG_NAME_PREFIX = "agent-worker-session-"
 
 DEFAULT_WORKER_ID = "default"
 
+
 def ensure_https_url(server):
     parts = six.moves.urllib.parse.urlparse(server)
 
@@ -92,6 +93,7 @@ def ensure_https_url(server):
         return re.sub("^http://", "https://", server)
     else:
         return server
+
 
 class Configuration(object):
     """Encapsulates the results of a single read of the configuration file.
@@ -289,7 +291,7 @@ class Configuration(object):
                 self.__verify_main_config(content, self.__file_path)
                 self.__verify_logs_and_monitors_configs_and_apply_defaults(content, fp)
 
-                for (key, value) in six.iteritems(content):
+                for key, value in six.iteritems(content):
                     if key not in allowed_multiple_keys:
                         self.__config.put(key, value)
 
@@ -361,10 +363,10 @@ class Configuration(object):
                 and self.__config["max_send_rate_enforcement"] != "legacy"
             ):
                 try:
-                    self.__config[
-                        "parsed_max_send_rate_enforcement"
-                    ] = scalyr_util.parse_data_rate_string(
-                        self.__config["max_send_rate_enforcement"]
+                    self.__config["parsed_max_send_rate_enforcement"] = (
+                        scalyr_util.parse_data_rate_string(
+                            self.__config["max_send_rate_enforcement"]
+                        )
                     )
                 except ValueError as e:
                     raise BadConfiguration(
@@ -567,7 +569,6 @@ class Configuration(object):
         worker_ids = set()
         for worker_config in self.__config.get_json_array("workers"):
             worker_ids.add(worker_config["id"])
-
 
         # get all lists where log files entries may be defined and require worker_id param.
         # __k8s_log_configs is left out because it interferes with the kubernetes monitor container checker and CopyingManager itself sets default worker_id while adding logs.
@@ -1220,7 +1221,8 @@ class Configuration(object):
         """If True, and events are getting parsed with the parse_as_json feature, events with messages that do not
         end in a newline character will be joined together until a newline character is found. This is to work around
         Docker's logging message length limit of 16KB, which is usually well below our own max message size.
-        The final merged line will use the timestamp and other attributes of the first line."""
+        The final merged line will use the timestamp and other attributes of the first line.
+        """
         return self.__get_config().get_bool("merge_json_parsed_lines")
 
     @property
@@ -4948,12 +4950,12 @@ def perform_object_substitution(object_value, substitutions):
     """
     # We collect the new values and apply them later to avoid messing up the iteration.
     new_values = {}
-    for (key, value) in six.iteritems(object_value):
+    for key, value in six.iteritems(object_value):
         replace_value = perform_generic_substitution(value, substitutions=substitutions)
         if replace_value is not None:
             new_values[key] = replace_value
 
-    for (key, value) in six.iteritems(new_values):
+    for key, value in six.iteritems(new_values):
         object_value[key] = value
 
 

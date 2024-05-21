@@ -472,7 +472,8 @@ class JsonObject(object):
             is missing, then creates a new JsonObject, inserts it into this
             object, and returns it.
 
-        @raise JsonConversionError: If the underlying field's value is not a JsonObject."""
+        @raise JsonConversionError: If the underlying field's value is not a JsonObject.
+        """
         if field not in self:
             self.__map[field] = JsonObject()
         value = self.__map[field]
@@ -537,7 +538,8 @@ class JsonObject(object):
             none_if_missing is True, then None is returned.  Otherwise,
             the exception is thrown.
 
-        @raise JsonMissingFieldError: Raised if default_value is None and none_if_missing is False."""
+        @raise JsonMissingFieldError: Raised if default_value is None and none_if_missing is False.
+        """
         if default_value is not None:
             return default_value
         if none_if_missing:
@@ -642,7 +644,8 @@ class JsonArray(object):
         """Yields all items in the array,
         checking to make sure they are JsonObjects.
 
-        @raise JsonConversionException: If an item is reached that is not a JsonObject."""
+        @raise JsonConversionException: If an item is reached that is not a JsonObject.
+        """
         for index in range(len(self._items)):
             element = self._items[index]
             if not isinstance(element, JsonObject):

@@ -445,7 +445,7 @@ _PROCESS_DISK_IO_METRICS = [
             extra_fields={"type": "write"},
         ),
         GATHER_METRIC("io_counters", "write_bytes"),
-    )
+    ),
     # TODO: Additional attributes for this section
     #  * ...
 ]

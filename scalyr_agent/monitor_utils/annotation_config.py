@@ -217,7 +217,7 @@ def _process_annotation_items(items, hyphens_as_underscores):
     previous_key = None
     is_array = False
     is_object = False
-    for (key, value) in sorted_items:
+    for key, value in sorted_items:
 
         # split out the sub key from the rest of the key
         m = SCALYR_ANNOTATION_ELEMENT_RE.match(key)

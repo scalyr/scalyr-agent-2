@@ -938,17 +938,17 @@ class NewJsonApi(NewApi):
         elif isinstance(event_data, dict):
             for key, val in event_data.items():
                 if isinstance(val, str) and re.match("^%%[0-9]+$", val):
-                    rv["Event"]["EventData"]["Data"][
-                        key
-                    ] = self._param_placeholder_value(channel, provider, val)
+                    rv["Event"]["EventData"]["Data"][key] = (
+                        self._param_placeholder_value(channel, provider, val)
+                    )
                 elif (
                     isinstance(val, dict)
                     and "Text" in val
                     and re.match("^%%[0-9]+$", val["Text"])
                 ):
-                    rv["Event"]["EventData"]["Data"][key][
-                        "Text"
-                    ] = self._param_placeholder_value(channel, provider, val["Text"])
+                    rv["Event"]["EventData"]["Data"][key]["Text"] = (
+                        self._param_placeholder_value(channel, provider, val["Text"])
+                    )
 
         return rv
 

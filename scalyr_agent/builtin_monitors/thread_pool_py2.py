@@ -28,4 +28,3 @@ class BoundedThreadingMixIn(ThreadingMixIn):
 
     def __init__(self, global_config):
         pass
-

@@ -646,7 +646,7 @@ class _K8sCache(object):
         self._lock.acquire()
         try:
             stale = self.__get_stale_objects(access_time)
-            for (namespace, obj_name) in stale:
+            for namespace, obj_name in stale:
                 global_log.log(
                     scalyr_logging.DEBUG_LEVEL_1,
                     "Mark object %s/%s as expired in cache" % (namespace, obj_name),
@@ -664,7 +664,7 @@ class _K8sCache(object):
         self._lock.acquire()
         try:
             stale = self.__get_stale_objects(access_time)
-            for (namespace, obj_name) in stale:
+            for namespace, obj_name in stale:
                 global_log.log(
                     scalyr_logging.DEBUG_LEVEL_1,
                     "Removing object %s/%s from cache" % (namespace, obj_name),
