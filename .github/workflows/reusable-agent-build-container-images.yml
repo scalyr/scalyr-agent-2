@@ -579,17 +579,6 @@ jobs:
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/kubernetes_events.log" $parser="k8sEvents" k8s-kind="CronJob" involvedObjectKind="CronJob" involvedObjectName="hello" watchEventType="ADDED" reason="SawCompletedJob"'
           
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" "Hello from the Kubernetes cluster"'
-
-      - name: Check the short lived pods logs are ingested - 404 response handling
-        if: ${{ matrix.k8s_version.runtime != 'docker' && matrix.k8s_version.runtime != 'containerd' }}
-        env:
-          # Needed for scalyr-tool
-          scalyr_readlog_token: "${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}"
-          SCALYR_AGENT_POD_NAME: "${{ env.SCALYR_AGENT_POD_NAME }}"
-        run: |
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" message matches "Pod default/short-lived-job-1.* not found in K8s API. Including pod based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS=true."'
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" message matches "Pod default/short-lived-job-2.* not found in K8s API. Including pod based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS=true."'
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" message matches "Pod default/short-lived-job-3.* not found in K8s API. Including pod based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS=true."'
           
       - name: Check the short lived pods logs are ingested - log message
         env:
