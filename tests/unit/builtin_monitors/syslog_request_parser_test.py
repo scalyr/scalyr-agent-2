@@ -42,7 +42,7 @@ class SyslogRequestParserTestCase(ScalyrTestCase):
             socket_client_address=("127.0.0.1", 1234),
             socket_server_address=("127.0.0.2", 5678),
             max_buffer_size=32,
-            handle_frame=handler.handle
+            handle_frame=handler.handle,
         )
 
         parser.process(b"5 hello5 world")
@@ -57,7 +57,7 @@ class SyslogRequestParserTestCase(ScalyrTestCase):
             socket_client_address=("127.0.0.1", 1234),
             socket_server_address=("127.0.0.2", 5678),
             max_buffer_size=11,
-            handle_frame=handler.handle
+            handle_frame=handler.handle,
         )
 
         parser.process(b"11 hello")
@@ -75,7 +75,7 @@ class SyslogRequestParserTestCase(ScalyrTestCase):
             socket_client_address=("127.0.0.1", 1234),
             socket_server_address=("127.0.0.2", 5678),
             max_buffer_size=32,
-            handle_frame=handler.handle
+            handle_frame=handler.handle,
         )
 
         parser.process(b"11 hello")
@@ -98,11 +98,9 @@ class SyslogRequestParserTestCase(ScalyrTestCase):
             socket_client_address=("127.0.0.1", 1234),
             socket_server_address=("127.0.0.2", 5678),
             max_buffer_size=11,
-            handle_frame=handler.handle
+            handle_frame=handler.handle,
         )
-        self.assertRaises(
-            ValueError, lambda: parser.process(b"1a1 hello")
-        )
+        self.assertRaises(ValueError, lambda: parser.process(b"1a1 hello"))
 
     def test_framed_message_exceeds_max_size(self):
         handler = Handler()
@@ -110,7 +108,7 @@ class SyslogRequestParserTestCase(ScalyrTestCase):
             socket_client_address=("127.0.0.1", 1234),
             socket_server_address=("127.0.0.2", 5678),
             max_buffer_size=11,
-            handle_frame=handler.handle
+            handle_frame=handler.handle,
         )
         parser.process(b"23 hello world h")
         parser.process(b"10 lo world .")
@@ -125,7 +123,7 @@ class SyslogRequestParserTestCase(ScalyrTestCase):
             socket_client_address=("127.0.0.1", 1234),
             socket_server_address=("127.0.0.2", 5678),
             max_buffer_size=32,
-            handle_frame=handler.handle
+            handle_frame=handler.handle,
         )
 
         parser.process(b"hello\nworld\n")
@@ -140,7 +138,7 @@ class SyslogRequestParserTestCase(ScalyrTestCase):
             socket_client_address=("127.0.0.1", 1234),
             socket_server_address=("127.0.0.2", 5678),
             max_buffer_size=32,
-            handle_frame=handler.handle
+            handle_frame=handler.handle,
         )
 
         parser.process(b"hello")
@@ -157,7 +155,7 @@ class SyslogRequestParserTestCase(ScalyrTestCase):
             socket_client_address=("127.0.0.1", 1234),
             socket_server_address=("127.0.0.2", 5678),
             max_buffer_size=13,
-            handle_frame=handler.handle
+            handle_frame=handler.handle,
         )
 
         parser.process(b"in my hand i have ")

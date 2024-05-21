@@ -35,7 +35,11 @@ import re
 import pytest
 import mock
 
-from scalyr_agent.copying_manager.copying_manager import DynamicWorkers, CopyingManagerWorker, PathWorkerIdDict
+from scalyr_agent.copying_manager.copying_manager import (
+    DynamicWorkers,
+    CopyingManagerWorker,
+    PathWorkerIdDict,
+)
 
 root = logging.getLogger()
 root.setLevel(logging.DEBUG)
@@ -123,12 +127,11 @@ class TestPathWorkerIdDict(object):
         assert d.get("path2", "worker_id2") == "value2"
 
         assert list(d.get_path("path1")) == [
-            ("worker_id1", "value1"), ("worker_id3", "value3")
+            ("worker_id1", "value1"),
+            ("worker_id3", "value3"),
         ]
 
-        assert list(d.get_path("path2")) == [
-            ("worker_id2", "value2")
-        ]
+        assert list(d.get_path("path2")) == [("worker_id2", "value2")]
 
         assert d.complement_keys("path1", ["worker_id3"]) == [("path1", "worker_id1")]
         assert d.complement_keys("path2", ["worker_id2"]) == []
@@ -142,7 +145,7 @@ class TestPathWorkerIdDict(object):
         assert list(d.keys()) == [
             ("path1", "worker_id1"),
             ("path1", "worker_id3"),
-            ("path2", "worker_id2")
+            ("path2", "worker_id2"),
         ]
 
         assert list(d.copy().items()) == [
@@ -162,7 +165,7 @@ class TestPathWorkerIdDict(object):
         assert d.get("path1", "worker_id1") is None
 
 
-class TestDynamicWorkers():
+class TestDynamicWorkers:
 
     API_KEYS = ["API_1", "API_2"]
 
@@ -186,44 +189,59 @@ class TestDynamicWorkers():
         assert len(list(dynamic_workers.values())) == 0
         assert len(list(dynamic_workers.items())) == 0
 
-    @mock.patch("scalyr_agent.copying_manager.copying_manager.CopyingManagerWorker", autospec=False)
+    @mock.patch(
+        "scalyr_agent.copying_manager.copying_manager.CopyingManagerWorker",
+        autospec=False,
+    )
     def test_create_and_reuse_worker(self, MockCopyingManagerWorker):
         dynamic_workers = DynamicWorkers()
 
         MockCopyingManagerWorker.side_effect = [
             TestDynamicWorkers.FakeWorker("dynamic_1"),
-            TestDynamicWorkers.FakeWorker("dynamic_2")
+            TestDynamicWorkers.FakeWorker("dynamic_2"),
         ]
 
         # Create two workers and check if they are created with proper parameters.
         mock_config = TestDynamicWorkers.FakeConfig()
 
-        worker_1 = dynamic_workers.get_or_create_worker(TestDynamicWorkers.API_KEYS[0], mock_config)
+        worker_1 = dynamic_workers.get_or_create_worker(
+            TestDynamicWorkers.API_KEYS[0], mock_config
+        )
 
         MockCopyingManagerWorker.assert_called_with(
-            mock_config, {
-            "id": "dynamic_1",
-            "api_key": TestDynamicWorkers.API_KEYS[0],
-            "sessions": mock_config.default_sessions_per_worker,
-            "server_url": mock_config.scalyr_server
-        })
+            mock_config,
+            {
+                "id": "dynamic_1",
+                "api_key": TestDynamicWorkers.API_KEYS[0],
+                "sessions": mock_config.default_sessions_per_worker,
+                "server_url": mock_config.scalyr_server,
+            },
+        )
 
-        worker_2 = dynamic_workers.get_or_create_worker(TestDynamicWorkers.API_KEYS[1], mock_config)
+        worker_2 = dynamic_workers.get_or_create_worker(
+            TestDynamicWorkers.API_KEYS[1], mock_config
+        )
 
         MockCopyingManagerWorker.assert_called_with(
-            mock_config, {
+            mock_config,
+            {
                 "id": "dynamic_2",
                 "api_key": TestDynamicWorkers.API_KEYS[1],
                 "sessions": mock_config.default_sessions_per_worker,
-                "server_url": mock_config.scalyr_server
-            })
+                "server_url": mock_config.scalyr_server,
+            },
+        )
 
         # Check if workers are different.
         assert worker_1 is not worker_2
 
         # Check if workers are reused.
-        assert worker_1 is dynamic_workers.get_or_create_worker(TestDynamicWorkers.API_KEYS[0], mock_config)
-        assert worker_2 is dynamic_workers.get_or_create_worker(TestDynamicWorkers.API_KEYS[1], mock_config)
+        assert worker_1 is dynamic_workers.get_or_create_worker(
+            TestDynamicWorkers.API_KEYS[0], mock_config
+        )
+        assert worker_2 is dynamic_workers.get_or_create_worker(
+            TestDynamicWorkers.API_KEYS[1], mock_config
+        )
 
         # Check get access methods
         assert worker_1 in dynamic_workers.values()
