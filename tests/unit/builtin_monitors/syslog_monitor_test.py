@@ -159,6 +159,8 @@ class SyslogMonitorTestCase(ScalyrTestCase):
         except Exception:
             self.fail("Unexpected Exception: %s" % sys.exc_info()[0])
 
+
+
 class SyslogMonitorThreadingTest(ScalyrTestCase):
 
     BIND_ADDRESS = "localhost"
@@ -168,8 +170,7 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
             return True
 
     VERIFIER = RequestVerifierMock()
-
-    class SyslogHandlerMock:
+    class SyslogHandlerMock():
         @dataclass
         class LogLine:
             timestamp: float
@@ -193,7 +194,7 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
     def __tcp_server(self, port, handling_time, global_config):
         server = SyslogTCPServer(
             port,
-            tcp_buffer_size=50,
+            tcp_buffer_size = 50,
             bind_address=self.BIND_ADDRESS,
             verifier=self.VERIFIER,
             global_config=global_config,
@@ -332,7 +333,7 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
                         server.socket.getsockname(),
                         server.socket.type,
                         connections,
-                        messages_per_connection,
+                        messages_per_connection
                     )
                     for server in servers
                 ]
@@ -345,6 +346,7 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
             def join_threads(threads):
                 for t in threads:
                     t.join()
+
 
             threads_first = send_data_to_servers(udp_servers[:1] + tcp_servers[:1])
             time.sleep(advantage_time)
@@ -365,10 +367,10 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
 
             # Then
             logged_port_timestamp_sorted = sorted([
-                    (server.socket.getsockname()[1], log_line.timestamp)
-                    for server in udp_servers + tcp_servers
-                    for log_line in server.syslog_handler.logged_data
-                ], key=lambda x: x[1])
+                (server.socket.getsockname()[1], log_line.timestamp)
+                for server in udp_servers + tcp_servers
+                for log_line in server.syslog_handler.logged_data
+            ], key=lambda x: x[1])
 
             logged_port_sorted = [x[0] for x in logged_port_timestamp_sorted]
 
@@ -1120,7 +1122,7 @@ class SyslogDefaultRequestParserTestCase(SyslogMonitorTestCase):
             socket_client_address=("127.0.0.1", 1234),
             socket_server_address=("127.0.0.2", 5678),
             max_buffer_size=max_buffer_size,
-            handle_frame=mock_handle_frame,
+            handle_frame=mock_handle_frame
         )
         self.assertEqual(parser._remaining, None)
 
@@ -1174,7 +1176,7 @@ class SyslogDefaultRequestParserTestCase(SyslogMonitorTestCase):
             socket_client_address=("127.0.0.1", 1234),
             socket_server_address=("127.0.0.2", 5678),
             max_buffer_size=max_buffer_size,
-            handle_frame=mock_handle_frame,
+            handle_frame=mock_handle_frame
         )
         parser.process(mock_data)
 
@@ -1258,7 +1260,10 @@ class SyslogTCPRequestParserTestCase(SyslogMonitorTestCase):
         mock_socket_recv.counter = 0
         mock_socket.recv = mock_socket_recv
 
-        reader = SyslogRequest(socket=mock_socket, max_buffer_size=64)
+        reader = SyslogRequest(
+            socket=mock_socket,
+            max_buffer_size=64
+        )
 
         self.assertRaises(SocketNotReadyException, reader.read)
         self.assertEqual(mock_socket_recv.counter, 1)
@@ -1304,7 +1309,7 @@ class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
             socket_client_address=("127.0.0.1", 1234),
             socket_server_address=("127.0.0.2", 5678),
             max_buffer_size=max_buffer_size,
-            handle_frame=mock_handle_frame,
+            handle_frame=mock_handle_frame
         )
 
         self.assertEqual(mock_global_log.warning.call_count, 0)
@@ -1326,7 +1331,7 @@ class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
             socket_client_address=("127.0.0.1", 1234),
             socket_server_address=("127.0.0.2", 5678),
             max_buffer_size=max_buffer_size,
-            handle_frame=mock_handle_frame,
+            handle_frame=mock_handle_frame
         )
         parser.process(mock_msg_1)
         self.assertEqual(mock_handle_frame.call_count, 1)
@@ -1350,7 +1355,7 @@ class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
             socket_client_address=("127.0.0.1", 1234),
             socket_server_address=("127.0.0.2", 5678),
             max_buffer_size=max_buffer_size,
-            handle_frame=mock_handle_frame,
+            handle_frame=mock_handle_frame
         )
         parser.process(mock_data)
 
@@ -1379,7 +1384,7 @@ class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
             socket_client_address=("127.0.0.1", 1234),
             socket_server_address=("127.0.0.2", 5678),
             max_buffer_size=max_buffer_size,
-            handle_frame=mock_handle_frame,
+            handle_frame=mock_handle_frame
         )
         parser.process(mock_data)
 
@@ -1420,7 +1425,7 @@ class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
             socket_server_address=("127.0.0.2", 5678),
             max_buffer_size=max_buffer_size,
             incomplete_frame_timeout=1,
-            handle_frame=mock_handle_frame,
+            handle_frame=mock_handle_frame
         )
         parser.process(mock_data)
 
@@ -1459,7 +1464,7 @@ class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
             socket_server_address=("127.0.0.2", 5678),
             max_buffer_size=max_buffer_size,
             message_delimiter="\000",
-            handle_frame=mock_handle_frame,
+            handle_frame=mock_handle_frame
         )
         parser.process(mock_data)
 
