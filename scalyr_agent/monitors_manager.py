@@ -229,7 +229,6 @@ class MonitorsManager(StoppableThread):
                 except Exception:
                     log.exception("Failed to stop the metric log due to an exception")
 
-
         for monitor in self.__running_monitors:
             # noinspection PyBroadException
             try:

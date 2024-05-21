@@ -37,6 +37,7 @@ _PARENT_DIR = pl.Path(__file__).parent
 
 global_log = scalyr_logging.getLogger(__name__)
 
+
 def get_packages_stable_version(version: str = None):
 
     if version:
@@ -76,7 +77,10 @@ def download_stable_packages(
     output_dir.mkdir(parents=True, exist_ok=True)
     agent_package_path = output_dir / file_name
     if agent_package_path.exists():
-        global_log.info("While downloading a stable package, found an existing one, skipping: " + str(agent_package_path))
+        global_log.info(
+            "While downloading a stable package, found an existing one, skipping: "
+            + str(agent_package_path)
+        )
     else:
         with requests.Session() as s:
             resp = s.get(url=package_url)

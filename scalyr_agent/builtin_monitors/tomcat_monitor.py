@@ -64,7 +64,7 @@ define_config_option(
     "Name of host machine the agent will connect to PostgreSQL to retrieve monitoring data.",
     convert_to=six.text_type,
     required_option=True,
-    allow_http=False
+    allow_http=False,
 )
 define_config_option(
     __monitor__,

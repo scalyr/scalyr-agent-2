@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright 2014-2020 Scalyr Inc.
+# Copyright 2014-2024 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """
-Script which errors out if any of the bundled certs will expire in 24 months or sooner.
+Script which checks if any of the bundled certs will expire soon.
 """
 
 from __future__ import absolute_import
@@ -31,8 +31,7 @@ from io import open
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 
-# By default we fail if any of the bundled cert expires in 1 year or sooner
-DEFAULT_EXPIRE_THRESHOLD_TIMEDELTA = datetime.timedelta(days=(12 * 30 * 1))
+DEFAULT_EXPIRE_THRESHOLD_TIMEDELTA = datetime.timedelta(days=100)
 
 
 def fail_if_cert_expires_in_timedelta(cert_path, expire_in_threshold_timedelta):

@@ -14,13 +14,21 @@
 # limitations under the License.
 
 import os
+import sys
 import time
+from http import HTTPStatus
 from typing import Dict, Set
 
+import requests
 from kubernetes import client, config
 from tabulate import tabulate
 
-from common.scalyr_query import scalyr_query, assert_env_non_empty
+
+def assert_env_non_empty(name):
+    if not os.environ.get(name):
+        print(f"ERROR: Environment variable {name} is not set or empty.")
+        sys.exit(1)
+
 
 ENV_TOKENS = [
     "SCALYR_API_KEY_READ_TEAM_1",
@@ -53,13 +61,52 @@ def validate_env():
     assert_env_non_empty("SERVER_HOST")
 
 
-def get_container_ingested_map(tokens: Dict[str, str], server_host: str, time_start: str, retries=10) -> Dict[str, Set[str]]:
-    filter = f"app=\"multi-account-test\" serverHost=\"{server_host}\""
+def query(token: str, server_host: str, time_start: str, retries: int):
+    def post_request():
+        return requests.post(
+            "https://app.scalyr.com/api/query",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "startTime": time_start,
+                "filter": f"app=\"multi-account-test\" serverHost=\"{server_host}\"",
+            },
+            timeout=20
+        )
 
+    def retry_request():
+        retries_left = retries
+        response = post_request()
+
+        while response.status_code == HTTPStatus.TOO_MANY_REQUESTS and retries_left > 0:
+            print(f"Rate limited. Retrying in 10 seconds. Retries left: {retries_left}")
+            time.sleep(10)
+            response = post_request()
+            retries_left -= 1
+
+        return response
+
+    response = retry_request()
+
+    if not response.ok:
+        raise Exception(f"Query failed: {response.status_code}: {response.text}")
+
+    content = response.json()
+
+    if content["status"] != "success":
+        print(f"ERROR: Query failed: {content}")
+        raise Exception(f"Query failed: {content}")
+
+    return content
+
+
+def get_container_ingested_map(tokens: Dict[str, str], server_host: str, time_start: str, retries=10) -> Dict[str, Set[str]]:
     return {
         token_name: set(
             match["message"].replace("MULTIPLE_ACCOUNT_TEST_CONTAINER_NAME:", "").strip()
-            for match in scalyr_query(token, filter, time_start, retries)["matches"]
+            for match in query(token, server_host, time_start, retries)["matches"]
         )
         for token_name, token in tokens.items()
     }
@@ -107,6 +154,10 @@ def main():
     # | workload-pod-1-container-3 | SCALYR_API_KEY_READ_TEAM_3, SCALYR_API_KEY_READ_TEAM_4   | Pod default api keys        |
     # | workload-pod-2-container-1 | SCALYR_API_KEY_READ_TEAM_2                               | Namespace default api key   |
     # | workload-pod-3-container-1 | SCALYR_API_KEY_READ_TEAM_1                               | Agent default api key       |
+
+    class AssertException(Exception):
+        def __init__(self, message):
+            super().__init__(message)
 
     def print_container_ingested_map(container_ingested_map):
         print(tabulate(

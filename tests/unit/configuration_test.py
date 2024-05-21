@@ -633,7 +633,9 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
         self.assertEqual("http://rick.com", config.monitor_configs[0].get("secure_url"))
-        self.assertEqual("https://morty.com", config.monitor_configs[0].get("insecure_url"))
+        self.assertEqual(
+            "https://morty.com", config.monitor_configs[0].get("insecure_url")
+        )
 
     def test_allow_http_monitors_force_https_http_env(self):
         self._write_file_with_separator_conversion(
@@ -656,7 +658,9 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
         self.assertEqual("http://rick.com", config.monitor_configs[0].get("secure_url"))
-        self.assertEqual("https://morty.com", config.monitor_configs[0].get("insecure_url"))
+        self.assertEqual(
+            "https://morty.com", config.monitor_configs[0].get("insecure_url")
+        )
 
     def test_allow_http_monitors_true(self):
         self._write_file_with_separator_conversion(
@@ -677,7 +681,9 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
         self.assertEqual("http://rick.com", config.monitor_configs[0].get("secure_url"))
-        self.assertEqual("http://morty.com", config.monitor_configs[0].get("insecure_url"))
+        self.assertEqual(
+            "http://morty.com", config.monitor_configs[0].get("insecure_url")
+        )
 
     def test_allow_http_monitors_default(self):
         self._write_file_with_separator_conversion(
@@ -697,7 +703,9 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
         self.assertEqual("http://rick.com", config.monitor_configs[0].get("secure_url"))
-        self.assertEqual("http://morty.com", config.monitor_configs[0].get("insecure_url"))
+        self.assertEqual(
+            "http://morty.com", config.monitor_configs[0].get("insecure_url")
+        )
 
     def test_non_string_value(self):
         self._write_file_with_separator_conversion(

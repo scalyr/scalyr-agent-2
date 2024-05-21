@@ -391,8 +391,6 @@ cluster.
 | `k8s_kubelet_host_ip`                         | Optional (defaults to None). Defines the host IP address for the Kubelet API. If None, the Kubernetes API will be queried for it | 
 | `k8s_kubelet_api_url_template`                | Optional (defaults to https://${host_ip}:10250). Defines the port and protocol to use when talking to the kubelet API. Allowed template variables are `node_name` and `host_ip`. | 
 | `k8s_sidecar_mode`                            | Optional, (defaults to False). If true, then logs will only be collected for containers running in the same Pod as the agent. This is used in situations requiring very high throughput. | 
-| `k8s_label_include_globs`                     | Optional, (defaults to ['*']). Specifies a list of K8s labels to be added to logs. | 
-| `k8s_label_exclude_globs`                     | Optional, (defaults to []]). Specifies a list of K8s labels to be ignored and not added to logs. | 
 
 <a name="metrics"></a>
 ## Metrics Reference

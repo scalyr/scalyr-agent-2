@@ -634,7 +634,6 @@ def define_config_option(
     option.env_name = env_name
     option.allow_http = allow_http
 
-
     MonitorInformation.set_monitor_info(monitor_module, option=option)
     return None
 

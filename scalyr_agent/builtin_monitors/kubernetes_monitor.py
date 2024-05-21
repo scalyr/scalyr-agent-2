@@ -1,4 +1,4 @@
-# Copyright 2018 Scalyr Inc.
+# Copyright 2018-2024 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,8 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# ------------------------------------------------------------------------
-# author:  Imron Alston <imron@scalyr.com>
 
 from __future__ import unicode_literals
 from __future__ import absolute_import
@@ -71,7 +69,8 @@ from scalyr_agent.monitor_utils.k8s import (
     KubeletApiException,
     K8sApiTemporaryError,
     K8sConfigBuilder,
-    K8sNamespaceFilter, KubernetesCache,
+    K8sNamespaceFilter,
+    KubernetesCache,
 )
 from scalyr_agent.monitor_utils.k8s import (
     K8sApiPermanentError,
@@ -296,7 +295,7 @@ define_config_option(
     "DEPRECATED.",
     convert_to=six.text_type,
     default="https://kubernetes.default",
-    allow_http=False
+    allow_http=False,
 )
 
 define_config_option(
@@ -424,7 +423,7 @@ define_config_option(
     convert_to=six.text_type,
     default="https://${host_ip}:10250",
     env_aware=True,
-    allow_http=False
+    allow_http=False,
 )
 
 define_config_option(
@@ -440,24 +439,6 @@ define_config_option(
 # define_config_option( __monitor__, 'log_timestamps',
 #                     'Optional (defaults to False). If true, stdout/stderr logs will contain docker timestamps at the beginning of the line\n',
 #                     convert_to=bool, default=False)
-
-define_config_option(
-    __monitor__,
-    "k8s_label_include_globs",
-    "Optional, (defaults to ['*']). Specifies a list of K8s labels to be added to logs.",
-    convert_to=ArrayOfStrings,
-    default=["*"],
-    env_aware=True,
-)
-
-define_config_option(
-    __monitor__,
-    "k8s_label_exclude_globs",
-    "Optional, (defaults to []]). Specifies a list of K8s labels to be ignored and not added to logs.",
-    convert_to=ArrayOfStrings,
-    default=[],
-    env_aware=True,
-)
 
 define_metric(
     __monitor__,
@@ -2352,7 +2333,6 @@ class CRIEnumerator(ContainerEnumerator):
                         if not k8s_include_by_default:
                             continue
 
-
                 # add this container to the list of results
                 result[cid] = {
                     "name": cname,
@@ -2534,6 +2514,7 @@ class DockerLog(object):
     """
     Represents a list of log configs for a container
     """
+
     def __init__(self, cid, stream, log_configs):
         assert len(log_configs) > 0, "log_configs must not be empty"
         self.__cid = cid
@@ -2669,7 +2650,7 @@ class ContainerChecker(object):
             "k8s_cache_init_abort_delay"
         )
 
-        self.k8s_cache = None # type: Optional[KubernetesCache]
+        self.k8s_cache = None  # type: Optional[KubernetesCache]
         self.__k8s_config_builder = None
 
         self.__node_name = None
@@ -2685,8 +2666,8 @@ class ContainerChecker(object):
         self.__controlled_warmer = controlled_warmer
 
         # give this an initial empty value
-        self.raw_logs = [] # type: List[DockerLog]
-        self.docker_logs = [] # type: List[DockerLog]
+        self.raw_logs = []  # type: List[DockerLog]
+        self.docker_logs = []  # type: List[DockerLog]
 
         self.__stopped = False
 
@@ -3066,7 +3047,11 @@ class ContainerChecker(object):
                                 limit_key="check-container-pod-info-%s" % cid,
                             )
 
-                        namespace = self.k8s_cache.namespace(pod_namespace, current_time=current_time, allow_expired=False)
+                        namespace = self.k8s_cache.namespace(
+                            pod_namespace,
+                            current_time=current_time,
+                            allow_expired=False,
+                        )
                     # start the container if have a container that wasn't running
                     if cid not in self.containers:
                         self._logger.log(
@@ -3077,10 +3062,14 @@ class ContainerChecker(object):
                     elif cid in prev_digests or cid in prev_digests_namespaces:
                         # container was running and it exists in the previous digest dict, so see if
                         # it has changed
-                        if (pod and prev_digests[cid] != pod.digest) or (namespace and prev_digests_namespaces[cid] != namespace.digest):
+                        if (pod and prev_digests[cid] != pod.digest) or (
+                            namespace
+                            and prev_digests_namespaces[cid] != namespace.digest
+                        ):
                             self._logger.log(
                                 scalyr_logging.DEBUG_LEVEL_1,
-                                "Pod or namespace digest changed for '%s/%s'" % (namespace.name, info["name"]),
+                                "Pod or namespace digest changed for '%s/%s'"
+                                % (namespace.name, info["name"]),
                             )
                             changed[cid] = info
 
@@ -3128,8 +3117,12 @@ class ContainerChecker(object):
                                 "updating config for '%s'" % info["name"],
                             )
 
-                            logger.log_configs = self.__log_watcher.update_log_configs_on_path(
-                                info["log_path"], self.__module.module_name, new_configs
+                            logger.log_configs = (
+                                self.__log_watcher.update_log_configs_on_path(
+                                    info["log_path"],
+                                    self.__module.module_name,
+                                    new_configs,
+                                )
                             )
                 else:
                     self._logger.log(
@@ -3194,9 +3187,11 @@ class ContainerChecker(object):
             if self.__log_watcher:
                 updated_log_configs = []
                 for log_config in log.log_configs:
-                    updated_log_configs.append(self.__log_watcher.add_log_config(
-                        self.__module.module_name, log_config, force_add=True
-                    ))
+                    updated_log_configs.append(
+                        self.__log_watcher.add_log_config(
+                            self.__module.module_name, log_config, force_add=True
+                        )
+                    )
                 log.log_configs = updated_log_configs
 
             self.raw_logs.append(log)
@@ -3249,15 +3244,6 @@ class ContainerChecker(object):
             raise
 
         return attributes
-
-    def __is_label_allowed(self, label_name):
-        return any(
-            fnmatch.fnmatch(label_name, glob)
-            for glob in self._config.get("k8s_label_include_globs")
-        ) and not any(
-            fnmatch.fnmatch(label_name, glob)
-            for glob in self._config.get("k8s_label_exclude_globs")
-        )
 
     def __get_log_config_for_container(self, cid, info, k8s_cache, base_attributes):
         # type: (str, dict, KubernetesCache, JsonObject) -> List[Dict]
@@ -3327,8 +3313,7 @@ class ContainerChecker(object):
                     container_attributes["k8s_node"] = pod.node_name
 
                 for label, value in six.iteritems(pod.labels):
-                    if self.__is_label_allowed(label):
-                        container_attributes[label] = value
+                    container_attributes[label] = value
 
                 if "parser" in pod.labels:
                     parser = pod.labels["parser"]
@@ -3349,11 +3334,7 @@ class ContainerChecker(object):
                         # field `_k8s_ck`
                         container_attributes["_k8s_dn"] = controller.name
                         # `_k8s_dl` is translated to `k8s-labels`
-                        container_attributes["_k8s_dl"] = ",".join(
-                            f"{label}={value}"
-                            for label, value in controller.labels.items()
-                            if self.__is_label_allowed(label)
-                        )
+                        container_attributes["_k8s_dl"] = controller.flat_labels
                         # `_k8s_ck` is translated into the field key for
                         # `_k8s_dn`. Here are some examples: `k8s-deployment`,
                         # `k8s-daemon-set`, `k8s-stateful-set`, etc. If the
@@ -3510,26 +3491,47 @@ class ContainerChecker(object):
 
         self._logger.log(
             scalyr_logging.DEBUG_LEVEL_0,
-            "log_config_for_container Checking for teams in annotations for container %s(%s), pod %s, namespace %s. Container annotations = %s, Pod annotations = %s, Namespace annotations = %s  " \
-            % (info["name"], short_cid, pod_name, pod_namespace, container_annotations, all_annotations, namespace_annotations)
+            "log_config_for_container Checking for teams in annotations for container %s(%s), pod %s, namespace %s. Container annotations = %s, Pod annotations = %s, Namespace annotations = %s  "
+            % (
+                info["name"],
+                short_cid,
+                pod_name,
+                pod_namespace,
+                container_annotations,
+                all_annotations,
+                namespace_annotations,
+            ),
         )
 
         if container_annotations or all_annotations or namespace_annotations:
-            api_keys = self.__container_api_keys_from_annotations(k8s_cache, pod_namespace, container_annotations, "container", info["name"])
+            api_keys = self.__container_api_keys_from_annotations(
+                k8s_cache,
+                pod_namespace,
+                container_annotations,
+                "container",
+                info["name"],
+            )
             if not api_keys:
-                api_keys = self.__container_api_keys_from_annotations(k8s_cache, pod_namespace, all_annotations, "pod", info["name"])
+                api_keys = self.__container_api_keys_from_annotations(
+                    k8s_cache, pod_namespace, all_annotations, "pod", info["name"]
+                )
             if not api_keys:
-                api_keys = self.__container_api_keys_from_annotations(k8s_cache, pod_namespace, namespace_annotations, "namespace", info["name"])
+                api_keys = self.__container_api_keys_from_annotations(
+                    k8s_cache,
+                    pod_namespace,
+                    namespace_annotations,
+                    "namespace",
+                    info["name"],
+                )
             if api_keys:
                 # Multiple matching api keys will result in multiple log configs, which will differ in the api_key field only.
-                results = [
-                    {**result, "api_key": api_key}
-                    for api_key in api_keys
-                ]
+                results = [{**result, "api_key": api_key} for api_key in api_keys]
 
         return results
 
-    def __container_api_keys_from_annotations(self, k8s_cache, namespace, annotations, annotation_kind, container_name):
+    def __container_api_keys_from_annotations(
+        self, k8s_cache, namespace, annotations, annotation_kind, container_name
+    ):
         def fetch_secret(name):
             if not name:
                 return None
@@ -3537,7 +3539,7 @@ class ContainerChecker(object):
                 secret = k8s_cache.secret(namespace, name, time.time())
                 if secret:
                     return secret
-            except k8s_utils.K8sApiNotFoundException as e:
+            except k8s_utils.K8sApiNotFoundException:
                 self._logger.warning(
                     "Failed to fetch secret '%s/%s' (API returned Not found) ignoring."
                     % (namespace, name),
@@ -3546,8 +3548,7 @@ class ContainerChecker(object):
                 )
 
             self._logger.warning(
-                "Failed to fetch secret '%s/%s', ignoring."
-                % (namespace, name),
+                "Failed to fetch secret '%s/%s', ignoring." % (namespace, name),
                 limit_once_per_x_secs=300,
                 limit_key="k8s-fetch-secret-%s/%s" % (namespace, name),
             )
@@ -3555,39 +3556,37 @@ class ContainerChecker(object):
         def get_secret_api_key(secret):
             if not secret:
                 return None
-            api_key = base64.b64decode(secret.data.get("scalyr-api-key")).decode("utf-8")
+            api_key = base64.b64decode(secret.data.get("scalyr-api-key")).decode(
+                "utf-8"
+            )
 
             if not api_key:
                 self._logger.warning(
                     "Secret '%s/%s' does not contain a scalyr-api-key field, ingoring."
                     % (namespace, secret.name),
                     limit_once_per_x_secs=300,
-                    limit_key="k8s-fetch-secret-%s" % secret.name
+                    limit_key="k8s-fetch-secret-%s" % secret.name,
                 )
 
             return api_key
 
-        secrets_names = [
-            team.get("secret")
-            for team in annotations.get("teams", [])
-        ]
+        secrets_names = [team.get("secret") for team in annotations.get("teams", [])]
 
-        secrets = [
-            secret
-            for secret in map(fetch_secret, secrets_names)
-            if secret
-        ]
+        secrets = [secret for secret in map(fetch_secret, secrets_names) if secret]
 
-        api_keys = [
-            api_key
-            for api_key in map(get_secret_api_key, secrets)
-            if api_key
-        ]
+        api_keys = [api_key for api_key in map(get_secret_api_key, secrets) if api_key]
 
         self._logger.log(
             scalyr_logging.DEBUG_LEVEL_0,
-            "log_config_for_container From %s annotations of container %s and namespace %s, got %d non-empty api keys, %d secrets for secret names %s" \
-            % (annotation_kind, container_name, namespace, len(api_keys), len(secrets), ",".join(secrets_names))
+            "log_config_for_container From %s annotations of container %s and namespace %s, got %d non-empty api keys, %d secrets for secret names %s"
+            % (
+                annotation_kind,
+                container_name,
+                namespace,
+                len(api_keys),
+                len(secrets),
+                ",".join(secrets_names),
+            ),
         )
 
         return api_keys

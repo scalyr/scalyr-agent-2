@@ -69,19 +69,25 @@ def _test(python_version):
     agent_log_reader = AgentLogReader(runner.agent_log_file_path)
 
     try:
-        os.system("logger message1 --port {0} --udp --server 127.0.0.1".format(UDP_PORT))
+        os.system(
+            "logger message1 --port {0} --udp --server 127.0.0.1".format(UDP_PORT)
+        )
 
         last_line = reader.wait_for_next_line()
 
         assert "message1" in last_line
 
-        os.system("logger message2 --port {0} --tcp --server 127.0.0.1".format(TCP_PORT))
+        os.system(
+            "logger message2 --port {0} --tcp --server 127.0.0.1".format(TCP_PORT)
+        )
 
         last_line = reader.wait_for_next_line()
 
         assert "message2" in last_line
 
-        os.system("logger message3 --port {0} --udp --server 127.0.0.1".format(UDP_PORT))
+        os.system(
+            "logger message3 --port {0} --udp --server 127.0.0.1".format(UDP_PORT)
+        )
 
         last_line = reader.wait_for_next_line()
 
@@ -91,10 +97,12 @@ def _test(python_version):
     finally:
         runner.stop(executable=python_version)
 
+
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__)
 def test_syslog_python3(request):
     _test(python_version="python3")
+
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__)
