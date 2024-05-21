@@ -581,7 +581,7 @@ jobs:
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" "Hello from the Kubernetes cluster"'
 
       - name: Check the short lived pods logs are ingested - 404 response handling
-        if: ${{ matrix.k8s_version.runtime != 'docker' }}
+        if: ${{ matrix.k8s_version.runtime != 'docker' && matrix.k8s_version.runtime != 'containerd' }}
         env:
           # Needed for scalyr-tool
           scalyr_readlog_token: "${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}"
