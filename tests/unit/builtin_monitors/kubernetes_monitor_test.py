@@ -1263,9 +1263,9 @@ class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
             cri.get_containers(k8s_cache=k8s_cache, k8s_include_by_default=False) == {}
         )
 
-        assert cri.get_containers(
+        assert CONTAINER_ID_1 in cri.get_containers(
             k8s_cache=k8s_cache, k8s_include_by_default=True
-        ) == {}
+        )
 
         assert (
             k8s_cache.pod.call_args_list
@@ -1291,7 +1291,17 @@ class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
         assert_has_calls_non_consecutive(
             logger,
             [
+                mock.call.info(
+                    StringMatcher(
+                        "Excluding pod based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS=false."
+                    )
+                ),
                 mock.call.error(mock.ANY, exc_info=self.K8sApiExceptionMatcher(401)),
+                mock.call.info(
+                    StringMatcher(
+                        "Including pod based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS=true."
+                    )
+                ),
                 mock.call.error(mock.ANY, exc_info=self.K8sApiExceptionMatcher(401)),
             ],
         )

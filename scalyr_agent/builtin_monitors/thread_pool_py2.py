@@ -27,22 +27,5 @@ global_log = scalyr_logging.getLogger(__name__)
 class BoundedThreadingMixIn(ThreadingMixIn):
 
     def __init__(self, global_config):
-        if global_config:
-            processing_threads = global_config.syslog_processing_thread_count
-        else:
-            processing_threads = 16
-
-        self.__threads_sempahore = threading.Semaphore(processing_threads)
-
-    # Note this is a mixin for use with SocketServer
-    # pylint: disable=no-member
-    def process_request(self, request, client_address):
-        self.__threads_sempahore.acquire()
-        super().process_request(request, client_address)
-
-    # Note this is a mixin for use with SocketServer
-    # pylint: disable=no-member
-    def shutdown_request(self, request):
-        self.__threads_sempahore.release()
-        super().shutdown_request(request)
+        pass
 
