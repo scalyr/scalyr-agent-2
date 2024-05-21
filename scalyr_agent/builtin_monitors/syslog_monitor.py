@@ -593,9 +593,7 @@ class SyslogUDPHandler(six.moves.socketserver.BaseRequestHandler):
         if six.PY3:
             super(SyslogUDPHandler, self).__init__(request, client_address, server)
         else:
-            six.moves.socketserver.BaseRequestHandler.__init__(
-                self, request, client_address, server
-            )
+            six.moves.socketserver.BaseRequestHandler.__init__(self, request, client_address, server)
 
     def handle(self):
         data = six.ensure_text(self.request[0].strip(), "utf-8", errors="ignore")
@@ -607,6 +605,7 @@ class SyslogUDPHandler(six.moves.socketserver.BaseRequestHandler):
 
         # self.server.syslog_handler is of type SyslogHandler
         self.server.syslog_handler.handle(data, extra)
+
 
 class SocketNotReadyException(Exception):
     def __init__(self, cause):
@@ -1031,7 +1030,7 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
                 socket_server_address=self.server.server_address,
                 max_buffer_size=self.server.tcp_buffer_size,
                 handle_frame=self.server.syslog_handler.handle,
-                message_size_can_exceed_tcp_buffer=self.server.message_size_can_exceed_tcp_buffer,
+                message_size_can_exceed_tcp_buffer=self.server.message_size_can_exceed_tcp_buffer
             )
         elif self.request_parser == "batch":
             return SyslogBatchedRequestParser(
@@ -1040,21 +1039,22 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
                 max_buffer_size=self.server.tcp_buffer_size,
                 handle_frame=self.server.syslog_handler.handle,
                 incomplete_frame_timeout=self.incomplete_frame_timeout,
-                message_delimiter=self.message_delimiter,
+                message_delimiter=self.message_delimiter
             )
         elif self.request_parser == "raw":
             return SyslogRawRequestParser(
                 socket_client_address=self.client_address,
                 socket_server_address=self.server.server_address,
                 max_buffer_size=self.server.tcp_buffer_size,
-                handle_frame=self.server.syslog_handler.handle,
+                handle_frame=self.server.syslog_handler.handle
             )
         else:
             raise ValueError("Invalid request parser: %s" % (self.request_parser))
 
     def handle(self):
         syslog_request = SyslogRequest(
-            socket=self.request, max_buffer_size=self.server.tcp_buffer_size
+            socket=self.request,
+            max_buffer_size=self.server.tcp_buffer_size
         )
         syslog_parser = self._syslog_request_parser()
 
@@ -1944,7 +1944,7 @@ class SyslogServer(object):
                     request_parser=request_parser,
                     incomplete_frame_timeout=incomplete_frame_timeout,
                     message_delimiter=message_delimiter,
-                    global_config=global_config,
+                    global_config=global_config
                 )
             elif protocol == "udp":
                 global_log.log(
@@ -1952,10 +1952,8 @@ class SyslogServer(object):
                     "Starting UDP Server (host=%s, port=%s)" % (bind_address, port),
                 )
                 server = SyslogUDPServer(
-                    port,
-                    bind_address=bind_address,
-                    verifier=verifier,
-                    global_config=global_config,
+                    port, bind_address=bind_address, verifier=verifier,
+                    global_config=global_config
                 )
 
         except socket_error as e:
