@@ -18,45 +18,48 @@ function generate_config() {
   TCP_SERVERS=$1
   UDP_SERVERS=$2
 
-  echo "{" > agent.json
+  cat > agent.json <<-EOF
+  {
+    "import_vars": ["SCALYR_API_KEY"],
+    "scalyr_server": "agent.scalyr.com",
+    "api_key": "$SCALYR_API_KEY",
+    "log_rotation_max_bytes": "1073741824",
+    "syslog_processing_thread_count": "16",
+    "server_attributes": {
+      "serverHost": "github-action-memory-test"
+    },
+    "monitors": [
+EOF
 
-  echo '
-"import_vars": ["SCALYR_API_KEY"],
-"scalyr_server": "agent.scalyr.com",
-"api_key": "$SCALYR_API_KEY",
-"log_rotation_max_bytes": "1073741824",
-"syslog_processing_thread_count": "16",
+  for N in `seq $TCP_SERVERS`;
+  do
+    cat >> agent.json <<-EOF
+    {
+        "module":                    "scalyr_agent.builtin_monitors.syslog_monitor",
+        "protocols":                 "tcp:$(($N+1600))",
+        "accept_remote_connections": "true",
+        "message_log": "tcp_$N.log"
+      },
+EOF
+  done
 
-"server_attributes": {
-   "serverHost": "github-action-memory-test"
+  for N in `seq $UDP_SERVERS`;
+  do
+    cat >> agent.json <<-EOF
+    {
+        "module":                    "scalyr_agent.builtin_monitors.syslog_monitor",
+        "protocols":                 "udp:$(($N+1500))",
+        "accept_remote_connections": "true",
+        "message_log": "udp_$N.log"
+      },
+EOF
+  done
 
-},' >> agent.json
+  cat >> agent.json <<-EOF
+  ]
+  }
+EOF
 
-echo "\"monitors\": [" >> agent.json
-
-for N in `seq $TCP_SERVERS`;
-do
-  echo "{
-      \"module\":                    \"scalyr_agent.builtin_monitors.syslog_monitor\",
-      \"protocols\":                 \"tcp:$(($N+1600))\",
-      \"accept_remote_connections\": \"true\",
-      \"message_log\": \"tcp_$N.log\"
-    }," >> agent.json
-done
-
-for N in `seq $UDP_SERVERS`;
-do
-  echo "{
-      \"module\":                    \"scalyr_agent.builtin_monitors.syslog_monitor\",
-      \"protocols\":                 \"udp:$(($N+1500))\",
-      \"accept_remote_connections\": \"true\",
-      \"message_log\": \"udp_$N.log\"
-    }," >> agent.json
-done
-
-echo "]" >> agent.json
-
-  echo "}" >> agent.json
 }
 
 generate_config $TCP_SERVERS $UDP_SERVERS
