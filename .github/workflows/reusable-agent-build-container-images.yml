@@ -590,7 +590,7 @@ jobs:
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" message matches "Pod default/short-lived-job-1.* not found in K8s API. Including pod based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS=true."'
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" message matches "Pod default/short-lived-job-2.* not found in K8s API. Including pod based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS=true."'
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" message matches "Pod default/short-lived-job-3.* not found in K8s API. Including pod based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS=true."'
-
+          
       - name: Check the short lived pods logs are ingested - log message
         env:
           # Needed for scalyr-tool
