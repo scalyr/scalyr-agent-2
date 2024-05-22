@@ -1248,6 +1248,7 @@ class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
         ]
 
         cri = CRIEnumerator(
+            {"k8s_cri_query_filesystem_retain_not_found":True},
             global_config=global_config,
             agent_pod=mock.Mock,
             k8s_api_url="mock",
@@ -1263,9 +1264,9 @@ class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
             cri.get_containers(k8s_cache=k8s_cache, k8s_include_by_default=False) == {}
         )
 
-        assert cri.get_containers(
+        assert CONTAINER_ID_1 in cri.get_containers(
             k8s_cache=k8s_cache, k8s_include_by_default=True
-        ) == {}
+        )
 
         assert (
             k8s_cache.pod.call_args_list
@@ -1291,7 +1292,17 @@ class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
         assert_has_calls_non_consecutive(
             logger,
             [
+                mock.call.info(
+                    StringMatcher(
+                        "Excluding pod based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS=false."
+                    )
+                ),
                 mock.call.error(mock.ANY, exc_info=self.K8sApiExceptionMatcher(401)),
+                mock.call.info(
+                    StringMatcher(
+                        "Including pod based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS=true."
+                    )
+                ),
                 mock.call.error(mock.ANY, exc_info=self.K8sApiExceptionMatcher(401)),
             ],
         )
@@ -1369,6 +1380,7 @@ class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
         k8s_cache.pod.side_effect = mock_k8s_cache_pod
 
         cri = CRIEnumerator(
+            {"k8s_cri_query_filesystem_retain_not_found":True},
             global_config=global_config,
             agent_pod=mock.Mock,
             k8s_api_url="mock",

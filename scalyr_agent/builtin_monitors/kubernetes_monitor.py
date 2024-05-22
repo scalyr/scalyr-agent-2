@@ -376,6 +376,15 @@ define_config_option(
 
 define_config_option(
     __monitor__,
+    "k8s_cri_query_filesystem_retain_not_found",
+    "Optional (defaults to True). If True, then when in CRI mode, the monitor retains pods found in the filesystem and not found via the Kubelet API.  Has no effect unless k8s_cri_query_filesystem is true.",
+    convert_to=bool,
+    default=True,
+    env_aware=True,
+)
+
+define_config_option(
+    __monitor__,
     "k8s_verify_api_queries",
     "Optional (defaults to True). If true, then the ssl connection for all queries to the k8s API will be verified using "
     "the ca.crt certificate found in the service account directory. If false, no verification will be performed. "
@@ -2150,6 +2159,7 @@ class CRIEnumerator(ContainerEnumerator):
 
     def __init__(
         self,
+        config,
         global_config,
         agent_pod,
         k8s_api_url,
@@ -2160,6 +2170,7 @@ class CRIEnumerator(ContainerEnumerator):
         is_sidecar_mode=False,
     ):
         """
+        @param config: Monitor configuration
         @param global_config: Global configuration
         @param agent_pod: The QualfiedName of the agent pod.
         @param k8s_api_url: The URL to use for accessing the API
@@ -2180,7 +2191,9 @@ class CRIEnumerator(ContainerEnumerator):
             verify_https=global_config.k8s_verify_kubelet_queries,
             ca_file=global_config.k8s_kubelet_ca_cert,
         )
+
         self._query_filesystem = query_filesystem
+        self._query_filesystem_retain_not_found = config.get("k8s_cri_query_filesystem_retain_not_found")
 
         self._log_base = "/var/log/containers"
         self._pod_base = "/var/log/pods"
@@ -2296,12 +2309,11 @@ class CRIEnumerator(ContainerEnumerator):
                     except k8s_utils.K8sApiException as e:
                         # If the pod details cannot be retrieved from the api
                         # - Due to a 404 then conditionally include and log behavior
-                        #   - Do not include if querying the container list by filesystem,
-                        #     since dead containers may not be cleaned up for some time
-                        #     (and would fill up the cache with unneeded entries)
                         # - Due to another status code then log the error
                         if e.status_code == 404:
-                            if self._query_filesystem:
+                            # Optionally do not include when querying the container list by filesystem;
+                            # dead containers may not be cleaned up for an arbitrary amount of time
+                            if not self._query_filesystem_retain_not_found:
                                 continue
                             if k8s_include_by_default:
                                 include_message = "Including pod based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS=true."
@@ -2875,6 +2887,7 @@ class ContainerChecker(object):
                     % six.text_type(query_fs)
                 )
                 self._container_enumerator = CRIEnumerator(
+                    self._config,
                     self._global_config,
                     self.__agent_pod,
                     k8s_api_url,
