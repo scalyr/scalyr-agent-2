@@ -92,7 +92,8 @@ runs:
           --from-literal=SCALYR_SERVER="${{ inputs.scalyr_server }}" \
           --from-literal=SCALYR_K8S_LEADER_CHECK_INTERVAL="5" \
           --from-literal=SCALYR_K8S_IGNORE_MASTER="false" \
-          --from-literal=SCALYR_K8S_CACHE_EXPIRY_SECS="5"
+          --from-literal=SCALYR_K8S_CACHE_EXPIRY_SECS="5" \
+          --from-literal=SCALYR_K8S_CRI_QUERY_FILESYSTEM="false"
 
         # Apply any additional custom resources
         if [ ! -z "${{ inputs.extra_yaml_paths }}" ]; then
