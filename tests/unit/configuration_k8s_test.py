@@ -96,6 +96,7 @@ class TestConfigurationK8s(TestConfigurationBase):
             "k8s_parse_format": (STANDARD_PREFIX, TEST_PARSE_FORMAT, six.text_type),
             "k8s_always_use_cri": (STANDARD_PREFIX, True, bool),
             "k8s_cri_query_filesystem": (STANDARD_PREFIX, True, bool),
+            "k8s_cri_query_filesystem_retain_not_found": (STANDARD_PREFIX, True, bool),
             "k8s_always_use_docker": (STANDARD_PREFIX, True, bool),
             "k8s_kubelet_host_ip": (STANDARD_PREFIX, False, bool),
             "k8s_kubelet_api_url_template": (STANDARD_PREFIX, False, bool),
