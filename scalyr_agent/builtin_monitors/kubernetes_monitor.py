@@ -1,4 +1,4 @@
-# Copyright 2018 Scalyr Inc.
+# Copyright 2018-2024 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,8 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# ------------------------------------------------------------------------
-# author:  Imron Alston <imron@scalyr.com>
 
 from __future__ import unicode_literals
 from __future__ import absolute_import
@@ -22,10 +20,7 @@ import base64
 if False:  # NOSONAR
     from typing import Dict, List, Optional
 
-__author__ = "imron@scalyr.com"
-
 import six
-
 
 import datetime
 import docker
@@ -374,6 +369,15 @@ define_config_option(
     __monitor__,
     "k8s_cri_query_filesystem",
     "Optional (defaults to True). If True, then when in CRI mode, the monitor will only query the filesystem for the list of active containers, rather than first querying the Kubelet API.",
+    convert_to=bool,
+    default=True,
+    env_aware=True,
+)
+
+define_config_option(
+    __monitor__,
+    "k8s_cri_query_filesystem_retain_not_found",
+    "Optional (defaults to True). If True, then when in CRI mode, the monitor retains pods found in the filesystem and not found via the Kubelet API.  Has no effect unless k8s_cri_query_filesystem is true.",
     convert_to=bool,
     default=True,
     env_aware=True,
@@ -2155,6 +2159,7 @@ class CRIEnumerator(ContainerEnumerator):
 
     def __init__(
         self,
+        config,
         global_config,
         agent_pod,
         k8s_api_url,
@@ -2165,6 +2170,7 @@ class CRIEnumerator(ContainerEnumerator):
         is_sidecar_mode=False,
     ):
         """
+        @param config: Monitor configuration
         @param global_config: Global configuration
         @param agent_pod: The QualfiedName of the agent pod.
         @param k8s_api_url: The URL to use for accessing the API
@@ -2185,7 +2191,9 @@ class CRIEnumerator(ContainerEnumerator):
             verify_https=global_config.k8s_verify_kubelet_queries,
             ca_file=global_config.k8s_kubelet_ca_cert,
         )
+
         self._query_filesystem = query_filesystem
+        self._query_filesystem_retain_not_found = config.get("k8s_cri_query_filesystem_retain_not_found")
 
         self._log_base = "/var/log/containers"
         self._pod_base = "/var/log/pods"
@@ -2299,11 +2307,14 @@ class CRIEnumerator(ContainerEnumerator):
                             ignore_k8s_api_exception=False,
                         )
                     except k8s_utils.K8sApiException as e:
-                        # If the pod details cannot be retrieved from the K8s API:
-                        # 404 - log warning, include based on k8s_include_by_default
-                        # Otherwise (401 as per K8s Api documentation) - log error
-                        # Exclude the pod
+                        # If the pod details cannot be retrieved from the api
+                        # - Due to a 404 then conditionally include and log behavior
+                        # - Due to another status code then log the error
                         if e.status_code == 404:
+                            # Optionally do not include when querying the container list by filesystem;
+                            # dead containers may not be cleaned up for an arbitrary amount of time
+                            if not self._query_filesystem_retain_not_found:
+                                continue
                             if k8s_include_by_default:
                                 include_message = "Including pod based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS=true."
                             else:
@@ -2876,6 +2887,7 @@ class ContainerChecker(object):
                     % six.text_type(query_fs)
                 )
                 self._container_enumerator = CRIEnumerator(
+                    self._config,
                     self._global_config,
                     self.__agent_pod,
                     k8s_api_url,

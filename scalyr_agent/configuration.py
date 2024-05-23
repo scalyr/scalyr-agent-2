@@ -1,4 +1,4 @@
-# Copyright 2014 Scalyr Inc.
+# Copyright 2014-2024 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,15 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# ------------------------------------------------------------------------
-#
-#
-# author: Steven Czerwinski <czerwin@scalyr.com>
 
 from __future__ import unicode_literals
 from __future__ import absolute_import
-
-__author__ = "czerwin@scalyr.com"
 
 from scalyr_agent.scalyr_monitor import MonitorInformation
 
@@ -80,6 +74,7 @@ AGENT_WORKER_SESSION_LOG_NAME_PREFIX = "agent-worker-session-"
 
 DEFAULT_WORKER_ID = "default"
 
+
 def ensure_https_url(server):
     parts = six.moves.urllib.parse.urlparse(server)
 
@@ -92,6 +87,7 @@ def ensure_https_url(server):
         return re.sub("^http://", "https://", server)
     else:
         return server
+
 
 class Configuration(object):
     """Encapsulates the results of a single read of the configuration file.
@@ -155,7 +151,6 @@ class Configuration(object):
         # FIX THESE:
         # Add documentation, verify, etc.
         self.max_retry_time = 15 * 60
-        self.max_allowed_checkpoint_age = 15 * 60
 
         # An additional directory to look for config snippets
         self.__extra_config_directory = extra_config_dir
@@ -567,7 +562,6 @@ class Configuration(object):
         worker_ids = set()
         for worker_config in self.__config.get_json_array("workers"):
             worker_ids.add(worker_config["id"])
-
 
         # get all lists where log files entries may be defined and require worker_id param.
         # __k8s_log_configs is left out because it interferes with the kubernetes monitor container checker and CopyingManager itself sets default worker_id while adding logs.
@@ -2091,6 +2085,10 @@ class Configuration(object):
             "certs", "intermediate_certs.pem"
         )
 
+    @property
+    def max_allowed_checkpoint_age(self):
+        return self.__get_config().get_int("max_allowed_checkpoint_age")
+
     @staticmethod
     def __resolve_to_install_location(*paths):
         """Returns the absolute path created by joining the specified intermediate paths to
@@ -3597,6 +3595,14 @@ class Configuration(object):
                     "use_multiprocess_workers",
                     error_code="invalidValue",
                 )
+
+        self.__verify_or_set_optional_int(
+            config,
+            "max_allowed_checkpoint_age",
+            15 * 60,
+            description,
+            apply_defaults,
+        )
 
     def __verify_compression_type(self, compression_type):
         """

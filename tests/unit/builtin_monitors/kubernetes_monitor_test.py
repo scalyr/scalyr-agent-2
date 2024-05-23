@@ -1,4 +1,4 @@
-# Copyright 2019 Scalyr Inc.
+# Copyright 2019-2024 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,9 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# ------------------------------------------------------------------------
-#
-# author: Edward Chee <echee@scalyr.com>
 
 from __future__ import unicode_literals
 from __future__ import absolute_import
@@ -50,9 +47,6 @@ from urllib3.exceptions import (  # pylint: disable=import-error
     InsecureRequestWarning,
 )
 from six import StringIO
-
-__author__ = "echee@scalyr.com"
-
 
 from scalyr_agent.builtin_monitors.kubernetes_monitor import (
     KubernetesMonitor,
@@ -1216,8 +1210,8 @@ class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
         """
         Mocking based test case which verifies that CRIEnumerator._get_container() correctly
         Handles the case when the Kubernetes API server returns an invalid status code.
-        404 => Pod not found, Log Warning, excluded
-        401 => Unauthorized, Log Error, excluded
+        404 => Not found, pod excluded
+        401 => Unauthorized, log error, pod excluded
         """
         self._write_file_with_separator_conversion(
             """ {
@@ -1254,6 +1248,7 @@ class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
         ]
 
         cri = CRIEnumerator(
+            {"k8s_cri_query_filesystem_retain_not_found":True},
             global_config=global_config,
             agent_pod=mock.Mock,
             k8s_api_url="mock",
@@ -1385,6 +1380,7 @@ class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
         k8s_cache.pod.side_effect = mock_k8s_cache_pod
 
         cri = CRIEnumerator(
+            {"k8s_cri_query_filesystem_retain_not_found":True},
             global_config=global_config,
             agent_pod=mock.Mock,
             k8s_api_url="mock",
