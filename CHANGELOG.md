@@ -1,6 +1,16 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.2.16 "Lenny" - May 29, 2024
+<!---
+Packaged by Ales Novak <ales.novak@sentinelone.com> on May 29, 2024 00:00 -0800
+--->
+
+Changes:
+* Fixed steady growth of memory usage of Syslog Monitor. syslog_processing_thread_count can be used to limit the number of threads and memory consumption.
+* Added the max_allowed_checkpoint_age option to allow configuring the checkpoint age (default 15 minutes), useful for agents monitoring a large number of short-lived logs
+* Added the Kubernetes monitor k8s_cri_query_filesystem_retain_not_found option to disable caching info about pods that are dead (default is true), useful for agents that monitor clusters whose pods are not cleaned up frequently
+
 ## 2.2.15 "Jain" - May 20, 2024
 <!---
 Packaged by Ales Novak <ales.novak@sentinelone.com> on May 20, 2024 00:00 -0800
