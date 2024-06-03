@@ -12,6 +12,9 @@ python-dateutil==2.8.2
 repoze.lru==0.7
 six==1.14.0
 
+# Required for opentelemetry support.
+protobuf==3.17.3
+
 # Required for redis monitor.
 redis==2.10.5
 

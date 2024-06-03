@@ -775,6 +775,41 @@ class TestConfiguration(TestConfigurationBase):
         config.parse()
         self.assertEqual(config.network_proxies, {"https": "https://bar.com"})
 
+    # Validate oauth settings and that a change of our transport doesn't need api_key set
+    def test_oauth_transport(self):
+       self._write_file_with_separator_conversion(
+            """ {
+            transport: "otlp",
+            auth: "oauth2",
+            oauth_client_id: "a",
+            oauth_client_secret: "b",
+            oauth_token_url: "c",
+            oauth_scopes: [],
+            }
+       """
+       )
+       config = self._create_test_configuration_instance()
+       config.parse()
+       self.assertEqual(config.auth, "oauth2")
+       self.assertEqual(config.oauth_client_id, "a")
+       self.assertEqual(config.oauth_client_secret, "b")
+       self.assertEqual(config.oauth_token_url, "c")
+       self.assertEqual(config.oauth_scopes, JsonArray())
+
+    def test_transport(self):
+       self._write_file_with_separator_conversion(
+            """ {
+            transport: "otlp",
+            server_url: "a",
+            }
+       """
+       )
+       config = self._create_test_configuration_instance()
+       config.parse()
+       self.assertEqual(config.transport, "otlp")
+       self.assertEqual(config.server_url, "a")
+
+
     @skipIf(sys.platform.startswith("win"), "Skipping test on Windows")
     @mock.patch("scalyr_agent.util.read_config_file_as_json")
     def test_parse_incorrect_file_permissions_or_owner(

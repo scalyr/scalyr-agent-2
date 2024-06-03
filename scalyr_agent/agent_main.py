@@ -597,7 +597,7 @@ class ScalyrAgent(object):
         )
 
         # Send a test message to the server to make sure everything works.  If not, print a decent error message.
-        if not no_check_remote or self.__config.use_new_ingestion:
+        if self.__config.transport == "scalyr" and (not no_check_remote or self.__config.use_new_ingestion):
             client = create_client(self.__config, quiet=True)
             try:
                 ping_result = client.ping()

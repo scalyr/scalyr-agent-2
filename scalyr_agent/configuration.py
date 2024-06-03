@@ -770,6 +770,8 @@ class Configuration(object):
             "default_sessions_per_worker",
             "default_worker_session_status_message_interval",
             "enable_worker_session_process_metrics_gather",
+            "server_url"
+            "transport",
             # NOTE: It's important we use sanitzed_ version of this method which masks the API key
             "sanitized_worker_configs",
         ]
@@ -1499,6 +1501,51 @@ class Configuration(object):
         return self.__get_config().get_string("api_key")
 
     @property
+    def server_url(self):
+        """Returns the configuration value for 'server_url'."""
+        return self.__get_config().get_string("server_url")
+
+    @property
+    def auth(self):
+        """Returns the configuration value for 'auth'."""
+        return self.__get_config().get_string("auth")
+
+    @property
+    def oauth_client_id(self):
+        """Returns the configuration value for 'oauth_client_id'."""
+        return self.__get_config().get_string("oauth_client_id")
+
+    @property
+    def oauth_client_secret(self):
+        """Returns the configuration value for 'oauth_client_secret'."""
+        return self.__get_config().get_string("oauth_client_secret")
+
+    @property
+    def oauth_token_url(self):
+        """Returns the configuration value for 'oauth_token_url'."""
+        return self.__get_config().get_string("oauth_token_url")
+
+    @property
+    def oauth_scopes(self):
+        """Returns the configuration value for 'oauth_scopes'."""
+        return self.__get_config().get_json_array("oauth_scopes")
+
+    @property
+    def basic_username(self):
+        """Returns the configuration value for 'basic_username'."""
+        return self.__get_config().get_string("basic_username")
+
+    @property
+    def basic_password(self):
+        """Returns the configuration value for 'basic_password'."""
+        return self.__get_config().get_string("basic_password")
+
+    @property
+    def transport(self):
+        """Returns the configuration value for 'transport'."""
+        return self.__get_config().get_string("transport")
+
+    @property
     def scalyr_server(self):
         """Returns the configuration value for 'scalyr_server'."""
         return self.__get_config().get_string("scalyr_server")
@@ -2180,6 +2227,10 @@ class Configuration(object):
         if api_key:
             config.put("api_key", api_key)
 
+        # Ingore api_key check if we are not writing to Scalyr/DataSet/SDL
+        if "transport" in config and config.get_string("transport") != "scalyr":
+            return
+
         if "api_key" not in config:
             raise BadConfiguration(
                 'The configuration file is missing the required field "api_key" that '
@@ -2264,6 +2315,36 @@ class Configuration(object):
 
         self.__verify_or_set_optional_string(
             config, "api_key", "", description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_string(
+            config, "transport", "scalyr", description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_string(
+            config, "auth", "", description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_string(
+            config, "oauth_client_id", "", description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_string(
+            config, "oauth_client_secret", "", description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_string(
+            config, "oauth_token_url", "", description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_array_of_strings(
+            config,
+            "oauth_scopes",
+            [],
+            description,
+            apply_defaults,
+            separators=[None, ","],
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_string(
+            config, "basic_username", "", description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_string(
+            config, "basic_password", "", description, apply_defaults, env_aware=True
         )
         self.__verify_or_set_optional_bool(
             config, "allow_http", False, description, apply_defaults, env_aware=True
@@ -2829,6 +2910,27 @@ class Configuration(object):
             description,
             apply_defaults,
             env_aware=True,
+        )
+        self.__verify_or_set_optional_string(
+            config,
+            "transport",
+            "scalyr",
+            description,
+            apply_defaults
+        )
+        self.__verify_or_set_optional_string(
+            config,
+            "server_url",
+            "",
+            description,
+            apply_defaults
+        )
+        self.__verify_or_set_optional_string(
+            config,
+            "auth",
+            "",
+            description,
+            apply_defaults
         )
         self.__verify_or_set_optional_bool(
             config,
@@ -4211,10 +4313,14 @@ class Configuration(object):
                 worker_entry, "api_key", description % entry_index
             )
 
+        # Only use scalyr_server if our transport is scalyr (but still use it if we don't get a server_url)
+        default_server_url = self.scalyr_server
+        if self.transport != "scalyr" and self.server_url is not None and self.server_url != "":
+            default_server_url = self.server_url
         self.__verify_or_set_optional_string(
             worker_entry,
             "server_url",
-            default_value=self.scalyr_server,
+            default_value=default_server_url,
             config_description=description % entry_index,
         )
 
