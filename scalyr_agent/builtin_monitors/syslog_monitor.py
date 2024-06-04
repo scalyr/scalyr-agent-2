@@ -632,6 +632,12 @@ class SyslogRequest(object):
 
         try:
             data = self._socket.recv(self._max_buffer_size)
+
+            global_log.log(
+                scalyr_logging.DEBUG_LEVEL_5,
+                f"Syslog Monitor - Received data from {self._socket}: {data}"
+            )
+
             if not data:
                 self.is_closed = True
                 raise SocketClosed()
@@ -1102,6 +1108,10 @@ class SyslogUDPServer(
         six.moves.socketserver.UDPServer.__init__(self, address, SyslogUDPHandler)
 
     def verify_request(self, request, client_address):
+        global_log.log(
+            scalyr_logging.DEBUG_LEVEL_5,
+            f"Syslog Monitor - Incoming UDP request from {client_address}: {request}"
+        )
         return self.__verifier.verify_request(client_address)
 
     def set_run_state(self, run_state):
@@ -1152,6 +1162,10 @@ class SyslogTCPServer(
         six.moves.socketserver.TCPServer.__init__(self, address, handler_cls)
 
     def verify_request(self, request, client_address):
+        global_log.log(
+            scalyr_logging.DEBUG_LEVEL_5,
+            f"Syslog Monitor - Incoming TCP request from {client_address}: {request}"
+        )
         return self.__verifier.verify_request(client_address)
 
     def set_run_state(self, run_state):
