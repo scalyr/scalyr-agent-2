@@ -16,7 +16,7 @@ six==1.14.0
 redis==2.10.5
 
 # Required for mysql monitor
-PyMySQL==0.9.3
+PyMySQL==1.1.1
 
 # Required for postgres monitor
 pg8000==1.10.6
