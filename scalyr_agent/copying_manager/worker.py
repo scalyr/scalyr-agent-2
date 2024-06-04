@@ -490,8 +490,8 @@ class CopyingManagerWorkerSession(
                         if current_time - last_success > self.__config.max_retry_time:
                             if self.__pending_add_events_task is not None:
                                 if (
-                                    "parseResponseFailed"
-                                    in self.__pending_add_events_task.__receive_response_status
+                                    hasattr(self.__pending_add_events_task, "__receive_response_status") and
+                                    "parseResponseFailed" in self.__pending_add_events_task.__receive_response_status
                                 ):
                                     log.error(
                                         "Repeatedly failed to parse response due to exception.  Dropping events",
