@@ -386,7 +386,12 @@ jobs:
           # Needed for containerd or cri-o runtime
           if [ "${{ matrix.k8s_version.runtime }}" = "containerd" ] || [ "${{ matrix.k8s_version.runtime }}" = "cri-o" ]; then
             docker tag k8s-image:test docker.io/library/k8s-image:test
-            minikube image load docker.io/library/k8s-image:test
+            
+            IMAGE=docker.io/library/k8s-image:test
+            FILE=k8s-image-test.tar
+          
+            docker save -o $FILE $IMAGE
+            minikube image load $FILE
           fi
 
       # Here we build the dummy container which continuously prints data to stdout and stderr
@@ -732,7 +737,12 @@ jobs:
           # Needed for containerd or cri-o runtime
           if [ "${{ matrix.k8s_version.runtime }}" = "containerd" ] || [ "${{ matrix.k8s_version.runtime }}" = "cri-o" ]; then
             docker tag k8s-image:test docker.io/library/k8s-image:test
-            minikube image load docker.io/library/k8s-image:test
+            
+            IMAGE=docker.io/library/k8s-image:test
+            FILE=k8s-image-test.tar
+          
+            docker save -o $FILE $IMAGE
+            minikube image load $FILE
           fi
 
       # Here we build the dummy Java app image which exposes JMX metrics via exporter
