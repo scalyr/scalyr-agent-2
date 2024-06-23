@@ -353,9 +353,10 @@ jobs:
           # Since the minikube runtimes we use cannot be reasonably configured to use custom credentials for docker hub, 
           # we need to pull the images and load them into minikube.
           IMAGE=busybox:1.28
+          TMP_FILE=/tmp/image.tar
           docker pull $IMAGE
-          docker image save -o /tmp/image.tar $IMAGE
-          minikube image load $IMAGE
+          docker image save -o $TMP_FILE $IMAGE
+          minikube image load $TMP_FILE
           rm /tmp/image.tar
 
       - name: Download OCI tarball of the built image.
