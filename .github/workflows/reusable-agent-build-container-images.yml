@@ -393,12 +393,11 @@ jobs:
           if [ "${{ matrix.k8s_version.runtime }}" = "containerd" ] || [ "${{ matrix.k8s_version.runtime }}" = "cri-o" ]; then
             docker tag k8s-image:test docker.io/library/k8s-image:test
             
-            IMAGE=docker.io/library/k8s-image:test
-            FILE=k8s-image-test.tar
-          
-            docker save -o $FILE $IMAGE
-            minikube image load $FILE
-          
+            docker save -o image.tar docker.io/library/k8s-image:test
+            minikube image load image.tar
+            
+            rm image.tar
+            
             minikube image ls
           fi
 
@@ -754,14 +753,11 @@ jobs:
           if [ "${{ matrix.k8s_version.runtime }}" = "containerd" ] || [ "${{ matrix.k8s_version.runtime }}" = "cri-o" ]; then
             docker tag k8s-image:test docker.io/library/k8s-image:test
             
-            IMAGE=docker.io/library/k8s-image:test
-            FILE=k8s-image-test.tar
+            docker save -o image.tar docker.io/library/k8s-image:test
           
-            docker save -o $FILE $IMAGE
+            minikube image load image.tar
           
-            minikube image load $FILE
-          
-            rm $FILE
+            rm image.tar
           
             minikube image ls
           fi
