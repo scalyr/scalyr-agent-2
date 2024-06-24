@@ -407,7 +407,10 @@ jobs:
               IMAGE_TAG=docker.io/library/${IMAGE}:latest
               FILE=/tmp/image.tar
               docker tag ${IMAGE}:latest $IMAGE_TAG
-              minikube image load $IMAGE_TAG
+          
+              docker save -o $FILE $IMAGE_TAG
+          
+              minikube image load $FILE
               rm $FILE
             done
           fi
@@ -745,6 +748,7 @@ jobs:
             FILE=k8s-image-test.tar
           
             docker save -o $FILE $IMAGE
+          
             minikube image load $FILE
           
             rm $FILE
@@ -763,7 +767,10 @@ jobs:
           if [ "${{ matrix.k8s_version.runtime }}" = "containerd" ] || [ "${{ matrix.k8s_version.runtime }}" = "cri-o" ]; then
               IMAGE=java-hello-world
               FILE=/tmp/image.tar
-              minikube image load $IMAGE
+          
+              docker save -o $FILE $IMAGE
+          
+              minikube image load $FILE
               rm $FILE
           fi
 
