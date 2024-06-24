@@ -316,6 +316,18 @@ jobs:
         with:
           python_version: ${{ inputs.python_version }}
 
+      - name: Setup minikube k8s cluster
+        uses: ./.github/actions/setup-minikube-cluster/
+        with:
+          k8s_version: "${{ matrix.k8s_version.version }}"
+          minikube_driver: "${{ matrix.k8s_version.driver }}"
+          container_runtime: "${{ matrix.k8s_version.runtime }}"
+          github_token: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Point shell to minikube docker
+        run: |
+            eval $(minikube -p minikube docker-env)
+
       - name: Set up QEMU
         id: qemu
         uses: docker/setup-qemu-action@68827325e0b33c7199eb31dd4e31fbe9023e06e3 # v3
@@ -340,29 +352,11 @@ jobs:
           chmod +x scalyr
           sudo mv scalyr /usr/local/bin
 
-      - name: Setup minikube k8s cluster
-        uses: ./.github/actions/setup-minikube-cluster/
-        with:
-          k8s_version: "${{ matrix.k8s_version.version }}"
-          minikube_driver: "${{ matrix.k8s_version.driver }}"
-          container_runtime: "${{ matrix.k8s_version.runtime }}"
-          github_token: "${{ secrets.GITHUB_TOKEN }}"
-
       - name: Preload minikube images
         run: |
           # Since the minikube runtimes we use cannot be reasonably configured to use custom credentials for docker hub, 
           # we need to pull the images and load them into minikube.
-          IMAGE=busybox:1.28
-          IMAGE_TAG=docker.io/library/busybox:1.28
-          TMP_FILE=/tmp/image.tar
-          
-          docker pull $IMAGE
-          docker tag $IMAGE $IMAGE_TAG
-          
-          docker image save -o $TMP_FILE $IMAGE_TAG
-          minikube image load $TMP_FILE
-          rm $TMP_FILE
-          
+          docker pull docker.io/library/busybox:1.28
           minikube image ls
 
       - name: Download OCI tarball of the built image.
