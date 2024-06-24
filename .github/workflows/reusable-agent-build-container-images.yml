@@ -422,8 +422,8 @@ jobs:
           kubectl apply -f tests/e2e/k8s_k8s_monitor/std_printer_deployment.yaml
           kubectl apply -f tests/e2e/k8s_k8s_monitor/long_message_printer_deployment.yaml
           
-          kubectl wait --for=condition=ready pod -l app=std-printer
-          kubectl wait --for=condition=ready pod -l app=long-message-printer
+          kubectl wait --for=condition=ready pod -l app=std-printer || (kubectl get pods -A; exit 1) 
+          kubectl wait --for=condition=ready pod -l app=long-message-printer || (kubectl get pods -A; exit 1)
           kubectl get pods -A
 
           export APP_POD_NAME=$(kubectl get pod --namespace=default --selector=app=std-printer -o jsonpath="{.items[0].metadata.name}")
