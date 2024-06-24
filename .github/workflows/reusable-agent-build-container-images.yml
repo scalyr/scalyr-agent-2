@@ -316,6 +316,18 @@ jobs:
         with:
           python_version: ${{ inputs.python_version }}
 
+      - name: Setup minikube k8s cluster
+        uses: ./.github/actions/setup-minikube-cluster/
+        with:
+          k8s_version: "${{ matrix.k8s_version.version }}"
+          minikube_driver: "${{ matrix.k8s_version.driver }}"
+          container_runtime: "${{ matrix.k8s_version.runtime }}"
+          github_token: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Point shell to minikube podman
+        run: |
+            eval $(minikube -p minikube podman-env)
+
       - name: Set up QEMU
         id: qemu
         uses: docker/setup-qemu-action@68827325e0b33c7199eb31dd4e31fbe9023e06e3 # v3
@@ -340,20 +352,13 @@ jobs:
           chmod +x scalyr
           sudo mv scalyr /usr/local/bin
 
-      - name: Setup minikube k8s cluster
-        uses: ./.github/actions/setup-minikube-cluster/
-        with:
-          k8s_version: "${{ matrix.k8s_version.version }}"
-          minikube_driver: "${{ matrix.k8s_version.driver }}"
-          container_runtime: "${{ matrix.k8s_version.runtime }}"
-          github_token: "${{ secrets.GITHUB_TOKEN }}"
-
       - name: Preload minikube images
         run: |
           # Since the minikube runtimes we use cannot be reasonably configured to use custom credentials for docker hub, 
           # we need to pull the images and load them into minikube.
-          docker pull busybox:1.28
-          minikube image load busybox:1.28
+          docker pull docker.io/library/busybox:1.28
+          skopeo copy docker-daemon:docker.io/library/busybox:1.28 containers-storage:docker.io/library/busybox:1.28
+          minikube image ls
 
       - name: Download OCI tarball of the built image.
         uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3
@@ -382,7 +387,13 @@ jobs:
           # Needed for containerd or cri-o runtime
           if [ "${{ matrix.k8s_version.runtime }}" = "containerd" ] || [ "${{ matrix.k8s_version.runtime }}" = "cri-o" ]; then
             docker tag k8s-image:test docker.io/library/k8s-image:test
-            minikube image load docker.io/library/k8s-image:test
+            
+            docker save -o image.tar docker.io/library/k8s-image:test
+            minikube image load image.tar
+            
+            rm image.tar
+            
+            minikube image ls
           fi
 
       # Here we build the dummy container which continuously prints data to stdout and stderr
@@ -395,8 +406,16 @@ jobs:
           # Needed for containerd or cri-o runtime
           if [ "${{ matrix.k8s_version.runtime }}" = "containerd" ] || [ "${{ matrix.k8s_version.runtime }}" = "cri-o" ]; then
             for IMAGE in std-printer long-message-printer; do
-              docker tag ${IMAGE}:latest docker.io/library/${IMAGE}:latest
-              minikube image load docker.io/library/${IMAGE}:latest
+              IMAGE_TAG=docker.io/library/${IMAGE}:latest
+              FILE=/tmp/image.tar
+              docker tag ${IMAGE}:latest $IMAGE_TAG
+          
+              docker save -o $FILE $IMAGE_TAG
+          
+              minikube image load $FILE
+              rm $FILE
+          
+              minikube image ls
             done
           fi
 
@@ -407,8 +426,8 @@ jobs:
           kubectl apply -f tests/e2e/k8s_k8s_monitor/std_printer_deployment.yaml
           kubectl apply -f tests/e2e/k8s_k8s_monitor/long_message_printer_deployment.yaml
           
-          kubectl wait --for=condition=ready pod -l app=std-printer
-          kubectl wait --for=condition=ready pod -l app=long-message-printer
+          kubectl wait --for=condition=ready pod -l app=std-printer || (kubectl get pods -A; exit 1) 
+          kubectl wait --for=condition=ready pod -l app=long-message-printer || (kubectl get pods -A; exit 1)
           kubectl get pods -A
 
           export APP_POD_NAME=$(kubectl get pod --namespace=default --selector=app=std-printer -o jsonpath="{.items[0].metadata.name}")
@@ -728,7 +747,14 @@ jobs:
           # Needed for containerd or cri-o runtime
           if [ "${{ matrix.k8s_version.runtime }}" = "containerd" ] || [ "${{ matrix.k8s_version.runtime }}" = "cri-o" ]; then
             docker tag k8s-image:test docker.io/library/k8s-image:test
-            minikube image load docker.io/library/k8s-image:test
+            
+            docker save -o image.tar docker.io/library/k8s-image:test
+          
+            minikube image load image.tar
+          
+            rm image.tar
+          
+            minikube image ls
           fi
 
       # Here we build the dummy Java app image which exposes JMX metrics via exporter
@@ -742,8 +768,15 @@ jobs:
 
           # Needed for containerd or cri-o runtime
           if [ "${{ matrix.k8s_version.runtime }}" = "containerd" ] || [ "${{ matrix.k8s_version.runtime }}" = "cri-o" ]; then
-            docker tag java-hello-world:latest docker.io/library/java-hello-world:latest
-            minikube image load docker.io/library/java-hello-world:latest
+              IMAGE=java-hello-world
+              FILE=/tmp/image.tar
+          
+              docker save -o $FILE $IMAGE
+          
+              minikube image load $FILE
+              rm $FILE
+          
+              minikube image ls
           fi
 
       # Create mock pods and exporters which will be scrapped by the monitor
