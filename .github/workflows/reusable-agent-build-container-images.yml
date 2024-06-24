@@ -324,9 +324,9 @@ jobs:
           container_runtime: "${{ matrix.k8s_version.runtime }}"
           github_token: "${{ secrets.GITHUB_TOKEN }}"
 
-      - name: Point shell to minikube docker
+      - name: Point shell to minikube podman
         run: |
-            eval $(minikube -p minikube docker-env)
+            eval $(minikube -p minikube podman-env)
 
       - name: Set up QEMU
         id: qemu
@@ -357,6 +357,7 @@ jobs:
           # Since the minikube runtimes we use cannot be reasonably configured to use custom credentials for docker hub, 
           # we need to pull the images and load them into minikube.
           docker pull docker.io/library/busybox:1.28
+          skopeo copy docker-daemon:docker.io/library/busybox:1.28 containers-storage:docker.io/library/busybox:1.28
           minikube image ls
 
       - name: Download OCI tarball of the built image.
