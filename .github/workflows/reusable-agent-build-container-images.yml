@@ -353,11 +353,17 @@ jobs:
           # Since the minikube runtimes we use cannot be reasonably configured to use custom credentials for docker hub, 
           # we need to pull the images and load them into minikube.
           IMAGE=busybox:1.28
+          IMAGE_TAG=docker.io/library/busybox:1.28
           TMP_FILE=/tmp/image.tar
+          
           docker pull $IMAGE
-          docker image save -o $TMP_FILE $IMAGE
+          docker tag $IMAGE $IMAGE_TAG
+          
+          docker image save -o $TMP_FILE $IMAGE_TAG
           minikube image load $TMP_FILE
           rm $TMP_FILE
+          
+          minikube image ls
 
       - name: Download OCI tarball of the built image.
         uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3
@@ -392,6 +398,8 @@ jobs:
           
             docker save -o $FILE $IMAGE
             minikube image load $FILE
+          
+            minikube image ls
           fi
 
       # Here we build the dummy container which continuously prints data to stdout and stderr
@@ -412,6 +420,8 @@ jobs:
           
               minikube image load $FILE
               rm $FILE
+          
+              minikube image ls
             done
           fi
 
@@ -752,6 +762,8 @@ jobs:
             minikube image load $FILE
           
             rm $FILE
+          
+            minikube image ls
           fi
 
       # Here we build the dummy Java app image which exposes JMX metrics via exporter
@@ -772,6 +784,8 @@ jobs:
           
               minikube image load $FILE
               rm $FILE
+          
+              minikube image ls
           fi
 
       # Create mock pods and exporters which will be scrapped by the monitor
