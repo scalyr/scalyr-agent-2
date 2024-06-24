@@ -357,7 +357,7 @@ jobs:
           docker pull $IMAGE
           docker image save -o $TMP_FILE $IMAGE
           minikube image load $TMP_FILE
-          rm /tmp/image.tar
+          rm $TMP_FILE
 
       - name: Download OCI tarball of the built image.
         uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3
@@ -404,8 +404,11 @@ jobs:
           # Needed for containerd or cri-o runtime
           if [ "${{ matrix.k8s_version.runtime }}" = "containerd" ] || [ "${{ matrix.k8s_version.runtime }}" = "cri-o" ]; then
             for IMAGE in std-printer long-message-printer; do
-              docker tag ${IMAGE}:latest docker.io/library/${IMAGE}:latest
-              minikube image load docker.io/library/${IMAGE}:latest
+              IMAGE_TAG=docker.io/library/${IMAGE}:latest
+              FILE=/tmp/image.tar
+              docker tag ${IMAGE}:latest $IMAGE_TAG
+              minikube image load $IMAGE_TAG
+              rm $FILE
             done
           fi
 
@@ -743,6 +746,8 @@ jobs:
           
             docker save -o $FILE $IMAGE
             minikube image load $FILE
+          
+            rm $FILE
           fi
 
       # Here we build the dummy Java app image which exposes JMX metrics via exporter
@@ -756,8 +761,10 @@ jobs:
 
           # Needed for containerd or cri-o runtime
           if [ "${{ matrix.k8s_version.runtime }}" = "containerd" ] || [ "${{ matrix.k8s_version.runtime }}" = "cri-o" ]; then
-            docker tag java-hello-world:latest docker.io/library/java-hello-world:latest
-            minikube image load docker.io/library/java-hello-world:latest
+              IMAGE=java-hello-world
+              FILE=/tmp/image.tar
+              minikube image load $IMAGE
+              rm $FILE
           fi
 
       # Create mock pods and exporters which will be scrapped by the monitor
