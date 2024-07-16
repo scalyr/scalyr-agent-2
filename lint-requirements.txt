@@ -5,3 +5,4 @@ flake8==4.0.1
 pylint==2.13.8
 mypy==0.761
 bandit==1.6.3
+setuptools>=70.0.0 # not directly required, pinned by Snyk to avoid a vulnerability
