@@ -9,6 +9,9 @@ ENV BASH_ENV="/root/.bash_env"
 ARG d=1
 
 FROM centos:7 as base_aarch64
+RUN sed -i s/mirror.centos.org/vault.centos.org/g /etc/yum.repos.d/*.repo
+RUN sed -i s/^#.*baseurl=http/baseurl=http/g /etc/yum.repos.d/*.repo
+RUN sed -i s/^mirrorlist=http/#mirrorlist=http/g /etc/yum.repos.d/*.repo
 RUN yum install -y centos-release-scl
 RUN yum install -y devtoolset-9 perl-core
 RUN echo -e "source /opt/rh/devtoolset-9/enable" >> /root/.bash_env
