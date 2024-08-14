@@ -155,7 +155,7 @@ EMBEDDED_OPENSSL_VERSION_NUMBER = 0x30000070
 PORTABLE_PYTEST_RUNNER_NAME = "portable_runner"
 
 # Version of Rust to use in order to build some of agent's requirements, e.g. orjson.
-RUST_VERSION = "1.64.0"
+RUST_VERSION = "1.80.1"
 
 EMBEDDED_PYTHON_PIP_VERSION = "23.0"
 

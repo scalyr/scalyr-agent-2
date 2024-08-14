@@ -1,10 +1,8 @@
 ARG ARCH
 
-FROM centos:6 as base_x86_64
-ADD agent_build_refactored/managed_packages/dependencies/centos6/*.repo /etc/yum.repos.d/
-RUN yum install -y centos-release-scl
-RUN yum install -y devtoolset-9 perl-core
-RUN echo -e "source /opt/rh/devtoolset-9/enable" >> /root/.bash_env
+FROM quay.io/centos/centos:stream9 as base_x86_64
+RUN yum install -y gcc-toolset-12 perl-core
+RUN echo -e "source /opt/rh/gcc-toolset-12/enable" >> /root/.bash_env
 ENV BASH_ENV="/root/.bash_env"
 ARG d=1
 
