@@ -21,8 +21,8 @@ RUN apk update && apk add --no-cache \
     cargo \
     py3-orjson
 
-RUN mkdir -p /tmp/requrements_root/usr/lib/python3.11/site-packages
-RUN cp -r ./usr/lib/python3.11/site-packages/orjson /tmp/requrements_root/usr/lib/python3.11/site-packages
+RUN mkdir -p /tmp/requrements_root/usr/lib/python3.12/site-packages
+RUN cp -r ./usr/lib/python3.12/site-packages/orjson /tmp/requrements_root/usr/lib/python3.12/site-packages
 
 FROM base as runtime_base
 RUN apk update && apk add --no-cache python3 py3-pip
