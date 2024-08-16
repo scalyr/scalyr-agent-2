@@ -155,7 +155,7 @@ EMBEDDED_OPENSSL_VERSION_NUMBER = 0x30000070
 PORTABLE_PYTEST_RUNNER_NAME = "portable_runner"
 
 # Version of Rust to use in order to build some of agent's requirements, e.g. orjson.
-RUST_VERSION = "1.63.0"
+RUST_VERSION = "1.80.1"
 
 EMBEDDED_PYTHON_PIP_VERSION = "23.0"
 
@@ -561,7 +561,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
             "DEPENDENCIES_INSTALL_PREFIX": str(DEPENDENCIES_INSTALL_PREFIX),
             "REQUIREMENTS_FILE_CONTENT": AGENT_REQUIREMENTS,
             "PORTABLE_RUNNER_NAME": PORTABLE_PYTEST_RUNNER_NAME,
-            "RUST_VERSION": "1.63.0",
+            "RUST_VERSION": RUST_VERSION,
             "RUST_PLATFORM": rust_platform,
             "BZIP_VERSION": "1.0.8",
             "LIBEDIT_VERSION_COMMIT": "0cdd83b3ebd069c1dee21d81d6bf716cae7bf5da",  # tag - "upstream/3.1-20221030",
