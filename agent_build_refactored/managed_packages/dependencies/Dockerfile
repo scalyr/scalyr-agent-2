@@ -10,6 +10,7 @@ ARG d=1
 
 FROM centos:7 as base_aarch64
 ADD agent_build_refactored/managed_packages/dependencies/centos7/*.repo /etc/yum.repos.d/
+ADD agent_build_refactored/managed_packages/dependencies/centos7-rpm-gpg/* /etc/pki/rpm-gpg/
 RUN yum install -y devtoolset-9 perl-core
 RUN echo -e "source /opt/rh/devtoolset-9/enable" >> /root/.bash_env
 ENV BASH_ENV="/root/.bash_env"
