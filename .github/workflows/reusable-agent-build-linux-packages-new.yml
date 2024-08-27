@@ -114,8 +114,8 @@ jobs:
         variant:
           - { "builder_name": "aio-x86_64",  "package_type": "deb", runner: "ubuntu-22.04" }
           - { "builder_name": "aio-x86_64",  "package_type": "rpm", runner: "ubuntu-22.04" }
-          - { "builder_name": "aio-aarch64", "package_type": "deb", runner: "ubuntu-22.04" }
-          - { "builder_name": "aio-aarch64", "package_type": "rpm", runner: "ubuntu-22.04" }
+          - { "builder_name": "aio-aarch64", "package_type": "deb", runner: "aws-aarch64" }
+          - { "builder_name": "aio-aarch64", "package_type": "rpm", runner: "aws-aarch64" }
           - { "builder_name": "non-aio",     "package_type": "deb", runner: "ubuntu-22.04" }
           - { "builder_name": "non-aio",     "package_type": "rpm", runner: "ubuntu-22.04" }
     steps:
@@ -188,8 +188,8 @@ jobs:
           - { "package_type": "rpm", "builder": "aio-x86_64",  "arch": "x86_64", "distro-name": "centos7",       "remote-machine-type": "ec2", runner: "ubuntu-22.04" }
           - { "package_type": "rpm", "builder": "aio-x86_64",  "arch": "x86_64", "distro-name": "centos6",       "remote-machine-type": "docker", runner: "ubuntu-22.04" }
           - { "package_type": "rpm", "builder": "aio-x86_64",  "arch": "x86_64", "distro-name": "amazonlinux2",  "remote-machine-type": "ec2", runner: "ubuntu-22.04" }
-          - { "package_type": "deb", "builder": "aio-aarch64", "arch": "arm64",  "distro-name": "ubuntu1404",    "remote-machine-type": "docker", runner: "ubuntu-22.04" }
-          - { "package_type": "rpm", "builder": "aio-aarch64", "arch": "arm64",  "distro-name": "centos7",       "remote-machine-type": "docker", runner: "ubuntu-22.04" }
+          - { "package_type": "deb", "builder": "aio-aarch64", "arch": "arm64",  "distro-name": "ubuntu1404",    "remote-machine-type": "docker", runner: "aws-aarch64" }
+          - { "package_type": "rpm", "builder": "aio-aarch64", "arch": "arm64",  "distro-name": "centos7",       "remote-machine-type": "docker", runner: "aws-aarch64" }
             # - { "package_type": "deb", "builder": "non-aio",     "arch": "x86_64", "distro-name": "ubuntu1404",    "remote-machine-type": "ec2", runner: "ubuntu-22.04" }
           - { "package_type": "deb", "builder": "non-aio",     "arch": "x86_64", "distro-name": "ubuntu2204",    "remote-machine-type": "docker", runner: "ubuntu-22.04" }
             # - { "package_type": "rpm", "builder": "non-aio",     "arch": "x86_64", "distro-name": "centos7",       "remote-machine-type": "ec2", runner: "ubuntu-22.04" }
