@@ -64,6 +64,48 @@ _EC2_INSTANCE_SIZE_X86_64 = "t2.small"
 
 _DISTROS_LIST = [
     TargetDistro(
+        name="ubuntu2404-aarch64",
+        ec2_images={
+            CpuArch.x86_64: StockAMIImage(
+                image_id="ami-096ea6a12ea24a797",
+                name="Ubuntu Server 24.04 (HVM), SSD Volume Type",
+                short_name="ubuntu2204-aarch64",
+                ssh_username="ubuntu",
+            )
+        },
+        ec2_instance_size_id=_EC2_INSTANCE_SIZE_X86_64,
+        docker_image="ubuntu:22.04",
+        expected_openssl_version_number=0x30000020,
+    ),
+    TargetDistro(
+        name="ubuntu2204-aarch64",
+        ec2_images={
+            CpuArch.x86_64: StockAMIImage(
+                image_id="ami-070f589e4b4a3fece",
+                name="Ubuntu Server 22.04 (HVM), SSD Volume Type",
+                short_name="ubuntu2204-aarch64",
+                ssh_username="ubuntu",
+            )
+        },
+        ec2_instance_size_id=_EC2_INSTANCE_SIZE_X86_64,
+        docker_image="ubuntu:22.04",
+        expected_openssl_version_number=0x30000020,
+    ),
+    TargetDistro(
+        name="ubuntu2404",
+        ec2_images={
+            CpuArch.x86_64: StockAMIImage(
+                image_id="ami-0e86e20dae9224db8",
+                name="Ubuntu Server 24.04 (HVM), SSD Volume Type",
+                short_name="ubuntu2204",
+                ssh_username="ubuntu",
+            )
+        },
+        ec2_instance_size_id=_EC2_INSTANCE_SIZE_X86_64,
+        docker_image="ubuntu:22.04",
+        expected_openssl_version_number=0x30000020,
+    ),
+    TargetDistro(
         name="ubuntu2204",
         ec2_images={
             CpuArch.x86_64: StockAMIImage(
