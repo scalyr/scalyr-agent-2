@@ -157,6 +157,27 @@ EC2_DISTRO_DETAILS_MAP = {
         "ssh_username": "ubuntu",
         "default_python_package_name": "python3",
     },
+    "ubuntu2204-aarch64": {
+        "image_id": "ami-070f589e4b4a3fece",
+        "image_name": "Ubuntu Server 22.04 (HVM), SSD Volume Type",
+        "size_id": "m1.small",
+        "ssh_username": "ubuntu",
+        "default_python_package_name": "python3",
+    },
+    "ubuntu2404": {
+        "image_id": "ami-0e86e20dae9224db8",
+        "image_name": "Ubuntu Server 24.04 (HVM), SSD Volume Type",
+        "size_id": "m1.small",
+        "ssh_username": "ubuntu",
+        "default_python_package_name": "python3",
+    },
+    "ubuntu2404-aarch64": {
+        "image_id": "ami-096ea6a12ea24a797",
+        "image_name": "Ubuntu Server 24.04 (HVM), SSD Volume Type",
+        "size_id": "m1.small",
+        "ssh_username": "ubuntu",
+        "default_python_package_name": "python3",
+    },
     "debian1003": {
         "image_id": "ami-0b9a611a02047d3b1",
         "image_name": "Debian 10 Buster",
