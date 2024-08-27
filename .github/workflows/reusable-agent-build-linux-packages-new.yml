@@ -177,10 +177,8 @@ jobs:
       fail-fast: false
       matrix:
         test_target:
-          - { "package_type": "deb", "builder": "aio-x86_64",  "arch": "x86_64", "distro-name": "ubuntu2404",    "remote-machine-type": "ec2", runner: "ubuntu-22.04" }
-          - { "package_type": "deb", "builder": "aio-aarch64",  "arch": "aarch64", "distro-name": "ubuntu2404-aarch64",    "remote-machine-type": "ec2", runner: "ubuntu-22.04" }
           - { "package_type": "deb", "builder": "aio-x86_64",  "arch": "x86_64", "distro-name": "ubuntu2204",    "remote-machine-type": "ec2", runner: "ubuntu-22.04" }
-          - { "package_type": "deb", "builder": "aio-aarch64",  "arch": "aarch64", "distro-name": "ubuntu2204-aarch64",    "remote-machine-type": "ec2", runner: "ubuntu-22.04" }
+          - { "package_type": "deb", "builder": "aio-aarch64",  "arch": "aarch64", "distro-name": "ubuntu2204",    "remote-machine-type": "ec2", runner: "ubuntu-22.04" }
           - { "package_type": "deb", "builder": "aio-x86_64",  "arch": "x86_64", "distro-name": "ubuntu2004",    "remote-machine-type": "ec2", runner: "ubuntu-22.04" }
           - { "package_type": "deb", "builder": "aio-x86_64",  "arch": "x86_64", "distro-name": "ubuntu1804",    "remote-machine-type": "ec2", runner: "ubuntu-22.04" }
           - { "package_type": "deb", "builder": "aio-x86_64",  "arch": "x86_64", "distro-name": "ubuntu1604",    "remote-machine-type": "ec2", runner: "ubuntu-22.04" }
