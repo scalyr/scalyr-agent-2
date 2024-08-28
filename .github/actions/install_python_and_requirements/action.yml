@@ -27,7 +27,7 @@ runs:
       uses: actions/cache@v3
       with:
         path: wheels
-        key: ${{ runner.os }}-${{ runner.arch }}-requirements-wheels-${{ hashFiles('dev-requirements-new.txt') }}-6
+        key: ${{ runner.os }}-${{ runner.arch }}-${{ inputs.python_version }}-requirements-wheels-${{ hashFiles('dev-requirements-new.txt') }}-6
 
     - name: Create wheels
       if: steps.cache_wheels.outputs.cache-hit != 'true'
