@@ -71,12 +71,6 @@ _DISTROS_LIST = [
                 name="Ubuntu Server 22.04 (HVM), SSD Volume Type",
                 short_name="ubuntu2204",
                 ssh_username="ubuntu",
-            ),
-            CpuArch.AARCH64: StockAMIImage(
-                image_id="ami-070f589e4b4a3fece",
-                name="Ubuntu Server 22.04 (HVM), SSD Volume Type",
-                short_name="ubuntu2204",
-                ssh_username="ubuntu",
             )
         },
         ec2_instance_size_id=_EC2_INSTANCE_SIZE_X86_64,
