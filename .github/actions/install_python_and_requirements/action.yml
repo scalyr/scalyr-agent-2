@@ -15,6 +15,7 @@ runs:
         python-version: ${{ inputs.python_version }}
 
     - name: Check python3 version
+      shell: bash
       env:
         PYTHON_VERSION: ${{ inputs.python_version }}
       run: |
