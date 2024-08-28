@@ -50,12 +50,12 @@ env:
 jobs:
   build_dependencies:
     name: Build dependencies ${{ matrix.builder.name }}
-    runs-on: ubuntu-22.04
+    runs-on: ${{ matrix.builder.runner }}
     strategy:
       matrix:
         builder:
-          - { "name": "aio-aarch64" }
-          - { "name": "aio-x86_64" }
+          - { "name": "aio-aarch64", runner: "aws-aarch64" }
+          - { "name": "aio-x86_64", runner: "ubuntu-22.04" }
 
     steps:
       - name: Checkout repository
