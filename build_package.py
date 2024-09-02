@@ -382,7 +382,7 @@ def build_win32_installer_package(variant, version):
     )
 
     try:
-        subprocess.check_call(command)
+        subprocess.run(command, check=True, capture_output=True)
     except subprocess.CalledProcessError as e:
         print("Error building frozen binary: {}".format(e))
         print("stdout: {}".format(e.output))
