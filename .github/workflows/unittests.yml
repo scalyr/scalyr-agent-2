@@ -61,7 +61,7 @@ jobs:
         uses: codecov/codecov-action@eaaf4bedf32dbdc6b720b63067d99c4d77d6047d # pin@v3.1.4
         with:
           files: ./coverage.xml
-          fail_ci_if_error: true
+          fail_ci_if_error: false
 
   unittests:
     name: Unittests - Python ${{ matrix.python-version }} - ${{ matrix.platform }}
