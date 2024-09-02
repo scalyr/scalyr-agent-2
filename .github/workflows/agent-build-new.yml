@@ -109,12 +109,6 @@ jobs:
       INTERNAL_BUILD_REGISTRY_USERNAME: ${{ secrets.INTERNAL_BUILD_REGISTRY_USERNAME }}
       INTERNAL_BUILD_REGISTRY_PASSWORD: ${{ secrets.INTERNAL_BUILD_REGISTRY_PASSWORD }}
 
-  build-windows-package:
-    name: "Build Windows package"
-    uses: ./.github/workflows/reusable-agent-build-windows.yml
-    secrets:
-      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
   build_tarball:
     runs-on: ubuntu-20.04
 
@@ -158,7 +152,6 @@ jobs:
     runs-on: ubuntu-20.04
     needs:
       - build_linux_packages
-      - build-windows-package
       - build_tarball
 
     steps:
@@ -175,7 +168,6 @@ jobs:
           mkdir -p /tmp/result_artifacts
           cp -a /tmp/all_artifacts/linux-packages-*/. /tmp/result_artifacts
           cp -a /tmp/all_artifacts/tarball-noarch/. /tmp/result_artifacts
-          cp -a /tmp/all_artifacts/windows-msi/. /tmp/result_artifacts
 
       - name: Save result artifact
         uses: actions/upload-artifact@v3
@@ -191,7 +183,6 @@ jobs:
       - pre_job
       - build_container_images
       - build_linux_packages
-      - build-windows-package
       - build_tarball
     runs-on: ubuntu-20.04
     steps:
