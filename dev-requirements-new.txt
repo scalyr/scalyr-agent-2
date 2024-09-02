@@ -10,7 +10,7 @@ requests==2.31.0; python_version >= '3.7'
 requests==2.25.1; python_version < '3.7'
 python-dateutil==2.8.2
 repoze.lru==0.7
-six==1.14.0
+six==1.16.0
 
 # Required for redis monitor.
 redis==2.10.5
