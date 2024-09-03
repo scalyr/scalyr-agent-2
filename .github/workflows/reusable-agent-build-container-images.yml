@@ -293,7 +293,6 @@ jobs:
         k8s_version:
           # NOTE: We don't test under very old versions where CronJob was part of v2alpha1 since in
           # those versions CronJobs are not enabled by default and need to be installed extra
-          - { "version": "v1.17.17", "driver": "", "runtime": "docker", "run_cronjob_checks": false }
           - { "version": "v1.20.15", "driver": "", "runtime": "docker", "run_cronjob_checks": false }
           - { "version": "v1.21.10", "driver": "", "runtime": "docker", "run_cronjob_checks": true }
           - { "version": "v1.22.7", "driver": "", "runtime": "docker", "run_cronjob_checks": true }
@@ -304,8 +303,16 @@ jobs:
           - { "version": "v1.26.5", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true }
           # CRI-O
           - { "version": "v1.27.4", "driver": "docker", "runtime": "cri-o", "run_cronjob_checks": true }
+          - { "version": "v1.29.3", "driver": "docker", "runtime": "cri-o", "run_cronjob_checks": true }
+          - { "version": "v1.30.0", "driver": "docker", "runtime": "cri-o", "run_cronjob_checks": true }
 
     steps:
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        with:
+          detached: true
+          timeout-minutes: 5
+          limit-access-to-actor: true
       - name: Checkout Repository
         uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
         with:
