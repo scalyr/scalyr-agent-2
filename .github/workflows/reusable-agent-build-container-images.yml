@@ -775,7 +775,7 @@ jobs:
 
           sleep 2
           kubectl wait --for=condition=ready pod -l app=node-exporter --namespace monitoring ||
-            (echo "Failed to wait for node-exporter pod to become ready"; kubectl describe pods -l app=node-exporter; echo; echo GET PODS:; kubectl get pods -A; echo LOGS:; kubectl logs -l app=node-exporter; exit 1)
+            (echo "Failed to wait for node-exporter pod to become ready"; kubectl describe pods -l app=node-exporter --namespace monitoring; echo; echo GET PODS:; kubectl get pods -A; echo LOGS:; kubectl logs -l app=node-exporter --namespace monitoring; exit 1)
           
           kubectl wait --for=condition=ready pod -l app=java-hello-world ||
             (echo "Failed to wait for java-hello-world pod to become ready"; kubectl describe pods -l app=java-hello-world; echo; echo GET PODS:; kubectl get pods -A; echo LOGS:; kubectl logs -l app=java-hello-world; exit 1)
