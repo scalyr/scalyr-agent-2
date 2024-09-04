@@ -25,7 +25,7 @@ spec:
       hostPID: true
       containers:
       - name: java-hello-world
-        image: java-hello-world:latest
+        image: docker.io/library/java-hello-world:latest
         imagePullPolicy: Never
         env:
           - name: PORT
