@@ -15,6 +15,7 @@ spec:
   template:
     metadata:
       labels:
+        app: node-exporter
         app.kubernetes.io/component: exporter
         app.kubernetes.io/name: node-exporter
       annotations:
