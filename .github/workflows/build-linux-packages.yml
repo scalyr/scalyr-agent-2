@@ -66,35 +66,6 @@ jobs:
       CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
       CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
 
-  # Aggregate all agent build artifacts that we build by this workflow and put in a single artifact,
-  # so it's just need to download only one artifact, for example during a release process.
-  prepare-artifacts:
-    runs-on: ubuntu-20.04
-    needs:
-      - build_linux_packages
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
-
-      - name: Download artifacts
-        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3
-        with:
-          path: /tmp/all_artifacts
-
-      - name: Prepare artifacts
-        run: |
-          mkdir -p /tmp/result_artifacts
-          cp -a /tmp/all_artifacts/linux-packages-*/. /tmp/result_artifacts
-          cp -a /tmp/all_artifacts/tarball-noarch/. /tmp/result_artifacts
-
-      - name: Save result artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: result-artifacts
-          path: /tmp/result_artifacts
-          retention-days: 1
-
   clean-ec2-tests-objects:
     name: Remove ec2 object that were created by this workflow
     if: ${{ always() }}
