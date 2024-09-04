@@ -774,7 +774,7 @@ jobs:
           kubectl apply -f tests/e2e/k8s_om_monitor/java_app_deployment.yaml
 
           sleep 2
-          kubectl wait --for=condition=ready pod -l app=node-exporter ||
+          kubectl wait --for=condition=ready pod -l app=node-exporter --namespace monitoring ||
             (echo "Failed to wait for node-exporter pod to become ready"; kubectl describe pods -l app=node-exporter; echo; echo GET PODS:; kubectl get pods -A; echo LOGS:; kubectl logs -l app=node-exporter; exit 1)
           
           kubectl wait --for=condition=ready pod -l app=java-hello-world ||
