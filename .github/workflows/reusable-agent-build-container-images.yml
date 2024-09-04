@@ -396,6 +396,8 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: k8s-image-${{ inputs.builder_name }}
+          path: build
+          retention-days: 1
 
       # Here we build the dummy container which continuously prints data to stdout and stderr
       - name: Build Dummy App Docker Images
