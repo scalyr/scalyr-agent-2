@@ -392,6 +392,11 @@ jobs:
             minikube image load docker.io/library/k8s-image:test
           fi
 
+      - name: Upload Agent k8s Test Docker Image as artifact for debugging purposses
+        uses: actions/upload-artifact@v3
+        with:
+          name: k8s-image-${{ inputs.builder_name }}
+
       # Here we build the dummy container which continuously prints data to stdout and stderr
       - name: Build Dummy App Docker Images
         run: |
