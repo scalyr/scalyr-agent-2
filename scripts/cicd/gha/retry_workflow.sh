@@ -20,7 +20,7 @@ do
     if [ "$(echo $WORKFLOW_STATUS_JSON | jq '.status')" = "\"completed\"" ]; then
       if [ "$(echo $WORKFLOW_STATUS_JSON | jq '.conclusion')" = "\"success\"" ]; then
       	echo_with_date Success
-        break
+        exit 0
       else
         echo_with_date Rerunning $RUN_ID
         gh run rerun $RUN_ID --failed
