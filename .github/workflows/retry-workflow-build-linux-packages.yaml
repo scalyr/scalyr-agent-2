@@ -27,7 +27,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           echo "Retrying workflow"
-          scripts/cicd/gha/retry_workflow.sh "Build Linux packages"
+          scripts/cicd/gha/retry_workflow.sh "Build Linux Packages"
 
       - name: Notify Slack on Failure
         if: ${{ failure() && github.ref_name == 'master' }}
