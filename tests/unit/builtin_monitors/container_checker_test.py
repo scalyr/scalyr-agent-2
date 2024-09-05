@@ -610,7 +610,6 @@ class ContainerCheckerMultiAccountTest(ContainerCheckerTest):
 
 
 class ContainerCheckerFilterLabelsTest(ContainerCheckerTest):
-
     def _container_checker_config(self):
         config = super()._container_checker_config()
 

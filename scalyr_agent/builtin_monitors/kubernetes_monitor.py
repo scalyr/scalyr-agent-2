@@ -2193,7 +2193,9 @@ class CRIEnumerator(ContainerEnumerator):
         )
 
         self._query_filesystem = query_filesystem
-        self._query_filesystem_retain_not_found = config.get("k8s_cri_query_filesystem_retain_not_found")
+        self._query_filesystem_retain_not_found = config.get(
+            "k8s_cri_query_filesystem_retain_not_found"
+        )
 
         self._log_base = "/var/log/containers"
         self._pod_base = "/var/log/pods"
@@ -2871,7 +2873,7 @@ class ContainerChecker(object):
                 self.__client = DockerClient(
                     base_url=("unix:/%s" % self.__socket_file),
                     version=self.__docker_api_version,
-                    **docker_client_kwargs
+                    **docker_client_kwargs,
                 )
 
                 self._container_enumerator = DockerEnumerator(

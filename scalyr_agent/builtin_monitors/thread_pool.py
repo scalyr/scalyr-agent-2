@@ -25,7 +25,6 @@ global_log = scalyr_logging.getLogger(__name__)
 
 
 class BoundedThreadingMixIn(ThreadingMixIn):
-
     def __init__(self, global_config):
         if global_config:
             processing_threads = global_config.syslog_processing_thread_count
@@ -45,4 +44,3 @@ class BoundedThreadingMixIn(ThreadingMixIn):
     def shutdown_request(self, request):
         self.__threads_sempahore.release()
         super().shutdown_request(request)
-

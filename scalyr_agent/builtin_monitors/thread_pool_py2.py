@@ -25,7 +25,5 @@ global_log = scalyr_logging.getLogger(__name__)
 
 
 class BoundedThreadingMixIn(ThreadingMixIn):
-
     def __init__(self, global_config):
         pass
-

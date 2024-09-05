@@ -1248,7 +1248,7 @@ class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
         ]
 
         cri = CRIEnumerator(
-            {"k8s_cri_query_filesystem_retain_not_found":True},
+            {"k8s_cri_query_filesystem_retain_not_found": True},
             global_config=global_config,
             agent_pod=mock.Mock,
             k8s_api_url="mock",
@@ -1380,7 +1380,7 @@ class CRIEnumeratorTestCase(TestConfigurationBase, ScalyrTestCase):
         k8s_cache.pod.side_effect = mock_k8s_cache_pod
 
         cri = CRIEnumerator(
-            {"k8s_cri_query_filesystem_retain_not_found":True},
+            {"k8s_cri_query_filesystem_retain_not_found": True},
             global_config=global_config,
             agent_pod=mock.Mock,
             k8s_api_url="mock",

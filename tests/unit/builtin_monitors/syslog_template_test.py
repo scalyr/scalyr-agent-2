@@ -90,6 +90,7 @@ class ConfigurationMock(Configuration):
     def syslog_processing_thread_count(self):
         return 4
 
+
 class LogWatcherMock(LogWatcher):
     def __init__(self):
         self.log_configs = []
