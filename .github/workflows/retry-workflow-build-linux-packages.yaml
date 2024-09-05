@@ -1,4 +1,4 @@
-name: Retry Workflow Build Container Images
+name: Retry Workflow Build Linux packages
 
 on:
   push:
@@ -27,7 +27,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           echo "Retrying workflow"
-          scripts/cicd/gha/retry_workflow.sh "Build Container Images"
+          scripts/cicd/gha/retry_workflow.sh "Build Linux packages"
 
       - name: Notify Slack on Failure
         if: ${{ failure() && github.ref_name == 'master' }}

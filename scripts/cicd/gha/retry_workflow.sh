@@ -4,6 +4,11 @@ populate_workflow_status_json() {
   WORKFLOW_STATUS_JSON=`gh run list --json status,workflowName,number,createdAt,databaseId,conclusion --jq "map(select(.workflowName == \"$WORKFLOW_NAME\"))[0]"`
 }
 
+echo_with_date() {
+    date +"[%Y-%m-%d %H:%M:%S] $*"
+}
+
+
 populate_workflow_status_json
 RUN_ID="`echo $WORKFLOW_STATUS_JSON | jq '.databaseId'`"
 
@@ -14,17 +19,20 @@ do
 
     if [ "$(echo $WORKFLOW_STATUS_JSON | jq '.status')" = "\"completed\"" ]; then
       if [ "$(echo $WORKFLOW_STATUS_JSON | jq '.conclusion')" = "\"success\"" ]; then
-      	echo Success
+      	echo_with_date Success
         break
       else
-        echo Rerunning $RUN_ID
+        echo_with_date Rerunning $RUN_ID
         gh run rerun $RUN_ID --failed
       fi
     else
-      echo "Waiting for $RUN_ID to finish .."
+      echo_with_date "Waiting for $RUN_ID to finish .."
     fi
 
     sleep 30
 done
+
+exit 1
+
 
 
