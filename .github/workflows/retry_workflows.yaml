@@ -23,6 +23,8 @@ jobs:
         uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
 
       - name: Retry workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           echo "Retrying workflow"
           scripts/cicd/gha/retry_workflow.sh
