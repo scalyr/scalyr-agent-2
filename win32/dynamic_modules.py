@@ -39,4 +39,5 @@ WINDOWS_MONITOR_MODULES_TO_EXCLUDE = [
     "scalyr_agent.builtin_monitors.openmetrics_monitor",
     "scalyr_agent.builtin_monitors.symlink_file_monitor",
     "tests.unit.scalyr_logging_test",
+    "tests.unit.test_monitor",
 ]

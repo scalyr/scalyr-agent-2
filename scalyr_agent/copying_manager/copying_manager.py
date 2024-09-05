@@ -379,9 +379,9 @@ class PathWorkerIdDict(object):
     """
 
     def __init__(self):
-        # (path, worker_id) => LogFileProcessor
-        # type: Dict[six.text_type, Dict[six.text_type, object]]
-        self.__paths = defaultdict(dict)
+        self.__paths = defaultdict(
+            dict
+        )  # type: Dict[six.text_type, Dict[six.text_type, object]]
 
     def set(self, path, worker_id, value):
         # type: (six.text_type, six.text_type, object) -> None

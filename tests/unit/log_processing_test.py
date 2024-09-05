@@ -155,7 +155,7 @@ class TestCRIStreamBuffers(ScalyrTestCase):
         buffers.append_log_line(CRILogLine(0, "stdout", ["P"], "line 00 ", None), 0)
         buffers.append_log_line(CRILogLine(1, "stderr", ["P"], "line 01 ", None), 1)
 
-        assert None == buffers.pop_completed(current_time=2)
+        assert None is buffers.pop_completed(current_time=2)
 
         assert (
             buffers.append_log_line(CRILogLine(2, "stdout", ["P"], "line 02 ", None), 2)

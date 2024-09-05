@@ -24,6 +24,7 @@ from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import unicode_literals
 
+81
 if False:  # NOSONAR
     from typing import Tuple, Optional
 
@@ -802,6 +803,9 @@ class SyslogRawRequestParser(SyslogRequestParser):
     to write received data as-is. It's much more efficient and offers much better throughput than
     the default parser which handles framed data, etc.
     """
+
+    def handle_frame(self, data, extra):
+        pass
 
     def process(self, data):
         extra = {
