@@ -1,21 +1,30 @@
-gh run list --json status,workflowName,number,createdAt,databaseId,conclusion --jq 'map(select(.workflowName == "Build Linux Packages"))[0]'
+WORKFLOW_NAME=$1
 
+populate_workflow_status_json() {
+  WORKFLOW_STATUS_JSON=`gh run list --json status,workflowName,number,createdAt,databaseId,conclusion --jq "map(select(.workflowName == \"$WORKFLOW_NAME\"))[0]"`
+}
 
-RUN_ID="`echo $WF_JSON | jq '.databaseId'`"
+populate_workflow_status_json
+RUN_ID="`echo $WORKFLOW_STATUS_JSON | jq '.databaseId'`"
 
-for X in `seq 120`;
+for X in `seq 480`;
 do
-    WF_JSON="`gh run view $RUN_ID --json status,workflowName,number,createdAt,databaseId,conclusion --jq 'map(select(.workflowName == "Build Linux Packages"))[0]'`"
-    if [ "`echo $WF_JSON | jq '.conclusion'`" = "\"success\"" ]; then
+    populate_workflow_status_json
+	  echo $WORKFLOW_STATUS_JSON
+
+    if [ "$(echo $WORKFLOW_STATUS_JSON | jq '.status')" = "\"completed\"" ]; then
+      if [ "$(echo $WORKFLOW_STATUS_JSON | jq '.conclusion')" = "\"success\"" ]; then
+      	echo Success
         break
-    elif [ "`echo $WF_JSON | jq '.conclusion'`" = "\"failure\"" ]; then
+      else
         echo Rerunning $RUN_ID
         gh run rerun $RUN_ID --failed
+      fi
     else
       echo "Waiting for $RUN_ID to finish .."
     fi
 
-    sleep 60
+    sleep 30
 done
 
 

@@ -1,4 +1,4 @@
-name: Retry Workflows
+name: Retry Workflow Build Container Images
 
 on:
   push:
@@ -15,7 +15,7 @@ on:
     - cron: '0 4 * * *'
 
 jobs:
-  build_tarball:
+  retry_workflow:
     runs-on: ubuntu-20.04
 
     steps:
@@ -27,4 +27,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           echo "Retrying workflow"
-          scripts/cicd/gha/retry_workflow.sh
+          scripts/cicd/gha/retry_workflow.sh "Build Container Images"
