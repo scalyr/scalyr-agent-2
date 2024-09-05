@@ -15,8 +15,8 @@
 # ------------------------------------------------------------------------
 # author: scalyr-cloudtech@scalyr.com
 
-from __future__ import unicode_literals
 from __future__ import absolute_import
+from __future__ import unicode_literals
 
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -38,7 +38,6 @@ from io import open
 from io import StringIO
 import threading
 import platform
-from statistics import mean
 
 from scalyr_agent.builtin_monitors import syslog_monitor
 from scalyr_agent.builtin_monitors.syslog_monitor import (
@@ -352,7 +351,6 @@ class SyslogMonitorThreadingTest(ScalyrTestCase):
         messages_per_connection = 50
         handling_time = 0.0001
         advantage_time = handling_time * 10
-        message_window = (udp_servers_count + tcp_servers_count) * 300
         shutdown_time = connections * messages_per_connection * handling_time + 3
 
         with self.start_servers(

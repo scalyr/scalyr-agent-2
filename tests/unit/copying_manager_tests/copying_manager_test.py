@@ -19,10 +19,10 @@
 # Those test just the same test from previous copying manager, but adapted to the new copying manager.
 #
 
-from __future__ import unicode_literals
 from __future__ import absolute_import
-from io import open
+from __future__ import unicode_literals
 
+from io import open
 
 __author__ = "czerwin@scalyr.com"
 
@@ -37,7 +37,6 @@ import mock
 
 from scalyr_agent.copying_manager.copying_manager import (
     DynamicWorkers,
-    CopyingManagerWorker,
     PathWorkerIdDict,
 )
 

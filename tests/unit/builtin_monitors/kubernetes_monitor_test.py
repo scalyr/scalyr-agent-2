@@ -12,42 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import unicode_literals
 from __future__ import absolute_import
+from __future__ import unicode_literals
 
-import base64
+import platform
 import re
+import sys
+import tempfile
 import time
 import warnings
-import platform
-import tempfile
-from dataclasses import dataclass, field
-from string import Template
 from collections import OrderedDict
+from string import Template
 
-import sys
-from threading import Condition, Semaphore, Thread, Lock
-from typing import Dict, List
-
-import pytest
-from mock.mock import MagicMock, call
-
-from scalyr_agent import AgentLogger
-from scalyr_agent.json_lib import JsonArray, JsonObject
-from scalyr_agent.monitor_utils.k8s import (
-    KubeletApi,
-    KubeletApiException,
-    K8sConfigBuilder,
-    K8sNamespaceFilter,
-    PodInfo,
-    K8sApiException,
-)
-
+import mock
+import requests
+import requests_mock
+from mock import patch
+from six import StringIO
+from six.moves import range
 from urllib3.exceptions import (  # pylint: disable=import-error
     InsecureRequestWarning,
 )
-from six import StringIO
 
+from scalyr_agent import AgentLogger
 from scalyr_agent.builtin_monitors.kubernetes_monitor import (
     KubernetesMonitor,
     ControlledCacheWarmer,
@@ -57,21 +44,22 @@ from scalyr_agent.builtin_monitors.kubernetes_monitor import (
     CRIEnumerator,
 )
 from scalyr_agent.copying_manager import CopyingManager
-from scalyr_agent.util import FakeClock, FakeClockCounter
+from scalyr_agent.monitor_utils.k8s import (
+    KubeletApi,
+    KubeletApiException,
+    K8sConfigBuilder,
+    K8sNamespaceFilter,
+    PodInfo,
+    K8sApiException,
+)
 from scalyr_agent.test_base import ScalyrTestCase, BaseScalyrLogCaptureTestCase
+from scalyr_agent.test_base import skipIf
 from scalyr_agent.test_util import ScalyrTestUtils, assert_has_calls_non_consecutive
-
-from tests.unit.monitor_utils.k8s_test import FakeCache
-from tests.unit.monitor_utils.k8s_test import KubernetesApi
+from scalyr_agent.util import FakeClock, FakeClockCounter
 from tests.unit.configuration_test import TestConfigurationBase
 from tests.unit.copying_manager_tests.copying_manager_test import FakeMonitor
-from scalyr_agent.test_base import skipIf
-
-import mock
-import requests
-import requests_mock
-from mock import patch
-from six.moves import range
+from tests.unit.monitor_utils.k8s_test import FakeCache
+from tests.unit.monitor_utils.k8s_test import KubernetesApi
 
 
 class StringMatcher:

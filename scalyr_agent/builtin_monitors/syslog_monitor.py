@@ -1,4 +1,4 @@
-# Copyright 2017-2024 Scalyr Inc.
+ # Copyright 2017-2024 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -1007,7 +1007,7 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
                 if count > 1000:
                     check_running = True
                     count = 0
-            except SocketNotReadyException as e:
+            except SocketNotReadyException:
                 time.sleep(0.01)
                 check_running = True
             except SocketClosed:
