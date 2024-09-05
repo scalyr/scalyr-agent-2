@@ -1,3 +1,5 @@
+#! /bin/bash
+
 WORKFLOW_NAME=$1
 
 populate_workflow_status_json() {
