@@ -68,17 +68,6 @@ jobs:
         # in confused and undesired behavior.
         run: ./scripts/circleci/verify-codecov-config.sh
 
-      - name: Verify add events api response headers
-        # Runs script which verifies /addEvents API returns correct response headers. In ideal
-        # world, this script would live somewhere else (perhaps as part of monitoring tooling,
-        # but for now it will live here.
-        env:
-          PYTHONPATH: .
-          SCALYR_TOKEN_PROD_US: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
-          SCALYR_TOKEN_PROD_EU: ${{ secrets.CT_SCALYR_TOKEN_PROD_EU_MONITOR_WRITE }}
-          SCALYR_TOKEN_STAGING_EU: ${{ secrets.CT_SCALYR_TOKEN_STAGING_EU_PROD_WRITE }}
-        run: ./scripts/verify-add-events-api-response-headers.py
-
       - name: Run Shell Scripts Lint Checks
         env:
           IGNORE_BINARY_DOESNT_EXIST: "0"

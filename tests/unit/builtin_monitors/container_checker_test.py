@@ -2,7 +2,6 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import base64
-import json
 from dataclasses import dataclass, field
 from threading import Condition, Thread, Lock
 from typing import Dict, List
@@ -299,7 +298,7 @@ class ContainerCheckerMultiAccountTest(ContainerCheckerTest):
         self.log_watcher.add_log_config.reset_mock()
 
         # Wait for the loop to complete and pause it to change pod annotations.
-        with run_state.running_lock as lock:
+        with run_state.running_lock:
             run_state.wait_for_next_loop_start()
 
             k8s_namespace.annotations = process_annotations(
@@ -545,7 +544,7 @@ class ContainerCheckerMultiAccountTest(ContainerCheckerTest):
         self.log_watcher.add_log_config.reset_mock()
 
         # Wait for the loop to complete and pause it to change pod annotations.
-        with run_state.running_lock as lock:
+        with run_state.running_lock:
             run_state.wait_for_next_loop_start()
 
             k8s_pod_1_namespace_1.annotations = process_annotations(
@@ -610,7 +609,6 @@ class ContainerCheckerMultiAccountTest(ContainerCheckerTest):
 
 
 class ContainerCheckerFilterLabelsTest(ContainerCheckerTest):
-
     def _container_checker_config(self):
         config = super()._container_checker_config()
 
@@ -687,7 +685,7 @@ class ContainerCheckerFilterLabelsTest(ContainerCheckerTest):
             }
         )
 
-        get_containers_value = self._set_mocked_k8s_objects([k8s_pod], [k8s_namespace])
+        self._set_mocked_k8s_objects([k8s_pod], [k8s_namespace])
 
         run_state, exception_holder = self._start_check_containers_thread()
 
