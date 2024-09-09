@@ -307,12 +307,6 @@ jobs:
           - { "version": "v1.30.0", "driver": "docker", "runtime": "cri-o", "run_cronjob_checks": true }
 
     steps:
-#      - name: Setup tmate session
-#        uses: mxschmitt/action-tmate@v3
-#        with:
-#          detached: true
-#          timeout-minutes: 5
-#          limit-access-to-actor: true
       - name: Checkout Repository
         uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
         with:

@@ -1,7 +1,7 @@
 FROM ubuntu:20.04
 
 RUN apt update
-RUN ln -fs /usr/share/zoneinfo/Europe/Prague /etc/localtime
+RUN ln -fs /usr/share/zoneinfo/UTC /etc/localtime
 RUN apt install software-properties-common build-essential -y
 RUN add-apt-repository ppa:deadsnakes/ppa
 RUN apt update
