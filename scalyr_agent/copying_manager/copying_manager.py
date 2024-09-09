@@ -96,9 +96,9 @@ class DynamicWorkers(object):
         """
         Add worker.
         """
-        if not api_key in self.__workers_by_api_key:
+        if api_key not in self.__workers_by_api_key:
             with self.__worker_lock:
-                if not api_key in self.__workers_by_api_key:
+                if api_key not in self.__workers_by_api_key:
                     worker = self.__create_worker(api_key, global_config)
                     self.__workers_by_api_key[api_key] = worker
                     self.__workers_by_id[worker.worker_id] = worker
@@ -379,9 +379,9 @@ class PathWorkerIdDict(object):
     """
 
     def __init__(self):
-        # (path, worker_id) => LogFileProcessor
-        # type: Dict[six.text_type, Dict[six.text_type, object]]
-        self.__paths = defaultdict(dict)
+        self.__paths = defaultdict(
+            dict
+        )  # type: Dict[six.text_type, Dict[six.text_type, object]]
 
     def set(self, path, worker_id, value):
         # type: (six.text_type, six.text_type, object) -> None
