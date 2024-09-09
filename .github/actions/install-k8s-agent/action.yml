@@ -111,7 +111,8 @@ runs:
 
         # Give it some time to start up
         echo "Waiting for agent to become ready, timeout ${{ inputs.sleep_delay }}s ..."
-        kubectl wait --for=condition=ready --namespace scalyr --timeout=${{ inputs.sleep_delay }}s pod -l app=scalyr-agent-2
+        kubectl wait --for=condition=ready --namespace scalyr --timeout=${{ inputs.sleep_delay }}s pod -l app=scalyr-agent-2 || \
+            (echo "Failed to wait for agent to become ready"; kubectl describe pods -l app=scalyr-agent-2 --namespace scalyr; echo; echo GET PODS:; kubectl get pods -A; echo LOGS:; kubectl logs -l app=scalyr-agent-2 --namespace scalyr; exit 1)
         
         echo "Scalyr agent Status:"  
         kubectl exec --namespace scalyr `kubectl get pod --namespace scalyr -l app=scalyr-agent-2 -o name` -- scalyr-agent-2 status -v

@@ -381,7 +381,15 @@ def build_win32_installer_package(variant, version):
         ]
     )
 
-    subprocess.check_call(command)
+    try:
+        subprocess.run(command, check=True, capture_output=True)
+    except subprocess.CalledProcessError as e:
+        print("Error building frozen binary: {}".format(e))
+        print("stdout: {}".format(e.output.decode("utf-8")))
+        print("stderr:")
+        for line in e.stderr.decode("utf-8").split("\n"):
+            print(line)
+        raise
 
     make_directory("Scalyr/certs")
     make_directory("Scalyr/logs")

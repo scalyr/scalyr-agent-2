@@ -1,0 +1,21 @@
+FROM ubuntu:20.04
+
+RUN apt update
+RUN ln -fs /usr/share/zoneinfo/Europe/Prague /etc/localtime
+RUN apt install software-properties-common build-essential -y
+RUN add-apt-repository ppa:deadsnakes/ppa
+RUN apt update
+RUN apt install python3.10 python3.10-venv python3.10-dev curl -y
+
+RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.10
+
+RUN python3.10 -m pip install "tox==3.20.1" "tox-gh-actions==2.9.1"
+
+ADD dev-requirements-new.txt /dev-requirements-new.txt
+RUN python3.10 -m pip install -r /dev-requirements-new.txt
+
+
+
+
+
+

@@ -187,7 +187,7 @@ class ScalyrRequestsHttpConnectionTestCase(ScalyrTestCase):
             self.assertIsNone(connection._RequestsConnection__session)
             # pylint: enable=no-member
 
-            expected_msg = r"hostname 'agent.invalid.scalyr.com' doesn't match either of '\*.scalyr.com', 'scalyr.com'"
+            expected_msg = r"(hostname 'agent.invalid.scalyr.com' doesn't match either of '\*.scalyr.com', 'scalyr.com'|Hostname mismatch, certificate is not valid for 'agent.invalid.scalyr.com')"
             self.assertRaisesRegexp(
                 Exception,
                 expected_msg,

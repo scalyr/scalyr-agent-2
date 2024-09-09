@@ -15,6 +15,7 @@ spec:
   template:
     metadata:
       labels:
+        app: node-exporter
         app.kubernetes.io/component: exporter
         app.kubernetes.io/name: node-exporter
       annotations:
@@ -31,7 +32,7 @@ spec:
         - --collector.filesystem.ignored-mount-points=^/(dev|proc|sys|var/lib/docker/.+|var/lib/kubelet/pods/.+)($|/)
         - --collector.netclass.ignored-devices=^(veth.*)$
         name: node-exporter
-        image: prom/node-exporter
+        image: docker.io/prom/node-exporter
         ports:
           - containerPort: 9100
             protocol: TCP

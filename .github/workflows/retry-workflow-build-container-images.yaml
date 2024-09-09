@@ -1,0 +1,40 @@
+name: Retry Workflow Build Container Images
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - v*.*.*
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+  schedule:
+    - cron: '0 4 * * *'
+
+jobs:
+  retry_workflow:
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
+
+      - name: Retry workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Retrying workflow"
+          scripts/cicd/gha/retry_workflow.sh "Build Container Images"
+
+      - name: Notify Slack on Failure
+        if: ${{ failure() && github.ref_name == 'master' }}
+        uses: act10ns/slack@ed1309ab9862e57e9e583e51c7889486b9a00b0f # v2.0.0
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          status: ${{ job.status }}
+          steps: ${{ toJson(steps) }}
+          channel: '#eng-dataset-cloud-tech'

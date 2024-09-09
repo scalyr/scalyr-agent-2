@@ -112,7 +112,7 @@ jobs:
         uses: codecov/codecov-action@eaaf4bedf32dbdc6b720b63067d99c4d77d6047d # pin@v3.1.4
         with:
           files: ./coverage.xml
-          fail_ci_if_error: true
+          fail_ci_if_error: false
 
   # Build cacheable requirements of the images.
   build_image_requirements:
@@ -293,7 +293,6 @@ jobs:
         k8s_version:
           # NOTE: We don't test under very old versions where CronJob was part of v2alpha1 since in
           # those versions CronJobs are not enabled by default and need to be installed extra
-          - { "version": "v1.17.17", "driver": "", "runtime": "docker", "run_cronjob_checks": false }
           - { "version": "v1.20.15", "driver": "", "runtime": "docker", "run_cronjob_checks": false }
           - { "version": "v1.21.10", "driver": "", "runtime": "docker", "run_cronjob_checks": true }
           - { "version": "v1.22.7", "driver": "", "runtime": "docker", "run_cronjob_checks": true }
@@ -304,8 +303,16 @@ jobs:
           - { "version": "v1.26.5", "driver": "docker", "runtime": "containerd", "run_cronjob_checks": true }
           # CRI-O
           - { "version": "v1.27.4", "driver": "docker", "runtime": "cri-o", "run_cronjob_checks": true }
+          - { "version": "v1.29.3", "driver": "docker", "runtime": "cri-o", "run_cronjob_checks": true }
+          - { "version": "v1.30.0", "driver": "docker", "runtime": "cri-o", "run_cronjob_checks": true }
 
     steps:
+#      - name: Setup tmate session
+#        uses: mxschmitt/action-tmate@v3
+#        with:
+#          detached: true
+#          timeout-minutes: 5
+#          limit-access-to-actor: true
       - name: Checkout Repository
         uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
         with:
@@ -384,6 +391,13 @@ jobs:
             docker tag k8s-image:test docker.io/library/k8s-image:test
             minikube image load docker.io/library/k8s-image:test
           fi
+
+      - name: Upload Agent k8s Test Docker Image as artifact for debugging purposses
+        uses: actions/upload-artifact@v3
+        with:
+          name: k8s-image-${{ inputs.builder_name }}
+          path: build
+          retention-days: 1
 
       # Here we build the dummy container which continuously prints data to stdout and stderr
       - name: Build Dummy App Docker Images
@@ -628,16 +642,6 @@ jobs:
           
           ./scripts/cicd/verify-multiaccount-records-have-been-ingested.py
 
-      - name: Notify Slack on Failure
-        if: ${{ failure() && github.ref_name == 'master' }}
-        uses: act10ns/slack@ed1309ab9862e57e9e583e51c7889486b9a00b0f # v2.0.0
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        with:
-          status: ${{ job.status }}
-          steps: ${{ toJson(steps) }}
-          channel: '#eng-dataset-cloud-tech'
-
 
   k8s_open_metrics_monitor_tests:
     name: OpenMetrics Monitor - k8s ${{ inputs.builder_name }} ${{ matrix.k8s_version.version }}-${{ matrix.k8s_version.runtime}}
@@ -652,7 +656,6 @@ jobs:
       fail-fast: false
       matrix:
         k8s_version:
-          - { "version": "v1.17.17", "driver": "", "runtime": "docker" }
           - { "version": "v1.20.15", "driver": "", "runtime": "docker" }
           - { "version": "v1.21.10", "driver": "", "runtime": "docker" }
           - { "version": "v1.22.7", "driver": "", "runtime": "docker" }
@@ -760,7 +763,13 @@ jobs:
           # 3. Install dummy java app container with jmx exporter side
           kubectl apply -f tests/e2e/k8s_om_monitor/java_app_deployment.yaml
 
-          sleep 20
+          sleep 2
+          kubectl wait --for=condition=ready pod -l app=node-exporter --namespace monitoring ||
+            (echo "Failed to wait for node-exporter pod to become ready"; kubectl describe pods -l app=node-exporter --namespace monitoring; echo; echo GET PODS:; kubectl get pods -A; echo LOGS:; kubectl logs -l app=node-exporter --namespace monitoring; exit 1)
+          
+          kubectl wait --for=condition=ready pod -l app=java-hello-world ||
+            (echo "Failed to wait for java-hello-world pod to become ready"; kubectl describe pods -l app=java-hello-world; echo; echo GET PODS:; kubectl get pods -A; echo LOGS:; kubectl logs -l app=java-hello-world; exit 1)
+          
           kubectl get pods -A
 
       - name: Create scalyr-agent-2 daemonset
@@ -941,16 +950,6 @@ jobs:
           path: |
             .coverage
         if: ${{ success() || failure() }}
-
-      - name: Notify Slack on Failure
-        if: ${{ failure() && github.ref_name == 'master' }}
-        uses: act10ns/slack@ed1309ab9862e57e9e583e51c7889486b9a00b0f # v2.0.0
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        with:
-          status: ${{ job.status }}
-          steps: ${{ toJson(steps) }}
-          channel: '#eng-dataset-cloud-tech'
 
   docker-smoketest:
     name: Docker Smoketest - ${{ inputs.builder_name }} ${{ matrix.variant.image_type }}

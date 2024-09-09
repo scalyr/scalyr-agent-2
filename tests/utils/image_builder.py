@@ -203,7 +203,18 @@ class AgentImageBuilder(object):
 
         global_log.info(" ".join(cmd))
 
-        subprocess.check_output(cmd)
+        try:
+            subprocess.check_output(cmd)
+        except subprocess.CalledProcessError as e:
+            global_log.error("Failed to build image: {0}".format(self.image_tag))
+
+            global_log.error("stdout:")
+            global_log.error(e.stdout)
+
+            global_log.error("stderr:")
+            global_log.error(e.stderr)
+
+            raise
 
         shutil.rmtree(six.text_type(build_context_path), ignore_errors=True)
 

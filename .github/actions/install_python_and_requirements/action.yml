@@ -14,12 +14,20 @@ runs:
       with:
         python-version: ${{ inputs.python_version }}
 
+    - name: Check python3 version
+      shell: bash
+      env:
+        PYTHON_VERSION: ${{ inputs.python_version }}
+      run: |
+        python3 --version
+        python3 --version | grep -q $PYTHON_VERSION
+
     - name: Cache wheels
       id: cache_wheels
       uses: actions/cache@v3
       with:
         path: wheels
-        key: ${{ runner.os }}-requirements-wheels-${{ hashFiles('dev-requirements-new.txt') }}-6
+        key: ${{ runner.os }}-${{ runner.arch }}-${{ inputs.python_version }}-requirements-wheels-${{ hashFiles('dev-requirements-new.txt') }}-6
 
     - name: Create wheels
       if: steps.cache_wheels.outputs.cache-hit != 'true'

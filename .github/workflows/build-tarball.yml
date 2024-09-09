@@ -1,0 +1,55 @@
+name: Build Tarball
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - v*.*.*
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+  schedule:
+    - cron: '0 4 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  build_tarball:
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
+
+      - name: Install python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.8.13"
+
+      - name: Build tarball
+        run: |
+          mkdir -p build/tarball/noarch
+          pushd build/tarball/noarch
+          python3 ../../../build_package.py tarball
+          popd
+
+      - name: Save tarball as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: tarball-noarch
+          path: build
+          retention-days: 1
+
+      - name: Notify Slack on Failure
+        if: ${{ failure() && github.ref_name == 'master' }}
+        uses: act10ns/slack@ed1309ab9862e57e9e583e51c7889486b9a00b0f # v2.0.0
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          status: ${{ job.status }}
+          steps: ${{ toJson(steps) }}
+          channel: '#eng-dataset-cloud-tech'
