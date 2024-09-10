@@ -18,6 +18,7 @@
 
 from six.moves.socketserver import ThreadingMixIn
 
+
 from scalyr_agent import scalyr_logging
 
 global_log = scalyr_logging.getLogger(__name__)
