@@ -27,6 +27,9 @@ from __future__ import print_function
 
 import sys
 
+if False:
+    from typing import Union, Optional
+
 import six
 
 from scalyr_agent.util import match_glob
@@ -96,7 +99,7 @@ class CRIParseError(Exception):
         self.line = line
 
     def __repr__(self):
-        return "Error parsing line - %s: %s" % self.message, self.line
+        return "Error parsing line - %s: %s" % (self.message, self.line)
 
 
 class CRILogLine(object):

@@ -16,7 +16,6 @@
 # ------------------------------------------------------------------------
 # @author ales.novak@sentinelone.com
 
-import threading
 from socketserver import ThreadingMixIn
 
 from scalyr_agent import scalyr_logging
@@ -25,7 +24,5 @@ global_log = scalyr_logging.getLogger(__name__)
 
 
 class BoundedThreadingMixIn(ThreadingMixIn):
-
     def __init__(self, global_config):
         pass
-
