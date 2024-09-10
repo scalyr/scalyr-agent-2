@@ -26,6 +26,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          echo "Giving the workflow a 5 minute head start"
+          sleep 300
           echo "Retrying workflow"
           scripts/cicd/gha/retry_workflow.sh "Build Linux Packages"
 
