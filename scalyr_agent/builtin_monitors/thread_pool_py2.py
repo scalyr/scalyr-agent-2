@@ -16,7 +16,8 @@
 # ------------------------------------------------------------------------
 # @author ales.novak@sentinelone.com
 
-from SocketServer import ThreadingMixIn
+from six.moves.socketserver import ThreadingMixIn
+
 
 from scalyr_agent import scalyr_logging
 
