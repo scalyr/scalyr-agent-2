@@ -82,38 +82,6 @@ on:
         required: true
 
 jobs:
-  coverage:
-    runs-on: ubuntu-latest
-    if: ( success() || failure() ) && github.ref_name != '_release_build' && vars.UNIT_TESTS_DISABLED != 'true'
-    needs:
-      - k8s-smoketest
-      - docker-smoketest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        id: setup-python
-        with:
-          python-version: 3.8
-      - name: Install pycoverage
-        run: pip install coverage==4.5.4
-      - name: Download coverage reports
-        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3
-        with:
-          path: reports
-
-      - name: Prepare Coverage Data for codecov.io
-        run: |
-          coverage combine reports/**/.coverage
-          coverage xml -i -o coverage.xml
-
-      - name: Upload Coverage to Codecov.io
-        uses: codecov/codecov-action@eaaf4bedf32dbdc6b720b63067d99c4d77d6047d # pin@v3.1.4
-        with:
-          files: ./coverage.xml
-          fail_ci_if_error: false
-
   # Build cacheable requirements of the images.
   build_image_requirements:
     name: requirements-${{ inputs.builder_name }}-${{ matrix.architecture }}
