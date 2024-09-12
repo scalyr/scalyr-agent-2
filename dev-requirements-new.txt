@@ -14,8 +14,7 @@ six==1.16.0
 urllib3==1.26.20
 
 # Required for redis monitor.
-redis==5.0.8; python_version >= '3.7'
-redis==2.10.5; python_version < '3.7'
+redis==2.10.5
 
 # Required for mysql monitor
 PyMySQL==0.10.1; python_version < '3.7'
