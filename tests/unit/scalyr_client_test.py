@@ -1039,7 +1039,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
 
         user_agent = session._ScalyrClientSession__standard_headers["User-Agent"]
         split = user_agent.split(";")
-        self.assertEqual(split[-1], "requests-2.32.0")
+        self.assertEqual(split[-1], "requests-2.31.0")
         self.assertEqual(split[-4], "o-1.0.2-13")
         self.assertTrue(split[1].startswith("python-"))
 
