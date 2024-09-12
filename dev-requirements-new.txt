@@ -17,7 +17,8 @@ urllib3==1.26.20
 redis==2.10.5
 
 # Required for mysql monitor
-PyMySQL==0.9.3
+PyMySQL==0.10.1; python_version < '3.7'
+PyMySQL==1.1.1; python_version >= '3.7'
 
 # Required for postgres monitor
 pg8000==1.10.6
