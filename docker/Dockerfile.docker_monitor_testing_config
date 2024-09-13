@@ -31,7 +31,7 @@
 #
 # Log files should then be available at ~/scalyr-agent-dev/log/docker-std-printer-stdout.log.
 
-FROM python:3.8-slim as build-image
+FROM python:3.13.0rc1-slim as build-image
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
 ADD print-to-stdout-stderr.sh /app/print-to-stdout-stderr.sh
