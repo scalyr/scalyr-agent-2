@@ -21,7 +21,7 @@ jobs:
       - name: install python and requirements
         uses: ./.github/actions/install_python_and_requirements
         with:
-          python_version: 3.10
+          python_version: '3.10'
 
       - name: Check Changelog
         run: |
