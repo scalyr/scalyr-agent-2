@@ -1,6 +1,23 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.2.17 "Sinthia" - Sep 17, 2024
+<!---
+Packaged by Ales Novak <ales.novak@sentinelone.com> on Sep 17, 2024 00:00 -0800
+--->
+
+Changes:
+* Several packages were upgraded to mitigate vulnerabilities:
+  * oprjson==3.10.7
+  * PyMySQL==1.1.1;
+* Unused root CA file scalyr_agent_ca_root was removed
+* Alpine base image upgraded to 2.19.4
+
+Fixes:
+* Added safety check when handling pending addEvents task to handle the following error: `AttributeError: 'AddEventsTask' object has no attribute '_CopyingManagerWorkerSession__receive_response_status'`
+* Added missing zstandard library to alpine image
+
+
 ## 2.2.16 "Lenny" - May 29, 2024
 <!---
 Packaged by Ales Novak <ales.novak@sentinelone.com> on May 29, 2024 00:00 -0800
