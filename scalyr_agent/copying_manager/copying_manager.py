@@ -388,11 +388,17 @@ class PathWorkerIdDict(object):
         self.__paths[path][worker_id] = value
 
     def get_path(self, path):
+
+        # We don't want to be creating an empty default dict by get.
+        if path not in self.__paths:
+            return {}.items()
+
         return self.__paths[path].items()
 
     def get(self, path, worker_id, default=None):
         # type: (six.text_type, six.text_type, Optional[object]) -> Optional[object]
 
+        # We don't want to be creating an empty default dict by get.
         if path not in self.__paths:
             return default
 
@@ -540,8 +546,8 @@ class CopyingManager(StoppableThread, LogWatcher):
         # A dict from file path to the LogFileProcessor that is processing it.
         self.__log_paths_being_processed = PathWorkerIdDict()
 
-        # A lock that protects the status variables and the __log_matchers variable, the only variables that
-        # are access in generate_status() which needs to be thread safe.
+        # A lock that protects the status variablesm, __log_matchers and dynamic state related variables
+        # (i.e. __pending_log_matchers, __logs_pending_reload, __logs_pending_removal, __logs_matcher_finishing, __dynamic_paths).
         self.__lock = threading.RLock()
 
         # The last time we scanned for new files that match the __log_matchers.
@@ -710,8 +716,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                 log.log(
                     scalyr_logging.DEBUG_LEVEL_0,
                     "Tried to add new log file (path='%s', worker_id='%s') for monitor '%s', but it is already being monitored by '%s' "
-                    "and scheduled for removal. Canceling scheduled removal and ensuring log file is continue "
-                    "to be monitored."
+                    "and scheduled for removal. The removal cannot be cancelled anymore, the log file will be added after the removal is finished."
                     % (
                         path,
                         worker_id,
