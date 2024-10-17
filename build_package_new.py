@@ -27,6 +27,7 @@ to see those options use build_package_new.py <name of the package> --help.
 import argparse
 import sys
 import pathlib as pl
+from agent_build_refactored.prepare_agent_filesystem import parse_change_log
 
 if sys.version_info < (3, 8, 0):
     raise ValueError("This script requires Python 3.8 or above")
@@ -169,12 +170,16 @@ if __name__ == "__main__":
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
+    subparsers.add_parser("parse-changelog")
     _add_image_parsers()
     _add_package_parsers()
 
     args = parser.parse_args()
 
-    if args.command == "image":
+    if args.command == "parse-changelog":
+        print("Checking changelog")
+        parse_change_log()
+    elif args.command == "image":
         image_builder_cls = ALL_CONTAINERISED_AGENT_BUILDERS[args.builder_name]
 
         builder = image_builder_cls(base_image=args.base_image)
