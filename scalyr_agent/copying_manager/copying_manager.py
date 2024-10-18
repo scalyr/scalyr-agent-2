@@ -378,8 +378,7 @@ class PathWorkerIdDict(object):
     """
 
     def __init__(self):
-        self.__paths = {}
-        # type: Dict[six.text_type, Dict[six.text_type, object]]
+        self.__paths = {}  # type: Dict[six.text_type, Dict[six.text_type, object]]
 
     def set(self, path, worker_id, value):
         # type: (six.text_type, six.text_type, object) -> None
