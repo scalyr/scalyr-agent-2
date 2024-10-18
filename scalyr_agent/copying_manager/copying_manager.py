@@ -27,7 +27,6 @@ import signal
 import errno
 import fnmatch
 import json
-from collections import defaultdict
 
 WORKER_SESSION_PROCESS_MONITOR_ID_PREFIX = "agent_worker_"
 
