@@ -379,30 +379,23 @@ class PathWorkerIdDict(object):
     """
 
     def __init__(self):
-        self.__paths = defaultdict(
-            dict
-        )  # type: Dict[six.text_type, Dict[six.text_type, object]]
+        self.__paths = {}
+        # type: Dict[six.text_type, Dict[six.text_type, object]]
 
     def set(self, path, worker_id, value):
         # type: (six.text_type, six.text_type, object) -> None
+        if path not in self.__paths:
+            self.__paths[path] = {}
+
         self.__paths[path][worker_id] = value
 
     def get_path(self, path):
-
-        # We don't want to be creating an empty default dict by get.
-        if path not in self.__paths:
-            return {}.items()
-
-        return self.__paths[path].items()
+        return self.__paths.get(path, {}).items()
 
     def get(self, path, worker_id, default=None):
         # type: (six.text_type, six.text_type, Optional[object]) -> Optional[object]
 
-        # We don't want to be creating an empty default dict by get.
-        if path not in self.__paths:
-            return default
-
-        return self.__paths[path].get(worker_id, default)
+        return self.__paths.get(path, {}).get(worker_id, default)
 
     def complement_keys(self, path, worker_ids):
         # type: (six.text_type, List[six.text_type]) -> List[Tuple[six.text_type, six.text_type]]
@@ -417,7 +410,7 @@ class PathWorkerIdDict(object):
 
     def contains(self, path, worker_id):
         # type: (six.text_type, six.text_type) -> bool
-        return worker_id in self.__paths[path]
+        return worker_id in self.__paths.get(path, {})
 
     def copy(self):
         # type: () -> PathWorkerIdDict
@@ -446,10 +439,12 @@ class PathWorkerIdDict(object):
     def pop(self, path, worker_id, default=None):
         # type: (six.text_type, six.text_type, Optional[object]) -> Optional[object]
 
-        value = self.__paths[path].pop(worker_id, default)
-
-        if not self.__paths[path]:
-            self.__paths.pop(path)
+        if path in self.__paths:
+            value = self.__paths[path].pop(worker_id, default)
+            if not self.__paths[path]:
+                self.__paths.pop(path)
+        else:
+            value = default
 
         return value
 
