@@ -163,6 +163,56 @@ class TestPathWorkerIdDict(object):
 
         assert d.get("path1", "worker_id1") is None
 
+    def test_get_nonexistent_path(self):
+        d = PathWorkerIdDict()
+        assert d.get_path("nonexistent") == {}.items()
+
+    def test_get_nonexistent_key(self):
+        d = PathWorkerIdDict()
+        assert d.get("nonexistent", "nonexistent") is None
+
+    def test_pop_nonexistent_key(self):
+        d = PathWorkerIdDict()
+        try:
+            assert d.pop("nonexistent", "nonexistent") is None
+        except Exception:
+            pytest.fail("pop raised an exception unexpectedly")
+
+    def test_complement_keys_nonexistent_path(self):
+        d = PathWorkerIdDict()
+        try:
+            assert d.complement_keys("nonexistent", ["nonexistent"]) == []
+        except Exception:
+            pytest.fail("pop raised an exception unexpectedly")
+
+    def test_contains_nonexistent_path(self):
+        d = PathWorkerIdDict()
+        try:
+            assert not d.contains("nonexistent_path", "worker_id")
+        except Exception:
+            pytest.fail("pop raised an exception unexpectedly")
+
+    def test_set_nonexistent_path(self):
+        d = PathWorkerIdDict()
+        try:
+            d.set("nonexistent_path", "worker_id", "value")
+            assert d.get("nonexistent_path", "worker_id") == "value"
+        except Exception:
+            pytest.fail("pop raised an exception unexpectedly")
+
+    def test_get_does_not_create_empty_path(self):
+        d = PathWorkerIdDict()
+        # We're testing a private field here to ensure optimal implementation avoiding memory leaks.
+        assert "worker_id" not in d._PathWorkerIdDict__paths == {}
+
+    def test_pop_removed_one_worker_only(self):
+        d = PathWorkerIdDict()
+        d.set("path1", "worker_id1", "value1")
+        d.set("path1", "worker_id2", "value2")
+        assert d.pop("path1", "worker_id1") == "value1"
+        assert d.get("path1", "worker_id1") is None
+        assert d.get("path1", "worker_id2") == "value2"
+
 
 class TestDynamicWorkers:
 
