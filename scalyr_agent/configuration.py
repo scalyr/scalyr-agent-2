@@ -1499,6 +1499,11 @@ class Configuration(object):
         return self.__get_config().get_string("api_key")
 
     @property
+    def agent_status_timeout(self):
+        """Returns the configuration value for 'agent_status_timeout'."""
+        return self.__get_config().get_int("agent_status_timeout")
+
+    @property
     def scalyr_server(self):
         """Returns the configuration value for 'scalyr_server'."""
         return self.__get_config().get_string("scalyr_server")
@@ -3600,6 +3605,14 @@ class Configuration(object):
             config,
             "max_allowed_checkpoint_age",
             15 * 60,
+            description,
+            apply_defaults,
+        )
+
+        self.__verify_or_set_optional_int(
+            config,
+            "agent_status_timeout",
+            30,
             description,
             apply_defaults,
         )
