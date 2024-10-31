@@ -70,7 +70,7 @@ if [[ "$delete_existing_objects" == "delete_existing_k8s_objs" ]]; then
     kubectl delete daemonset scalyr-agent-2 || true
     kubectl delete configmap scalyr-config || true
     kubectl delete secret scalyr-api-key || true
-    kubectl delete -f https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/k8s/scalyr-service-account.yaml || true
+    kubectl delete -f ./k8s/scalyr-service-account.yaml || true
     echo "::endgroup::"
 fi
 
@@ -78,7 +78,7 @@ echo ""
 echo "::group::Creating k8s objects"
 echo "=================================================="
 # Create service account
-kubectl create -f https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/k8s/scalyr-service-account.yaml
+kubectl create -f ./k8s/scalyr-service-account.yaml
 
 # Define api key
 kubectl create secret generic scalyr-api-key --from-literal=scalyr-api-key=${SCALYR_API_KEY}
