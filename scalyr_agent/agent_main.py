@@ -926,7 +926,7 @@ class ScalyrAgent(object):
                 return 2
 
         # We wait for five seconds at most to get the status.
-        deadline = time.time() + 5
+        deadline = time.time() + self.__config.agent_status_timeout
 
         last_debug_stat_time = 0
         # Now loop until we see it show up.
@@ -980,9 +980,9 @@ class ScalyrAgent(object):
                     debug_stats_str = ""
 
                 print(
-                    "Failed to get status within 5 seconds.  Giving up.  The agent process is "
+                    "Failed to get status within %d seconds.  Giving up.  The agent process is "
                     "possibly stuck.  See %s for more details.\n%s"
-                    % (agent_log, debug_stats_str),
+                    % (self.__config.agent_status_timeout, agent_log, debug_stats_str),
                     file=sys.stderr,
                 )
                 return 1
@@ -2329,8 +2329,8 @@ class ScalyrAgent(object):
 
         log.log(
             scalyr_logging.DEBUG_LEVEL_4,
-            'Wrote agent status data in "%s" format to %s'
-            % (status_format, final_file_path),
+            'Wrote agent status data in "%s" format to %s in %.2f seconds'
+            % (status_format, final_file_path, time.time() - start_ts),
         )
 
         return final_file_path
