@@ -1,6 +1,18 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.2.18 "Sinthia" - Nov 5, 2024
+<!---
+Packaged by Ales Novak <ales.novak@sentinelone.com> on Nov 5, 2024 00:00 -0800
+--->
+
+Changes:
+* Introducing a a new config key `agent_status_timeout` and setting it to 30s by default. Until version 2.2.17 it was hardcoded to 5 seconds.
+
+Fixes:
+* Fixed a bug where pod logs were removed from ingestion because of a temporrary K8s API error and the agent was not able to add them again.
+
+  
 ## 2.2.17 "Sinthia" - Sep 17, 2024
 <!---
 Packaged by Ales Novak <ales.novak@sentinelone.com> on Sep 17, 2024 00:00 -0800
