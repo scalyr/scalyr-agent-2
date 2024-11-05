@@ -1,7 +1,7 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.2.18 "Sinthia" - Nov 5, 2024
+## 2.2.18 "Zack" - Nov 5, 2024
 <!---
 Packaged by Ales Novak <ales.novak@sentinelone.com> on Nov 5, 2024 00:00 -0800
 --->
