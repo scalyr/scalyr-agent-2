@@ -92,7 +92,7 @@ def buildx_build(
         output: BuildOutput = None,
         cache_name: str = None,
         fallback_to_remote_builder: bool = False,
-        capture_output: bool = False
+        capture_output: bool = True
 ):
     """
     Wrapper for the 'docker buildx build' command.
