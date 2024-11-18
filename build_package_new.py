@@ -29,8 +29,8 @@ import sys
 import pathlib as pl
 from agent_build_refactored.prepare_agent_filesystem import parse_change_log
 
-if sys.version_info < (3, 8, 0):
-    raise ValueError("This script requires Python 3.8 or above")
+# if sys.version_info < (3, 8, 0):
+#     raise ValueError("This script requires Python 3.8 or above")
 
 # This file can be executed as script. Add source root to the PYTHONPATH in order to be able to import
 # local packages. All such imports also have to be done after that.
