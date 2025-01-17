@@ -36,8 +36,8 @@ from agent_build_refactored.prepare_agent_filesystem import build_linux_fhs_agen
 
 _SUPPORTED_ARCHITECTURES = [
     CpuArch.x86_64,
-    CpuArch.AARCH64,
-    CpuArch.ARMV7,
+    # CpuArch.AARCH64,
+    # CpuArch.ARMV7,
 ]
 
 logger = logging.getLogger(__name__)
