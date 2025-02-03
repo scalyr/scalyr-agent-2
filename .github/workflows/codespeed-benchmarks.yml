@@ -81,7 +81,7 @@ jobs:
           python benchmarks/scripts/send_microbenchmarks_data_to_codespeed.py --data-path="benchmark_results/*.json" --debug
 
       - name: Store artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: codespeed-micro-benchmarks-${{ matrix.python-version }}
           path: |

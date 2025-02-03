@@ -238,7 +238,7 @@ jobs:
             --output-dir ./build
       
       - name: Save image OCI tarball as artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: container-image-tarball-${{  matrix.variant.image_type }}-${{ inputs.builder_name }}
           path: build
@@ -355,7 +355,7 @@ jobs:
           fi
 
       - name: Upload Agent k8s Test Docker Image as artifact for debugging purposses
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: k8s-image-${{ inputs.builder_name }}
           path: build
@@ -906,7 +906,7 @@ jobs:
           source ./.circleci/smoketest_k8s.sh scalyr/scalyr-agent-ci-unittest:4 150 no_delete_existing_k8s_objs k8s-image:test
 
       - name: Upload test results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: k8s-smoketest
           path: |
@@ -1007,7 +1007,7 @@ jobs:
           source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 ${{ matrix.variant.image_type }} ${{ matrix.variant.timeout }} ${{ matrix.variant.image_type }}-${{ inputs.builder_name }}:test
 
       - name: Upload test results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: docker-smoketest-${{ matrix.variant.image_type }}-${{ inputs.builder_name }}
           path: |
