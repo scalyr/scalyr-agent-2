@@ -8,7 +8,7 @@ from agent_build_refactored.utils.constants import CpuArch
 
 _FIPS_IMAGES_SUPPORTED_ARCHITECTURES = [
     CpuArch.x86_64,
-    # CpuArch.AARCH64,
+    CpuArch.AARCH64,
 ]
 
 
