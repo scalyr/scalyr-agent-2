@@ -420,19 +420,19 @@ class ContainerisedAgentBuilder(Builder):
             "--rm",
             f"--name={container_name}",
             "--net=host",
-            "quay.io/skopeo/stable:v1.13.2",
+            "quay.io/skopeo/stable:v1.17.0",
             "copy",
             "--all",
         ]
 
-        if not registry_password:
-            cmd_args.append(
-                "--dest-no-creds",
-            )
-        else:
-            cmd_args.append(
-                f"--dest-creds={registry_username}:{registry_password}"
-            )
+        # if not registry_password:
+        #     cmd_args.append(
+        #         "--dest-no-creds",
+        #     )
+        # else:
+        #     cmd_args.append(
+        #         f"--dest-creds={registry_username}:{registry_password}"
+        #     )
 
         if no_verify_tls:
             cmd_args.append(
@@ -447,33 +447,20 @@ class ContainerisedAgentBuilder(Builder):
             logger.info(f"Publish image '{tag}'")
 
             try:
-                # Create the container, copy tarball into it and start.
-                subprocess.run(
-                    [
-                        *cmd_args,
-                        f"oci-archive:/tmp/{oci_layout_tarball.name}",
-                        f"docker://{tag}",
-                    ],
-                    check=True,
-                )
+
+                cmd_args = [
+                    "skopeo",
+                    "copy",
+                    "--all",
+                    f"oci-archive:{oci_layout_tarball}",
+                    f"docker://{tag}"
+                ]
 
                 subprocess.run(
-                    [
-                        "docker",
-                        "cp",
-                        str(oci_layout_tarball),
-                        f"{container_name}:/tmp/{oci_layout_tarball.name}"
-                    ]
+                    cmd_args,
+                    check=True
                 )
-                subprocess.run(
-                    [
-                        "docker",
-                        "start",
-                        "-i",
-                        container_name,
-                    ],
-                    check=True,
-                )
+
             except subprocess.CalledProcessError as e:
                 logger.exception(
                     f"Subprocess call failed. Stderr: {(e.stderr or b'').decode()}"
