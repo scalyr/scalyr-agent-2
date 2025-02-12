@@ -108,6 +108,7 @@ def buildx_build(
         "docker",
         "buildx",
         "build",
+        "--builder=agent-builder"
         f"-f={dockerfile_path}",
         "--progress=plain",
     ]
