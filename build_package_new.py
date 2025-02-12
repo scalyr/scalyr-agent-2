@@ -128,12 +128,6 @@ def _add_image_parsers():
         help="OCI tarball with already built image. When provided that image us used instead of building new one",
     )
     image_publish_parser.add_argument(
-        "--registry-username", required=True, help="Username for a target registry."
-    )
-    image_publish_parser.add_argument(
-        "--registry-password", required=False, help="Password for a target registry."
-    )
-    image_publish_parser.add_argument(
         "--no-verify-tls",
         required=False,
         action="store_true",
@@ -222,8 +216,6 @@ if __name__ == "__main__":
                 image_type=ImageType(args.image_type),
                 tags=final_tags,
                 existing_oci_layout_tarball=existing_oci_layout_tarball,
-                registry_username=args.registry_username,
-                registry_password=args.registry_password,
                 no_verify_tls=args.no_verify_tls,
             )
             exit(0)

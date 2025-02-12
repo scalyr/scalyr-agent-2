@@ -379,8 +379,6 @@ class ContainerisedAgentBuilder(Builder):
         image_type: ImageType,
         tags: List[str],
         existing_oci_layout_tarball: pl.Path = None,
-        registry_username: str = None,
-        registry_password: str = None,
         no_verify_tls: bool = False,
     ):
         """
@@ -391,8 +389,6 @@ class ContainerisedAgentBuilder(Builder):
         :param tags: list of tags
         :param existing_oci_layout_tarball: Path to existing image OCI tarball. If exists, it will publish image from this
             tarball. If not new image will be built inplace.
-        :param registry_username: Registry login
-        :param registry_password: Registry password
         :param no_verify_tls: Disable certificate validation when pushing the image.
         :return:
         """
