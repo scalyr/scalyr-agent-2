@@ -76,13 +76,13 @@ jobs:
       - name: Set up Docker Context for Buildx
         id: buildx-context
         run: |
-          docker context create builders || echo Already exists
+          docker context create agent-builder || echo Already exists
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226 # v3
         with:
           driver-opts: network=host
-          endpoint: builders
+          endpoint: agent-builder
 
       - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
         uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
