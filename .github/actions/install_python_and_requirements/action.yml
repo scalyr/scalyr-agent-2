@@ -40,4 +40,4 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}
       run: |
-        python3 -m pip install -r dev-requirements-new.txt --no-index --find-links wheels
+        python3 -m pip install -r dev-requirements-new.txt --no-index --find-links wheels | (echo "Installing from cached wheels failed, trying to install from PyPI" && python3 -m pip install -r dev-requirements-new.txt)
