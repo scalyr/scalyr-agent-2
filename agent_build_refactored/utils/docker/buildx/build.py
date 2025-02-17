@@ -92,7 +92,8 @@ def buildx_build(
         output: BuildOutput = None,
         cache_name: str = None,
         fallback_to_remote_builder: bool = False,
-        capture_output: bool = False
+        capture_output: bool = False,
+        buildx_builder: str = None
 ):
     """
     Wrapper for the 'docker buildx build' command.
@@ -108,10 +109,14 @@ def buildx_build(
         "docker",
         "buildx",
         "build",
-        "--builder=agent-builder",
         f"-f={dockerfile_path}",
         "--progress=plain",
     ]
+
+    if buildx_builder:
+        cmd_args.append(
+            f"--builder={buildx_builder}",
+        )
 
     architectures = architectures or []
     for arch in architectures:

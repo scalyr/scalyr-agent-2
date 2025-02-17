@@ -72,11 +72,12 @@ class ContainerisedAgentBuilder(Builder):
     TAG_SUFFIXES: List[str]
     AGENT_REQUIREMENTS_EXCLUDE = []
 
-    def __init__(self, base_image):
+    def __init__(self, base_image, buildx_builder_name=None):
         super(ContainerisedAgentBuilder, self).__init__()
 
         self._already_build_requirements: Set[CpuArch] = set()
         self.__base_image = base_image
+        self.__buildx_builder_name = buildx_builder_name
 
     @property
     def __build_args(self) -> Dict[str, str]:
@@ -106,7 +107,8 @@ class ContainerisedAgentBuilder(Builder):
             cache_name=cache_name,
             output=output,
             capture_output=True,
-            build_args=self.__build_args
+            build_args=self.__build_args,
+            buildx_builder=self.__buildx_builder_name
         )
 
     def __agent_requirements(self):
@@ -173,6 +175,7 @@ class ContainerisedAgentBuilder(Builder):
             output=output,
             cache_name=cache_name,
             fallback_to_remote_builder=True,
+            buildx_builder=self.__buildx_builder_name
         )
 
         if not only_cache:
@@ -323,6 +326,7 @@ class ContainerisedAgentBuilder(Builder):
                 **requirements_libs_contexts,
             },
             output=output,
+            buildx_builder=self.__buildx_builder_name
         )
 
     def build_and_load_docker_image(
@@ -400,45 +404,6 @@ class ContainerisedAgentBuilder(Builder):
         if not oci_layout_tarball.exists():
             raise Exception("OCI layout tarball does not exists.")
 
-        container_name = f"agent_image_publish_skopeo_{self.name}_{image_type.value}"
-
-        delete_container(
-            container_name=container_name,
-        )
-
-        # use skopeo tool to copy image.
-        # also use it from container, so we don't have to rly on a local installation.
-        # We also do not use mounting because on some docker environments, this feature may be unavailable,
-        # so we just create a container first and then copy the tarball.
-        cmd_args = [
-            "docker",
-            "create",
-            "--rm",
-            f"--name={container_name}",
-            "--net=host",
-            "quay.io/skopeo/stable:v1.17.0",
-            "copy",
-            "--all",
-        ]
-
-        # if not registry_password:
-        #     cmd_args.append(
-        #         "--dest-no-creds",
-        #     )
-        # else:
-        #     cmd_args.append(
-        #         f"--dest-creds={registry_username}:{registry_password}"
-        #     )
-
-        if no_verify_tls:
-            cmd_args.append(
-                "--dest-tls-verify=false",
-            )
-
-        delete_container(
-            container_name=container_name,
-        )
-
         for tag in tags:
             logger.info(f"Publish image '{tag}'")
 
@@ -462,10 +427,6 @@ class ContainerisedAgentBuilder(Builder):
                     f"Subprocess call failed. Stderr: {(e.stderr or b'').decode()}"
                 )
                 raise
-            finally:
-                delete_container(
-                    container_name=container_name,
-                )
 
 
 def _arch_to_docker_build_target_name(architecture: CpuArch):
