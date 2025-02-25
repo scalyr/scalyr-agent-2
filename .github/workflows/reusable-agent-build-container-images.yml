@@ -1079,6 +1079,11 @@ jobs:
             echo "tags=empty" >> "${GITHUB_OUTPUT}"
           fi
 
+      - name: Set up skopeo
+        uses: warjiang/setup-skopeo@latest
+        with:
+          version: latest
+
       - name: Publish image
         if: steps.verify.outputs.tags != 'empty'
         run: |
