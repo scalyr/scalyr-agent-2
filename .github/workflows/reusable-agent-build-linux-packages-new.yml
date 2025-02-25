@@ -160,9 +160,9 @@ jobs:
             --package-type ${{ matrix.variant.package_type }}
 
       - name: Save packages as artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: linux-packages-${{ matrix.variant.builder_name }}
+          name: linux-packages-${{ matrix.variant.builder_name }}-${{ matrix.variant.package_type }}
           path: build
           retention-days: 1
 
@@ -212,10 +212,14 @@ jobs:
           driver-opts: network=host
 
       - name: Download built packages.
-        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3
+        uses: actions/download-artifact@v4
         with:
-          name:  linux-packages-${{ matrix.test_target.builder }}
+          name:  linux-packages-${{ matrix.test_target.builder }}-${{ matrix.test_target.package_type }}
           path: /tmp/packages
+
+      - name: Debug - List downloaded packages
+        run: |
+          find /tmp/packages
 
       - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
         uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1

@@ -63,6 +63,10 @@ def _add_image_parsers():
         "--base-image", required=True, help="Base image to be used for docker build."
     )
 
+    image_parser.add_argument(
+        "--buildx-builder-name", required=False, help="Name of the buildx builder.", default=None
+    )
+
     image_parser_action_subparsers = image_parser.add_subparsers(
         dest="action", required=True
     )
@@ -128,12 +132,6 @@ def _add_image_parsers():
         help="OCI tarball with already built image. When provided that image us used instead of building new one",
     )
     image_publish_parser.add_argument(
-        "--registry-username", required=True, help="Username for a target registry."
-    )
-    image_publish_parser.add_argument(
-        "--registry-password", required=False, help="Password for a target registry."
-    )
-    image_publish_parser.add_argument(
         "--no-verify-tls",
         required=False,
         action="store_true",
@@ -182,7 +180,7 @@ if __name__ == "__main__":
     elif args.command == "image":
         image_builder_cls = ALL_CONTAINERISED_AGENT_BUILDERS[args.builder_name]
 
-        builder = image_builder_cls(base_image=args.base_image)
+        builder = image_builder_cls(base_image=args.base_image, buildx_builder_name=args.buildx_builder_name)
         if args.action == "load":
             builder.build_and_load_docker_image(
                 image_type=ImageType(args.image_type),
@@ -222,8 +220,6 @@ if __name__ == "__main__":
                 image_type=ImageType(args.image_type),
                 tags=final_tags,
                 existing_oci_layout_tarball=existing_oci_layout_tarball,
-                registry_username=args.registry_username,
-                registry_password=args.registry_password,
                 no_verify_tls=args.no_verify_tls,
             )
             exit(0)

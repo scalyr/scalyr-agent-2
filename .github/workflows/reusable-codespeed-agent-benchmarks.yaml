@@ -154,7 +154,7 @@ jobs:
           ./benchmarks/scripts/send-log-level-counts-to-codespeed.sh "${{ github.sha }}"
 
       - name: Upload log artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: agent-logs-${{ inputs.agent_server_host }}
           path: |
