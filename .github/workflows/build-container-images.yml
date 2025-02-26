@@ -61,7 +61,6 @@ jobs:
       aws_region: ${{ needs.pre_job.outputs.aws_region }}
       cicd_workflow: ${{ needs.pre_job.outputs.cicd_workflow }}
       builder_name: ${{ matrix.builder.builder_name }}
-      base_image: ${{ matrix.builder.base_image }}
       architectures: ${{ toJson(matrix.builder.architectures) }}
     secrets:
       CT_AWS_DEV_EC2_PRIVATE_KEY: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}

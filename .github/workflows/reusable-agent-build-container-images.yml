@@ -154,7 +154,7 @@ jobs:
           python3 build_package_new.py \
             image \
             ${{ inputs.builder_name }} \
-            --base-image ${{ inputs.base_image }} \
+            --base-image $(cat agent_build_refactored/container_images/base_image_${{ inputs.builder_name }}.txt) \
             cache-requirements \
             --architecture ${{ matrix.architecture }}
 
@@ -232,7 +232,7 @@ jobs:
           python3 build_package_new.py \
             image \
             ${{ inputs.builder_name }} \
-            --base-image ${{ inputs.base_image }} \
+            --base-image $(cat agent_build_refactored/container_images/base_image_${{ inputs.builder_name }}.txt) \
             build-tarball \
             --image-type ${{  matrix.variant.image_type }} \
             --output-dir ./build
@@ -340,7 +340,7 @@ jobs:
         run: |
           python3 tests/end_to_end_tests/container_images_test/scripts/build_test_image.py \
             --image-builder-name ${{ inputs.builder_name }} \
-            --base-image ${{ inputs.base_image }} \
+            --base-image $(cat agent_build_refactored/container_images/base_image_${{ inputs.builder_name }}.txt) \
             --architecture x86_64 \
             --image-oci-tarball /tmp/image_tarball/k8s-${{ inputs.builder_name }}.tar \
             --result-image-name k8s-image:test \
@@ -682,7 +682,7 @@ jobs:
         run: |
           python3 tests/end_to_end_tests/container_images_test/scripts/build_test_image.py \
             --image-builder-name ${{ inputs.builder_name }} \
-            --base-image ${{ inputs.base_image }} \
+            --base-image $(cat agent_build_refactored/container_images/base_image_${{ inputs.builder_name }}.txt) \
             --architecture x86_64 \
             --image-oci-tarball /tmp/image_tarball/k8s-${{ inputs.builder_name }}.tar \
             --result-image-name k8s-image:test \
@@ -890,7 +890,7 @@ jobs:
         run: |
           python3 tests/end_to_end_tests/container_images_test/scripts/build_test_image.py \
             --image-builder-name ${{ inputs.builder_name }} \
-            --base-image ${{ inputs.base_image }} \
+            --base-image $(cat agent_build_refactored/container_images/base_image_${{ inputs.builder_name }}.txt) \
             --architecture x86_64 \
             --image-oci-tarball /tmp/image_tarball/k8s-${{ inputs.builder_name }}.tar \
             --result-image-name k8s-image:test \
@@ -991,7 +991,7 @@ jobs:
         run: |
           python3 tests/end_to_end_tests/container_images_test/scripts/build_test_image.py \
             --image-builder-name ${{ inputs.builder_name }} \
-            --base-image ${{ inputs.base_image }} \
+            --base-image $(cat agent_build_refactored/container_images/base_image_${{ inputs.builder_name }}.txt) \
             --architecture x86_64 \
             --image-oci-tarball /tmp/image_tarball/${{ matrix.variant.image_type }}-${{ inputs.builder_name }}.tar \
             --result-image-name ${{ matrix.variant.image_type }}-${{ inputs.builder_name }}:test \
@@ -1090,7 +1090,7 @@ jobs:
           python3 build_package_new.py \
             image \
             ${{ inputs.builder_name }} \
-            --base-image ${{ inputs.base_image }} \
+            --base-image $(cat agent_build_refactored/container_images/base_image_${{ inputs.builder_name }}.txt) \
             publish \
             --registry docker.io \
             --name-prefix "${{ secrets.PUBLISH_REGISTRY_USERNAME }}" \
