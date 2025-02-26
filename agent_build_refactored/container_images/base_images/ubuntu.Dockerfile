@@ -3,7 +3,6 @@ FROM ${BASE_IMAGE} as base
 
 FROM base as dependencies_build_base
 ENV DEBIANFRONTEND=noninteractive
-RUN echo "libc-bin hold" | dpkg --set-selections
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip  \
