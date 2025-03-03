@@ -1,1 +1,1 @@
-ubuntu:22.04
+artifactory.eng.sentinelone.tech/docker-release/common/ubuntu-base/python311:2.0.48
