@@ -111,6 +111,7 @@ def buildx_build(
         "build",
         f"-f={dockerfile_path}",
         "--progress=plain",
+        "--no-cache"
     ]
 
     if buildx_builder:
