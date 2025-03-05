@@ -49,7 +49,7 @@ spec:
         envFrom:
         - configMapRef:
             name: scalyr-config
-        image: scalyr/scalyr-k8s-agent:2.2.18
+        image: scalyr/scalyr-k8s-agent:0.0.112
         imagePullPolicy: Always
         name: scalyr-agent
         securityContext:
