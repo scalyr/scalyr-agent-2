@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 # It is also expected that GHA cache authentication environment variables are already exposed to the build process.
 # see more - https://docs.docker.com/build/cache/backends/gha/
 USE_GHA_CACHE = bool(os.environ.get("USE_GHA_CACHE"))
+USE_DOCKER_CACHE=bool(os.environ.get("USE_DOCKER_CACHE"))
 
 # Just a suffix for the build cache string. May be usefull when it is needed to invalidate the cache.
 CACHE_VERSION = os.environ.get("CACHE_VERSION", "")
@@ -146,6 +147,9 @@ def buildx_build(
                 f"--cache-from=type=gha,scope={final_cache_scope}",
                 f"--cache-to=type=gha,scope={final_cache_scope}",
             ])
+        elif USE_DOCKER_CACHE:
+            # Add nothing
+            pass
         else:
             cache_dir = _get_local_cache_dir(name=cache_name)
             cmd_args.extend([
