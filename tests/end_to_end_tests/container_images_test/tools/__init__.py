@@ -11,11 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
+import logging
 import pathlib as pl
 import subprocess
 from typing import Callable
+
+logger = logging.getLogger(__name__)
 
 from agent_build_refactored.utils.constants import CpuArch
 from agent_build_refactored.utils.docker.common import delete_container
@@ -61,7 +62,7 @@ def build_test_version_of_container_image(
         "registry:2",
     ]
 
-    print(f"Creating local registry container: {cmd}")
+    logger.info(f"Creating local registry container: {cmd}")
 
     completed_process = subprocess.run(
         cmd,
@@ -69,8 +70,9 @@ def build_test_version_of_container_image(
         capture_output=True
     )
 
-    print(completed_process.stdout.decode())
-    print(completed_process.stderr.decode())
+    logger.info("Completed:")
+    logger.info(completed_process.stdout.decode())
+    logger.info(completed_process.stderr.decode())
 
     try:
         all_image_tags = image_builder.generate_final_registry_tags(
@@ -81,7 +83,7 @@ def build_test_version_of_container_image(
         )
 
         # Publish image to the local registry
-        print(f"Publishing image to the local registry: {all_image_tags}")
+        logger.info(f"Publishing image to the local registry: {all_image_tags}")
         image_builder.publish(
             image_type=image_type,
             tags=all_image_tags,
