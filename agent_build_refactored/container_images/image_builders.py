@@ -414,6 +414,7 @@ class ContainerisedAgentBuilder(Builder):
                     "copy",
                     "--all",
                     "--dest-tls-verify=false",
+                    "--remove-signatures",
                     f"oci-archive:{oci_layout_tarball}",
                     f"docker://{tag}"
                 ]
