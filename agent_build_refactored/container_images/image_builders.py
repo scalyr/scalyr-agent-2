@@ -413,6 +413,7 @@ class ContainerisedAgentBuilder(Builder):
                     "skopeo",
                     "copy",
                     "--all",
+                    "--dest-tls-verify=false",
                     f"oci-archive:{oci_layout_tarball}",
                     f"docker://{tag}"
                 ]
