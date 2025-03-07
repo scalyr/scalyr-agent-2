@@ -410,13 +410,21 @@ class ContainerisedAgentBuilder(Builder):
             try:
 
                 cmd_args = [
-                    "skopeo",
-                    "copy",
-                    "--all",
-                    "--dest-tls-verify=false",
-                    "--remove-signatures",
-                    f"oci-archive:{oci_layout_tarball}",
-                    f"docker://{tag}"
+                    "docker",
+                    "import",
+                    oci_layout_tarball,
+                    tag
+                ]
+
+                subprocess.run(
+                    cmd_args,
+                    check=True
+                )
+
+                cmd_args = [
+                    "docker",
+                    "push",
+                    oci_layout_tarball
                 ]
 
                 subprocess.run(

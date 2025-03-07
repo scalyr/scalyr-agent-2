@@ -14,7 +14,7 @@
 import logging
 import pathlib as pl
 import subprocess
-from typing import Callable
+from typing import Callable, List
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +47,19 @@ def build_test_version_of_container_image(
     tests can enable it in order to obtain coverage information of the docker/k8s related code.
     """
 
+    def run(comment: str, cmd: List[str]):
+        logger.info(f"Running: {comment}")
+        logger.info(f"Command: {cmd}")
+        completed_process = subprocess.run(
+            cmd,
+            check=True,
+            capture_output=True,
+        )
+
+        logger.info(f"Completed: {comment}")
+        logger.info(completed_process.stdout.decode())
+        logger.info(completed_process.stderr.decode())
+
     registry_container_name = "agent_image_e2e_test_registry"
 
     delete_container(container_name=registry_container_name)
@@ -62,17 +75,8 @@ def build_test_version_of_container_image(
         "registry:2",
     ]
 
-    logger.info(f"Creating local registry container: {cmd}")
+    run(f"Creating local registry container.", cmd)
 
-    completed_process = subprocess.run(
-        cmd,
-        check=True,
-        capture_output=True
-    )
-
-    logger.info("Completed:")
-    logger.info(completed_process.stdout.decode())
-    logger.info(completed_process.stderr.decode())
 
     try:
         all_image_tags = image_builder.generate_final_registry_tags(
