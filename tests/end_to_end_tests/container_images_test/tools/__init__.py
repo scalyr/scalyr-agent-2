@@ -81,6 +81,7 @@ def build_test_version_of_container_image(
         )
 
         # Publish image to the local registry
+        print(f"Publishing image to the local registry: {all_image_tags}")
         image_builder.publish(
             image_type=image_type,
             tags=all_image_tags,
