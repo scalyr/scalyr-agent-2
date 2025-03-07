@@ -989,6 +989,12 @@ jobs:
         with:
           version: latest
 
+
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        with:
+          detached: true
+
       - name: Build test image
         env:
           USE_GHA_CACHE: "1"
