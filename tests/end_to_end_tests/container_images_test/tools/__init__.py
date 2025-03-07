@@ -51,18 +51,27 @@ def build_test_version_of_container_image(
     delete_container(container_name=registry_container_name)
 
     # Create temporary local registry to push production image there.
-    subprocess.run(
-        [
-            "docker",
-            "run",
-            "-d",
-            "--rm",
-            "-p=5000:5000",
-            f"--name={registry_container_name}",
-            "registry:2",
-        ],
+    cmd = [
+        "docker",
+        "run",
+        "-d",
+        "--rm",
+        "-p=5000:5000",
+        f"--name={registry_container_name}",
+        "registry:2",
+    ]
+
+    print(f"Creating local registry container: {cmd}")
+
+    completed_process = subprocess.run(
+        cmd,
         check=True,
+        capture_output=True
     )
+
+    print(completed_process.stdout.decode())
+    print(completed_process.stderr.decode())
+
     try:
         all_image_tags = image_builder.generate_final_registry_tags(
             image_type=image_type,
