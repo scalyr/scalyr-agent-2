@@ -424,7 +424,7 @@ class ContainerisedAgentBuilder(Builder):
                 cmd_args = [
                     "docker",
                     "push",
-                    str(oci_layout_tarball)
+                    tag
                 ]
 
                 subprocess.run(
