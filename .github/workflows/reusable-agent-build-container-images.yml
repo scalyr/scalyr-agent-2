@@ -984,6 +984,11 @@ jobs:
       - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
         uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
 
+      - name: Set up skopeo
+        uses: warjiang/setup-skopeo@latest
+        with:
+          version: latest
+
       - name: Build test image
         env:
           USE_GHA_CACHE: "1"
