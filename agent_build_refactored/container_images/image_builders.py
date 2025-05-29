@@ -410,11 +410,21 @@ class ContainerisedAgentBuilder(Builder):
             try:
 
                 cmd_args = [
-                    "skopeo",
-                    "copy",
-                    "--all",
-                    f"oci-archive:{oci_layout_tarball}",
-                    f"docker://{tag}"
+                    "docker",
+                    "import",
+                    str(oci_layout_tarball),
+                    tag
+                ]
+
+                subprocess.run(
+                    cmd_args,
+                    check=True
+                )
+
+                cmd_args = [
+                    "docker",
+                    "push",
+                    tag
                 ]
 
                 subprocess.run(

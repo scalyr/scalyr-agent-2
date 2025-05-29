@@ -11,11 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
+import logging
 import pathlib as pl
 import subprocess
-from typing import Callable
+from typing import Callable, List
+
+logger = logging.getLogger(__name__)
 
 from agent_build_refactored.utils.constants import CpuArch
 from agent_build_refactored.utils.docker.common import delete_container
@@ -46,23 +47,37 @@ def build_test_version_of_container_image(
     tests can enable it in order to obtain coverage information of the docker/k8s related code.
     """
 
+    def run(comment: str, cmd: List[str]):
+        logger.info(f"Running: {comment}")
+        logger.info(f"Command: {cmd}")
+        completed_process = subprocess.run(
+            cmd,
+            check=True,
+            capture_output=True,
+        )
+
+        logger.info(f"Completed: {comment}")
+        logger.info(completed_process.stdout.decode())
+        logger.info(completed_process.stderr.decode())
+
     registry_container_name = "agent_image_e2e_test_registry"
 
     delete_container(container_name=registry_container_name)
 
     # Create temporary local registry to push production image there.
-    subprocess.run(
-        [
-            "docker",
-            "run",
-            "-d",
-            "--rm",
-            "-p=5000:5000",
-            f"--name={registry_container_name}",
-            "registry:2",
-        ],
-        check=True,
-    )
+    cmd = [
+        "docker",
+        "run",
+        "-d",
+        "--rm",
+        "-p=5000:5000",
+        f"--name={registry_container_name}",
+        "registry:2",
+    ]
+
+    run(f"Creating local registry container.", cmd)
+
+
     try:
         all_image_tags = image_builder.generate_final_registry_tags(
             image_type=image_type,
@@ -72,6 +87,7 @@ def build_test_version_of_container_image(
         )
 
         # Publish image to the local registry
+        logger.info(f"Publishing image to the local registry: {all_image_tags}")
         image_builder.publish(
             image_type=image_type,
             tags=all_image_tags,
