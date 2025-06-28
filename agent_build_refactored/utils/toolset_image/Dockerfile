@@ -1,7 +1,6 @@
 FROM ubuntu:22.04
 RUN DEBIAN_FRONTEND="noninteractive" \
     apt-get update && \
-    apt-get dist-upgrade --yes --no-install-recommends --no-install-suggests && \
     apt-get install -y \
     binutils \
     tar \
