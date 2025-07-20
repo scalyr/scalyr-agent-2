@@ -456,7 +456,8 @@ define_config_option(
     __monitor__,
     "unique_file_log_rotation",
     "Optional (defaults to `false`). When `true` the log files are rotated such that a different "
-    "file name is written on rotation to avoid relying on inodes to determine log file rotatations.",
+    "file name is written on rotation to avoid relying on inodes to determine log file rotatations. "
+    "This is required for log rotation on Windows.",
     convert_to=bool,
     default=False,
 )
