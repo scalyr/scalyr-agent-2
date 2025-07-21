@@ -1611,7 +1611,11 @@ class SyslogMonitorUniqueFileLogRotationTest(unittest.TestCase):
         expected_log_config_history = [ ("remove", self.monitor_config["message_log"]) ]
         for i in range(self.monitor_config["max_log_rotations"]):
             expected_log_config_history.append(("add", f"{self.monitor_config['message_log']}.{i}"))
-        self.assertEqual(expected_log_config_history, self.copying_manager.log_config_history)
+
+        self.assertEqual(
+            [ (type, os.path.abspath(path)) for type, path in expected_log_config_history ],
+            [ (type, os.path.abspath(path)) for type, path in self.copying_manager.log_config_history ]
+        )
 
         self.socket.sendall("<1> 2025-01-01T00:01:00Z host test message 1\n".encode("utf-8"))
         self.socket.sendall("<1> 2025-01-01T00:01:00Z host test message 2\n".encode("utf-8"))

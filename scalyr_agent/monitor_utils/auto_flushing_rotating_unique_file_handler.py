@@ -144,3 +144,9 @@ class AutoFlushingRotatingUniqueFileHandler(AutoFlushingRotatingFileHandler):
 
     def doRollover(self):
         pass
+
+    def get_file_paths(self):
+        if self._backup_count > 0 and self._max_bytes > 0:
+            return [ self._file_path + "." + str(i) for i in range(self._backup_count) ]
+        else:
+            return [ self._file_path ]

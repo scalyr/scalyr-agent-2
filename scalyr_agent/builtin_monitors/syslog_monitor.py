@@ -1354,9 +1354,9 @@ class SyslogHandler(object):
 
                     watcher.remove_log_config(module.module_name, log_config)
 
-                    for i in range(backup_count):
+                    for file_path in file.get_file_paths():
                         file_log_config = log_config.copy()
-                        file_log_config["path"] = f"{log_config['path']}.{i}"
+                        file_log_config["path"] = file_path
                         watcher.add_log_config(module.module_name, file_log_config)
 
                 return file
@@ -2272,9 +2272,9 @@ From Search view, query [monitor = 'syslog_monitor'](https://app.scalyr.com/even
 
                     watcher.remove_log_config(module.module_name, monitor.log_config)
 
-                    for i in range(backupCount):
+                    for file_path in handler.get_file_paths():
                         log_config = monitor.log_config.copy()
-                        log_config["path"] = f"{log_config['path']}.{i}"
+                        log_config["path"] = file_path
                         watcher.add_log_config(module.module_name, log_config)
 
                 return handler
