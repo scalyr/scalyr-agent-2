@@ -132,8 +132,9 @@ jobs:
           driver-opts: network=host
           endpoint: builders
 
-      - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
-        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+      # TODO Investigate, no longer working
+      #- name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
+      #  uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
 
       - name: Build requirements
         shell: bash
@@ -216,8 +217,9 @@ jobs:
           driver-opts: network=host
           endpoint: builders
 
-      - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
-        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+      # TODO Investigate, no longer working
+      #- name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
+      #  uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
 
       - name: Build image tarball
         shell: bash
@@ -330,8 +332,9 @@ jobs:
           name: container-image-tarball-k8s-${{ inputs.builder_name }}
           path: /tmp/image_tarball
 
-      - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
-        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+      # TODO Investigate, no longer working
+      #- name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
+      #  uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
 
       - name: Build Agent k8s Test Docker Image
         env:
@@ -672,8 +675,9 @@ jobs:
           name: container-image-tarball-k8s-${{ inputs.builder_name }}
           path: /tmp/image_tarball
 
-      - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
-        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+      # TODO Investigate, no longer working
+      #- name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
+      #  uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
 
       - name: Build Agent k8s Test Docker Image
         env:
@@ -862,8 +866,9 @@ jobs:
           driver-opts: network=host
           endpoint: builders
 
-      - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
-        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+      # TODO Investigate, no longer working
+      #- name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
+      #  uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
 
       - name: Setup minikube k8s cluster
         uses: ./.github/actions/setup-minikube-cluster/
@@ -878,10 +883,6 @@ jobs:
         with:
           name: container-image-tarball-k8s-${{ inputs.builder_name }}
           path: /tmp/image_tarball
-
-      - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
-        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
-
 
       - name: Build test image
         env:
@@ -972,17 +973,15 @@ jobs:
           driver-opts: network=host
           endpoint: builders
 
-      - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
-        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+      # TODO Investigate, no longer working
+      #- name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
+      #  uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
 
       - name: Download OCI tarball of the built image.
         uses: actions/download-artifact@v4
         with:
           name: container-image-tarball-${{ matrix.variant.image_type }}-${{ inputs.builder_name }}
           path: /tmp/image_tarball
-
-      - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
-        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
 
       - name: Build test image
         env:
