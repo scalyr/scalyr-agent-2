@@ -249,7 +249,7 @@ jobs:
   # Jobs which performs basic sanity checks for the Kubernetes Monitor and Kubernetes Events Monitor
   k8s_kubernetes_monitor_tests:
     name: Kubernetes Monitors - k8s ${{ inputs.builder_name }} ${{ matrix.k8s_version.version }}-${{ matrix.k8s_version.runtime}}
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 15
 
     if: ${{ ! vars.K8S_TESTS_DISABLED }}
@@ -610,7 +610,7 @@ jobs:
 
   k8s_open_metrics_monitor_tests:
     name: OpenMetrics Monitor - k8s ${{ inputs.builder_name }} ${{ matrix.k8s_version.version }}-${{ matrix.k8s_version.runtime}}
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     if: vars.K8S_TESTS_DISABLED != 'true' && github.ref_name != '_release_build' && inputs.builder_name != 'alpine'
     timeout-minutes: 15
 
@@ -1025,7 +1025,7 @@ jobs:
 
   publish_images:
     name: Publish image ${{ matrix.variant.image_type }}-${{ inputs.builder_name }}
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     if: github.ref_type == 'tag' || github.ref_name == 'master' || github.head_ref == 'release' || github.event_name == 'pull_request'
     needs:
       # k8s_kubernetes_monitor_tests, k8s_open_metrics_monitor_tests, k8s-smoketest checks are not needed before pushing a test version to dockerhub.
