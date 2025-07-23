@@ -117,6 +117,7 @@ def submit_result_to_codespeed(func):
     """
     Decorator which marks a pytest benchmark function with "submit_result_to_codespeed" marker.
     """
+
     # NOTE: functools.wraps doesn't work well enough under Python 2 so we need to use decorator
     # package
     def wrapped_function(func, *args, **kwargs):

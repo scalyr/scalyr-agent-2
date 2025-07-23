@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from scalyr_agent.monitor_utils.auto_flushing_rotating_file import AutoFlushingRotatingFile
+from scalyr_agent.monitor_utils.auto_flushing_rotating_file import (
+    AutoFlushingRotatingFile,
+)
 
 import os
 import os.path
@@ -69,13 +71,17 @@ class AutoFlushingRotatingUniqueFile(AutoFlushingRotatingFile):
             for entry in os.listdir(dirname):
                 path = os.path.join(dirname, entry)
                 if os.path.isfile(path):
-                    match = re.match(re.escape(self._file_path) + r'\.(\d+)$', path)
+                    match = re.match(re.escape(self._file_path) + r"\.(\d+)$", path)
                     if match:
-                        existing_paths += [(path, os.path.getmtime(path), int(match.groups()[-1]))]
+                        existing_paths += [
+                            (path, os.path.getmtime(path), int(match.groups()[-1]))
+                        ]
             existing_paths.sort(key=lambda x: x[1])
 
             self._current_postfix = existing_paths[0][2] if existing_paths else 0
-            self._current_file = open(self._file_path + "." + str(self._current_postfix), "w")
+            self._current_file = open(
+                self._file_path + "." + str(self._current_postfix), "w"
+            )
 
         self._current_size = 0
         self._lock = threading.Lock()
@@ -92,9 +98,13 @@ class AutoFlushingRotatingUniqueFile(AutoFlushingRotatingFile):
         try:
             if self._backup_count > 0 and self._max_bytes > 0:
                 if self._current_size + size > self._max_bytes:
-                    self._current_postfix = (self._current_postfix + 1) % self._backup_count
+                    self._current_postfix = (
+                        self._current_postfix + 1
+                    ) % self._backup_count
                     self._current_file.close()
-                    self._current_file = open(self._file_path + "." + str(self._current_postfix), "w")
+                    self._current_file = open(
+                        self._file_path + "." + str(self._current_postfix), "w"
+                    )
                     self._current_size = 0
 
             self._current_file.write(message)
@@ -112,6 +122,6 @@ class AutoFlushingRotatingUniqueFile(AutoFlushingRotatingFile):
 
     def get_file_paths(self):
         if self._backup_count > 0 and self._max_bytes > 0:
-            return [ self._file_path + "." + str(i) for i in range(self._backup_count) ]
+            return [self._file_path + "." + str(i) for i in range(self._backup_count)]
         else:
-            return [ self._file_path ]
+            return [self._file_path]

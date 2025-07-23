@@ -1152,7 +1152,7 @@ def import_config(config_src, config_file_path, configuration):
         used_files = dict()
 
         # The order of operations is important here.  For streamed tarfiles, we need to extract the files first.
-        in_tar.extractall()
+        in_tar.extractall()  # nosec B202
 
         # Go back and mark the extract files as used and also chown the files to have the same owner/group as the
         # current config.

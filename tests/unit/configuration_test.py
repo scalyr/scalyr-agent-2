@@ -2789,17 +2789,17 @@ class TestGetConfigFromEnv(TestConfigurationBase):
             get_config_from_env("server_attributes", convert_to=JsonObject),
         )
 
-        os.environ[
-            "SCALYR_SERVER_ATTRIBUTES"
-        ] = '{"serverHost": "foo1.example.com", "tier": "foo"}'
+        os.environ["SCALYR_SERVER_ATTRIBUTES"] = (
+            '{"serverHost": "foo1.example.com", "tier": "foo"}'
+        )
         self.assertEqual(
             JsonObject(content={"serverHost": "foo1.example.com", "tier": "foo"}),
             get_config_from_env("server_attributes", convert_to=JsonObject),
         )
 
-        os.environ[
-            "SCALYR_SERVER_ATTRIBUTES"
-        ] = '{"serverHost": "foo1.example.com", "tier": "foo", "bar": "baz"}'
+        os.environ["SCALYR_SERVER_ATTRIBUTES"] = (
+            '{"serverHost": "foo1.example.com", "tier": "foo", "bar": "baz"}'
+        )
         self.assertEqual(
             JsonObject(
                 content={"serverHost": "foo1.example.com", "tier": "foo", "bar": "baz"}

@@ -64,7 +64,10 @@ def _add_image_parsers():
     )
 
     image_parser.add_argument(
-        "--buildx-builder-name", required=False, help="Name of the buildx builder.", default=None
+        "--buildx-builder-name",
+        required=False,
+        help="Name of the buildx builder.",
+        default=None,
     )
 
     image_parser_action_subparsers = image_parser.add_subparsers(
@@ -118,6 +121,9 @@ def _add_image_parsers():
         default="docker.io",
         help="Hostname of the target registry.",
     )
+
+    image_publish_parser.add_argument("--registry-username", dest="registry_username")
+    image_publish_parser.add_argument("--registry-password", dest="registry_password")
 
     image_publish_parser.add_argument(
         "--name-prefix", required=True, help="Prefix for the image name."
@@ -180,7 +186,9 @@ if __name__ == "__main__":
     elif args.command == "image":
         image_builder_cls = ALL_CONTAINERISED_AGENT_BUILDERS[args.builder_name]
 
-        builder = image_builder_cls(base_image=args.base_image, buildx_builder_name=args.buildx_builder_name)
+        builder = image_builder_cls(
+            base_image=args.base_image, buildx_builder_name=args.buildx_builder_name
+        )
         if args.action == "load":
             builder.build_and_load_docker_image(
                 image_type=ImageType(args.image_type),
@@ -221,6 +229,9 @@ if __name__ == "__main__":
                 tags=final_tags,
                 existing_oci_layout_tarball=existing_oci_layout_tarball,
                 no_verify_tls=args.no_verify_tls,
+                registry=args.registry,
+                registry_username=args.registry_username,
+                registry_password=args.registry_password,
             )
             exit(0)
     elif args.command == "package":

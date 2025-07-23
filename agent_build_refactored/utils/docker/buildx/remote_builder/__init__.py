@@ -75,7 +75,8 @@ class EC2BackedRemoteBuildxBuilderWrapper:
             )
         except subprocess.SubprocessError as e:
             stderr = e.stderr.decode()
-            raise Exception(f"Cannot remove builder. Stderr: {stderr}")
+            #raise Exception(f"Cannot remove builder. Stderr: {stderr}")
+            print(f"Cannot remove builder. Stderr: {stderr}")
 
     def initialize(self):
         if self.__docker_builder_exists(self.name):

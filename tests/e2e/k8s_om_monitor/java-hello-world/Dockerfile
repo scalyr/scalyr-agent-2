@@ -1,6 +1,6 @@
 # Use the official maven/Java 11 image to create a build artifact.
 # https://hub.docker.com/_/maven
-FROM maven:3.6-openjdk-11-slim as builder
+FROM maven:3.8-openjdk-18-slim as builder
 #FROM adoptopenjdk/openjdk11:alpine-slim as builder
 #FROM arm32v7/openjdk:7-jdk-slim as builder
 #FROM arm32v7/adoptopenjdk:16-jdk as builder
@@ -16,7 +16,7 @@ COPY src ./src/
 RUN printenv
 RUN which mvn
 RUN ls -la /usr/share/maven
-RUN mvn package -DskipTests -s /usr/share/maven/ref/settings-docker.xml 
+RUN mvn package -DskipTests -s /usr/share/maven/ref/settings-docker.xml
 
 # Use AdoptOpenJDK for base image.
 # It's important to use OpenJDK 8u191 or above that has container support enabled.
@@ -25,7 +25,7 @@ RUN mvn package -DskipTests -s /usr/share/maven/ref/settings-docker.xml
 # FROM arm32v7/openjdk:7-jre-slim
 # FROM arm32v7/adoptopenjdk:11-jre
 #FROM adoptopenjdk/openjdk11:alpine-slim
-FROM maven:3.6-openjdk-11-slim
+FROM maven:3.8-openjdk-11-slim
 
 RUN apt-get update && apt-get install -y wget
 
@@ -39,7 +39,7 @@ COPY --from=builder /app/target/helloworld-*.jar /helloworld.jar
 # Run the web service on container startup.
 CMD ["java", "-javaagent:./jmx_prometheus_javaagent-0.15.0.jar=9404:config.yaml", \
      "-Djava.security.egd=file:/dev/./urandom", \
-     "-Dcom.sun.management.jmxremote.ssl=false", \ 
+     "-Dcom.sun.management.jmxremote.ssl=false", \
      "-Dcom.sun.management.jmxremote.authenticate=false", \
      "-Dcom.sun.management.jmxremote.port=5555", \
      "-Dserver.port=${PORT}","-jar", \

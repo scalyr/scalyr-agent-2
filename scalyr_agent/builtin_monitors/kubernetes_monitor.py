@@ -2854,14 +2854,14 @@ class ContainerChecker(object):
                 docker_client_kwargs = {}
 
                 if self._global_config.k8s_docker_client_timeout:
-                    docker_client_kwargs[
-                        "timeout"
-                    ] = self._global_config.k8s_docker_client_timeout
+                    docker_client_kwargs["timeout"] = (
+                        self._global_config.k8s_docker_client_timeout
+                    )
 
                 if self._global_config.k8s_docker_client_max_pool_size:
-                    docker_client_kwargs[
-                        "max_pool_size"
-                    ] = self._global_config.k8s_docker_client_max_pool_size
+                    docker_client_kwargs["max_pool_size"] = (
+                        self._global_config.k8s_docker_client_max_pool_size
+                    )
 
                 global_log.info(
                     "kubernetes_monitor is using docker for listing containers (docker_py_version=%s, client_kwargs=%s)"
@@ -4615,9 +4615,11 @@ cluster.
                 if container_name in containers_to_check:
                     k8s_extra = all_k8s_extra.get(container_name, {})
                     self.__log_cri_container_metrics(
-                        k8s_extra["pod_uid"]
-                        if "pod_uid" in k8s_extra
-                        else container_name,
+                        (
+                            k8s_extra["pod_uid"]
+                            if "pod_uid" in k8s_extra
+                            else container_name
+                        ),
                         container_stat,
                         k8s_extra,
                     )

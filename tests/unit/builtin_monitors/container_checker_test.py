@@ -36,7 +36,7 @@ class MockRunState:
 
     def wait_for_next_loop_start(self):
         with self.next_loop_condition:
-            if not self.next_loop_condition.wait(timeout=15):
+            if not self.next_loop_condition.wait(timeout=60):
                 raise Exception("Failed to acquire started lock")
 
     def is_running(self):

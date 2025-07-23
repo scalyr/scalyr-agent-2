@@ -1528,6 +1528,7 @@ class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
 
         self.assertEqual(parser._remaining, bytearray())
 
+
 class SyslogMonitorUniqueFileLogRotationTest(unittest.TestCase):
     def setUp(self):
         class_name = "scalyr_agent.builtin_monitors.syslog_monitor"
@@ -1538,7 +1539,7 @@ class SyslogMonitorUniqueFileLogRotationTest(unittest.TestCase):
             "max_log_size": 100,
             "max_log_rotations": 3,
             "unique_file_log_rotation": True,
-            "log_flush_delay": 0
+            "log_flush_delay": 0,
         }
 
         # Arranges for the global/class logger to write to stdout
@@ -1546,13 +1547,12 @@ class SyslogMonitorUniqueFileLogRotationTest(unittest.TestCase):
         scalyr_logging.set_log_level(logging.INFO)
 
         self.monitor = SyslogMonitor(
-            self.monitor_config,
-            logging.getLogger(class_name + __class__.__name__)
+            self.monitor_config, logging.getLogger(class_name + __class__.__name__)
         )
 
         self.config_filename = "agent.config-" + __class__.__name__
         with open(self.config_filename, "w") as file:
-            file.write("{ \"api_key\": \"invalid\" }")
+            file.write('{ "api_key": "invalid" }')
 
         class MockedDefaultPaths:
             def __init__(self):
@@ -1562,25 +1562,31 @@ class SyslogMonitorUniqueFileLogRotationTest(unittest.TestCase):
         config = Configuration(
             self.config_filename,
             MockedDefaultPaths(),
-            logging.getLogger("CopyingManager-" + __class__.__name__)
+            logging.getLogger("CopyingManager-" + __class__.__name__),
         )
         config.parse()
 
-        self.copying_manager = CopyingManager(config, [ self.monitor ])
+        self.copying_manager = CopyingManager(config, [self.monitor])
 
         self.copying_manager.log_config_history = []
 
         def add_log_config(self, monitor_name, log_config):
-            self.log_config_history += [ ("add", log_config["path"]) ]
-        self.copying_manager.add_log_config = types.MethodType(add_log_config, self.copying_manager)
+            self.log_config_history += [("add", log_config["path"])]
+
+        self.copying_manager.add_log_config = types.MethodType(
+            add_log_config, self.copying_manager
+        )
 
         def remove_log_config(self, monitor_name, log_config):
-            self.log_config_history += [ ("remove", log_config["path"]) ]
-        self.copying_manager.remove_log_config = types.MethodType(remove_log_config, self.copying_manager)
+            self.log_config_history += [("remove", log_config["path"])]
+
+        self.copying_manager.remove_log_config = types.MethodType(
+            remove_log_config, self.copying_manager
+        )
 
         self.monitor.open_metric_log()
         self.monitor.start()
-        time.sleep(1) # Time for listening sockets to be opened
+        time.sleep(1)  # Time for listening sockets to be opened
 
         self.socket = socket.socket(socket.AF_INET)
         self.socket.connect(("localhost", 8514))
@@ -1608,70 +1614,92 @@ class SyslogMonitorUniqueFileLogRotationTest(unittest.TestCase):
                         contents[filename] = file.read().splitlines()
             return contents
 
-        expected_log_config_history = [ ("remove", self.monitor_config["message_log"]) ]
+        expected_log_config_history = [("remove", self.monitor_config["message_log"])]
         for i in range(self.monitor_config["max_log_rotations"]):
-            expected_log_config_history.append(("add", f"{self.monitor_config['message_log']}.{i}"))
+            expected_log_config_history.append(
+                ("add", f"{self.monitor_config['message_log']}.{i}")
+            )
 
         self.assertEqual(
-            [ (type, os.path.abspath(path)) for type, path in expected_log_config_history ],
-            [ (type, os.path.abspath(path)) for type, path in self.copying_manager.log_config_history ]
+            [
+                (type, os.path.abspath(path))
+                for type, path in expected_log_config_history
+            ],
+            [
+                (type, os.path.abspath(path))
+                for type, path in self.copying_manager.log_config_history
+            ],
         )
 
-        self.socket.sendall("<1> 2025-01-01T00:01:00Z host test message 1\n".encode("utf-8"))
-        self.socket.sendall("<1> 2025-01-01T00:01:00Z host test message 2\n".encode("utf-8"))
-        time.sleep(1) # Time for the OS to flush the file buffer
+        self.socket.sendall(
+            "<1> 2025-01-01T00:01:00Z host test message 1\n".encode("utf-8")
+        )
+        self.socket.sendall(
+            "<1> 2025-01-01T00:01:00Z host test message 2\n".encode("utf-8")
+        )
+        time.sleep(1)  # Time for the OS to flush the file buffer
 
         self.assertEqual(
             {
                 f"{self.monitor_config['message_log']}.0": [
                     "<1> 2025-01-01T00:01:00Z host test message 1",
-                    "<1> 2025-01-01T00:01:00Z host test message 2"
+                    "<1> 2025-01-01T00:01:00Z host test message 2",
                 ]
             },
-            get_file_contents()
+            get_file_contents(),
         )
 
-        self.socket.sendall("<1> 2025-01-01T00:01:00Z host test message 3\n".encode("utf-8"))
-        self.socket.sendall("<1> 2025-01-01T00:01:00Z host test message 4\n".encode("utf-8"))
+        self.socket.sendall(
+            "<1> 2025-01-01T00:01:00Z host test message 3\n".encode("utf-8")
+        )
+        self.socket.sendall(
+            "<1> 2025-01-01T00:01:00Z host test message 4\n".encode("utf-8")
+        )
         time.sleep(1)
 
         self.assertEqual(
             {
                 f"{self.monitor_config['message_log']}.0": [
                     "<1> 2025-01-01T00:01:00Z host test message 1",
-                    "<1> 2025-01-01T00:01:00Z host test message 2"
+                    "<1> 2025-01-01T00:01:00Z host test message 2",
                 ],
                 f"{self.monitor_config['message_log']}.1": [
                     "<1> 2025-01-01T00:01:00Z host test message 3",
-                    "<1> 2025-01-01T00:01:00Z host test message 4"
-                ]
+                    "<1> 2025-01-01T00:01:00Z host test message 4",
+                ],
             },
-            get_file_contents()
+            get_file_contents(),
         )
 
-        self.socket.sendall("<1> 2025-01-01T00:01:00Z host test message 5\n".encode("utf-8"))
-        self.socket.sendall("<1> 2025-01-01T00:01:00Z host test message 6\n".encode("utf-8"))
+        self.socket.sendall(
+            "<1> 2025-01-01T00:01:00Z host test message 5\n".encode("utf-8")
+        )
+        self.socket.sendall(
+            "<1> 2025-01-01T00:01:00Z host test message 6\n".encode("utf-8")
+        )
         time.sleep(1)
 
         self.assertEqual(
             {
                 f"{self.monitor_config['message_log']}.0": [
                     "<1> 2025-01-01T00:01:00Z host test message 1",
-                    "<1> 2025-01-01T00:01:00Z host test message 2"
+                    "<1> 2025-01-01T00:01:00Z host test message 2",
                 ],
                 f"{self.monitor_config['message_log']}.1": [
                     "<1> 2025-01-01T00:01:00Z host test message 3",
-                    "<1> 2025-01-01T00:01:00Z host test message 4"
+                    "<1> 2025-01-01T00:01:00Z host test message 4",
                 ],
                 f"{self.monitor_config['message_log']}.2": [
                     "<1> 2025-01-01T00:01:00Z host test message 5",
-                    "<1> 2025-01-01T00:01:00Z host test message 6"
-                ]
+                    "<1> 2025-01-01T00:01:00Z host test message 6",
+                ],
             },
-            get_file_contents()
+            get_file_contents(),
         )
 
-        self.socket.sendall("<1> 2025-01-01T00:01:00Z host test message 7\n".encode("utf-8"))
+        self.socket.sendall(
+            "<1> 2025-01-01T00:01:00Z host test message 7\n".encode("utf-8")
+        )
         time.sleep(1)
 
         self.assertEqual(
@@ -1681,12 +1709,12 @@ class SyslogMonitorUniqueFileLogRotationTest(unittest.TestCase):
                 ],
                 f"{self.monitor_config['message_log']}.1": [
                     "<1> 2025-01-01T00:01:00Z host test message 3",
-                    "<1> 2025-01-01T00:01:00Z host test message 4"
+                    "<1> 2025-01-01T00:01:00Z host test message 4",
                 ],
                 f"{self.monitor_config['message_log']}.2": [
                     "<1> 2025-01-01T00:01:00Z host test message 5",
-                    "<1> 2025-01-01T00:01:00Z host test message 6"
-                ]
+                    "<1> 2025-01-01T00:01:00Z host test message 6",
+                ],
             },
-            get_file_contents()
+            get_file_contents(),
         )

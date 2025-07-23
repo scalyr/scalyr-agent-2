@@ -1545,6 +1545,7 @@ def create_change_logs():
     will have the same content as CHANGELOG.md but formatted by the respective standards for the different
     packaging systems.
     """
+
     # We define a helper function named print_release_notes that is used down below.
     def print_release_notes(output_fp, notes, level_prefixes, level=0):
         """Emits the notes for a single release to output_fp.
