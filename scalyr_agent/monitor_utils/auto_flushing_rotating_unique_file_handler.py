@@ -54,7 +54,9 @@ class AutoFlushingRotatingUniqueFileHandler(AutoFlushingRotatingFileHandler):
         }
     """
 
-    def __init__(self, filename, mode="a", maxBytes=0, backupCount=0, delay=0, flushDelay=0):
+    def __init__(
+        self, filename, mode="a", maxBytes=0, backupCount=0, delay=0, flushDelay=0
+    ):
         StreamHandler.__init__(self)
 
         self._max_bytes = maxBytes
@@ -73,13 +75,17 @@ class AutoFlushingRotatingUniqueFileHandler(AutoFlushingRotatingFileHandler):
             for entry in os.listdir(dirname):
                 path = os.path.join(dirname, entry)
                 if os.path.isfile(path):
-                    match = re.match(re.escape(self._file_path) + r'\.(\d+)$', path)
+                    match = re.match(re.escape(self._file_path) + r"\.(\d+)$", path)
                     if match:
-                        existing_paths += [(path, os.path.getmtime(path), int(match.groups()[-1]))]
+                        existing_paths += [
+                            (path, os.path.getmtime(path), int(match.groups()[-1]))
+                        ]
             existing_paths.sort(key=lambda x: x[1])
 
             self._current_postfix = existing_paths[0][2] if existing_paths else 0
-            self._current_file = open(self._file_path + "." + str(self._current_postfix), "w")
+            self._current_file = open(
+                self._file_path + "." + str(self._current_postfix), "w"
+            )
 
         self._current_size = 0
 
@@ -130,9 +136,13 @@ class AutoFlushingRotatingUniqueFileHandler(AutoFlushingRotatingFileHandler):
         try:
             if self._backup_count > 0 and self._max_bytes > 0:
                 if self._current_size + size > self._max_bytes:
-                    self._current_postfix = (self._current_postfix + 1) % self._backup_count
+                    self._current_postfix = (
+                        self._current_postfix + 1
+                    ) % self._backup_count
                     self._current_file.close()
-                    self._current_file = open(self._file_path + "." + str(self._current_postfix), "w")
+                    self._current_file = open(
+                        self._file_path + "." + str(self._current_postfix), "w"
+                    )
                     self._current_size = 0
 
             # NB The newline is automatically converted according to the platform
@@ -147,6 +157,6 @@ class AutoFlushingRotatingUniqueFileHandler(AutoFlushingRotatingFileHandler):
 
     def get_file_paths(self):
         if self._backup_count > 0 and self._max_bytes > 0:
-            return [ self._file_path + "." + str(i) for i in range(self._backup_count) ]
+            return [self._file_path + "." + str(i) for i in range(self._backup_count)]
         else:
-            return [ self._file_path ]
+            return [self._file_path]

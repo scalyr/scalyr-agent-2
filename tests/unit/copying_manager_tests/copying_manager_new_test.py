@@ -539,6 +539,7 @@ class TestBasic(CopyingManagerTest):
             log_config = self._env_builder.config.parse_log_config(
                 {"path": file.str_path}
             )
+            # pylint: disable-next=not-callable
             manager.add_log_config("scheduled-deletion", log_config)
 
         assert manager.worker_sessions_log_processors_count == 0

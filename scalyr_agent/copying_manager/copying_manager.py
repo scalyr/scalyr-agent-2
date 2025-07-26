@@ -764,6 +764,7 @@ class CopyingManager(StoppableThread, LogWatcher):
             if self.__dynamic_paths.contains(path, worker_id):
                 new_log_configs.append(self.update_log_config(monitor_name, log_config))
             else:
+                # pylint: disable-next=not-callable
                 new_log_configs.append(self.add_log_config(monitor_name, log_config))
             worker_ids.append(worker_id)
 

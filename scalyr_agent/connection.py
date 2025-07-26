@@ -24,13 +24,16 @@ import re
 import ssl
 import socket
 import logging
+import sys
 
 import six
 import six.moves.http_client
 
 import scalyr_agent.scalyr_logging as scalyr_logging
-from scalyr_agent.compat import ssl_match_hostname
-from scalyr_agent.compat import CertificateError
+
+if sys.version_info <= (3, 11):
+    from scalyr_agent.compat import ssl_match_hostname
+    from scalyr_agent.compat import CertificateError
 from scalyr_agent.compat import PY_post_equal_279
 from scalyr_agent.compat import PY3_post_equal_37
 
@@ -606,8 +609,9 @@ class HTTPSConnectionWithTimeoutAndVerification(six.moves.http_client.HTTPSConne
             # should happen automatically post handshake, but to also support older versions and
             # ensure this verification is always performed, we call this method manually here.
             # Will throws CertificateError in case host validation fails
-            cert = self.sock.getpeercert()
-            ssl_match_hostname(cert=cert, hostname=self.host)
+            if sys.version_info <= (3, 11):
+                cert = self.sock.getpeercert()
+                ssl_match_hostname(cert=cert, hostname=self.host)
         else:
             log.warn(
                 "Server certificate validation has been disabled while communicating with Scalyr. "

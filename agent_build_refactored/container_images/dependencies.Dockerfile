@@ -1,5 +1,5 @@
 FROM extended_base as build_requirement_libs
-RUN python3 -m pip install --upgrade setuptools pip --root /tmp/requrements_root
+RUN python3 -m pip install --upgrade setuptools --root /tmp/requrements_root
 RUN cp -a /tmp/requrements_root/. /
 ARG AGENT_REQUIREMENTS
 RUN echo "${AGENT_REQUIREMENTS}" > /tmp/requirements.txt

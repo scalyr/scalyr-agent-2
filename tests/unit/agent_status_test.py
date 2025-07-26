@@ -370,9 +370,9 @@ class TestReportStatus(ScalyrTestCase):
         os.environ["SCALYR_API_KEY"] = "This private key should be redacted"
         # intentionally leave out required scalyr_server
         os.environ["SCALYR_K8S_CLUSTER_NAME"] = "test_cluster"
-        os.environ[
-            "K8S_EVENT_DISABLE"
-        ] = "Special-case-included despite missing prefix.  Appears at end of main keys."
+        os.environ["K8S_EVENT_DISABLE"] = (
+            "Special-case-included despite missing prefix.  Appears at end of main keys."
+        )
         os.environ["SCALYR_K8S_EVENT_DISABLE"] = "true"
         os.environ["SCALYR_AAA"] = "Should appear just after main keys"
         os.environ["SCALYR_XXX_A"] = "A before b (ignores case)"
@@ -658,9 +658,9 @@ Failed monitors:
         os.environ["SCALYR_API_KEY"] = "This private key should be redacted"
         # intentionally leave out required scalyr_server
         os.environ["SCALYR_K8S_CLUSTER_NAME"] = "test_cluster"
-        os.environ[
-            "K8S_EVENT_DISABLE"
-        ] = "Special-case-included despite missing prefix.  Appears at end of main keys."
+        os.environ["K8S_EVENT_DISABLE"] = (
+            "Special-case-included despite missing prefix.  Appears at end of main keys."
+        )
         os.environ["SCALYR_K8S_EVENT_DISABLE"] = "true"
         os.environ["SCALYR_AAA"] = "Should appear just after main keys"
         os.environ["SCALYR_XXX_A"] = "A before b (ignores case)"

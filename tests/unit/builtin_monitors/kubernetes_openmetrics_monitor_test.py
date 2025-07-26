@@ -231,9 +231,9 @@ class KubernetesOpenMetricsMonitorTestCase(ScalyrTestCase):
         self.assertEqual(mock_logger.warn.call_count, 0)
 
         annotations = copy.copy(base_annotations)
-        annotations[
-            SCALYR_AGENT_ANNOTATION_ATTRIBUTES
-        ] = '{"app": "test", "template-app": "${pod_labels_app}", "three": "${pod_labels_test.bar/bar}", "invalid": "${pod_labels_doesnt_exist}", "instance": "${pod_labels_app.kubernetes.io/instance}"}'
+        annotations[SCALYR_AGENT_ANNOTATION_ATTRIBUTES] = (
+            '{"app": "test", "template-app": "${pod_labels_app}", "three": "${pod_labels_test.bar/bar}", "invalid": "${pod_labels_doesnt_exist}", "instance": "${pod_labels_app.kubernetes.io/instance}"}'
+        )
 
         expected_attributes = {
             "app": "test",

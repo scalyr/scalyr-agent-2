@@ -1926,6 +1926,7 @@ class RedirectorClient(StoppableThread):
         @param deadline: The walltime when this operation should return
         @type deadline: float
         """
+
         # Helper method to determine if the exit condition has been met.
         def deadline_exceeded_or_is_stopped(current_time):
             return current_time > deadline or not self._run_state.is_running()

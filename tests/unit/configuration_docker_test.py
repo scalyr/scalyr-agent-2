@@ -213,9 +213,9 @@ class TestConfigurationDocker(TestConfiguration):
         ]
 
         os.environ["SCALYR_LABEL_INCLUDE_GLOBS"] = "*env_glob1*, *env_glob2*"
-        os.environ[
-            "SCALYR_LABEL_EXCLUDE_GLOBS"
-        ] = "*env_glob1_exclude_1, *env_glob1_exclude_2, *env_glob1_exclude_3"
+        os.environ["SCALYR_LABEL_EXCLUDE_GLOBS"] = (
+            "*env_glob1_exclude_1, *env_glob1_exclude_2, *env_glob1_exclude_3"
+        )
         self._write_file_with_separator_conversion(
             """ {
             api_key: "hi there",

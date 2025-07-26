@@ -48,7 +48,7 @@ if PY2_pre_279 or PY3_pre_32:
             "Missing backports.ssl_match_hostname module, hostname verification can't "
             "be performed"
         )
-else:
+elif sys.version_info <= (3, 11):
     # ssl module in Python 2 >= 2.7.9 and Python 3 >= 3.2 includes match hostname function
     from ssl import match_hostname as ssl_match_hostname  # NOQA
     from ssl import CertificateError  # type: ignore # NOQA
@@ -123,9 +123,11 @@ if six.PY2:
             for element in iterable:
                 if type(element) is tuple:
                     yield tuple(
-                        v.decode("utf-8", "replace")
-                        if type(v) is six.binary_type
-                        else v
+                        (
+                            v.decode("utf-8", "replace")
+                            if type(v) is six.binary_type
+                            else v
+                        )
                         for v in element
                     )
                 else:

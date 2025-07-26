@@ -115,9 +115,9 @@ for package_builder in ALL_PACKAGE_BUILDERS.values():
         NAME = "remote_test_dependency_builder"
         PACKAGE_BUILDER = package_builder
 
-    remote_test_dependency_builders[
-        package_builder.NAME
-    ] = _RemotePackageTestDependenciesBuilder
+    remote_test_dependency_builders[package_builder.NAME] = (
+        _RemotePackageTestDependenciesBuilder
+    )
 
 
 def main(
