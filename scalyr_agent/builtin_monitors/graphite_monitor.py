@@ -455,7 +455,9 @@ class GraphitePickleServer(ServerProcessor):
         try:
             # Use pickle to read the binary data.
             data_object = pickle.loads(request)
-        except Exception:  # pickle.loads is document as raising any type of exception, so have to catch them all.
+        except (
+            Exception
+        ):  # pickle.loads is document as raising any type of exception, so have to catch them all.
             self.__logger.warn(
                 "Could not parse incoming metric line from graphite pickle server, ignoring",
                 error_code="graphite_monitor/badUnpickle",
@@ -464,7 +466,7 @@ class GraphitePickleServer(ServerProcessor):
 
         try:
             # The format should be [[ metric [ timestamp, value]] ... ]
-            for (metric, datapoint) in data_object:
+            for metric, datapoint in data_object:
                 value = float(datapoint[1])
                 orig_timestamp = float(datapoint[0])
                 self.__logger.emit_value(

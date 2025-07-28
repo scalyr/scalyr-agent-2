@@ -55,7 +55,7 @@ jobs:
       matrix:
         builder:
           - { "name": "aio-aarch64", runner: "aws-aarch64" }
-          - { "name": "aio-x86_64", runner: "ubuntu-22.04" }
+          - { "name": "aio-x86_64", runner: "ubuntu-24.04" }
 
     steps:
       - name: Checkout repository
@@ -113,12 +113,12 @@ jobs:
     strategy:
       matrix:
         variant:
-          - { "builder_name": "aio-x86_64",  "package_type": "deb", runner: "ubuntu-22.04" }
-          - { "builder_name": "aio-x86_64",  "package_type": "rpm", runner: "ubuntu-22.04" }
+          - { "builder_name": "aio-x86_64",  "package_type": "deb", runner: "ubuntu-24.04" }
+          - { "builder_name": "aio-x86_64",  "package_type": "rpm", runner: "ubuntu-24.04" }
           - { "builder_name": "aio-aarch64", "package_type": "deb", runner: "aws-aarch64" }
           - { "builder_name": "aio-aarch64", "package_type": "rpm", runner: "aws-aarch64" }
-          - { "builder_name": "non-aio",     "package_type": "deb", runner: "ubuntu-22.04" }
-          - { "builder_name": "non-aio",     "package_type": "rpm", runner: "ubuntu-22.04" }
+          - { "builder_name": "non-aio",     "package_type": "deb", runner: "ubuntu-24.04" }
+          - { "builder_name": "non-aio",     "package_type": "rpm", runner: "ubuntu-24.04" }
     steps:
       - name: Checkout repository
         uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4

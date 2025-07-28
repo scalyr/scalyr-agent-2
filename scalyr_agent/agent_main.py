@@ -755,9 +755,9 @@ class ScalyrAgent(object):
                 machine_stats["cpu_percent"] = psutil.cpu_percent()
                 machine_stats["cpu_count"] = psutil.cpu_count()
                 machine_stats["getloadavg"] = psutil.getloadavg()
-                machine_stats[
-                    "virtual_memory_percent"
-                ] = psutil.virtual_memory().percent
+                machine_stats["virtual_memory_percent"] = (
+                    psutil.virtual_memory().percent
+                )
             except Exception as e:
                 machine_stats["error"] = str(e)
 
@@ -1667,9 +1667,9 @@ class ScalyrAgent(object):
                 self.__config.scalyr_server, raw_scalyr_server
             )
 
-            last_config_change_check_time = (
-                last_essential_monitors_check_time
-            ) = time.time()
+            last_config_change_check_time = last_essential_monitors_check_time = (
+                time.time()
+            )
 
             # Create generator that has to check config for changes and, if so, reload everything which is needed
             # according to a new configuration.
@@ -2289,9 +2289,9 @@ class ScalyrAgent(object):
             elif status_format == "json":
                 status_data = agent_status.to_dict()
                 status_data["overall_stats"] = self.__overall_stats.to_dict()
-                status_data[
-                    "avg_status_report_duration"
-                ] = agent_status.avg_status_report_duration
+                status_data["avg_status_report_duration"] = (
+                    agent_status.avg_status_report_duration
+                )
                 tmp_file.write(scalyr_util.json_encode(status_data))
 
             tmp_file.close()

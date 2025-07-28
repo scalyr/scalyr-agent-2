@@ -1346,8 +1346,21 @@ class SyslogHandler(object):
         self.__syslog_attributes = JsonObject(config.get("attributes") or {})
 
         if config.get("unique_file_log_rotation"):
-            def unique_file_factory(handler, log_config, filename=None, max_bytes=0, backup_count=0, flush_delay=0):
-                file = AutoFlushingRotatingUniqueFile(filename=filename, max_bytes=max_bytes, backup_count=backup_count, flush_delay=flush_delay)
+
+            def unique_file_factory(
+                handler,
+                log_config,
+                filename=None,
+                max_bytes=0,
+                backup_count=0,
+                flush_delay=0,
+            ):
+                file = AutoFlushingRotatingUniqueFile(
+                    filename=filename,
+                    max_bytes=max_bytes,
+                    backup_count=backup_count,
+                    flush_delay=flush_delay,
+                )
 
                 if backup_count > 0 and max_bytes > 0:
                     watcher, module = handler.__get_log_watcher()
@@ -1363,8 +1376,21 @@ class SyslogHandler(object):
 
             self.__file_factory = unique_file_factory
         else:
-            def file_factory(handler, log_config, filename=None, max_bytes=0, backup_count=0, flush_delay=0):
-                return AutoFlushingRotatingFile(filename=filename, max_bytes=max_bytes, backup_count=backup_count, flush_delay=flush_delay)
+
+            def file_factory(
+                handler,
+                log_config,
+                filename=None,
+                max_bytes=0,
+                backup_count=0,
+                flush_delay=0,
+            ):
+                return AutoFlushingRotatingFile(
+                    filename=filename,
+                    max_bytes=max_bytes,
+                    backup_count=backup_count,
+                    flush_delay=flush_delay,
+                )
 
             self.__file_factory = file_factory
 
@@ -2264,8 +2290,16 @@ From Search view, query [monitor = 'syslog_monitor'](https://app.scalyr.com/even
         self._docker_options = None
 
         if self._config.get("unique_file_log_rotation"):
-            def unique_file_handler_factory(monitor, filename=None, maxBytes=0, backupCount=0, flushDelay=0):
-                handler = AutoFlushingRotatingUniqueFileHandler(filename, maxBytes=maxBytes, backupCount=backupCount, flushDelay=flushDelay)
+
+            def unique_file_handler_factory(
+                monitor, filename=None, maxBytes=0, backupCount=0, flushDelay=0
+            ):
+                handler = AutoFlushingRotatingUniqueFileHandler(
+                    filename,
+                    maxBytes=maxBytes,
+                    backupCount=backupCount,
+                    flushDelay=flushDelay,
+                )
 
                 if backupCount > 0 and maxBytes > 0:
                     watcher, module = monitor.__get_log_watcher()
@@ -2281,8 +2315,16 @@ From Search view, query [monitor = 'syslog_monitor'](https://app.scalyr.com/even
 
             self.__file_handler_factory = unique_file_handler_factory
         else:
-            def file_handler_factory(monitor, filename=None, maxBytes=0, backupCount=0, flushDelay=0):
-                return AutoFlushingRotatingFileHandler(filename, maxBytes=maxBytes, backupCount=backupCount, flushDelay=flushDelay)
+
+            def file_handler_factory(
+                monitor, filename=None, maxBytes=0, backupCount=0, flushDelay=0
+            ):
+                return AutoFlushingRotatingFileHandler(
+                    filename,
+                    maxBytes=maxBytes,
+                    backupCount=backupCount,
+                    flushDelay=flushDelay,
+                )
 
             self.__file_handler_factory = file_handler_factory
 
