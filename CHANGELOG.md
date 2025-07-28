@@ -2,6 +2,9 @@ Scalyr Agent 2 Changes By Release
 =================================
 
 ## 2.2.19 "Yvette" - Jul 28, 2025
+<!---
+Packaged by Joseph Makar <joseph.makar@sentinelone.com> on Jul 28, 2025 00:00 -0800
+--->
 
 * Introduced a new syslog monitor config option `unique_file_log_rotation` to support log rotation in Windows hosts
 
