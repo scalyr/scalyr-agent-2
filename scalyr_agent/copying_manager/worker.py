@@ -1023,9 +1023,9 @@ class CopyingManagerWorkerSession(
                     processor.close()
                     # Also save its checkpoint state, so it can be requested by the copying manager object (by
                     # calling the 'get_and_reset_closed_files_checkpoints' method).
-                    closed_files_checkpoints[
-                        processor.get_log_path()
-                    ] = processor.get_checkpoint()
+                    closed_files_checkpoints[processor.get_log_path()] = (
+                        processor.get_checkpoint()
+                    )
 
             # add new closed checkpoints to the main closed checkpoints collection.
             with self._closed_files_checkpoints_lock:

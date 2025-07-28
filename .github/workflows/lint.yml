@@ -30,7 +30,7 @@ jobs:
           github_token: ${{ github.token }}
 
   tox-lint:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     needs: pre_job
     # NOTE: We always want to run job on master branch
     if: ${{ needs.pre_job.outputs.should_skip != 'true' || github.ref_name == 'master' }}
@@ -48,7 +48,7 @@ jobs:
         uses: actions/setup-python@v4
         id: setup-python
         with:
-          python-version: 3.6.15
+          python-version: 3.8.18
 
       - name: Install tox
         env:

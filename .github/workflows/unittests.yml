@@ -50,14 +50,14 @@ jobs:
           - "3.10"
           - "3.11"
         os:
-          - ubuntu-20.04
+          - ubuntu-22.04
         platform:
           - ubuntu
         include:
           - os: windows-2022
             platform: windows
             python-version: "3.10"
-          - os: macos-12
+          - os: macos-13
             platform: macos
             python-version: "3.10"
     steps:
@@ -88,7 +88,7 @@ jobs:
           KIND: unittests
 
       - name: Upload pytest test results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: pytest-results-${{ matrix.python-version }}-${{ matrix.platform }}
           path: |
@@ -108,7 +108,7 @@ jobs:
 
   monitor-smoketests:
     name: Monitor Smoketests - Python ${{ matrix.python-version }}
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 10
 
     needs: pre_job
@@ -153,7 +153,7 @@ jobs:
           AGENT_HOST_NAME: monitors-test-${{ github.run_number }}
 
       - name: Upload pytest test results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: pytest-results-${{ matrix.python-version }}-monitor-smoketests
           path: |
@@ -189,11 +189,11 @@ jobs:
           - "3.10"
           - "3.11"
         os:
-          - ubuntu-20.04
+          - ubuntu-22.04
         platform:
           - ubuntu
         include:
-          - os: macos-12
+          - os: macos-13
             platform: macos
             python-version: "3.10"
 
@@ -228,9 +228,9 @@ jobs:
           KIND: end2end
 
       - name: Upload pytest test results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: pytest-results-${{ matrix.python-version }}-${{ matrix.variant }}
+          name: pytest-results-${{ matrix.python-version }}-${{ matrix.platform }}-agent-source
           path: |
             test-results/junit*.xml
         if: ${{ success() || failure() }}
@@ -247,7 +247,7 @@ jobs:
       - monitor-smoketests
     steps:
       - name: Download test results
-        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3
+        uses: actions/download-artifact@v4
         with:
           path: reports
       - name: Publish Test Results

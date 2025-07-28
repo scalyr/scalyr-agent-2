@@ -875,9 +875,9 @@ This monitor was released and enabled by default in Scalyr Agent version `2.0.43
                                         )
                                         continue
                                     if pod and pod.controller:
-                                        extra_fields[
-                                            "k8s-controller"
-                                        ] = pod.controller.name
+                                        extra_fields["k8s-controller"] = (
+                                            pod.controller.name
+                                        )
                                         extra_fields["k8s-kind"] = pod.controller.kind
                                 elif kind != "Node":
                                     controller = k8s_cache.controller(

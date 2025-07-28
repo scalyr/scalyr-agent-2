@@ -30,7 +30,7 @@ runs:
     - name: Create minikube Kubernetes ${{ inputs.k8s_version }} Cluster
       id: create-minikube-cluster
       if: ${{ inputs.k8s_version != '' && inputs.k8s_version != 'v1.24.0' }}
-      uses: manusa/actions-setup-minikube@3856c6fa039819f1c8e7e248b1fc5a8564e354c9 # v2.9.0
+      uses: manusa/actions-setup-minikube@v2.14.0
       with:
         minikube version: '${{ inputs.minikube_version }}'
         kubernetes version: '${{ inputs.k8s_version }}'

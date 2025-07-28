@@ -16,7 +16,6 @@ Changes:
 Fixes:
 * Fixed a bug where pod logs were removed from ingestion because of a temporrary K8s API error and the agent was not able to add them again.
 
-
 ## 2.2.17 "Sinthia" - Sep 17, 2024
 <!---
 Packaged by Ales Novak <ales.novak@sentinelone.com> on Sep 17, 2024 00:00 -0800
@@ -30,7 +29,6 @@ Changes:
 Fixes:
 * Added safety check when handling pending addEvents task to handle the following error: `AttributeError: 'AddEventsTask' object has no attribute '_CopyingManagerWorkerSession__receive_response_status'`
 * Added missing zstandard library to alpine image
-
 
 ## 2.2.16 "Lenny" - May 29, 2024
 <!---

@@ -550,9 +550,9 @@ class StatReader(BaseReader):
                 Metric("app.nice", None): float(fields[16]),
                 Metric("app.threads", None): int(fields[17]),
                 Metric("app.mem.majflt", None): int(fields[9]),
-                Metric("app.io.wait", None): int(fields[39])
-                if len(fields) >= 39
-                else 0,
+                Metric("app.io.wait", None): (
+                    int(fields[39]) if len(fields) >= 39 else 0
+                ),
             }
         )
         return collector

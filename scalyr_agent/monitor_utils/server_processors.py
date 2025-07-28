@@ -600,7 +600,8 @@ class RequestStream(object):
 
     def __get_buffer_write_position(self):
         """Returns the current write position of the buffer relative to the start of the buffer.  This is where
-        new bytes will be added.  This essentially says how many bytes the entire buffer is consuming."""
+        new bytes will be added.  This essentially says how many bytes the entire buffer is consuming.
+        """
         return self.__current_buffer_size
 
     def __get_buffer_read_position(self):

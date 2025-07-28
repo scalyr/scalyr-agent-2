@@ -1,4 +1,4 @@
-# Copyright 2017-2024 Scalyr Inc.
+# Copyright 2017-2025 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,7 +24,6 @@ from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import unicode_literals
 
-81
 if False:  # NOSONAR
     from typing import Tuple, Optional
 
@@ -74,6 +73,12 @@ from scalyr_agent import (
 from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
 from scalyr_agent.monitor_utils.auto_flushing_rotating_file import (
     AutoFlushingRotatingFile,
+)
+from scalyr_agent.monitor_utils.auto_flushing_rotating_unique_file import (
+    AutoFlushingRotatingUniqueFile,
+)
+from scalyr_agent.monitor_utils.auto_flushing_rotating_unique_file_handler import (
+    AutoFlushingRotatingUniqueFileHandler,
 )
 from scalyr_agent.util import (
     StoppableThread,
@@ -445,6 +450,16 @@ define_config_option(
     "log file is deleted.",
     convert_to=bool,
     default=True,
+)
+
+define_config_option(
+    __monitor__,
+    "unique_file_log_rotation",
+    "Optional (defaults to `false`). When `true` the log files are rotated such that a different "
+    "file name is written on rotation to avoid relying on inodes to determine log file rotatations. "
+    "This is required for log rotation on Windows.",
+    convert_to=bool,
+    default=False,
 )
 
 # NOTE: On Windows on newer Python 3 versions, BlockingIOError is thrown instead of
@@ -1330,6 +1345,55 @@ class SyslogHandler(object):
         self.__global_log_configs = global_config.log_configs if global_config else []
         self.__syslog_attributes = JsonObject(config.get("attributes") or {})
 
+        if config.get("unique_file_log_rotation"):
+
+            def unique_file_factory(
+                handler,
+                log_config,
+                filename=None,
+                max_bytes=0,
+                backup_count=0,
+                flush_delay=0,
+            ):
+                file = AutoFlushingRotatingUniqueFile(
+                    filename=filename,
+                    max_bytes=max_bytes,
+                    backup_count=backup_count,
+                    flush_delay=flush_delay,
+                )
+
+                if backup_count > 0 and max_bytes > 0:
+                    watcher, module = handler.__get_log_watcher()
+
+                    watcher.remove_log_config(module.module_name, log_config)
+
+                    for file_path in file.get_file_paths():
+                        file_log_config = log_config.copy()
+                        file_log_config["path"] = file_path
+                        watcher.add_log_config(module.module_name, file_log_config)
+
+                return file
+
+            self.__file_factory = unique_file_factory
+        else:
+
+            def file_factory(
+                handler,
+                log_config,
+                filename=None,
+                max_bytes=0,
+                backup_count=0,
+                flush_delay=0,
+            ):
+                return AutoFlushingRotatingFile(
+                    filename=filename,
+                    max_bytes=max_bytes,
+                    backup_count=backup_count,
+                    flush_delay=flush_delay,
+                )
+
+            self.__file_factory = file_factory
+
         if docker_logging:
             self._docker_options = docker_options
             if self._docker_options is None:
@@ -1437,7 +1501,9 @@ class SyslogHandler(object):
         """create our own rotating logger which will log raw messages out to disk."""
         result = None
         try:
-            result = AutoFlushingRotatingFile(
+            result = self.__file_factory(
+                self,
+                log_config,
                 filename=log_config["path"],
                 max_bytes=self.__max_log_size,
                 backup_count=self.__max_log_rotations,
@@ -1687,13 +1753,6 @@ class SyslogHandler(object):
                         )
 
                     if log_config_attribs is not None:
-                        logfile = AutoFlushingRotatingFile(
-                            filename=path,
-                            max_bytes=self.__max_log_size,
-                            backup_count=self.__max_log_rotations,
-                            flush_delay=self.__flush_delay,
-                        )
-
                         global_log.log(
                             scalyr_logging.DEBUG_LEVEL_1,
                             "__syslog_attributes=%s log_config_attribs=%s extra=%s"
@@ -1733,6 +1792,15 @@ class SyslogHandler(object):
                             log_config = watcher.add_log_config(
                                 module.module_name, log_config
                             )
+
+                        logfile = self.__file_factory(
+                            self,
+                            log_config,
+                            filename=path,
+                            max_bytes=self.__max_log_size,
+                            backup_count=self.__max_log_rotations,
+                            flush_delay=self.__flush_delay,
+                        )
 
                         self.__syslog_loggers[path] = {
                             "log_config": log_config,
@@ -2221,6 +2289,45 @@ From Search view, query [monitor = 'syslog_monitor'](https://app.scalyr.com/even
 
         self._docker_options = None
 
+        if self._config.get("unique_file_log_rotation"):
+
+            def unique_file_handler_factory(
+                monitor, filename=None, maxBytes=0, backupCount=0, flushDelay=0
+            ):
+                handler = AutoFlushingRotatingUniqueFileHandler(
+                    filename,
+                    maxBytes=maxBytes,
+                    backupCount=backupCount,
+                    flushDelay=flushDelay,
+                )
+
+                if backupCount > 0 and maxBytes > 0:
+                    watcher, module = monitor.__get_log_watcher()
+
+                    watcher.remove_log_config(module.module_name, monitor.log_config)
+
+                    for file_path in handler.get_file_paths():
+                        log_config = monitor.log_config.copy()
+                        log_config["path"] = file_path
+                        watcher.add_log_config(module.module_name, log_config)
+
+                return handler
+
+            self.__file_handler_factory = unique_file_handler_factory
+        else:
+
+            def file_handler_factory(
+                monitor, filename=None, maxBytes=0, backupCount=0, flushDelay=0
+            ):
+                return AutoFlushingRotatingFileHandler(
+                    filename,
+                    maxBytes=maxBytes,
+                    backupCount=backupCount,
+                    flushDelay=flushDelay,
+                )
+
+            self.__file_handler_factory = file_handler_factory
+
     def __build_server_list(self, protocol_string):
         """Builds a list containing (protocol, port) tuples, based on a comma separated list
         of protocols and optional ports e.g. protocol[:port], protocol[:port]
@@ -2291,7 +2398,8 @@ From Search view, query [monitor = 'syslog_monitor'](https://app.scalyr.com/even
             # logger handler hasn't been created yet, so assume unsuccssful
             success = False
             try:
-                self.__log_handler = AutoFlushingRotatingFileHandler(
+                self.__log_handler = self.__file_handler_factory(
+                    self,
                     filename=self.log_config["path"],
                     maxBytes=self.__max_log_size,
                     backupCount=self.__max_log_rotations,
