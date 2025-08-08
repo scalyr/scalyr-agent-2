@@ -55,7 +55,7 @@ jobs:
       matrix:
         builder:
           - { "name": "aio-aarch64", runner: "aws-aarch64" }
-          - { "name": "aio-x86_64", runner: "ubuntu-22.04" }
+          - { "name": "aio-x86_64", runner: "ubuntu-24.04" }
 
     steps:
       - name: Checkout repository
@@ -68,7 +68,7 @@ jobs:
 
       - name: Set up QEMU
         id: qemu
-        uses: docker/setup-qemu-action@68827325e0b33c7199eb31dd4e31fbe9023e06e3 # v3
+        uses: docker/setup-qemu-action@v3
         with:
           image: tonistiigi/binfmt:qemu-v6.2.0
           platforms: all
@@ -79,13 +79,14 @@ jobs:
           docker context create builders || echo Already exists
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226 # v3
+        uses: docker/setup-buildx-action@v3
         with:
           driver-opts: network=host
           endpoint: builders
 
-      - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
-        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+      # TODO Investigate, no longer working
+      #- name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
+      #  uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
 
       - name: Build Dependencies
         shell: bash
@@ -112,12 +113,12 @@ jobs:
     strategy:
       matrix:
         variant:
-          - { "builder_name": "aio-x86_64",  "package_type": "deb", runner: "ubuntu-22.04" }
-          - { "builder_name": "aio-x86_64",  "package_type": "rpm", runner: "ubuntu-22.04" }
+          - { "builder_name": "aio-x86_64",  "package_type": "deb", runner: "ubuntu-24.04" }
+          - { "builder_name": "aio-x86_64",  "package_type": "rpm", runner: "ubuntu-24.04" }
           - { "builder_name": "aio-aarch64", "package_type": "deb", runner: "aws-aarch64" }
           - { "builder_name": "aio-aarch64", "package_type": "rpm", runner: "aws-aarch64" }
-          - { "builder_name": "non-aio",     "package_type": "deb", runner: "ubuntu-22.04" }
-          - { "builder_name": "non-aio",     "package_type": "rpm", runner: "ubuntu-22.04" }
+          - { "builder_name": "non-aio",     "package_type": "deb", runner: "ubuntu-24.04" }
+          - { "builder_name": "non-aio",     "package_type": "rpm", runner: "ubuntu-24.04" }
     steps:
       - name: Checkout repository
         uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
@@ -130,7 +131,7 @@ jobs:
 
       - name: Set up QEMU
         id: qemu
-        uses: docker/setup-qemu-action@68827325e0b33c7199eb31dd4e31fbe9023e06e3 # v3
+        uses: docker/setup-qemu-action@v3
         with:
           image: tonistiigi/binfmt:qemu-v6.2.0
           platforms: all
@@ -141,13 +142,14 @@ jobs:
           docker context create builders || echo Already exists
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226 # v3
+        uses: docker/setup-buildx-action@v3
         with:
           driver-opts: network=host
           endpoint: builders
 
-      - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
-        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+      # TODO Investigate, no longer working
+      #- name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
+      #  uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
 
       - name: Build package
         shell: bash
@@ -201,13 +203,13 @@ jobs:
 
       - name: Set up QEMU
         id: qemu
-        uses: docker/setup-qemu-action@68827325e0b33c7199eb31dd4e31fbe9023e06e3 # v3
+        uses: docker/setup-qemu-action@v3
         with:
           image: tonistiigi/binfmt:qemu-v6.2.0
           platforms: all
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226 # v3
+        uses: docker/setup-buildx-action@v3
         with:
           driver-opts: network=host
 
@@ -221,8 +223,9 @@ jobs:
         run: |
           find /tmp/packages
 
-      - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
-        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+      # TODO Investigate, no longer working
+      #- name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
+      #  uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
 
       - name: install python and requirements
         uses: ./.github/actions/install_python_and_requirements

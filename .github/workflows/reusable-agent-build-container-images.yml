@@ -18,7 +18,7 @@ on:
       cicd_workflow:
         description: "Additional string that has to differentiate AWS object from another workflows."
         type: string
-      
+
       builder_name:
         description: "Builder name used to build docker images. Accepted values: ubuntu, alpine, ubuntu-fips."
         type: string
@@ -115,7 +115,7 @@ jobs:
 
       - name: Set up QEMU
         id: qemu
-        uses: docker/setup-qemu-action@68827325e0b33c7199eb31dd4e31fbe9023e06e3 # v3
+        uses: docker/setup-qemu-action@v3
         with:
           image: tonistiigi/binfmt:qemu-v6.2.0
           platforms: all
@@ -127,13 +127,14 @@ jobs:
           docker context create builders || echo Already exists
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226 # v3 # v3
+        uses: docker/setup-buildx-action@v3
         with:
           driver-opts: network=host
           endpoint: builders
 
-      - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
-        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+      # TODO Investigate, no longer working
+      #- name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
+      #  uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
 
       - name: Build requirements
         shell: bash
@@ -186,7 +187,7 @@ jobs:
         with:
           username: ${{ secrets.PULL_REGISTRY_USERNAME }}
           password: ${{ secrets.PULL_REGISTRY_PASSWORD }}
-      
+
       - name: Login to an internal build registry
         if: vars.INTERNAL_BUILD_REGISTRY
         uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3
@@ -199,11 +200,11 @@ jobs:
 
       - name: Set up QEMU
         id: qemu
-        uses: docker/setup-qemu-action@68827325e0b33c7199eb31dd4e31fbe9023e06e3 # v3
+        uses: docker/setup-qemu-action@v3
         with:
           image: tonistiigi/binfmt:qemu-v6.2.0
           platforms: all
-        
+
         # Context need to be created for a self-hosted runner
       - name: Set up Docker Context for Buildx
         id: buildx-context
@@ -211,13 +212,14 @@ jobs:
           docker context create builders || echo Already exists
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226 # v3
+        uses: docker/setup-buildx-action@v3
         with:
           driver-opts: network=host
           endpoint: builders
 
-      - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
-        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+      # TODO Investigate, no longer working
+      #- name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
+      #  uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
 
       - name: Build image tarball
         shell: bash
@@ -236,7 +238,7 @@ jobs:
             build-tarball \
             --image-type ${{  matrix.variant.image_type }} \
             --output-dir ./build
-      
+
       - name: Save image OCI tarball as artifact
         uses: actions/upload-artifact@v4
         with:
@@ -247,7 +249,7 @@ jobs:
   # Jobs which performs basic sanity checks for the Kubernetes Monitor and Kubernetes Events Monitor
   k8s_kubernetes_monitor_tests:
     name: Kubernetes Monitors - k8s ${{ inputs.builder_name }} ${{ matrix.k8s_version.version }}-${{ matrix.k8s_version.runtime}}
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
 
     if: ${{ ! vars.K8S_TESTS_DISABLED }}
@@ -287,13 +289,13 @@ jobs:
 
       - name: Set up QEMU
         id: qemu
-        uses: docker/setup-qemu-action@68827325e0b33c7199eb31dd4e31fbe9023e06e3 # v3
+        uses: docker/setup-qemu-action@v3
         with:
           image: tonistiigi/binfmt:qemu-v6.2.0
           platforms: all
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226 # v3
+        uses: docker/setup-buildx-action@v3
         with:
           driver-opts: network=host
 
@@ -319,7 +321,7 @@ jobs:
 
       - name: Preload minikube images
         run: |
-          # Since the minikube runtimes we use cannot be reasonably configured to use custom credentials for docker hub, 
+          # Since the minikube runtimes we use cannot be reasonably configured to use custom credentials for docker hub,
           # we need to pull the images and load them into minikube.
           docker pull busybox:1.28
           minikube image load busybox:1.28
@@ -330,8 +332,9 @@ jobs:
           name: container-image-tarball-k8s-${{ inputs.builder_name }}
           path: /tmp/image_tarball
 
-      - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
-        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+      # TODO Investigate, no longer working
+      #- name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
+      #  uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
 
       - name: Build Agent k8s Test Docker Image
         env:
@@ -382,7 +385,7 @@ jobs:
           minikube image ls
           kubectl apply -f tests/e2e/k8s_k8s_monitor/std_printer_deployment.yaml
           kubectl apply -f tests/e2e/k8s_k8s_monitor/long_message_printer_deployment.yaml
-          
+
           kubectl wait --for=condition=ready pod -l app=std-printer
           kubectl wait --for=condition=ready pod -l app=long-message-printer
           kubectl get pods -A
@@ -393,7 +396,7 @@ jobs:
 
           echo ""
           kubectl logs "${APP_POD_NAME}"
-          echo "" 
+          echo ""
 
       - name: Create mock pods for multi account printer
         env:
@@ -504,7 +507,7 @@ jobs:
             echo "Kubernetes event monitor log has to be handled by the agent 1 time, but it got ${k8s_event_log_files_number}"
             exit 1
           fi
-          
+
           echo "Wait for BEGIN DELAYED MESSAGE-END DELAYED MESSAGE lines. They should not be splitted."
           MINIMUM_RESULTS=10 ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" app="std-printer" parser="test-parser-1" stream="stdout" "BEGIN DELAYED MESSAGE stdout"'
           MINIMUM_RESULTS=10 ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" app="std-printer" parser="test-parser-1" stream="stderr" "BEGIN DELAYED MESSAGE stderr"'
@@ -514,7 +517,7 @@ jobs:
           echo 'Looking for mixed streams'
           RETRY_ATTEMPTS=1 ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" app="std-printer" parser="test-parser-1" stream="stdout" "stderr"' && echo -e $MIXED_STREAMS_ERR_MSG && exit 1 || echo -e $MIXED_STREAMS_SUCCESS_MSG
           RETRY_ATTEMPTS=1 ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" app="std-printer" parser="test-parser-1" stream="stderr" "stdout"' && echo -e $MIXED_STREAMS_ERR_MSG && exit 1 || echo -e $MIXED_STREAMS_SUCCESS_MSG
-          
+
           echo "Wait for BEGIN_LONG_MESSAGE .* END_LONG_MESSAGE lines. They should not be splitted."
           MINIMUM_RESULTS=10 ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" app="long-message-printer" parser="test-parser-2" stream="stdout" "stdout_BEGIN_LONG_MESSAGE"'
           MINIMUM_RESULTS=10 ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" app="long-message-printer" parser="test-parser-2" stream="stderr" "stderr_BEGIN_LONG_MESSAGE"'
@@ -525,7 +528,7 @@ jobs:
           RETRY_ATTEMPTS=1 ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" app="long-message-printer" parser="test-parser-2" stream="stdout" "stderr"'  && echo -e $MIXED_STREAMS_ERR_MSG && exit 1 || echo -e $MIXED_STREAMS_SUCCESS_MSG
           RETRY_ATTEMPTS=1 ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" app="long-message-printer" parser="test-parser-2" stream="stderr" "stdout"'  && echo -e $MIXED_STREAMS_ERR_MSG && exit 1 || echo -e $MIXED_STREAMS_SUCCESS_MSG
 
-          
+
           echo ""
 
       # We only assert this under newer Kubernetes versions since in the old ones CronJobs were not
@@ -541,9 +544,9 @@ jobs:
         run: |
           export RETRY_ATTEMPTS="14"
           export SLEEP_DELAY="10"
-          
-          # Wait for at least one hello-printer job to be scheduled and completed. 
-          RETRIES=1; 
+
+          # Wait for at least one hello-printer job to be scheduled and completed.
+          RETRIES=1;
           until echo -n "Waiting for first job to be completed - retry $RETRIES: " && kubectl wait --for=condition=complete job -l app=hello-printer || [ $RETRIES -gt 60 ]; do sleep 1; RETRIES=$(($RETRIES+1)); done
           [ $RETRIES -gt 60 ] && echo "Job didn't start in time" && exit 1
 
@@ -553,7 +556,7 @@ jobs:
 
           echo "CronJob events checks"
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/kubernetes_events.log" $parser="k8sEvents" k8s-kind="CronJob" involvedObjectKind="CronJob" involvedObjectName="hello" watchEventType="ADDED" reason="SawCompletedJob"'
-          
+
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" "Hello from the Kubernetes cluster"'
 
       - name: Check the short lived pods logs are ingested - 404 response handling
@@ -566,16 +569,16 @@ jobs:
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" message matches "Pod default/short-lived-job-1.* not found in K8s API. Including pod based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS=true."'
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" message matches "Pod default/short-lived-job-2.* not found in K8s API. Including pod based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS=true."'
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" message matches "Pod default/short-lived-job-3.* not found in K8s API. Including pod based on SCALYR_K8S_INCLUDE_ALL_CONTAINERS=true."'
-          
+
       - name: Check the short lived pods logs are ingested - log message
         env:
           # Needed for scalyr-tool
           scalyr_readlog_token: "${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}"
           SCALYR_AGENT_POD_NAME: "${{ env.SCALYR_AGENT_POD_NAME }}"
         run: |
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" "Message from short-lived-container-1"'
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" "Message from short-lived-container-2"'
-          ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" "Message from short-lived-container-3"'
+          RETRY_ATTEMPTS=20 ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" "Message from short-lived-container-1"'
+          RETRY_ATTEMPTS=20 ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" "Message from short-lived-container-2"'
+          RETRY_ATTEMPTS=20 ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" "Message from short-lived-container-3"'
 
       - name: Install Testing Python Packages
         run: |
@@ -601,13 +604,13 @@ jobs:
           ACCOUNT_NAME_7: "cloudtech-testing-7@scalyr.com"
         run: |
           echo 'Looking for multiple account logs'
-          
+
           ./scripts/cicd/verify-multiaccount-records-have-been-ingested.py
 
 
   k8s_open_metrics_monitor_tests:
     name: OpenMetrics Monitor - k8s ${{ inputs.builder_name }} ${{ matrix.k8s_version.version }}-${{ matrix.k8s_version.runtime}}
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     if: vars.K8S_TESTS_DISABLED != 'true' && github.ref_name != '_release_build' && inputs.builder_name != 'alpine'
     timeout-minutes: 15
 
@@ -642,13 +645,13 @@ jobs:
 
       - name: Set up QEMU
         id: qemu
-        uses: docker/setup-qemu-action@68827325e0b33c7199eb31dd4e31fbe9023e06e3 # v3
+        uses: docker/setup-qemu-action@v3
         with:
           image: tonistiigi/binfmt:qemu-v6.2.0
           platforms: all
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226 # v3
+        uses: docker/setup-buildx-action@v3
         with:
           driver-opts: network=host
 
@@ -672,8 +675,9 @@ jobs:
           name: container-image-tarball-k8s-${{ inputs.builder_name }}
           path: /tmp/image_tarball
 
-      - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
-        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+      # TODO Investigate, no longer working
+      #- name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
+      #  uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
 
       - name: Build Agent k8s Test Docker Image
         env:
@@ -689,7 +693,7 @@ jobs:
             --image-type k8s
 
           docker image ls
-          
+
           # Needed for containerd or cri-o runtime
           if [ "${{ matrix.k8s_version.runtime }}" = "containerd" ] || [ "${{ matrix.k8s_version.runtime }}" = "cri-o" ]; then
             docker tag k8s-image:test docker.io/library/k8s-image:test
@@ -728,10 +732,10 @@ jobs:
           sleep 2
           kubectl wait --for=condition=ready pod -l app=node-exporter --namespace monitoring ||
             (echo "Failed to wait for node-exporter pod to become ready"; kubectl describe pods -l app=node-exporter --namespace monitoring; echo; echo GET PODS:; kubectl get pods -A; echo LOGS:; kubectl logs -l app=node-exporter --namespace monitoring; exit 1)
-          
+
           kubectl wait --for=condition=ready pod -l app=java-hello-world ||
             (echo "Failed to wait for java-hello-world pod to become ready"; kubectl describe pods -l app=java-hello-world; echo; echo GET PODS:; kubectl get pods -A; echo LOGS:; kubectl logs -l app=java-hello-world; exit 1)
-          
+
           kubectl get pods -A
 
       - name: Create scalyr-agent-2 daemonset
@@ -756,7 +760,7 @@ jobs:
         run: |
           export RETRY_ATTEMPTS="30"
           export SLEEP_DELAY="10"
-          
+
           # Verify agent is running
           echo "Agent running checks"
           ./scripts/cicd/scalyr-query.sh '$serverHost="'${SCALYR_AGENT_POD_NAME}'" $logfile="/var/log/scalyr-agent-2/agent.log" "Starting scalyr agent..."'
@@ -829,7 +833,7 @@ jobs:
       - build_image_tarball
     name: K8s Smoketest - ${{ inputs.builder_name }}
     if: vars.K8S_TESTS_DISABLED != 'true' && github.ref_name != '_release_build' && (github.event_name != 'pull_request' || ! github.event.pull_request.draft)
-    steps: 
+    steps:
       - name: Checkout Repository
         uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
 
@@ -840,7 +844,7 @@ jobs:
 
       - name: Set up QEMU
         id: qemu
-        uses: docker/setup-qemu-action@68827325e0b33c7199eb31dd4e31fbe9023e06e3 # v3
+        uses: docker/setup-qemu-action@v3
         with:
           image: tonistiigi/binfmt:qemu-v6.2.0
           platforms: all
@@ -854,16 +858,17 @@ jobs:
       - name: Set up Docker Context for Buildx
         id: buildx-context
         run: |
-          docker context create builders || echo Already exists  
-      
+          docker context create builders || echo Already exists
+
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226 # v3
+        uses: docker/setup-buildx-action@v3
         with:
           driver-opts: network=host
           endpoint: builders
 
-      - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
-        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+      # TODO Investigate, no longer working
+      #- name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
+      #  uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
 
       - name: Setup minikube k8s cluster
         uses: ./.github/actions/setup-minikube-cluster/
@@ -878,10 +883,6 @@ jobs:
         with:
           name: container-image-tarball-k8s-${{ inputs.builder_name }}
           path: /tmp/image_tarball
-
-      - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
-        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
-
 
       - name: Build test image
         env:
@@ -903,7 +904,7 @@ jobs:
           SCALYR_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
           READ_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
         run: |
-          source ./.circleci/smoketest_k8s.sh scalyr/scalyr-agent-ci-unittest:4 150 no_delete_existing_k8s_objs k8s-image:test
+          source ./.circleci/smoketest_k8s.sh scalyr/scalyr-agent-ci-unittest:4 300 no_delete_existing_k8s_objs k8s-image:test
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -924,11 +925,11 @@ jobs:
       matrix:
         variant:
           - image_type: docker-json
-            timeout: 150
+            timeout: 300
           - image_type: docker-syslog
-            timeout: 150
+            timeout: 300
           - image_type: docker-api
-            timeout: 200
+            timeout: 300
     steps:
       - name: Checkout Repository
         uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
@@ -940,7 +941,7 @@ jobs:
 
       - name: Set up QEMU
         id: qemu
-        uses: docker/setup-qemu-action@68827325e0b33c7199eb31dd4e31fbe9023e06e3 # v3
+        uses: docker/setup-qemu-action@v3
         with:
           image: tonistiigi/binfmt:qemu-v6.2.0
           platforms: all
@@ -950,7 +951,7 @@ jobs:
         with:
           username: ${{ secrets.PULL_REGISTRY_USERNAME }}
           password: ${{ secrets.PULL_REGISTRY_PASSWORD }}
-      
+
       - name: Login to an internal build registry
         if: vars.INTERNAL_BUILD_REGISTRY
         uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3
@@ -967,22 +968,20 @@ jobs:
           docker context create builders || echo Already exists
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226 # v3
+        uses: docker/setup-buildx-action@v3
         with:
           driver-opts: network=host
           endpoint: builders
 
-      - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
-        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+      # TODO Investigate, no longer working
+      #- name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
+      #  uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
 
       - name: Download OCI tarball of the built image.
         uses: actions/download-artifact@v4
         with:
           name: container-image-tarball-${{ matrix.variant.image_type }}-${{ inputs.builder_name }}
           path: /tmp/image_tarball
-
-      - name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
-        uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
 
       - name: Build test image
         env:
@@ -1026,7 +1025,7 @@ jobs:
 
   publish_images:
     name: Publish image ${{ matrix.variant.image_type }}-${{ inputs.builder_name }}
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     if: github.ref_type == 'tag' || github.ref_name == 'master' || github.head_ref == 'release' || github.event_name == 'pull_request'
     needs:
       # k8s_kubernetes_monitor_tests, k8s_open_metrics_monitor_tests, k8s-smoketest checks are not needed before pushing a test version to dockerhub.
@@ -1067,7 +1066,7 @@ jobs:
               echo "tags=$AGENT_VERSION,latest" >> "${GITHUB_OUTPUT}"
             else
               echo "tags=empty" >> "${GITHUB_OUTPUT}"
-            fi        
+            fi
           elif [ "${{ github.ref_name }}" = "master" ]; then
               echo "tags=${{ github.sha }}" >> "${GITHUB_OUTPUT}"
           elif [ "${{ github.head_ref }}" = "release" ]; then
@@ -1080,7 +1079,7 @@ jobs:
           fi
 
       - name: Set up skopeo
-        uses: warjiang/setup-skopeo@latest
+        uses: warjiang/setup-skopeo@main
         with:
           version: latest
 
@@ -1093,6 +1092,7 @@ jobs:
             --base-image ${{ inputs.base_image }} \
             publish \
             --registry docker.io \
+            --no-verify-tls \
             --name-prefix "${{ secrets.PUBLISH_REGISTRY_USERNAME }}" \
             --tags "${{ steps.verify.outputs.tags }}" \
             --from-oci-layout /tmp/image_tarball/${{ matrix.variant.image_type }}-${{ inputs.builder_name }}.tar \

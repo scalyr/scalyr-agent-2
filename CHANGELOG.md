@@ -1,6 +1,13 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.2.19 "Yvette" - Jul 28, 2025
+<!---
+Packaged by Joseph Makar <joseph.makar@sentinelone.com> on Jul 28, 2025 00:00 -0800
+--->
+
+* Introduced a new syslog monitor config option `unique_file_log_rotation` to support log rotation in Windows hosts
+
 ## 2.2.18 "Zack" - Nov 5, 2024
 <!---
 Packaged by Ales Novak <ales.novak@sentinelone.com> on Nov 5, 2024 00:00 -0800
@@ -12,7 +19,6 @@ Changes:
 Fixes:
 * Fixed a bug where pod logs were removed from ingestion because of a temporrary K8s API error and the agent was not able to add them again.
 
-  
 ## 2.2.17 "Sinthia" - Sep 17, 2024
 <!---
 Packaged by Ales Novak <ales.novak@sentinelone.com> on Sep 17, 2024 00:00 -0800
@@ -26,7 +32,6 @@ Changes:
 Fixes:
 * Added safety check when handling pending addEvents task to handle the following error: `AttributeError: 'AddEventsTask' object has no attribute '_CopyingManagerWorkerSession__receive_response_status'`
 * Added missing zstandard library to alpine image
-
 
 ## 2.2.16 "Lenny" - May 29, 2024
 <!---
@@ -211,7 +216,7 @@ Packaged by Joseph Makar <joseph.makar@sentinelone.com> on Dec 1, 2022 00:00 -08
 
 Kubernetes:
 * Add ``securityContext.allowPrivilegeEscalation: false`` annotation to the Scalyr Agent DaemonSet container specification.
-* Fix bug that caused logging of the Kubernetes cache stats to agent status. 
+* Fix bug that caused logging of the Kubernetes cache stats to agent status.
 * More accurate docker.mem.usage metric (no longer includes filesystem cache).
 * Monitor leader election algorithm now uses pods in the owning ReplicaSet or DaemonSet.
 

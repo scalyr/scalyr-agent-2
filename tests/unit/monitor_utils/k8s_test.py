@@ -1602,9 +1602,9 @@ class FakeK8s(object):
             if self.__pending_request is not None:
                 # If there is still a blocked request at the end of the test, drain it out with an arbitrary
                 # response so the testing thread is not blocked.
-                self.__pending_responses[
-                    self.__pending_request
-                ] = self._raise_temp_error
+                self.__pending_responses[self.__pending_request] = (
+                    self._raise_temp_error
+                )
             self.__condition_var.notify_all()
         finally:
             self.__condition_var.release()

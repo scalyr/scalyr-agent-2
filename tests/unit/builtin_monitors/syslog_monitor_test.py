@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014-2022 Scalyr Inc.
+# Copyright 2014-2025 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,6 +38,7 @@ from io import open
 from io import StringIO
 import threading
 import platform
+import types
 
 from scalyr_agent.builtin_monitors import syslog_monitor
 from scalyr_agent.builtin_monitors.syslog_monitor import (
@@ -50,6 +51,8 @@ from scalyr_agent.builtin_monitors.syslog_monitor import (
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogFrameParser
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogRequestParser
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogBatchedRequestParser
+from scalyr_agent.configuration import Configuration
+from scalyr_agent.copying_manager.copying_manager import CopyingManager
 from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
 from scalyr_agent.scalyr_monitor import MonitorInformation
 from scalyr_agent.test_base import ScalyrTestCase
@@ -1524,3 +1527,194 @@ class SyslogBatchRequestParserTestCase(SyslogMonitorTestCase):
         )
 
         self.assertEqual(parser._remaining, bytearray())
+
+
+class SyslogMonitorUniqueFileLogRotationTest(unittest.TestCase):
+    def setUp(self):
+        class_name = "scalyr_agent.builtin_monitors.syslog_monitor"
+        self.monitor_config = {
+            "module": class_name,
+            "protocols": "tcp:8514",
+            "message_log": "paloalto.log",
+            "max_log_size": 100,
+            "max_log_rotations": 3,
+            "unique_file_log_rotation": True,
+            "log_flush_delay": 0,
+        }
+
+        # Arranges for the global/class logger to write to stdout
+        scalyr_logging.set_log_destination(use_stdout=True)
+        scalyr_logging.set_log_level(logging.INFO)
+
+        self.monitor = SyslogMonitor(
+            self.monitor_config, logging.getLogger(class_name + __class__.__name__)
+        )
+
+        self.config_filename = "agent.config-" + __class__.__name__
+        with open(self.config_filename, "w") as file:
+            file.write('{ "api_key": "invalid" }')
+
+        class MockedDefaultPaths:
+            def __init__(self):
+                self.agent_data_path = ""
+                self.agent_log_path = ""
+
+        config = Configuration(
+            self.config_filename,
+            MockedDefaultPaths(),
+            logging.getLogger("CopyingManager-" + __class__.__name__),
+        )
+        config.parse()
+
+        self.copying_manager = CopyingManager(config, [self.monitor])
+
+        self.copying_manager.log_config_history = []
+
+        def add_log_config(self, monitor_name, log_config):
+            self.log_config_history += [("add", log_config["path"])]
+
+        self.copying_manager.add_log_config = types.MethodType(
+            add_log_config, self.copying_manager
+        )
+
+        def remove_log_config(self, monitor_name, log_config):
+            self.log_config_history += [("remove", log_config["path"])]
+
+        self.copying_manager.remove_log_config = types.MethodType(
+            remove_log_config, self.copying_manager
+        )
+
+        self.monitor.open_metric_log()
+        self.monitor.start()
+        time.sleep(1)  # Time for listening sockets to be opened
+
+        self.socket = socket.socket(socket.AF_INET)
+        self.socket.connect(("localhost", 8514))
+
+    def tearDown(self):
+        self.monitor.stop(wait_on_join=True)
+        self.monitor.close_metric_log()
+
+        os.unlink(self.config_filename)
+
+        for i in range(self.monitor_config["max_log_rotations"]):
+            filename = f"{self.monitor_config['message_log']}.{i}"
+            if os.path.exists(filename):
+                os.unlink(filename)
+
+        self.socket.close()
+
+    def test_unique_file_log_rotation(self):
+        def get_file_contents():
+            contents = {}
+            for i in range(self.monitor_config["max_log_rotations"]):
+                filename = f"{self.monitor_config['message_log']}.{i}"
+                if os.path.exists(filename):
+                    with open(filename) as file:
+                        contents[filename] = file.read().splitlines()
+            return contents
+
+        expected_log_config_history = [("remove", self.monitor_config["message_log"])]
+        for i in range(self.monitor_config["max_log_rotations"]):
+            expected_log_config_history.append(
+                ("add", f"{self.monitor_config['message_log']}.{i}")
+            )
+
+        self.assertEqual(
+            [
+                (type, os.path.abspath(path))
+                for type, path in expected_log_config_history
+            ],
+            [
+                (type, os.path.abspath(path))
+                for type, path in self.copying_manager.log_config_history
+            ],
+        )
+
+        self.socket.sendall(
+            "<1> 2025-01-01T00:01:00Z host test message 1\n".encode("utf-8")
+        )
+        self.socket.sendall(
+            "<1> 2025-01-01T00:01:00Z host test message 2\n".encode("utf-8")
+        )
+        time.sleep(1)  # Time for the OS to flush the file buffer
+
+        self.assertEqual(
+            {
+                f"{self.monitor_config['message_log']}.0": [
+                    "<1> 2025-01-01T00:01:00Z host test message 1",
+                    "<1> 2025-01-01T00:01:00Z host test message 2",
+                ]
+            },
+            get_file_contents(),
+        )
+
+        self.socket.sendall(
+            "<1> 2025-01-01T00:01:00Z host test message 3\n".encode("utf-8")
+        )
+        self.socket.sendall(
+            "<1> 2025-01-01T00:01:00Z host test message 4\n".encode("utf-8")
+        )
+        time.sleep(1)
+
+        self.assertEqual(
+            {
+                f"{self.monitor_config['message_log']}.0": [
+                    "<1> 2025-01-01T00:01:00Z host test message 1",
+                    "<1> 2025-01-01T00:01:00Z host test message 2",
+                ],
+                f"{self.monitor_config['message_log']}.1": [
+                    "<1> 2025-01-01T00:01:00Z host test message 3",
+                    "<1> 2025-01-01T00:01:00Z host test message 4",
+                ],
+            },
+            get_file_contents(),
+        )
+
+        self.socket.sendall(
+            "<1> 2025-01-01T00:01:00Z host test message 5\n".encode("utf-8")
+        )
+        self.socket.sendall(
+            "<1> 2025-01-01T00:01:00Z host test message 6\n".encode("utf-8")
+        )
+        time.sleep(1)
+
+        self.assertEqual(
+            {
+                f"{self.monitor_config['message_log']}.0": [
+                    "<1> 2025-01-01T00:01:00Z host test message 1",
+                    "<1> 2025-01-01T00:01:00Z host test message 2",
+                ],
+                f"{self.monitor_config['message_log']}.1": [
+                    "<1> 2025-01-01T00:01:00Z host test message 3",
+                    "<1> 2025-01-01T00:01:00Z host test message 4",
+                ],
+                f"{self.monitor_config['message_log']}.2": [
+                    "<1> 2025-01-01T00:01:00Z host test message 5",
+                    "<1> 2025-01-01T00:01:00Z host test message 6",
+                ],
+            },
+            get_file_contents(),
+        )
+
+        self.socket.sendall(
+            "<1> 2025-01-01T00:01:00Z host test message 7\n".encode("utf-8")
+        )
+        time.sleep(1)
+
+        self.assertEqual(
+            {
+                f"{self.monitor_config['message_log']}.0": [
+                    "<1> 2025-01-01T00:01:00Z host test message 7",
+                ],
+                f"{self.monitor_config['message_log']}.1": [
+                    "<1> 2025-01-01T00:01:00Z host test message 3",
+                    "<1> 2025-01-01T00:01:00Z host test message 4",
+                ],
+                f"{self.monitor_config['message_log']}.2": [
+                    "<1> 2025-01-01T00:01:00Z host test message 5",
+                    "<1> 2025-01-01T00:01:00Z host test message 6",
+                ],
+            },
+            get_file_contents(),
+        )

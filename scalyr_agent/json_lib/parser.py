@@ -135,7 +135,8 @@ class TextScanner(object):
         @param none_if_bad_index: If the index that will be read is outside of the range of the underlying buffer, None
             will be returned instead of raising an exception.
 
-        @raise IndexError: If the position that will be examined is outside of the range for the underlying buffer."""
+        @raise IndexError: If the position that will be examined is outside of the range for the underlying buffer.
+        """
         index = self.__pos + offset
         if not none_if_bad_index:
             self.__check_index(index)

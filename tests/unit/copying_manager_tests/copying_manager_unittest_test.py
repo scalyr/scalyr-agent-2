@@ -162,6 +162,7 @@ class TestDynamicLogPathTest(BaseTest):
 
         log_config = {"path": path}
 
+        # pylint: disable-next=not-callable
         log_config = self._manager.add_log_config("unittest", log_config)
 
         assert log_config["worker_id"] == "default"
@@ -181,21 +182,25 @@ class TestDynamicLogPathTest(BaseTest):
         path = os.path.join(self._log_dir, "newlog.log")
         path2 = os.path.join(self._log_dir, "newlog2.log")
 
+        # pylint: disable-next=not-callable
         log_config1 = self._manager.add_log_config(
             "unittest", {"path": path, "api_key": API_KEYS[0]}
         )
         assert log_config1["worker_id"] == "dynamic_1"
 
+        # pylint: disable-next=not-callable
         log_config2 = self._manager.add_log_config(
             "unittest", {"path": path, "api_key": API_KEYS[1]}
         )
         assert log_config2["worker_id"] == "dynamic_2"
 
+        # pylint: disable-next=not-callable
         log_config3 = self._manager.add_log_config(
             "unittest", {"path": path, "api_key": API_KEYS[2]}
         )
         assert log_config3["worker_id"] == "dynamic_3"
 
+        # pylint: disable-next=not-callable
         log_config4 = self._manager.add_log_config(
             "unittest", {"path": path2, "api_key": API_KEYS[0]}
         )
@@ -231,16 +236,19 @@ class TestDynamicLogPathTest(BaseTest):
         path = os.path.join(self._log_dir, "newlog.log")
         path2 = os.path.join(self._log_dir, "newlog2.log")
 
+        # pylint: disable-next=not-callable
         log_config1 = self._manager.add_log_config(
             "unittest", {"path": path, "api_key": API_KEYS[0]}
         )
         assert log_config1["worker_id"] == "dynamic_1"
 
+        # pylint: disable-next=not-callable
         log_config2 = self._manager.add_log_config(
             "unittest", {"path": path, "api_key": API_KEYS[1]}
         )
         assert log_config2["worker_id"] == "dynamic_2"
 
+        # pylint: disable-next=not-callable
         log_config3 = self._manager.add_log_config(
             "unittest", {"path": path2, "api_key": API_KEYS[0]}
         )
@@ -312,6 +320,7 @@ class TestDynamicLogPathTest(BaseTest):
 
         self.matchers_paths_contain_only(("default", path), ("dynamic_1", path2))
 
+        # pylint: disable-next=not-callable
         log_config4 = self._manager.add_log_config(
             "unittest", {"path": path2, "api_key": API_KEYS[3]}
         )
@@ -323,6 +332,7 @@ class TestDynamicLogPathTest(BaseTest):
             ("default", path), ("dynamic_1", path2), ("dynamic_4", path2)
         )
 
+        # pylint: disable-next=not-callable
         self._manager.remove_log_config("unittest", log_config3)
 
         self.matchers_paths_contain_only(("default", path), ("dynamic_4", path2))
@@ -336,8 +346,10 @@ class TestDynamicLogPathTest(BaseTest):
 
         log_config = {"path": path}
 
+        # pylint: disable-next=not-callable
         self._manager.add_log_config("unittest", log_config)
         self.fake_scan()
+        # pylint: disable-next=not-callable
         self._manager.add_log_config("unittest", log_config)
         self.fake_scan()
 
@@ -354,8 +366,10 @@ class TestDynamicLogPathTest(BaseTest):
 
         log_config = {"path": path}
 
+        # pylint: disable-next=not-callable
         self._manager.add_log_config("unittest", log_config)
         self.fake_scan()
+        # pylint: disable-next=not-callable
         self._manager.add_log_config("unittest2", log_config)
         self.fake_scan()
 
@@ -373,6 +387,7 @@ class TestDynamicLogPathTest(BaseTest):
 
         log_config = {"path": path}
 
+        # pylint: disable-next=not-callable
         self._manager.add_log_config("unittest", log_config)
         self.fake_scan()
 
@@ -395,6 +410,7 @@ class TestDynamicLogPathTest(BaseTest):
 
         log_config = {"path": path}
 
+        # pylint: disable-next=not-callable
         self._manager.add_log_config("unittest", log_config)
         self.fake_scan()
 
@@ -433,6 +449,7 @@ class TestDynamicLogPathTest(BaseTest):
 
         log_config = {"path": path}
 
+        # pylint: disable-next=not-callable
         self._manager.add_log_config("unittest", log_config)
         self.fake_scan()
         matchers = self._manager.log_matchers
@@ -447,6 +464,7 @@ class TestDynamicLogPathTest(BaseTest):
 
         # We use force_add=True when adding the log file which means scheduled removal should be
         # canceled / removed
+        # pylint: disable-next=not-callable
         self._manager.add_log_config("unittest", log_config, force_add=True)
         assert not self._get_manager_log_pending_removal().contains(path, worker_id)
 
@@ -469,6 +487,7 @@ class TestDynamicLogPathTest(BaseTest):
 
         log_config = {"path": path}
 
+        # pylint: disable-next=not-callable
         self._manager.add_log_config("unittest", log_config)
         self.fake_scan()
         matchers = self._manager.log_matchers
@@ -494,6 +513,7 @@ class TestDynamicLogPathTest(BaseTest):
 
         # Add new log and remove it right after addition.
         # Expected that it will remain until all bytes have been read.
+        # pylint: disable-next=not-callable
         self._manager.add_log_config("unittest", log_config)
         self._manager.schedule_log_path_for_removal("unittest", path)
 
@@ -521,6 +541,7 @@ class TestDynamicLogPathTest(BaseTest):
 
         log_config = {"path": path}
 
+        # pylint: disable-next=not-callable
         self._manager.add_log_config("unittest", log_config)
         self.fake_scan()
         matchers = self._manager.log_matchers
@@ -547,7 +568,9 @@ class TestDynamicLogPathTest(BaseTest):
 
         log_config2 = {"path": path2}
 
+        # pylint: disable-next=not-callable
         self._manager.add_log_config("unittest", log_config)
+        # pylint: disable-next=not-callable
         self._manager.add_log_config("unittest", log_config2)
         self.fake_scan()
         matchers = self._manager.log_matchers
@@ -573,6 +596,7 @@ class TestDynamicLogPathTest(BaseTest):
 
         log_config = {"path": path}
 
+        # pylint: disable-next=not-callable
         self._manager.add_log_config("unittest", log_config)
         self.fake_scan()
         matchers = self._manager.log_matchers
@@ -586,6 +610,7 @@ class TestDynamicLogPathTest(BaseTest):
         self.assertEquals(0, len(matchers))
         self.assertEquals(0, self._manager.dynamic_matchers_count())
 
+        # pylint: disable-next=not-callable
         self._manager.add_log_config("otherunittest", log_config)
         self.fake_scan()
         self.assertEquals(1, self._manager.dynamic_matchers_count())
@@ -601,6 +626,7 @@ class TestDynamicLogPathTest(BaseTest):
 
         log_config = {"path": path}
 
+        # pylint: disable-next=not-callable
         self._manager.add_log_config("unittest", log_config)
         self.fake_scan()
         matchers = self._manager.log_matchers
@@ -634,6 +660,7 @@ class TestDynamicLogPathTest(BaseTest):
 
         log_config = {"path": path}
 
+        # pylint: disable-next=not-callable
         self._manager.add_log_config("unittest", log_config)
 
         self.fake_scan()

@@ -164,11 +164,15 @@ RUN make DESTDIR=/tmp/root install
 FROM download_base as download_xz
 RUN gpg2 --import /tmp/public_keys/xz_public_key.gpg
 ARG XZ_VERSION
-RUN curl -L "https://tukaani.org/xz/xz-${XZ_VERSION}.tar.gz" > xz.tar.gz
-RUN curl -L "https://tukaani.org/xz/xz-${XZ_VERSION}.tar.gz.sig" > xz.tar.gz.sig
+# TODO Bump XZ_VERSION to at least 5.2.10 (careful to avoid backdoored versions)
+#RUN curl -L "https://github.com/tukaani-project/xz/releases/download/xz-${XZ_VERSION}.tar.gz" > xz.tar.gz
+#RUN curl -L "https://github.com/tukaani-project/xz/releases/download/xz-${XZ_VERSION}.tar.gz.sig" > xz.tar.gz.sig
+RUN curl -L "https://github.com/tukaani-project/xz/releases/download/v5.2.10/xz-5.2.10.tar.gz" > xz.tar.gz
+RUN curl -L "https://github.com/tukaani-project/xz/releases/download/v5.2.10/xz-5.2.10.tar.gz.sig" > xz.tar.gz.sig
 RUN gpg2 --verify xz.tar.gz.sig xz.tar.gz
 RUN tar -xf xz.tar.gz
-RUN mv xz-${XZ_VERSION} /tmp/source
+#RUN mv xz-${XZ_VERSION} /tmp/source
+RUN mv xz-5.2.10 /tmp/source
 
 FROM base as build_xz
 COPY --from=download_xz /tmp/source /tmp/source
