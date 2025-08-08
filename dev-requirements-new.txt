@@ -6,7 +6,7 @@
 
 # Agent's common requirements. Expected to installed on any type of agent.
 # <COMPONENT:COMMON>
-requests==2.31.0; python_version >= '3.7'
+requests==2.32.4; python_version >= '3.7'
 requests==2.25.1; python_version < '3.7'
 python-dateutil==2.8.2
 repoze.lru==0.7
@@ -29,7 +29,7 @@ pysnmp==4.4.12; platform_system != 'Windows' and platform_system != 'Darwin'
 # Required for syslog monitor
 syslogmp==0.3; python_version >= '3.6'
 
-docker==6.1.3; python_version >= '3.7'
+docker==7.1.0; python_version >= '3.7'
 docker==5.0.3; python_version == '3.6'
 docker==4.4.4; python_version < '3.6'
 
