@@ -576,7 +576,10 @@ class WindowsPlatformController(PlatformController):
                 win32service.SERVICE_RUNNING,
                 win32service.SERVICE_START_PENDING,
             )
-
+        except:
+            # When running the script without a service on windows, this will fail
+            # If we return false here, we can use it without a service
+            return False
         finally:
             if hs is not None:
                 win32service.CloseServiceHandle(hs)
