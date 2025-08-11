@@ -827,201 +827,203 @@ jobs:
           steps: ${{ toJson(steps) }}
           channel: '#eng-dataset-cloud-tech'
 
-  k8s-smoketest:
-    runs-on: ${{ vars.RUNNER }}
-    needs:
-      - build_image_tarball
-    name: K8s Smoketest - ${{ inputs.builder_name }}
-    if: vars.K8S_TESTS_DISABLED != 'true' && github.ref_name != '_release_build' && (github.event_name != 'pull_request' || ! github.event.pull_request.draft)
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
+  # TODO Make decision on whether this is to be replaced or simply removed
+  #      The scalyr-agent-ci-unittest image dependency is problematic because it uses a centos image
+  #      Ref: .circleci/docker_unified_smoke_unit/Dockerfile.unittest
+  # k8s-smoketest:
+  #   runs-on: ${{ vars.RUNNER }}
+  #   needs:
+  #     - build_image_tarball
+  #   name: K8s Smoketest - ${{ inputs.builder_name }}
+  #   if: vars.K8S_TESTS_DISABLED != 'true' && github.ref_name != '_release_build' && (github.event_name != 'pull_request' || ! github.event.pull_request.draft)
+  #   steps:
+  #     - name: Checkout Repository
+  #       uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
+  #
+  #     - name: Install python and requirements
+  #       uses: ./.github/actions/install_python_and_requirements
+  #       with:
+  #         python_version: ${{ inputs.python_version }}
+  #
+  #     - name: Set up QEMU
+  #       id: qemu
+  #       uses: docker/setup-qemu-action@v3
+  #       with:
+  #         image: tonistiigi/binfmt:qemu-v6.2.0
+  #         platforms: all
+  #
+  #     - name: Login to DockerHub
+  #       uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3
+  #       with:
+  #         username: ${{ secrets.PULL_REGISTRY_USERNAME }}
+  #         password: ${{ secrets.PULL_REGISTRY_PASSWORD }}
+  #
+  #     - name: Set up Docker Context for Buildx
+  #       id: buildx-context
+  #       run: |
+  #         docker context create builders || echo Already exists
+  #
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
+  #       with:
+  #         driver-opts: network=host
+  #         endpoint: builders
+  #
+  #     - name: Setup minikube k8s cluster
+  #       uses: ./.github/actions/setup-minikube-cluster/
+  #       with:
+  #         k8s_version: v1.22.0
+  #         minikube_driver: ""
+  #         container_runtime: "docker"
+  #         github_token: "${{ secrets.GITHUB_TOKEN }}"
+  #
+  #     - name: Download OCI tarball of the built image.
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: container-image-tarball-k8s-${{ inputs.builder_name }}
+  #         path: /tmp/image_tarball
+  #
+  #     - name: Build test image
+  #       env:
+  #         USE_GHA_CACHE: "1"
+  #         CACHE_VERSION: ${{ inputs.cache_version }}
+  #       run: |
+  #         python3 tests/end_to_end_tests/container_images_test/scripts/build_test_image.py \
+  #           --image-builder-name ${{ inputs.builder_name }} \
+  #           --base-image ${{ inputs.base_image }} \
+  #           --architecture x86_64 \
+  #           --image-oci-tarball /tmp/image_tarball/k8s-${{ inputs.builder_name }}.tar \
+  #           --result-image-name k8s-image:test \
+  #           --image-type k8s
+  #
+  #     - name: Run Tests (with coverage)
+  #       env:
+  #         CIRCLE_BUILD_NUM: ${{ github.run_number }}
+  #         SCALYR_SERVER: https://agent.scalyr.com
+  #         SCALYR_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
+  #         READ_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
+  #       run: |
+  #         source ./.circleci/smoketest_k8s.sh scalyr/scalyr-agent-ci-unittest:4 300 no_delete_existing_k8s_objs k8s-image:test
+  #
+  #     - name: Upload test results
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: k8s-smoketest
+  #         path: |
+  #           .coverage
+  #       if: ${{ success() || failure() }}
 
-      - name: install python and requirements
-        uses: ./.github/actions/install_python_and_requirements
-        with:
-          python_version: ${{ inputs.python_version }}
-
-      - name: Set up QEMU
-        id: qemu
-        uses: docker/setup-qemu-action@v3
-        with:
-          image: tonistiigi/binfmt:qemu-v6.2.0
-          platforms: all
-
-      - name: Login to DockerHub
-        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3
-        with:
-          username: ${{ secrets.PULL_REGISTRY_USERNAME }}
-          password: ${{ secrets.PULL_REGISTRY_PASSWORD }}
-
-      - name: Set up Docker Context for Buildx
-        id: buildx-context
-        run: |
-          docker context create builders || echo Already exists
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver-opts: network=host
-          endpoint: builders
-
-      # TODO Investigate, no longer working
-      #- name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
-      #  uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
-
-      - name: Setup minikube k8s cluster
-        uses: ./.github/actions/setup-minikube-cluster/
-        with:
-          k8s_version: v1.22.0
-          minikube_driver: ""
-          container_runtime: "docker"
-          github_token: "${{ secrets.GITHUB_TOKEN }}"
-
-      - name: Download OCI tarball of the built image.
-        uses: actions/download-artifact@v4
-        with:
-          name: container-image-tarball-k8s-${{ inputs.builder_name }}
-          path: /tmp/image_tarball
-
-      - name: Build test image
-        env:
-          USE_GHA_CACHE: "1"
-          CACHE_VERSION: ${{ inputs.cache_version }}
-        run: |
-          python3 tests/end_to_end_tests/container_images_test/scripts/build_test_image.py \
-            --image-builder-name ${{ inputs.builder_name }} \
-            --base-image ${{ inputs.base_image }} \
-            --architecture x86_64 \
-            --image-oci-tarball /tmp/image_tarball/k8s-${{ inputs.builder_name }}.tar \
-            --result-image-name k8s-image:test \
-            --image-type k8s
-
-      - name: Run Tests (with coverage)
-        env:
-          CIRCLE_BUILD_NUM: ${{ github.run_number }}
-          SCALYR_SERVER: https://agent.scalyr.com
-          SCALYR_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
-          READ_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
-        run: |
-          source ./.circleci/smoketest_k8s.sh scalyr/scalyr-agent-ci-unittest:4 300 no_delete_existing_k8s_objs k8s-image:test
-
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
-        with:
-          name: k8s-smoketest
-          path: |
-            .coverage
-        if: ${{ success() || failure() }}
-
-  docker-smoketest:
-    name: Docker Smoketest - ${{ inputs.builder_name }} ${{ matrix.variant.image_type }}
-    if: github.ref_name != '_release_build'
-    needs:
-      - build_image_tarball
-    runs-on: ${{ vars.RUNNER }}
-    strategy:
-      fail-fast: false
-      matrix:
-        variant:
-          - image_type: docker-json
-            timeout: 300
-          - image_type: docker-syslog
-            timeout: 300
-          - image_type: docker-api
-            timeout: 300
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
-
-      - name: install python and requirements
-        uses: ./.github/actions/install_python_and_requirements
-        with:
-          python_version: ${{ inputs.python_version }}
-
-      - name: Set up QEMU
-        id: qemu
-        uses: docker/setup-qemu-action@v3
-        with:
-          image: tonistiigi/binfmt:qemu-v6.2.0
-          platforms: all
-
-      - name: Login to DockerHub
-        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3
-        with:
-          username: ${{ secrets.PULL_REGISTRY_USERNAME }}
-          password: ${{ secrets.PULL_REGISTRY_PASSWORD }}
-
-      - name: Login to an internal build registry
-        if: vars.INTERNAL_BUILD_REGISTRY
-        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3
-        continue-on-error: true
-        with:
-          registry: ${{ vars.INTERNAL_BUILD_REGISTRY }}
-          username: ${{ secrets.INTERNAL_BUILD_REGISTRY_USERNAME }}
-          password: ${{ secrets.INTERNAL_BUILD_REGISTRY_PASSWORD }}
-
-        # Context need to be created for a self-hosted runner
-      - name: Set up Docker Context for Buildx
-        id: buildx-context
-        run: |
-          docker context create builders || echo Already exists
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver-opts: network=host
-          endpoint: builders
-
-      # TODO Investigate, no longer working
-      #- name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
-      #  uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
-
-      - name: Download OCI tarball of the built image.
-        uses: actions/download-artifact@v4
-        with:
-          name: container-image-tarball-${{ matrix.variant.image_type }}-${{ inputs.builder_name }}
-          path: /tmp/image_tarball
-
-      - name: Build test image
-        env:
-          USE_GHA_CACHE: "1"
-          CACHE_VERSION: ${{ inputs.cache_version }}
-        run: |
-          python3 tests/end_to_end_tests/container_images_test/scripts/build_test_image.py \
-            --image-builder-name ${{ inputs.builder_name }} \
-            --base-image ${{ inputs.base_image }} \
-            --architecture x86_64 \
-            --image-oci-tarball /tmp/image_tarball/${{ matrix.variant.image_type }}-${{ inputs.builder_name }}.tar \
-            --result-image-name ${{ matrix.variant.image_type }}-${{ inputs.builder_name }}:test \
-            --image-type ${{ matrix.variant.image_type }}
-
-      - name: Run Tests (with coverage)
-        env:
-          CIRCLE_BUILD_NUM: ${{ github.run_number }}
-          SCALYR_SERVER: https://agent.scalyr.com
-          SCALYR_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
-          READ_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
-        run: |
-          source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 ${{ matrix.variant.image_type }} ${{ matrix.variant.timeout }} ${{ matrix.variant.image_type }}-${{ inputs.builder_name }}:test
-
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
-        with:
-          name: docker-smoketest-${{ matrix.variant.image_type }}-${{ inputs.builder_name }}
-          path: |
-            .coverage
-        if: ${{ success() || failure() }}
-
-      - name: Notify Slack on Failure
-        if: ${{ failure() && github.ref_name == 'master' }}
-        uses: act10ns/slack@ed1309ab9862e57e9e583e51c7889486b9a00b0f # v2.0.0
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        with:
-          status: ${{ job.status }}
-          steps: ${{ toJson(steps) }}
-          channel: '#eng-dataset-cloud-tech'
+  # TODO Make decision on whether this is to be replaced or simply removed
+  #      The scalyr-agent-ci-unittest image dependency is problematic because it uses a centos image
+  #      Ref: .circleci/docker_unified_smoke_unit/Dockerfile.unittest
+  # docker-smoketest:
+  #   name: Docker Smoketest - ${{ inputs.builder_name }} ${{ matrix.variant.image_type }}
+  #   if: github.ref_name != '_release_build'
+  #   needs:
+  #     - build_image_tarball
+  #   runs-on: ${{ vars.RUNNER }}
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       variant:
+  #         - image_type: docker-json
+  #           timeout: 300
+  #         - image_type: docker-syslog
+  #           timeout: 300
+  #         - image_type: docker-api
+  #           timeout: 300
+  #   steps:
+  #     - name: Checkout Repository
+  #       uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
+  #
+  #     - name: install python and requirements
+  #       uses: ./.github/actions/install_python_and_requirements
+  #       with:
+  #         python_version: ${{ inputs.python_version }}
+  #
+  #     - name: Set up QEMU
+  #       id: qemu
+  #       uses: docker/setup-qemu-action@v3
+  #       with:
+  #         image: tonistiigi/binfmt:qemu-v6.2.0
+  #         platforms: all
+  #
+  #     - name: Login to DockerHub
+  #       uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3
+  #       with:
+  #         username: ${{ secrets.PULL_REGISTRY_USERNAME }}
+  #         password: ${{ secrets.PULL_REGISTRY_PASSWORD }}
+  #
+  #     - name: Login to an internal build registry
+  #       if: vars.INTERNAL_BUILD_REGISTRY
+  #       uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3
+  #       continue-on-error: true
+  #       with:
+  #         registry: ${{ vars.INTERNAL_BUILD_REGISTRY }}
+  #         username: ${{ secrets.INTERNAL_BUILD_REGISTRY_USERNAME }}
+  #         password: ${{ secrets.INTERNAL_BUILD_REGISTRY_PASSWORD }}
+  #
+  #       # Context need to be created for a self-hosted runner
+  #     - name: Set up Docker Context for Buildx
+  #       id: buildx-context
+  #       run: |
+  #         docker context create builders || echo Already exists
+  #
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
+  #       with:
+  #         driver-opts: network=host
+  #         endpoint: builders
+  #
+  #     # TODO Investigate, no longer working
+  #     #- name: Expose GitHub Runtime To Be Able to Use GHA Cache By Docker.
+  #     #  uses: crazy-max/ghaction-github-runtime@715c25b40ccc0df9b62bfa8be3ccc57d09dbc4b1
+  #
+  #     - name: Download OCI tarball of the built image.
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: container-image-tarball-${{ matrix.variant.image_type }}-${{ inputs.builder_name }}
+  #         path: /tmp/image_tarball
+  #
+  #     - name: Build test image
+  #       env:
+  #         USE_GHA_CACHE: "1"
+  #         CACHE_VERSION: ${{ inputs.cache_version }}
+  #       run: |
+  #         python3 tests/end_to_end_tests/container_images_test/scripts/build_test_image.py \
+  #           --image-builder-name ${{ inputs.builder_name }} \
+  #           --base-image ${{ inputs.base_image }} \
+  #           --architecture x86_64 \
+  #           --image-oci-tarball /tmp/image_tarball/${{ matrix.variant.image_type }}-${{ inputs.builder_name }}.tar \
+  #           --result-image-name ${{ matrix.variant.image_type }}-${{ inputs.builder_name }}:test \
+  #           --image-type ${{ matrix.variant.image_type }}
+  #
+  #     - name: Run Tests (with coverage)
+  #       env:
+  #         CIRCLE_BUILD_NUM: ${{ github.run_number }}
+  #         SCALYR_SERVER: https://agent.scalyr.com
+  #         SCALYR_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_WRITE }}
+  #         READ_API_KEY: ${{ secrets.CT_SCALYR_TOKEN_PROD_US_CLOUDTECH_TESTING_READ }}
+  #       run: |
+  #         source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 ${{ matrix.variant.image_type }} ${{ matrix.variant.timeout }} ${{ matrix.variant.image_type }}-${{ inputs.builder_name }}:test
+  #
+  #     - name: Upload test results
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: docker-smoketest-${{ matrix.variant.image_type }}-${{ inputs.builder_name }}
+  #         path: |
+  #           .coverage
+  #       if: ${{ success() || failure() }}
+  #
+  #     - name: Notify Slack on Failure
+  #       if: ${{ failure() && github.ref_name == 'master' }}
+  #       uses: act10ns/slack@ed1309ab9862e57e9e583e51c7889486b9a00b0f # v2.0.0
+  #       env:
+  #         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  #       with:
+  #         status: ${{ job.status }}
+  #         steps: ${{ toJson(steps) }}
+  #         channel: '#eng-dataset-cloud-tech'
 
   publish_images:
     name: Publish image ${{ matrix.variant.image_type }}-${{ inputs.builder_name }}
