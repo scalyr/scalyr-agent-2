@@ -1033,7 +1033,6 @@ jobs:
       # k8s_kubernetes_monitor_tests, k8s_open_metrics_monitor_tests, k8s-smoketest checks are not needed before pushing a test version to dockerhub.
       # They need to pass to allow PR merge.
       - build_image_tarball
-      - docker-smoketest
     strategy:
       matrix:
         variant:
