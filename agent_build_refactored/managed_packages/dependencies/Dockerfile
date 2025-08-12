@@ -51,8 +51,9 @@ RUN make install CFLAGS="-fPIC" PREFIX="/tmp/root${DEPENDENCIES_INSTALL_PREFIX}"
 FROM download_base as download_ncurses
 RUN gpg2 --import /tmp/public_keys/gnu-keyring.gpg
 ARG NCURSES_VERSION
-RUN curl -L "https://ftp.gnu.org/pub/gnu/ncurses/ncurses-${NCURSES_VERSION}.tar.gz" > ncurses.tar.gz
-RUN curl -L "https://ftp.gnu.org/pub/gnu/ncurses/ncurses-${NCURSES_VERSION}.tar.gz.sig" > ncurses.tar.gz.sig
+# Avoid https://ftp.gnu.org/pub/gnu/ncurses/ because it tends to be slow
+RUN curl -L "https://mirrors.dotsrc.org/gnu/ncurses/ncurses-${NCURSES_VERSION}.tar.gz" > ncurses.tar.gz
+RUN curl -L "https://mirrors.dotsrc.org/gnu/ncurses/ncurses-${NCURSES_VERSION}.tar.gz.sig" > ncurses.tar.gz.sig
 RUN gpg2 --verify  ncurses.tar.gz.sig ncurses.tar.gz
 RUN tar -xf "ncurses.tar.gz"
 RUN mv ncurses-${NCURSES_VERSION} /tmp/source
@@ -414,5 +415,3 @@ COPY --from=build_openssl_3 /tmp/root /openssl_3
 COPY --from=build_venv /tmp/venv /venv
 ARG PORTABLE_RUNNER_NAME
 COPY --from=build_portable_pytest_runner /tmp/source/dist/${PORTABLE_RUNNER_NAME} /${PORTABLE_RUNNER_NAME}
-
-
