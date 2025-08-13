@@ -1943,9 +1943,6 @@ class KubernetesApi(object):
                     "token_file": global_config.k8s_service_account_token,
                     "namespace_file": global_config.k8s_service_account_namespace,
                     "token_re_read_interval": global_config.k8s_token_re_read_interval,
-                    "enable_fallback_urls": not (
-                        global_config.k8s_fallback_urls_disable
-                    ),
                 }
             )
         return KubernetesApi(**kwargs)
@@ -1966,7 +1963,6 @@ class KubernetesApi(object):
         token_file="/var/run/secrets/kubernetes.io/serviceaccount/token",
         namespace_file="/var/run/secrets/kubernetes.io/serviceaccount/namespace",
         token_re_read_interval=300,
-        enable_fallback_urls=True,
     ):
         """Init the kubernetes object"""
         self.log_api_responses = log_api_responses
@@ -1986,7 +1982,6 @@ class KubernetesApi(object):
         self._ca_file = ca_file
         self._token_file = token_file
         self._token_re_read_interval = int(token_re_read_interval)
-        self._enable_fallback_urls = enable_fallback_urls
 
         # We create a few headers ahead of time so that we don't have to recreate them each time we need them.
         self._standard_headers = {
@@ -2472,15 +2467,6 @@ class KubernetesApi(object):
         if not isinstance(object_endpoints, list):
             object_endpoints = [object_endpoints]
 
-        if not self._enable_fallback_urls:
-            global_log.info(
-                "k8s_fallback_urls_disable option is set to true. Won't fall back to "
-                "the next URL in the list if API returns 404 response",
-                limit_once_per_x_secs=3600,
-                limit_key="k8s_get_object_fallback_url_disabled",
-            )
-            object_endpoints = object_endpoints[:1]
-
         object_endpoints_count = len(object_endpoints)
 
         for index, object_endpoint in enumerate(object_endpoints):
@@ -2545,15 +2531,6 @@ class KubernetesApi(object):
 
         if not isinstance(objects_endpoints, list):
             objects_endpoints = [objects_endpoints]
-
-        if not self._enable_fallback_urls:
-            global_log.info(
-                "k8s_fallback_urls_disable option is set to true. Won't fall back to "
-                "the next URL in the list if API returns 404 response",
-                limit_once_per_x_secs=3600,
-                limit_key="k8s_list_objects_fallback_url_disabled",
-            )
-            objects_endpoints = objects_endpoints[:1]
 
         objects_endpoints_count = len(objects_endpoints)
 

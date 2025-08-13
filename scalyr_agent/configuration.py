@@ -1119,6 +1119,7 @@ class Configuration(object):
     def k8s_events_disable(self):
         return self.__get_config().get_bool("k8s_events_disable")
 
+    # TODO This has been deprecated and is to be removed
     @property
     def k8s_fallback_urls_disable(self):
         return self.__get_config().get_bool("k8s_fallback_urls_disable")
@@ -3107,6 +3108,7 @@ class Configuration(object):
             env_aware=True,
         )
 
+        # TODO This has been deprecated and is to be removed
         self.__verify_or_set_optional_bool(
             config,
             "k8s_fallback_urls_disable",
