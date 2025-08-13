@@ -44,43 +44,24 @@ global_log = scalyr_logging.getLogger(__name__)
 # A regex for splitting a container id and runtime
 _CID_RE = re.compile("^(.+)://(.+)$")
 
-# endpoints used by the agent for querying the k8s api.  Having this mapping allows
-# us to avoid special casing the logic for each different object type.  We can just
-# look up the appropriate endpoint in this dict and query objects however we need.
+# Endpoints used for querying the Kubernetes api
 #
-# The dict is keyed by object kind, and or each object kind, there are 3 endpoints:
-#       single, list and list all.
+# Keyed by object kind with the following endpoint specifiers:
+# - `single` is for querying a single object of a specific kind
+#   - Requires substitutions for ${namespace} and ${name}
+# - `list` is for querying all objects of a given kind in a specific namespace
+#   - Requires substitution for ${namespace}
+# - `list-all` is for querying all objects of a given kind in the entire cluster
 #
-# `single` is for querying a single object of a specific type
-# `list` is for querying all objects of a given type in a specific namespace
-# `list-all` is for querying all objects of a given type in the entire cluster
+# Each endpoint specifier may be a list and are attempted in order until successful.
+# The use case is to support changes, say promotions from /v1beta1 to /v1 and similar.
 #
-# the `single` and `list` endpoints are Templates that require the caller to substitute
-# in the appropriate values for ${namespace} and ${name}.
-#
-# For each key we also allow values to be a list. This way multiple URLs can be specific. We will
-# first try with the first URL with the list and then continue with the next one in case it returns
-# 404.
-# The use case here is to support URL paths which have changed, e.g. API endpoint which has been
-# promoted from /v1beta to /v1 and similar. Keep in mind that this is not a full blown robust
-# solution and not a replacement for proper API version management which is a larger and a longer
-# term project. It's a short term workaround / compromise to handle some of those scenarios where
-# an API endpoint has been promoted from beta to stable.
+# TODO Implement proper Kubernetes api version management
 _OBJECT_ENDPOINTS = {
     "CronJob": {
-        "single": [
-            Template("/apis/batch/v1beta1/namespaces/${namespace}/cronjobs/${name}"),
-            # In Kubernetes v1.25.0 this API endpoint has been promoted from v1beta to v1
-            Template("/apis/batch/v1/namespaces/${namespace}/cronjobs/${name}"),
-        ],
-        "list": [
-            Template("/apis/batch/v1beta1/namespaces/${namespace}/cronjobs"),
-            Template("/apis/batch/v1/namespaces/${namespace}/cronjobs"),
-        ],
-        "list-all": [
-            "/apis/batch/v1beta1/cronjobs",
-            "/apis/batch/v1/cronjobs",
-        ],
+        "single": Template("/apis/batch/v1/namespaces/${namespace}/cronjobs/${name}"),
+        "list": Template("/apis/batch/v1/namespaces/${namespace}/cronjobs"),
+        "list-all": "/apis/batch/v1/cronjobs",
     },
     "DaemonSet": {
         "single": Template("/apis/apps/v1/namespaces/${namespace}/daemonsets/${name}"),
@@ -1962,9 +1943,6 @@ class KubernetesApi(object):
                     "token_file": global_config.k8s_service_account_token,
                     "namespace_file": global_config.k8s_service_account_namespace,
                     "token_re_read_interval": global_config.k8s_token_re_read_interval,
-                    "enable_fallback_urls": not (
-                        global_config.k8s_fallback_urls_disable
-                    ),
                 }
             )
         return KubernetesApi(**kwargs)
@@ -1985,7 +1963,6 @@ class KubernetesApi(object):
         token_file="/var/run/secrets/kubernetes.io/serviceaccount/token",
         namespace_file="/var/run/secrets/kubernetes.io/serviceaccount/namespace",
         token_re_read_interval=300,
-        enable_fallback_urls=True,
     ):
         """Init the kubernetes object"""
         self.log_api_responses = log_api_responses
@@ -2005,7 +1982,6 @@ class KubernetesApi(object):
         self._ca_file = ca_file
         self._token_file = token_file
         self._token_re_read_interval = int(token_re_read_interval)
-        self._enable_fallback_urls = enable_fallback_urls
 
         # We create a few headers ahead of time so that we don't have to recreate them each time we need them.
         self._standard_headers = {
@@ -2491,15 +2467,6 @@ class KubernetesApi(object):
         if not isinstance(object_endpoints, list):
             object_endpoints = [object_endpoints]
 
-        if not self._enable_fallback_urls:
-            global_log.info(
-                "k8s_fallback_urls_disable option is set to true. Won't fall back to "
-                "the next URL in the list if API returns 404 response",
-                limit_once_per_x_secs=3600,
-                limit_key="k8s_get_object_fallback_url_disabled",
-            )
-            object_endpoints = object_endpoints[:1]
-
         object_endpoints_count = len(object_endpoints)
 
         for index, object_endpoint in enumerate(object_endpoints):
@@ -2564,15 +2531,6 @@ class KubernetesApi(object):
 
         if not isinstance(objects_endpoints, list):
             objects_endpoints = [objects_endpoints]
-
-        if not self._enable_fallback_urls:
-            global_log.info(
-                "k8s_fallback_urls_disable option is set to true. Won't fall back to "
-                "the next URL in the list if API returns 404 response",
-                limit_once_per_x_secs=3600,
-                limit_key="k8s_list_objects_fallback_url_disabled",
-            )
-            objects_endpoints = objects_endpoints[:1]
 
         objects_endpoints_count = len(objects_endpoints)
 
