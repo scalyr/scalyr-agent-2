@@ -44,43 +44,24 @@ global_log = scalyr_logging.getLogger(__name__)
 # A regex for splitting a container id and runtime
 _CID_RE = re.compile("^(.+)://(.+)$")
 
-# endpoints used by the agent for querying the k8s api.  Having this mapping allows
-# us to avoid special casing the logic for each different object type.  We can just
-# look up the appropriate endpoint in this dict and query objects however we need.
+# Endpoints used for querying the Kubernetes api
 #
-# The dict is keyed by object kind, and or each object kind, there are 3 endpoints:
-#       single, list and list all.
+# Keyed by object kind with the following endpoint specifiers:
+# - `single` is for querying a single object of a specific kind
+#   - Requires substitutions for ${namespace} and ${name}
+# - `list` is for querying all objects of a given kind in a specific namespace
+#   - Requires substitution for ${namespace}
+# - `list-all` is for querying all objects of a given kind in the entire cluster
 #
-# `single` is for querying a single object of a specific type
-# `list` is for querying all objects of a given type in a specific namespace
-# `list-all` is for querying all objects of a given type in the entire cluster
+# Each endpoint specifier may be a list and are attempted in order until successful.
+# The use case is to support changes, say promotions from /v1beta1 to /v1 and similar.
 #
-# the `single` and `list` endpoints are Templates that require the caller to substitute
-# in the appropriate values for ${namespace} and ${name}.
-#
-# For each key we also allow values to be a list. This way multiple URLs can be specific. We will
-# first try with the first URL with the list and then continue with the next one in case it returns
-# 404.
-# The use case here is to support URL paths which have changed, e.g. API endpoint which has been
-# promoted from /v1beta to /v1 and similar. Keep in mind that this is not a full blown robust
-# solution and not a replacement for proper API version management which is a larger and a longer
-# term project. It's a short term workaround / compromise to handle some of those scenarios where
-# an API endpoint has been promoted from beta to stable.
+# TODO Implement proper Kubernetes api version management
 _OBJECT_ENDPOINTS = {
     "CronJob": {
-        "single": [
-            Template("/apis/batch/v1beta1/namespaces/${namespace}/cronjobs/${name}"),
-            # In Kubernetes v1.25.0 this API endpoint has been promoted from v1beta to v1
-            Template("/apis/batch/v1/namespaces/${namespace}/cronjobs/${name}"),
-        ],
-        "list": [
-            Template("/apis/batch/v1beta1/namespaces/${namespace}/cronjobs"),
-            Template("/apis/batch/v1/namespaces/${namespace}/cronjobs"),
-        ],
-        "list-all": [
-            "/apis/batch/v1beta1/cronjobs",
-            "/apis/batch/v1/cronjobs",
-        ],
+        "single": Template("/apis/batch/v1/namespaces/${namespace}/cronjobs/${name}"),
+        "list": Template("/apis/batch/v1/namespaces/${namespace}/cronjobs"),
+        "list-all": "/apis/batch/v1/cronjobs",
     },
     "DaemonSet": {
         "single": Template("/apis/apps/v1/namespaces/${namespace}/daemonsets/${name}"),

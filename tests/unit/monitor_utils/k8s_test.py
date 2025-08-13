@@ -1,24 +1,6 @@
-# Copyright 2019 Scalyr Inc.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#   http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ------------------------------------------------------------------------
-#
-# author: Steven Czerwinski <czerwin@scalyr.com>
 from __future__ import unicode_literals
 from __future__ import absolute_import
 import threading
-
-__author__ = "czerwin@scalyr.com"
 
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.monitor_utils.k8s import DockerMetricFetcher
@@ -658,7 +640,7 @@ class TestKubernetesApi(ScalyrTestCase):
         self.assertEqual(result, {"a": 1})
         self.assertEqual(kapi.query_api_with_retries.call_count, 1)
         kapi.query_api_with_retries.assert_called_with(
-            "/apis/batch/v1beta1/namespaces/default/cronjobs/test-job",
+            "/apis/batch/v1/namespaces/default/cronjobs/test-job",
             query_options=None,
             retry_error_context="CronJob, default, test-job",
             retry_error_limit_key="query_object-CronJob",
@@ -678,7 +660,7 @@ class TestKubernetesApi(ScalyrTestCase):
         )
         self.assertEqual(kapi.query_api_with_retries.call_count, 1)
         kapi.query_api_with_retries.assert_called_with(
-            "/apis/batch/v1beta1/namespaces/default/cronjobs/test-job",
+            "/apis/batch/v1/namespaces/default/cronjobs/test-job",
             query_options=None,
             retry_error_context="CronJob, default, test-job",
             retry_error_limit_key="query_object-CronJob",
@@ -695,7 +677,7 @@ class TestKubernetesApi(ScalyrTestCase):
         self.assertEqual(result, {"a": 2})
         self.assertEqual(kapi.query_api_with_retries.call_count, 2)
         kapi.query_api_with_retries.assert_any_call(
-            "/apis/batch/v1beta1/namespaces/default/cronjobs/test-job",
+            "/apis/batch/v1/namespaces/default/cronjobs/test-job",
             query_options=None,
             retry_error_context="CronJob, default, test-job",
             retry_error_limit_key="query_object-CronJob",
@@ -753,7 +735,7 @@ class TestKubernetesApi(ScalyrTestCase):
         self.assertEqual(result, [{"a": 1, "b": 1}])
         self.assertEqual(kapi.query_api_with_retries.call_count, 1)
         kapi.query_api_with_retries.assert_called_with(
-            "/apis/batch/v1beta1/namespaces/default/cronjobs",
+            "/apis/batch/v1/namespaces/default/cronjobs",
             retry_error_context="CronJob, default",
             retry_error_limit_key="query_objects-CronJob",
         )
@@ -771,7 +753,7 @@ class TestKubernetesApi(ScalyrTestCase):
         )
         self.assertEqual(kapi.query_api_with_retries.call_count, 1)
         kapi.query_api_with_retries.assert_called_with(
-            "/apis/batch/v1beta1/namespaces/default/cronjobs",
+            "/apis/batch/v1/namespaces/default/cronjobs",
             retry_error_context="CronJob, default",
             retry_error_limit_key="query_objects-CronJob",
         )
@@ -787,7 +769,7 @@ class TestKubernetesApi(ScalyrTestCase):
         self.assertEqual(result, [{"a": 2, "b": 2}])
         self.assertEqual(kapi.query_api_with_retries.call_count, 2)
         kapi.query_api_with_retries.assert_any_call(
-            "/apis/batch/v1beta1/namespaces/default/cronjobs",
+            "/apis/batch/v1/namespaces/default/cronjobs",
             retry_error_context="CronJob, default",
             retry_error_limit_key="query_objects-CronJob",
         )
@@ -826,7 +808,7 @@ class TestKubernetesApi(ScalyrTestCase):
         self.assertEqual(result, [{"a": 1, "b": 1}])
         self.assertEqual(kapi.query_api_with_retries.call_count, 1)
         kapi.query_api_with_retries.assert_called_with(
-            "/apis/batch/v1beta1/cronjobs",
+            "/apis/batch/v1/cronjobs",
             retry_error_context="CronJob, None",
             retry_error_limit_key="query_objects-CronJob",
         )
