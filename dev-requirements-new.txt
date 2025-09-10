@@ -57,7 +57,7 @@ xmltodict==0.13.0; platform_system == 'Windows'
 
 # Agent build requirements.
 # <COMPONENT:BUILD>
-PyInstaller==5.13.0; python_version >= '3.7'
+PyInstaller==6.10.0; python_version >= '3.7'
 
 
 # Dev and testing requirements.
