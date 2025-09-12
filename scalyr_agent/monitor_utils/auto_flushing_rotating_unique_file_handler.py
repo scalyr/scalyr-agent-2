@@ -138,7 +138,9 @@ class AutoFlushingRotatingUniqueFileHandler(AutoFlushingRotatingFileHandler):
                 self._current_file.flush()
             else:
                 if self._timer is None:
-                    self._timer = threading.Timer(self._flush_delay, self._delayed_flush)
+                    self._timer = threading.Timer(
+                        self._flush_delay, self._delayed_flush
+                    )
                     self._timer.start()
 
             self._current_size += size
