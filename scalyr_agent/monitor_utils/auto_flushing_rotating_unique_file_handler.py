@@ -93,29 +93,15 @@ class AutoFlushingRotatingUniqueFileHandler(AutoFlushingRotatingFileHandler):
         self._timer = None
 
     def flush(self):
-        if self._flush_delay <= 0:
-            self._flush()
+        pass
 
-        else:
-            self._lock.acquire()
-            try:
-                if self._timer is not None:
-                    self._timer = threading.Timer(self._flush_delay, self._flush)
-                    self._timer.start()
-            finally:
-                self._lock.release()
-
-    def _flush(self):
-        self._current_file.flush()
-
-        if self._flush_delay > 0:
-            self._lock.acquire()
-            try:
-                if self._timer is not None:
-                    self._timer.cancel()
-                    self._timer = None
-            finally:
-                self._lock.release()
+    def _delayed_flush(self):
+        self._lock.acquire()
+        try:
+            self._current_file.flush()
+            self._timer = None
+        finally:
+            self._lock.release()
 
     def close(self):
         if self._flush_delay > 0:
@@ -147,7 +133,14 @@ class AutoFlushingRotatingUniqueFileHandler(AutoFlushingRotatingFileHandler):
 
             # NB The newline is automatically converted according to the platform
             self._current_file.write(self.format(record) + "\n")
-            self.flush()
+
+            if self._flush_delay <= 0:
+                self._current_file.flush()
+            else:
+                if self._timer is None:
+                    self._timer = threading.Timer(self._flush_delay, self._delayed_flush)
+                    self._timer.start()
+
             self._current_size += size
         finally:
             self._lock.release()
