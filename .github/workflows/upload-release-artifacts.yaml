@@ -1,0 +1,26 @@
+name: Upload Release Artifacts
+on:
+  # FIXME Uncomment
+  #push:
+  #  tags:
+  #    - v*.*.*
+  # FIXME Remove
+  pull_request:
+    branches:
+      - master
+jobs:
+  build-tarball:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # FIXME STOPPED
+  # FIXME build-linux-packages.yml
+  # FIXME build-container-images.yml
+  # FIXME build-windows-package.yml
+  upload-artifacts:
+    runs-on: ubuntu-latest
+    needs:
+      - build-tarball
+    steps:
+      # FIXME agent-release/Jenkinsfile
+      - run: echo test
