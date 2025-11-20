@@ -141,5 +141,5 @@ jobs:
 
       # FIXME STOPPED Ref agent-release/Jenkinsfile and specifically agent-release/scripts/publish_artifacts_to_s3_bucket.sh
       #               If reusing that script, the artifact files and install-scalyr-agent-2.sh will need to rearranged in the directory structure expected by that script
-      #               Currently blocked on 
+      #               Currently blocked on SCALYR_GPG_PASSPHRASE (ref agent-release/Jenkinsfile)
 
