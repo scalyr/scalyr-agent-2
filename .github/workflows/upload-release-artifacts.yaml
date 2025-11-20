@@ -24,6 +24,10 @@ jobs:
       - run: |
           mkdir -p build/tarball/noarch && cd build/tarball/noarch
           python3 ../../../build_package.py tarball
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tarball
+          path: build/tarball/noarch/scalyr-agent-*.tar.gz
 
   build-linux-packages-dependencies:
     strategy:
@@ -91,6 +95,10 @@ jobs:
           USE_GHA_CACHE: "1"
           CACHE_VERSION: ${{ github.ref_name }}
         run: python3 build_package_new.py package ${{ matrix.variant.builder_name }} build --package-type ${{ matrix.variant.package_type }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.variant.builder_name }}-${{ matrix.variant.package_type }}
+          path: build/*/scalyr-agent-*
 
   build-windows-package:
     runs-on: windows-latest
@@ -101,6 +109,13 @@ jobs:
           python-version: "3.10"
       - run: python3 -m pip install -r dev-requirements-new.txt
       - run: python3 build_package.py win32
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-msi
+          path: ScalyrAgentInstaller-*.msi
+
+  # Download all the artifacts previously built to prepare the upload to the underlying S3 bucket.
+  # This performs the same operations formerly done in the Jenkins job via agent-release/Jenkinsfile.
 
   upload-artifacts:
     needs:
@@ -109,5 +124,7 @@ jobs:
       - build-windows-package
     runs-on: ubuntu-latest
     steps:
+      # No specified name indicates all artifacts are to be downloaded
+      - uses: actions/download-artifact@v5
       # FIXME Ref agent-release/Jenkinsfile
-      - run: ls -lR build
+      - run: ls -lR .
