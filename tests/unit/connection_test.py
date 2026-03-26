@@ -100,7 +100,7 @@ class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
                 )  # NOQA
 
             self.assertEqual(mock_log.log.call_count, 0)
-            self.assertRaisesRegexp(
+            self.assertRaisesRegex(
                 Exception,
                 expected_msg,
                 self._get_connection_cls,
@@ -119,7 +119,7 @@ class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
     def test_connect_invalid_cert_failure(self, mock_log):
         expected_msg = r"Original error: \[SSL: CERTIFICATE_VERIFY_FAILED\]"
         self.assertEqual(mock_log.log.call_count, 0)
-        self.assertRaisesRegexp(
+        self.assertRaisesRegex(
             Exception,
             expected_msg,
             self._get_connection_cls,
@@ -188,7 +188,7 @@ class ScalyrRequestsHttpConnectionTestCase(ScalyrTestCase):
             # pylint: enable=no-member
 
             expected_msg = r"(hostname 'agent.invalid.scalyr.com' doesn't match either of '\*.scalyr.com', 'scalyr.com'|Hostname mismatch, certificate is not valid for 'agent.invalid.scalyr.com')"
-            self.assertRaisesRegexp(
+            self.assertRaisesRegex(
                 Exception,
                 expected_msg,
                 connection.get,
@@ -207,7 +207,7 @@ class ScalyrRequestsHttpConnectionTestCase(ScalyrTestCase):
         expected_msg = r"\[SSL: CERTIFICATE_VERIFY_FAILED\]"
 
         connection = self._get_connection_cls(server="https://example.com:443")
-        self.assertRaisesRegexp(
+        self.assertRaisesRegex(
             Exception,
             expected_msg,
             connection.get,

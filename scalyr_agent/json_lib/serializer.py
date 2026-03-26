@@ -14,8 +14,6 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
-from __future__ import unicode_literals
-from __future__ import absolute_import
 from scalyr_agent import compat
 
 __author__ = "czerwin@scalyr.com"
@@ -35,7 +33,7 @@ def serialize_as_length_prefixed_string(value, output_buffer):
     @type output_buffer: BytesIO
     """
     output_buffer.write(b"`s")
-    if type(value) is six.text_type:
+    if type(value) is str:
         to_serialize = value.encode("utf-8")
     else:
         to_serialize = value

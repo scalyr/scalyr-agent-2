@@ -15,9 +15,6 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-from __future__ import unicode_literals
-from __future__ import absolute_import
-from __future__ import print_function
 
 __author__ = "czerwin@scalyr.com"
 
@@ -32,7 +29,6 @@ import atexit
 import resource
 import signal
 import tempfile
-from io import open
 
 import six
 
@@ -332,7 +328,7 @@ class PosixPlatformController(PlatformController):
             raise e
         except Exception as e:
             reporter.report_status(
-                "forked #1 failed due to generic error: %s" % six.text_type(e)
+                "forked #1 failed due to generic error: %s" % str(e)
             )
             sys.exit(1)
 
@@ -362,7 +358,7 @@ class PosixPlatformController(PlatformController):
             raise e
         except Exception as e:
             reporter.report_status(
-                "forked #2 failed due to generic error: %s" % six.text_type(e)
+                "forked #2 failed due to generic error: %s" % str(e)
             )
             sys.exit(1)
 
@@ -372,7 +368,7 @@ class PosixPlatformController(PlatformController):
             # redirect standard file descriptors
             sys.stdout.flush()
             sys.stderr.flush()
-            si = open(self.__stdin, "r")
+            si = open(self.__stdin)
             so = open(self.__stdout, "a+")
             # 2->TODO io.open does not allow buffering disabling on text files. So open it as binary.
             se = open(self.__stderr, "ba+", 0)
@@ -393,7 +389,7 @@ class PosixPlatformController(PlatformController):
             return True
         except Exception as e:
             reporter.report_status(
-                "Finalizing fork failed due to generic error: %s" % six.text_type(e)
+                "Finalizing fork failed due to generic error: %s" % str(e)
             )
             sys.exit(1)
 
@@ -410,7 +406,7 @@ class PosixPlatformController(PlatformController):
             try:
                 # noinspection PyBroadException
                 try:
-                    pf = open("/proc/%d/stat" % pid, "r")
+                    pf = open("/proc/%d/stat" % pid)
                     ppid = int(pf.read().split()[3])
                     if ppid == 0:
                         return None
@@ -440,7 +436,7 @@ class PosixPlatformController(PlatformController):
                 time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(current_time)),
                 int(current_time % 1 * 1000),
             )
-            self.__init_log_lines.append(["%s   (%s)" % (line, time_str), is_debug])
+            self.__init_log_lines.append(["{}   ({})".format(line, time_str), is_debug])
 
     def _log_init_debug(self, line):
         """If we are still in the initialization phase (i.e., we have not started the agent service), then append
@@ -673,7 +669,7 @@ class PosixPlatformController(PlatformController):
             if not self.__write_pidfile():
                 raise AgentAlreadyRunning(
                     "The pidfile %s exists and indicates it is running pid=%s"
-                    % (self.__pidfile, six.text_type(self.__read_pidfile()))
+                    % (self.__pidfile, str(self.__read_pidfile()))
                 )
 
         # Register signal handlers for various signals.
@@ -737,13 +733,13 @@ class PosixPlatformController(PlatformController):
                 PosixPlatformController.__sleep(0.1)
 
         except OSError as err:
-            err = six.text_type(err)
+            err = str(err)
             if "No such process" in err or "No child processes" in err:
                 if os.path.exists(self.__pidfile):
                     os.remove(self.__pidfile)
             else:
                 print("Unable to terminate agent.")
-                print(six.text_type(err))
+                print(str(err))
                 return 1
 
         if not quiet:
@@ -847,17 +843,17 @@ class PosixPlatformController(PlatformController):
 
     def __read_pidfile(self):
         def debug_logger(message):
-            self._log_init_debug("%s %s" % (message, scalyr_util.get_pid_tid()))
+            self._log_init_debug("{} {}".format(message, scalyr_util.get_pid_tid()))
 
         def logger(message):
-            self._log_init("%s %s" % (message, scalyr_util.get_pid_tid()))
+            self._log_init("{} {}".format(message, scalyr_util.get_pid_tid()))
 
         manager = PidfileManager(self.__pidfile)
         manager.set_options(debug_logger=debug_logger, logger=logger)
         return manager.read_pid()
 
 
-class PidfileManager(object):
+class PidfileManager:
     """Used to read and write the pidfile for the running Scalyr Agent.
 
     This cleanly handles the race conditions that can occur when attempting to start up
@@ -910,9 +906,9 @@ class PidfileManager(object):
         try:
             # Read the pidfile
             try:
-                pf = open(self.__pidfile, "r")
+                pf = open(self.__pidfile)
                 raw_contents = pf.read()
-            except IOError:
+            except OSError:
                 self._log("Checked pidfile: does not exist")
                 return None
 
@@ -931,18 +927,18 @@ class PidfileManager(object):
                 was_locked = False
                 try:
                     fcntl.flock(pf, fcntl.LOCK_UN)
-                except IOError as e:
+                except OSError as e:
                     self._log_debug(
-                        "Unexpected error seen releasing lock: %s" % six.text_type(e)
+                        "Unexpected error seen releasing lock: %s" % str(e)
                     )
-            except IOError as e:
+            except OSError as e:
                 # Triggered if the LOCK_SH call fails, indicating another process holds the lock.
                 if (e.errno == errno.EAGAIN) or (e.errno == errno.EACCES):
                     was_locked = True
                 else:
                     self._log_debug(
                         "Unexpected error seen checking on lock status: %s"
-                        % six.text_type(e)
+                        % str(e)
                     )
                     was_locked = False
             pf.close()
@@ -1024,7 +1020,7 @@ class PidfileManager(object):
         if self.__logger is not None:
             self.__logger(message)
 
-    class PidWriter(object):
+    class PidWriter:
         """Used to atomically acquire the lock on the pidfile and rewrite its contents to point to
         the current process.
 
@@ -1114,7 +1110,7 @@ class PidfileManager(object):
                     # Grab the lock on the file if possible.
                     fp = os.fdopen(fd, "w")
                     fcntl.flock(fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                except IOError as e:
+                except OSError as e:
                     if (e.errno == errno.EAGAIN) or (e.errno == errno.EACCES):
                         # Someone else had the lock.
                         self._log("Acquire pidfile failed-")
@@ -1160,7 +1156,7 @@ class PidfileManager(object):
                 try:
                     fcntl.flock(self.__locked_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
                     self._log_debug("Refreshed pidfile lock")
-                except IOError as e:
+                except OSError as e:
                     if (e.errno == errno.EAGAIN) or (e.errno == errno.EACCES):
                         self._log("Write pidfile failed-")
                         return None
@@ -1199,8 +1195,8 @@ class PidfileManager(object):
             os.unlink(self.__pidfile)
             try:
                 fcntl.flock(self.__locked_fd, fcntl.LOCK_UN)
-            except IOError as e:
-                self._log("Unexpected error seen releasing lock: %s" % six.text_type(e))
+            except OSError as e:
+                self._log("Unexpected error seen releasing lock: %s" % str(e))
 
             self.__locked_fd.close()
             self.__locked_fd = None
@@ -1214,7 +1210,7 @@ class PidfileManager(object):
             self.__manager._log(message)
 
 
-class StatusReporter(object):
+class StatusReporter:
     """Used to send back a status message to process A from process B where process A has forked process B.
 
     The status message is just a single string of text.
@@ -1322,7 +1318,7 @@ def _read_command_line(pid):
     """
     pf = None
     try:
-        pf = open("/proc/%d/cmdline" % pid, "r")
+        pf = open("/proc/%d/cmdline" % pid)
         return pf.read().strip()
     finally:
         if pf is not None:

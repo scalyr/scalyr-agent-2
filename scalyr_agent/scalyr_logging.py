@@ -23,8 +23,6 @@
 #     should only be emitted at most once per X seconds).
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
@@ -51,17 +49,8 @@ import six
 import scalyr_agent.util as util
 from scalyr_agent.util import RateLimiter
 
-if six.PY2:
-    _METRIC_NAME_SUPPORTED_TYPES = (six.text_type, six.binary_type)
-    _METRIC_VALUE_SUPPORTED_TYPES = (
-        six.text_type,
-        six.binary_type,
-        bool,
-        float,
-    ) + six.integer_types
-else:
-    _METRIC_NAME_SUPPORTED_TYPES = (six.text_type,)
-    _METRIC_VALUE_SUPPORTED_TYPES = (six.text_type, bool, float) + six.integer_types
+_METRIC_NAME_SUPPORTED_TYPES = (str,)
+_METRIC_VALUE_SUPPORTED_TYPES = (str, bool, float) + (int,)
 
 # The debugging levels supported on the debugger logger.  The higher the debug level, the
 # more verbose the output.
@@ -353,7 +342,7 @@ class AgentLogger(logging.Logger):
             # code is in sync with that file.
             self.monitor_name_base = module_path.split(".")[-1]
             if self.__monitor_id is not None:
-                self.monitor_name = "%s(%s)" % (
+                self.monitor_name = "{}({})".format(
                     self.monitor_name_base,
                     self.__monitor_id,
                 )
@@ -445,7 +434,7 @@ class AgentLogger(logging.Logger):
             # NOTE: If there there tons of blacklisted metrics, this could cause log object to grow
             # because we need to store emit time for each limit key. So something to keep in mind.
             monitor_name = getattr(monitor, "raw_monitor_name", "unknown")
-            limit_key = "blacklisted-metric-name-%s-%s" % (monitor_name, metric_name)
+            limit_key = "blacklisted-metric-name-{}-{}".format(monitor_name, metric_name)
 
             monitor._logger.info(
                 'Metric "%s" is blacklisted so the value wont be reported to Scalyr.'
@@ -476,11 +465,11 @@ class AgentLogger(logging.Logger):
                 )
 
                 extra_fields_string_buffer.write(
-                    " %s=%s" % (field_name, util.json_encode(field_value))
+                    " {}={}".format(field_name, util.json_encode(field_value))
                 )
 
         self.info(
-            "%s %s" % (metric_name, util.json_encode(metric_value))
+            "{} {}".format(metric_name, util.json_encode(metric_value))
             + extra_fields_string_buffer.getvalue(),
             metric_log_for_monitor=monitor,
             monitor_id_override=monitor_id_override,
@@ -509,7 +498,7 @@ class AgentLogger(logging.Logger):
         # NOTE: We always include original extra_fields (if any) for any derived metrics
         for derived_metric_name, derived_metric_value in derived_metrics_to_emit:
             self.info(
-                "%s %s" % (derived_metric_name, util.json_encode(derived_metric_value))
+                "{} {}".format(derived_metric_name, util.json_encode(derived_metric_value))
                 + extra_fields_string_buffer.getvalue(),
                 metric_log_for_monitor=monitor,
                 monitor_id_override=monitor_id_override,
@@ -674,7 +663,7 @@ class AgentLogger(logging.Logger):
         monitor_id_override = __thread_local__.last_monitor_id_override
 
         if monitor_id_override is not None:
-            result.monitor_name = "%s(%s)" % (
+            result.monitor_name = "{}({})".format(
                 self.monitor_name_base,
                 monitor_id_override,
             )
@@ -874,16 +863,16 @@ class AgentLogger(logging.Logger):
         for key in values:
             value = values[key]
             value_type = type(value)
-            if value_type in six.integer_types or value_type is float:
-                string_entries.append("%s=%s" % (key, six.text_type(value)))
+            if value_type in (int,) or value_type is float:
+                string_entries.append("{}={}".format(key, str(value)))
             elif value_type is bool:
                 value_str = "true"
                 if not value:
                     value_str = "false"
-                string_entries.append("%s=%s" % (key, value_str))
-            elif value_type is six.text_type:
+                string_entries.append("{}={}".format(key, value_str))
+            elif value_type is str:
                 string_entries.append(
-                    "%s=%s" % (key, six.text_type(value).replace('"', '\\"'))
+                    "{}={}".format(key, str(value).replace('"', '\\"'))
                 )
             else:
                 raise UnsupportedValueType(key, value)
@@ -911,12 +900,8 @@ class AgentLogger(logging.Logger):
             rv = (co.co_filename, f.f_lineno, co.co_name, None)
             break
 
-        if sys.version_info[0] == 2:
-            # Python 2.
-            return rv[:3]
-        else:
-            # Python 3.
-            return rv
+        # Python 3.
+        return rv
 
     @property
     def last_record(self):
@@ -1076,7 +1061,7 @@ class MetricLogFormatter(BaseFormatter):
         )
 
 
-class AgentLogFilter(object):
+class AgentLogFilter:
     """A filter that includes any record emitted by an AgentLogger instance unless it was a metric record.
 
     Also will filter records with logging.DEBUG and lower if this filter is not meant for a debug handler,
@@ -1113,7 +1098,7 @@ class AgentLogFilter(object):
         )
 
 
-class RateLimiterLogFilter(object):
+class RateLimiterLogFilter:
     """A filter that rejects records when a maximum write rate has been exceeded, as calculated by
     a leaky bucket algorithm."""
 
@@ -1161,7 +1146,7 @@ class RateLimiterLogFilter(object):
             return False
 
 
-class StdoutFilter(object):
+class StdoutFilter:
     """A filter for outputting logs to stdout.
     Will output the record if `no_fork` is true and the record has a severity of `stdout_severity` or higher.
     Alternatively if `force_stdout` is true in the record it will always be output to stdout.
@@ -1201,7 +1186,7 @@ class StdoutFilter(object):
         )
 
 
-class StderrFilter(object):
+class StderrFilter:
     """A filter that includes any record if it has `force_stderr` as True"""
 
     def __init__(self):
@@ -1219,7 +1204,7 @@ class StderrFilter(object):
         return getattr(record, "force_stderr", False)
 
 
-class MetricLogHandler(object):
+class MetricLogHandler:
     """The LogHandler to use for recording metric values emitted by Scalyr agent monitors.
 
     The handler has several features such as a way to guarantee there is only one handler instance for each metric
@@ -1247,7 +1232,7 @@ class MetricLogHandler(object):
         self.__added_to_root = False
         self.__file_path = file_path
 
-        class Filter(object):
+        class Filter:
             """The filter used by the MetricLogHandler that only returns true if the record is for a metric for one of
             the monitors associated with the metric log file.
             """
@@ -1522,7 +1507,7 @@ class MetricStdoutLogHandler(logging.StreamHandler, MetricLogHandler):
         self.propagate = False
 
 
-class WrapStdout(object):
+class WrapStdout:
     """A stream implementation that sends all operations to `sys.stdout`.
 
     This is useful for creating a StreamHandler that will write to this object, but actually end up sending all
@@ -1544,7 +1529,7 @@ class WrapStdout(object):
             sys.stdout.close()
 
 
-class AgentLogManager(object):
+class AgentLogManager:
     """The central manager for all AgentLoggers.
 
     There is only one instance of this object created per running process.  It is meant to hold the global-like
@@ -1918,7 +1903,7 @@ class AgentLogManager(object):
                 ),
             )
         else:
-            return "%s%s" % (agent_log, agent_debug_log_file_suffix)
+            return "{}{}".format(agent_log, agent_debug_log_file_suffix)
 
 
 # noinspection PyRedeclaration
@@ -1968,21 +1953,21 @@ class UnsupportedValueType(Exception):
             message = (
                 "An unsupported type for a metric name was given.  It must be either str or unicode, but was "
                 '"%s".  This was for metric "%s"'
-                % (six.text_type(type(metric_name)), six.text_type(metric_name))
+                % (str(type(metric_name)), str(metric_name))
             )
         elif field_name is not __NOT_GIVEN__ and field_value is __NOT_GIVEN__:
             message = (
                 "An unsupported type for a field name was given.  It must be either str or unicode, but was "
                 '"%s".  This was for field "%s"'
-                % (six.text_type(type(field_name)), six.text_type(field_name))
+                % (str(type(field_name)), str(field_name))
             )
         elif metric_name is not __NOT_GIVEN__ and metric_value is not __NOT_GIVEN__:
             message = (
                 'Unsupported metric value type of "%s" with value "%s" for metric="%s". '
                 "Only int, long, float, and str are supported."
                 % (
-                    six.text_type(type(metric_value)),
-                    six.text_type(metric_value),
+                    str(type(metric_value)),
+                    str(metric_value),
                     metric_name,
                 )
             )
@@ -1991,8 +1976,8 @@ class UnsupportedValueType(Exception):
                 'Unsupported field value type of "%s" with value "%s" for field="%s". '
                 "Only int, long, float, and str are supported."
                 % (
-                    six.text_type(type(field_value)),
-                    six.text_type(field_value),
+                    str(type(field_value)),
+                    str(field_value),
                     field_name,
                 )
             )
@@ -2000,16 +1985,16 @@ class UnsupportedValueType(Exception):
             raise Exception(
                 'Bad combination of fields given for UnsupportedValueType: "%s" "%s" "%s" "%s"'
                 % (
-                    six.text_type(metric_name),
-                    six.text_type(metric_value),
-                    six.text_type(field_name),
-                    six.text_type(field_value),
+                    str(metric_name),
+                    str(metric_value),
+                    str(field_name),
+                    str(field_value),
                 )
             )
         Exception.__init__(self, message)
 
 
-class LazyOnPrintEvaluatedFunction(object):
+class LazyOnPrintEvaluatedFunction:
     """
     Wrapper for function which is evaluated lazily once __str__ called on this object.
 
@@ -2024,4 +2009,4 @@ class LazyOnPrintEvaluatedFunction(object):
         self.__func = func
 
     def __str__(self):
-        return six.text_type(self.__func())
+        return str(self.__func())

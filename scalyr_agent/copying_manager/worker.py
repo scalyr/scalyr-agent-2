@@ -13,8 +13,6 @@
 # limitations under the License.
 
 
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 import copy
 import datetime
@@ -53,12 +51,12 @@ import six
 log = scalyr_logging.getLogger(__name__)
 
 WORKER_SESSION_CHECKPOINT_FILENAME_PREFIX = "checkpoints-worker-"
-WORKER_SESSION_CHECKPOINT_FILENAME_GLOB = "{0}*-*.json".format(
+WORKER_SESSION_CHECKPOINT_FILENAME_GLOB = "{}*-*.json".format(
     WORKER_SESSION_CHECKPOINT_FILENAME_PREFIX
 )
 
 
-class CopyingParameters(object):
+class CopyingParameters:
     """Tracks the copying parameters that should be used for sending requests to Scalyr and adjusts them over time
     according to success and failures of requests.
 
@@ -192,7 +190,7 @@ class CopyingParameters(object):
         return value
 
 
-class AddEventsTask(object):
+class AddEventsTask:
     """Encapsulates the state for a pending AddEventRequest."""
 
     def __init__(self, add_events_request, completion_callback):
@@ -214,7 +212,7 @@ class AddEventsTask(object):
         self.next_pipelined_task = None
 
 
-class CopyingManagerWorkerSessionInterface(six.with_metaclass(ABCMeta)):
+class CopyingManagerWorkerSessionInterface(metaclass=ABCMeta):
     """
     The interface for the Copying manager worker session classes.
     """
@@ -318,7 +316,7 @@ class CopyingManagerWorkerSession(
             is_daemon=is_daemon,
         )
 
-        self._id = six.text_type(session_id)
+        self._id = str(session_id)
         self.__config = configuration
         self.__worker_config_entry = worker_config_entry
 
@@ -919,7 +917,7 @@ class CopyingManagerWorkerSession(
         log.log(
             scalyr_logging.DEBUG_LEVEL_1,
             "Getting batch of events to send. (pipelining=%s)"
-            % six.text_type(for_pipelining),
+            % str(for_pipelining),
         )
         start_time = time.time()
 
@@ -961,7 +959,7 @@ class CopyingManagerWorkerSession(
             # A callback of None indicates there was some error reading the log.  Just retry again later.
             if callback is None:
                 # We have to make sure we rollback any LogFileProcessors we touched by invoking their callbacks.
-                for cb in six.itervalues(all_callbacks):
+                for cb in all_callbacks.values():
                     cb(LogFileProcessor.FAIL_AND_RETRY)
                 end_time = time.time()
                 self.total_read_time += end_time - start_time
@@ -1040,7 +1038,7 @@ class CopyingManagerWorkerSession(
         log.log(
             scalyr_logging.DEBUG_LEVEL_1,
             "Information for batch of events. (pipelining=%s): %s"
-            % (six.text_type(for_pipelining), add_events_request.get_timing_data()),
+            % (str(for_pipelining), add_events_request.get_timing_data()),
         )
         return AddEventsTask(add_events_request, handle_completed_callback)
 
@@ -1125,7 +1123,7 @@ class CopyingManagerWorkerSession(
             # until it is marked as active again.
             processor.set_inactive()
 
-        file_name = "%s%s.json" % (WORKER_SESSION_CHECKPOINT_FILENAME_PREFIX, self._id)
+        file_name = "{}{}.json".format(WORKER_SESSION_CHECKPOINT_FILENAME_PREFIX, self._id)
 
         update_checkpoint_state_in_file(
             checkpoints,
@@ -1148,7 +1146,7 @@ class CopyingManagerWorkerSession(
 
         checkpoints = self._get_log_processors_checkpoints(log_processors, current_time)
 
-        file_name = "active-%s%s.json" % (
+        file_name = "active-{}{}.json".format(
             WORKER_SESSION_CHECKPOINT_FILENAME_PREFIX,
             self._id,
         )
@@ -1331,17 +1329,17 @@ if sys.version_info >= (3, 6, 0):
 
 # create base proxy class for the LogFileProcessor, here we also specify all its methods that may be called through proxy.
 _LogFileProcessorProxy = multiprocessing.managers.MakeProxyType(  # type: ignore
-    six.ensure_str("LogFileProcessorProxy"),
+    "LogFileProcessorProxy",
     [
-        six.ensure_str("is_closed"),
-        six.ensure_str("close_at_eof"),
-        six.ensure_str("close"),
-        six.ensure_str("add_missing_attributes"),
-        six.ensure_str("get_log_path"),
-        six.ensure_str("generate_status"),
-        six.ensure_str("add_sampler"),
-        six.ensure_str("add_redacter"),
-        six.ensure_str("skip_to_end"),
+        "is_closed",
+        "close_at_eof",
+        "close",
+        "add_missing_attributes",
+        "get_log_path",
+        "generate_status",
+        "add_sampler",
+        "add_redacter",
+        "skip_to_end",
     ],
 )
 
@@ -1349,7 +1347,7 @@ _LogFileProcessorProxy = multiprocessing.managers.MakeProxyType(  # type: ignore
 # Create final proxy class for the LogFileProcessors by subclassing the base class.
 class LogFileProcessorProxy(_LogFileProcessorProxy):  # type: ignore
     def __init__(self, *args, **kwargs):
-        super(LogFileProcessorProxy, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.__cached_log_path = None
 
     def get_log_path(self):
@@ -1363,22 +1361,22 @@ class LogFileProcessorProxy(_LogFileProcessorProxy):  # type: ignore
 
 # methods of the worker session class that should be exposed through proxy object.
 WORKER_SESSION_PROXY_EXPOSED_METHODS = [
-    six.ensure_str("start_worker_session"),
-    six.ensure_str("stop_worker_session"),
-    six.ensure_str("wait_for_copying_to_begin"),
-    six.ensure_str("get_id"),
-    six.ensure_str("augment_scalyr_client_user_agent"),
-    six.ensure_str("generate_status"),
-    six.ensure_str("generate_scalyr_client_status"),
-    six.ensure_str("schedule_new_log_processor"),
-    six.ensure_str("get_log_processors"),
-    six.ensure_str("create_and_schedule_new_log_processor"),
-    six.ensure_str("get_and_reset_closed_files_checkpoints"),
+    "start_worker_session",
+    "stop_worker_session",
+    "wait_for_copying_to_begin",
+    "get_id",
+    "augment_scalyr_client_user_agent",
+    "generate_status",
+    "generate_scalyr_client_status",
+    "schedule_new_log_processor",
+    "get_log_processors",
+    "create_and_schedule_new_log_processor",
+    "get_and_reset_closed_files_checkpoints",
 ]
 
 # create base proxy class for the worker session, here we also specify all its methods that may be called through proxy.
 _CopyingManagerWorkerSessionProxy = multiprocessing.managers.MakeProxyType(  # type: ignore
-    six.ensure_str("CopyingManagerWorkerSessionProxy"),
+    "CopyingManagerWorkerSessionProxy",
     WORKER_SESSION_PROXY_EXPOSED_METHODS,
 )
 
@@ -1403,7 +1401,7 @@ class _SharedObjectManager(scalyr_util.ParentProcessAwareSyncManager):
     """
 
     def __init__(self, worker_session_class, *args, **kwargs):
-        super(_SharedObjectManager, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         self._worker_session_class = worker_session_class
 
@@ -1478,16 +1476,16 @@ def create_shared_object_manager(worker_session_class, worker_session_proxy_clas
 
     # pylint: disable=E1101
     manager.register(
-        six.ensure_str("LogFileProcessorProxy"), proxytype=LogFileProcessorProxy
+        "LogFileProcessorProxy", proxytype=LogFileProcessorProxy
     )
 
     manager.register(
-        six.ensure_str("create_worker_session"),
+        "create_worker_session",
         manager._create_worker_session,
         worker_session_proxy_class,
         method_to_typeid={
-            six.ensure_str("get_log_processors"): six.ensure_str("list"),
-            six.ensure_str("create_and_schedule_new_log_processor"): six.ensure_str(
+            "get_log_processors": "list",
+            "create_and_schedule_new_log_processor": six.ensure_str(
                 "LogFileProcessorProxy"
             ),
         },

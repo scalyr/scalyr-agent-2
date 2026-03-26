@@ -14,8 +14,6 @@
 # ------------------------------------------------------------------------
 #
 # author: Imron Alston <imron@scalyr.com>
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 __author__ = "imron@scalyr.com"
 
@@ -29,7 +27,7 @@ class RequestsConnection(Connection):
 
     def __init__(self, server, request_deadline, ca_file, headers, proxies):
 
-        super(RequestsConnection, self).__init__(
+        super().__init__(
             server, request_deadline, ca_file, headers
         )
         self.__response = None

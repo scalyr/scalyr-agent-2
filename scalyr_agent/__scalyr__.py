@@ -15,7 +15,6 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
@@ -39,7 +38,6 @@ except NameError:
 
 import os
 import sys
-from io import open
 
 PY2 = sys.version_info[0] == 2
 PY3 = sys.version_info[0] == 3
@@ -105,7 +103,7 @@ def read_install_info():
     if not os.path.exists(install_info_path):
         return {}
 
-    with open(install_info_path, "r") as fp:
+    with open(install_info_path) as fp:
         return json.load(fp)
 
 
@@ -275,7 +273,7 @@ def __determine_version():
 
     version_path = find_path()
 
-    version_fp = open(version_path, "r")
+    version_fp = open(version_path)
     try:
         return version_fp.readline().strip()
     finally:

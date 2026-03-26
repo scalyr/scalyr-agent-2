@@ -29,7 +29,7 @@ import requests
 import requests_mock
 from mock import patch
 from six import StringIO
-from six.moves import range
+#from six.moves import range
 from urllib3.exceptions import (  # pylint: disable=import-error
     InsecureRequestWarning,
 )
@@ -174,7 +174,7 @@ class KubernetesMonitorTest(ScalyrTestCase):
                 m2.assert_called()
                 self.assertEqual(fragment_polls.count(), 40)
                 self.assertEqual(counter["callback_invocations"], 3)
-                self.assertEquals(
+                self.assertEqual(
                     detected_fragment_changes,
                     [
                         "k8s=true;k8s-runtime=%s" % container_runtime,
@@ -638,7 +638,7 @@ class TestExtraServerAttributes(ScalyrTestCase):
                 fake_clock=fake_clock,
             )
             copying_manager = CopyingManager(config, monitors_manager.monitors)
-            self.assertEquals(
+            self.assertEqual(
                 copying_manager._CopyingManager__expanded_server_attributes.get(
                     "_k8s_ver"
                 ),
@@ -759,7 +759,7 @@ class TestKubeletApi(BaseScalyrLogCaptureTestCase):
                 r"Invalid response from Kubelet API when querying '/stats/summary' "
                 r"\(https://127.0.0.1:10250/stats/summary\): foo bar error"
             )
-            self.assertRaisesRegexp(KubeletApiException, expected_msg, api.query_stats)
+            self.assertRaisesRegex(KubeletApiException, expected_msg, api.query_stats)
 
             expected_msg = (
                 "Invalid response while querying the Kubelet API on "

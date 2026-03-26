@@ -15,8 +15,6 @@
 #
 # author: Edward Chee <echee@scalyr.com>
 
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 __author__ = "echee@scalyr.com"
 
@@ -28,7 +26,7 @@ import threading
 import time
 from collections import deque
 
-from six.moves import range
+#from six.moves import range
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
@@ -37,7 +35,7 @@ MULTIPLY = "multiply"
 RESET_THE_MULTIPLY = "reset_then_multiply"
 
 
-class RateLimiterToken(object):
+class RateLimiterToken:
     def __init__(self, token_id):
         self._token_id = token_id
 
@@ -50,7 +48,7 @@ class RateLimiterToken(object):
         return "Token #%s" % self._token_id
 
 
-class BlockingRateLimiter(object):
+class BlockingRateLimiter:
     """A Rate Limiter that blocks for a random time interval such that over time, the average rate of acquire() calls
     is R where R varies between a max upper and min lower bound. R is a "cluster" rate where the semantics are
     each of num_agents Scalyr Agents instantiates one of these rate limiters such that the aggregate access rate over
@@ -78,7 +76,7 @@ class BlockingRateLimiter(object):
     registry_lock = threading.Lock()
 
     def __repr__(self):
-        return "%s/%s" % (self.__class__.__name__, self._name)
+        return "{}/{}".format(self.__class__.__name__, self._name)
 
     @classmethod
     def get_instance(cls, key, global_config, logger=None):

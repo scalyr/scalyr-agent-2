@@ -91,6 +91,6 @@ class MySqlMonitorTest(ScalyrTestCase):
             "Access denied; you need (at least one of) the PROCESS privilege(s) for this operation",
         )
 
-        self.assertRaisesRegexp(
+        self.assertRaisesRegex(
             Exception, "Received access denied error", db._query, "SELECT VERSION()"
         )

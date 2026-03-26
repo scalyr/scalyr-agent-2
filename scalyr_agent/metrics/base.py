@@ -109,7 +109,7 @@ def get_functions_for_metric(monitor, metric_name):
       - [ ] To speed up the common case then there are no functions defined, we should short circuit
            in such scenario.
     """
-    cache_key = "%s:%s" % (monitor.short_hash, metric_name)
+    cache_key = "{}:{}".format(monitor.short_hash, metric_name)
 
     # TODO: Use LRU cache with limited max size
 

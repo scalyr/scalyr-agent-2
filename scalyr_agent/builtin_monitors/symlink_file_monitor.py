@@ -143,6 +143,6 @@ class SymlinkMatchingFilesMonitor(ScalyrMonitor):
                 continue
 
             self._logger.debug(
-                "Creating symlink: %s -> %s" % (file_path, symlink_destination_path)
+                "Creating symlink: {} -> {}".format(file_path, symlink_destination_path)
             )
             os.symlink(file_path, symlink_destination_path)

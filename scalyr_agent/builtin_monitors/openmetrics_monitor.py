@@ -91,7 +91,6 @@ details.
   be a good idea.
 """
 
-from __future__ import absolute_import
 
 if False:
     from typing import Tuple
@@ -128,7 +127,7 @@ define_config_option(
     __monitor__,
     "url",
     "URL to the OpenMetrics / Prometheus API endpoint (e.g. https://my.host:8080/metrics).",
-    convert_to=six.text_type,
+    convert_to=str,
     allow_http=False,
 )
 
@@ -227,7 +226,7 @@ class OpenMetricsMonitor(ScalyrMonitor):
         # type: () -> None
         self.__url = self._config.get(
             "url",
-            convert_to=six.text_type,
+            convert_to=str,
             required_field=True,
         )
         self.__timeout = self._config.get("timeout", 10)
@@ -358,7 +357,7 @@ class OpenMetricsMonitor(ScalyrMonitor):
             resp = self.__session.get(url, **request_kwargs, timeout=self.__timeout)
         except Exception as e:
             self._logger.warn(
-                "Outgoing request failed to %s failed: %s" % (url, str(e))
+                "Outgoing request failed to {} failed: {}".format(url, str(e))
             )
             return []
 
@@ -623,7 +622,7 @@ class OpenMetricsMonitor(ScalyrMonitor):
                     )
 
                 for filter_glob in component_filter_globs:
-                    if not isinstance(filter_glob, six.text_type):
+                    if not isinstance(filter_glob, str):
                         raise BadMonitorConfiguration(
                             "Value must be a list of strings (got list of %s)"
                             % (type(filter_glob)),

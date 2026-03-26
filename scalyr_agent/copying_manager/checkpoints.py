@@ -13,8 +13,6 @@
 # limitations under the License.
 
 
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 import os
 
@@ -63,7 +61,7 @@ def read_checkpoint_state_from_file(
     try:
         checkpoints = scalyr_util.read_file_as_json(file_path, strict_utf8=True)
     except Exception:
-        logger.exception("Cannot read the checkpoint file {0}.".format(file_path))
+        logger.exception("Cannot read the checkpoint file {}.".format(file_path))
         return None
 
     # the data in the file was somehow corrupted so it can not be read as dict.

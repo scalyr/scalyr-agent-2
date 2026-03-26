@@ -49,7 +49,7 @@ from tests.unit.copying_manager_tests.common import (
 from scalyr_agent import util as scalyr_util
 
 import six
-from six.moves import range
+#from six.moves import range
 import mock
 
 log = scalyr_logging.getLogger(__name__)

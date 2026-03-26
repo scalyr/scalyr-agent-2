@@ -121,20 +121,20 @@ class EncodeDecodeTest(ScalyrTestCase):
             self._setlib(library)
             try:
                 text2 = util.json_encode(obj)
-                self.assertEquals(
+                self.assertEqual(
                     sorted(six.ensure_text(text)),
                     sorted(text2),
                     "%s != %s" % (str(text), str(text2)),
                 )
                 obj2 = util.json_decode(text2)
                 text3 = util.json_encode(obj2)
-                self.assertEquals(
+                self.assertEqual(
                     sorted(six.ensure_text(text)),
                     sorted(text3),
                     "%s != %s" % (str(text), str(text3)),
                 )
                 obj3 = util.json_decode(text)
-                self.assertEquals(obj3, obj)
+                self.assertEqual(obj3, obj)
 
                 # Sanity test to ensure curly brace is always the last character when serializing
                 # a dict.

@@ -15,8 +15,6 @@
 #
 # author: Imron Alston <imron@scalyr.com>
 
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 __author__ = "imron@scalyr.com"
 
@@ -27,7 +25,6 @@ import logging
 import sys
 
 import six
-import six.moves.http_client
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
@@ -83,19 +80,19 @@ class ConnectionFactory:
         @rtype: Connection
 
         """
+        print(sys.version)
 
         result = None
         if use_requests:
             try:
                 from scalyr_agent.requests_connection import RequestsConnection
-
                 result = RequestsConnection(
                     server, request_deadline, ca_file, headers, proxies
                 )
             except Exception as e:
                 log.warn(
                     "Unable to load requests module '%s'.  Falling back to Httplib for connection handling"
-                    % six.text_type(e)
+                    % str(e)
                 )
                 result = ScalyrHttpConnection(
                     server,
@@ -123,13 +120,12 @@ class ConnectionFactory:
         return result
 
 
-class Connection(object):
+class Connection:
     """Connection class
     An abstraction for dealing with different connection types Httplib or Requests
     """
 
     def __init__(self, server, request_deadline, ca_file, headers):
-
         # Verify the server address looks right.
         parsed_server = re.match(r"^(http://|https://|)([^:]*)(:\d+|)$", server.lower())
 
@@ -141,7 +137,7 @@ class Connection(object):
         # Whether or not the connection uses SSL.  For production use, this should always be true.  We only
         # use non-SSL when testing against development versions of the Scalyr server.
         self._use_ssl = parsed_server.group(1) == "https://"
-
+        print(self._use_ssl)
         # Determine the port, defaulting to the right one based on protocol if not given.
         if parsed_server.group(3) != "":
             self._port = int(parsed_server.group(3)[1:])
@@ -153,7 +149,7 @@ class Connection(object):
         # 2->TODO In python2 httplib accepts request headers as binary string(str),
         #  and in python3 http.client accepts headers as unicode.  In this case 'six.ensure_str' can be very useful.
         self._standard_headers = dict()
-        for name, value in six.iteritems(headers):
+        for name, value in headers.items():
             self._standard_headers[six.ensure_str(name)] = six.ensure_str(value)
 
         self._full_address = server
@@ -180,6 +176,7 @@ class Connection(object):
 
     def get(self, request_path):
         """Get requests"""
+        print("does this get called?")
         self.__check_ssl()
         self._get(request_path)
 
@@ -225,7 +222,7 @@ class ScalyrHttpConnection(Connection):
         intermediate_certs_file,
         headers,
     ):
-        super(ScalyrHttpConnection, self).__init__(
+        super().__init__(
             server, request_deadline, ca_file, headers
         )
         self.__http_response = None
@@ -236,6 +233,7 @@ class ScalyrHttpConnection(Connection):
         log.info("HttpConnection uses native os ssl")
 
     def _init_connection(self):
+        print("hello2")
         try:
             if self._use_ssl:
                 self.__connection = HTTPSConnectionWithTimeoutAndVerification(
@@ -284,7 +282,7 @@ class ScalyrHttpConnection(Connection):
                     "errno was %d and the full exception was '%s'.  Closing connection, will re-attempt",
                     self._full_address,
                     errno,
-                    six.text_type(error),
+                    str(error),
                     error_code=error_code,
                 )
             elif isinstance(error, CertificateError):
@@ -307,7 +305,7 @@ class ScalyrHttpConnection(Connection):
                     "errno was %d and the full exception was '%s'.  Closing connection, will re-attempt",
                     self._full_address,
                     errno,
-                    six.text_type(error),
+                    str(error),
                     error_code=error_code,
                 )
             elif errno == 61:  # Connection refused
@@ -331,7 +329,7 @@ class ScalyrHttpConnection(Connection):
                     "will re-attempt",
                     self._full_address,
                     errno,
-                    six.text_type(error),
+                    str(error),
                     error_code=error_code,
                 )
             else:
@@ -340,12 +338,12 @@ class ScalyrHttpConnection(Connection):
                     'Failed to connect to "%s" due to exception.  Exception was "%s".  Closing connection, '
                     "will re-attempt",
                     self._full_address,
-                    six.text_type(error),
+                    str(error),
                     error_code=error_code,
                 )
 
             # TODO: We should probably propagate original exception class...
-            exc = Exception("%s. Original error: %s" % (error_code, str(error)))
+            exc = Exception("{}. Original error: {}".format(error_code, str(error)))
             exc.error_code = error_code
             raise exc
 
@@ -354,7 +352,7 @@ class ScalyrHttpConnection(Connection):
     def _post(self, request_path, body):
         self.__http_response = None
         self.__connection.request(
-            six.ensure_str("POST"),
+            "POST",
             six.ensure_str(request_path),
             body=body,
             headers=self._standard_headers,
@@ -362,8 +360,9 @@ class ScalyrHttpConnection(Connection):
 
     def _get(self, request_path):
         self.__http_response = None
+        print("what about this one")
         self.__connection.request(
-            six.ensure_str("GET"),
+            "GET",
             six.ensure_str(request_path),
             headers=self._standard_headers,
         )
@@ -509,7 +508,7 @@ class HTTPSConnectionWithTimeoutAndVerification(six.moves.http_client.HTTPSConne
             except Exception as e:
                 log.log(
                     log_level,
-                    "Failed to retrieve certificate for %s: %s" % (self.host, str(e)),
+                    "Failed to retrieve certificate for {}: {}".format(self.host, str(e)),
                 )
             finally:
                 if sock:
@@ -649,7 +648,7 @@ def create_connection_helper(host, port, timeout=None, source_address=None):
             sock.connect(sa)
             return sock
 
-        except socket.error as _:
+        except OSError as _:
             err = _
             if sock is not None:
                 sock.close()
@@ -657,4 +656,4 @@ def create_connection_helper(host, port, timeout=None, source_address=None):
     if err is not None:
         raise err
     else:
-        raise socket.error("getaddrinfo returns an empty list")
+        raise OSError("getaddrinfo returns an empty list")

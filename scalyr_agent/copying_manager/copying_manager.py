@@ -13,8 +13,6 @@
 # limitations under the License.
 
 
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 import copy
 import datetime
@@ -72,7 +70,7 @@ CONSOLIDATED_CHECKPOINTS_FILE_NAME = "checkpoints.json"
 WORKER_SESSION_PROCESS_MONITOR_ID_PREFIX = "agent_worker_session_"
 
 
-class DynamicWorkers(object):
+class DynamicWorkers:
     """
     This class is responsible for managing the dynamic workers.
     """
@@ -130,7 +128,7 @@ class DynamicWorkers(object):
         return CopyingManagerWorker(config, worker_config)
 
 
-class CopyingManagerWorker(object):
+class CopyingManagerWorker:
     """
     This abstraction is responsible for maintaining the worker sessions
     for a particular entry in the 'workers' list in the configuration.
@@ -329,7 +327,7 @@ class CopyingManagerWorker(object):
                 memory_manager.wait_for_shutdown(timeout=5)
             except:
                 log.exception(
-                    "The error has occurred while waiting for shutdown of the shared object manager of the worker session {0}.".format(
+                    "The error has occurred while waiting for shutdown of the shared object manager of the worker session {}.".format(
                         worker_session_id
                     )
                     % worker_session_id
@@ -340,7 +338,7 @@ class CopyingManagerWorker(object):
             try:
                 os.kill(memory_manager.pid, signal.SIGKILL)
                 log.warning(
-                    "The process of the shared object manager for the worker session '{0}' has still been running and has been killed.".format(
+                    "The process of the shared object manager for the worker session '{}' has still been running and has been killed.".format(
                         worker_session_id
                     )
                 )
@@ -348,7 +346,7 @@ class CopyingManagerWorker(object):
                 if e.errno != errno.ESRCH:  # no such process
                     # we can not do anything more if even kill is failed, just report about it.
                     log.exception(
-                        "The kill operation of the shared object manager process of the worker session {0} has failed.".format(
+                        "The kill operation of the shared object manager process of the worker session {} has failed.".format(
                             worker_session_id
                         )
                     )
@@ -370,7 +368,7 @@ class CopyingManagerWorker(object):
         return result
 
 
-class PathWorkerIdDict(object):
+class PathWorkerIdDict:
     """
     This class is a dictionary like that allows for multiple keys (path, worker_id) to be associated with a single value
     and provides complementary methods for managing and accessing the keys.
@@ -630,10 +628,8 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         if "worker_id" in log_config:
             log.info(
-                (
                     "Using worker_id %s from log_config for path %s."
                     % (log_config["worker_id"], log_config.get("path"))
-                )
             )
 
             return log_config["worker_id"]
@@ -1504,7 +1500,7 @@ class CopyingManager(StoppableThread, LogWatcher):
             # update the log config of the matcher, which closes any open processors, and returns
             # their checkpoints
             closed_processors = matcher.update_log_entry_config(log_config)
-            for processor_path, checkpoint in six.iteritems(closed_processors):
+            for processor_path, checkpoint in closed_processors.items():
                 checkpoints[processor_path] = checkpoint
 
             reloaded.append(matcher)
@@ -1766,7 +1762,7 @@ class CopyingManager(StoppableThread, LogWatcher):
             checkpoint_file_name = os.path.basename(path)
             active_checkpoint_path = os.path.join(
                 os.path.dirname(path),
-                "active-{0}".format(checkpoint_file_name),
+                "active-{}".format(checkpoint_file_name),
             )
             if os.path.isfile(active_checkpoint_path):
                 os.unlink(active_checkpoint_path)
@@ -1939,7 +1935,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         # Ignore any other errors and continue without checkpoints.
         except Exception:
             log.exception(
-                "An unexpected error has occurred during during the read of the checkpoint file {0}".format(
+                "An unexpected error has occurred during during the read of the checkpoint file {}".format(
                     full_checkpoints_path
                 )
             )

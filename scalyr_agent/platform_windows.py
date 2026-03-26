@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import unicode_literals
-from __future__ import print_function
-from __future__ import absolute_import
 
 import argparse
 import atexit
@@ -73,7 +70,6 @@ scalyr_init()
 # [start of 2->TODO]
 # Check for suitability.
 # Important. Import six as any other dependency from "third_party" libraries after "__scalyr__.scalyr_init"
-from six.moves import input
 
 # [end of 2->TOD0]t
 
@@ -156,7 +152,7 @@ def _get_config_path_registry_entry(default_config_path):
         value, regtype = six.moves.winreg.QueryValueEx(registry_key, _CONFIG_KEY)
         six.moves.winreg.CloseKey(registry_key)
         return value
-    except EnvironmentError:
+    except OSError:
         return default_config_path
 
 
@@ -198,7 +194,7 @@ class ScalyrAgentService(win32serviceutil.ServiceFramework):
             win32event.WaitForSingleObject(self._stop_event, win32event.INFINITE)
         except Exception as e:
             self.error(
-                "Error, causing Windows Service to exit early %s" % six.text_type(e)
+                "Error, causing Windows Service to exit early %s" % str(e)
             )
             self.SvcStop()
 
@@ -285,7 +281,7 @@ class WindowsPlatformController(PlatformController):
             admin_names += admin_filter(users)
 
         domain = win32api.GetComputerName()
-        return ["%s\\%s" % (domain, n) for n in admin_names]
+        return ["{}\\{}".format(domain, n) for n in admin_names]
 
     def invoke_termination_handler(self):
         if self.__termination_handler:
@@ -379,7 +375,7 @@ class WindowsPlatformController(PlatformController):
         if name == "Administrators":
             return self.__local_administrators
         else:
-            return "%s\\%s" % (domain, name)
+            return "{}\\{}".format(domain, name)
 
     def set_file_owner(self, file_path, owner):
         """Sets the owner of the specified file.
@@ -860,7 +856,7 @@ class PipeRedirectorClient(RedirectorClient):
     def pipe_name(self):
         return self.__pipe_name
 
-    class ClientChannel(object):
+    class ClientChannel:
         """Implements the client channel that connects to a named pipe and can receive data from it."""
 
         def __init__(self, full_pipe_name):

@@ -31,9 +31,6 @@
 ### END INIT INFO
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
-from __future__ import unicode_literals
-from __future__ import print_function
-from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
@@ -52,7 +49,6 @@ import time
 import re
 import argparse
 import ssl
-from io import open
 
 if False:
     from typing import Optional
@@ -193,7 +189,7 @@ def _check_disabled(current_time, other_time, message):
     return result
 
 
-class ScalyrAgent(object):
+class ScalyrAgent:
     """Encapsulates the entire Scalyr Agent 2 application."""
 
     def __init__(self, platform_controller):
@@ -286,7 +282,7 @@ class ScalyrAgent(object):
         @rtype: int
         """
 
-        class Options(object):
+        class Options:
             pass
 
         my_options = Options()
@@ -371,7 +367,7 @@ class ScalyrAgent(object):
                 raise Exception(
                     "Error reading configuration file: %s\n"
                     "Terminating agent, please fix the configuration file and restart agent.\n%s"
-                    % (six.text_type(e), traceback.format_exc())
+                    % (str(e), traceback.format_exc())
                 )
             else:
                 self.__config = None
@@ -440,7 +436,7 @@ class ScalyrAgent(object):
                 raise Exception(
                     "Caught exception when attempt to execute command %s.  Exception was %s. "
                     "Traceback:\n%s"
-                    % (command, six.text_type(e), traceback.format_exc())
+                    % (command, str(e), traceback.format_exc())
                 )
 
     def __read_and_verify_config(self, config_file_path, log_warnings=True):
@@ -534,7 +530,7 @@ class ScalyrAgent(object):
             raise Exception(
                 "Configuration file uses a monitor that is not supported on this system Monitor '%s' "
                 "cannot be used due to: %s.  If you require support for this monitor for your system, "
-                "please e-mail contact@scalyr.com" % (e.monitor_name, six.text_type(e))
+                "please e-mail contact@scalyr.com" % (e.monitor_name, str(e))
             )
         return True
 
@@ -681,7 +677,7 @@ class ScalyrAgent(object):
                 "Terminating agent, please fix the error and restart the agent.",
                 file=sys.stderr,
             )
-            log.error("%s" % six.text_type(e))
+            log.error("%s" % str(e))
             log.error("Terminating agent, please fix the error and restart the agent.")
             return 1
 
@@ -728,7 +724,7 @@ class ScalyrAgent(object):
                 return {"error": "No PID file."}
 
             try:
-                with open(pidfile, "r") as fp:
+                with open(pidfile) as fp:
                     pidfile_content = fp.read().strip()
             except OSError as e:
                 return {"error": "Error during PID file read. Error: {}".format(e)}
@@ -791,14 +787,14 @@ class ScalyrAgent(object):
                 ).decode()
                 result["data_root_file_stats"] = ls_output.splitlines()
             except Exception as e:
-                result["data_root_file_stats"] = six.text_type(e)
+                result["data_root_file_stats"] = str(e)
 
             try:
                 with open(status_file_path, "rb") as fp:
                     content = fp.read()
                 result["content"] = content.decode(errors="ignore")
             except Exception as e:
-                result["content"] = six.text_type(e)
+                result["content"] = str(e)
 
             return result
 
@@ -875,7 +871,7 @@ class ScalyrAgent(object):
             self.__controller.is_agent_running(fail_if_not_running=True)
         except AgentNotRunning as e:
             print(AGENT_NOT_RUNNING_MESSAGE)
-            print("%s" % six.text_type(e))
+            print("%s" % str(e))
             return 1
 
         # The status works by sending telling the running agent to dump the status into a well known file and
@@ -906,7 +902,7 @@ class ScalyrAgent(object):
 
         # Write the file with the format we need to use
         with open(status_format_file, "w") as fp:
-            status_format = six.text_type(status_format)
+            status_format = str(status_format)
             fp.write(status_format)
 
         # Signal to the running process.  This should cause that process to write to the status file
@@ -999,7 +995,7 @@ class ScalyrAgent(object):
 
         return_code = 0
 
-        with open(status_file, "r") as fp:
+        with open(status_file) as fp:
             content = fp.read()
 
         # Health check invocation, try to parse status from the report and print and handle it here
@@ -1079,7 +1075,7 @@ class ScalyrAgent(object):
                 "Failed to stop the agent because it does not appear to be running.",
                 file=sys.stderr,
             )
-            print("%s" % six.text_type(e), file=sys.stderr)
+            print("%s" % str(e), file=sys.stderr)
             return 0  # For the sake of restart, we need to return non-error code here.
 
     def __status(self):
@@ -1496,7 +1492,7 @@ class ScalyrAgent(object):
                         log.error(
                             "Bad configuration file seen.  Ignoring, using last known good configuration file.  "
                             'Exception was "%s"',
-                            six.text_type(e),
+                            str(e),
                             error_code="badConfigFile",
                         )
                     self.__current_bad_config = new_config
@@ -1757,7 +1753,7 @@ class ScalyrAgent(object):
             print(
                 "Failed to start agent because it is already running.", file=sys.stderr
             )
-            print("%s" % six.text_type(e), file=sys.stderr)
+            print("%s" % str(e), file=sys.stderr)
             sys.exit(4)
 
     def __update_debug_log_level(self, debug_level, debug_level_logger_names=None):
@@ -2260,7 +2256,7 @@ class ScalyrAgent(object):
 
         if os.path.isfile(status_format_file):
             try:
-                with open(status_format_file, "r") as fp:
+                with open(status_format_file) as fp:
                     status_format = fp.read().strip()
             except OSError:
                 # Non fatal race
@@ -2310,7 +2306,7 @@ class ScalyrAgent(object):
                     4,
                 )
 
-        except (OSError, IOError) as e:
+        except OSError as e:
             # Temporary workaround to make race conditions less likely.
             # If agent status or health check is requested multiple times or concurrently around the
             # same time, it's likely the race will occur and rename will fail because the file  was
@@ -2336,7 +2332,7 @@ class ScalyrAgent(object):
         return final_file_path
 
 
-class WorkerThread(object):
+class WorkerThread:
     """A thread used to run the log copier and the monitor manager."""
 
     def __init__(self, configuration, copying_manager, monitors):
@@ -2518,7 +2514,7 @@ if __name__ == "__main__":
             options.config_filename, options.command, options
         )
     except Exception as mainExcept:
-        print(six.text_type(mainExcept), file=sys.stderr)
+        print(str(mainExcept), file=sys.stderr)
         sys.exit(1)
 
     # We do this outside of the try block above because sys.exit raises an exception itself.

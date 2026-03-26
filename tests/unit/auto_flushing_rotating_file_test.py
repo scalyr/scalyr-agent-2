@@ -28,7 +28,7 @@ from scalyr_agent.monitor_utils.auto_flushing_rotating_file import (
     AutoFlushingRotatingFile,
 )
 
-from six.moves import range
+#from six.moves import range
 
 LINE_STR = "abcdefghi"
 

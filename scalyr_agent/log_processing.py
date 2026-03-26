@@ -21,9 +21,6 @@
 #         logs.
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
-from __future__ import unicode_literals
-from __future__ import absolute_import
-from __future__ import print_function
 
 import sys
 
@@ -46,7 +43,6 @@ import string
 import threading
 import time
 import uuid
-from io import open
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
@@ -99,10 +95,10 @@ class CRIParseError(Exception):
         self.line = line
 
     def __repr__(self):
-        return "Error parsing line - %s: %s" % (self.message, self.line)
+        return "Error parsing line - {}: {}".format(self.message, self.line)
 
 
-class CRILogLine(object):
+class CRILogLine:
     __slots__ = (
         "timestamp",
         "stream",
@@ -173,7 +169,7 @@ class CRILogLine(object):
         return timestamp, stream, tags, line, raw_timestamp
 
 
-class CRILogLineBuffer(object):
+class CRILogLineBuffer:
     # This class is responsible for buffering CRI log lines for one stream and returning completed lines
     def __init__(self, first_line_time):
         # type: (float) -> None
@@ -236,7 +232,7 @@ class CRILogLineBuffer(object):
         return result
 
 
-class CRIStreamBuffers(object):
+class CRIStreamBuffers:
     # This class holds the buffers for all CRI streams and provides methods for adding lines and getting completed buffers
     def __init__(self, max_line_size, line_completion_wait_time):
         # type: (int, int) -> None
@@ -273,7 +269,7 @@ class CRIStreamBuffers(object):
                 return self.__buffers.pop(stream)
 
 
-class LogLine(object):
+class LogLine:
     """A class representing a line from a log file.
     This object will always have a single field 'line' which contains the log line.
     It can also contain two other attributes 'timestamp' which is the timestamp of the
@@ -299,7 +295,7 @@ class LogLine(object):
         self.raw_line_len = len(self.line)
 
 
-class LogFileIterator(object):
+class LogFileIterator:
     """Reads the bytes from a log file at a particular path, returning the lines.
 
     This is the core abstraction that handles iterating over the lines contained in the
@@ -565,7 +561,7 @@ class LogFileIterator(object):
         """Returns a uuid as a string
         We want uuids as strings mostly as a convenience for json_lib
         """
-        return six.text_type(uuid.uuid4())
+        return str(uuid.uuid4())
 
     def get_sequence(self):
         """Gets the current sequence id and sequence number of the iterator
@@ -842,7 +838,7 @@ class LogFileIterator(object):
 
                 except CRIParseError as e:
                     log.error(
-                        "Error parsing line: %s, reason: %s" % (e.line, e.message)
+                        "Error parsing line: {}, reason: {}".format(e.line, e.message)
                     )
 
                 next_line = self.__read_extended_line(current_time)
@@ -956,7 +952,7 @@ class LogFileIterator(object):
             except Exception as e:
                 # something went wrong. Return the full line and log a message
                 log.warning(
-                    "Error parsing line as json for log '%s' - %s" % (self.__path, e),
+                    "Error parsing line as json for log '{}' - {}".format(self.__path, e),
                     limit_once_per_x_secs=300,
                     limit_key=("bad-json-%s" % self.__path),
                 )
@@ -1460,7 +1456,7 @@ class LogFileIterator(object):
         # Use file with most recent creation date when there are multiple files
 
         possible_copy_filepaths = list(
-            six.moves.filter(
+            filter(
                 lambda f: not f.endswith(".gz")
                 and f != self.__path
                 and (int(time.time()) - self.__file_system.stat(f).st_ctime < 300)
@@ -1470,13 +1466,13 @@ class LogFileIterator(object):
                 and (
                     # if rotated file name ends with a new extension with number (e.g. foo.log.1).
                     re.match(
-                        r"{0}\.\d+".format(re.escape(file_name)), os.path.basename(f)
+                        r"{}\.\d+".format(re.escape(file_name)), os.path.basename(f)
                     )
                     or
                     # the same but the number or date is located before the extension ("extension" option in logrotate)
                     # (e.g. foo.1.log)
                     re.match(
-                        r"{0}\.\d+{1}".format(
+                        r"{}\.\d+{}".format(
                             re.escape(file_prefix), re.escape(file_ext)
                         ),
                         os.path.basename(f),
@@ -1788,7 +1784,7 @@ class LogFileIterator(object):
                     pending_file = None
                     attempts_left -= 1
                     starting_inode = None
-            except IOError as error:
+            except OSError as error:
                 if error.errno == 13:
                     log.warning(
                         "Permission denied while attempting to read file '%s'",
@@ -1920,7 +1916,7 @@ class LogFileIterator(object):
                 result += 1
         return result
 
-    class BufferEntry(object):
+    class BufferEntry:
         """Simple object used to represent a portion of the cache buffer holding a portion of a file."""
 
         def __init__(self, position_start, buffer_index_start, num_bytes):
@@ -1931,7 +1927,7 @@ class LogFileIterator(object):
             self.buffer_index_start = buffer_index_start
             self.buffer_index_end = buffer_index_start + num_bytes
 
-    class FileState(object):
+    class FileState:
         """Represents a file in the list of pending files for the LogFileIterator."""
 
         def __init__(self, state_json, file_handle):
@@ -2000,7 +1996,7 @@ class LogFileIterator(object):
                 result["inode"] = inode
             return result
 
-    class Position(object):
+    class Position:
         """Represents a position in the iterator."""
 
         def __init__(self, mark_generation, position, fragment_offset):
@@ -2019,7 +2015,7 @@ class LogFileIterator(object):
             """
             return self.mark_generation.get_offset_into_buffer(self.mark_offset)
 
-    class MarkGeneration(object):
+    class MarkGeneration:
         """Represents a generation of positions.  All positions made within the same MarkGeneration are all
         relative to the same location in the file.
 
@@ -2069,7 +2065,7 @@ class LogFileIterator(object):
                 current_generation = current_generation.__next_generation
             return position
 
-    class ExtendedLineBuffer(object):
+    class ExtendedLineBuffer:
         """
         Holds the entire contents of an extended log line including any attributes and timestamps
         associated with the entire line.
@@ -2184,7 +2180,7 @@ class LogFileIterator(object):
                 fragment_offset_in_data, self.__data_size, self.__raw_size
             )
 
-    class ExtendedLinePosition(object):
+    class ExtendedLinePosition:
         """
         Represents the position of the next line fragment to read when iterating over an
         extended line.
@@ -2319,7 +2315,7 @@ class LogFileIterator(object):
             return self.__data_position
 
 
-class LogFileProcessor(object):
+class LogFileProcessor:
     """Performs all processing on a single log file (identified by a path) including returning which lines are ready
     to be sent to the server after applying any sampling and redaction rules.
     """
@@ -2938,7 +2934,7 @@ class LogFileProcessor(object):
                         #  As in other similar places, it can be OK to leave literals here as str.
                         #  But as we use "unicode_literals",
                         #  we need to use six.text_type insted of str to be able to do formatting with unicode.
-                        raise Exception("Invalid result %s" % six.text_type(result))
+                        raise Exception("Invalid result %s" % str(result))
                         # [end of 2->TOD0]
                 finally:
                     self.__lock.release()
@@ -3158,7 +3154,7 @@ class LogFileProcessor(object):
         return "log_%d" % new_id
 
 
-class LogLineSampler(object):
+class LogLineSampler:
     """Encapsulates all of the configured sampling rules to perform on lines from a single log file.
 
     It contains a list of filters, specified as regular expressions and a corresponding pass rate
@@ -3251,7 +3247,7 @@ class LogLineSampler(object):
         return random.random()
 
 
-class SamplingRule(object):
+class SamplingRule:
     """Encapsulates all data for one sampling rule."""
 
     def __init__(self, match_expression, sampling_rate):
@@ -3261,7 +3257,7 @@ class SamplingRule(object):
         self.total_passes = 0
 
 
-class LogLineRedacter(object):
+class LogLineRedacter:
     """Encapsulates all of the configured redaction rules to perform on lines from a single log file.
 
     It contains a list of redaction filters, specified as regular expressions, that are applied against
@@ -3313,16 +3309,16 @@ class LogLineRedacter(object):
             if e.message == "unmatched group":  # pylint: disable=no-member
                 log.error(
                     'Error while applying redaction rule "%s": %s. Please make sure any redaction rules only reference groups that are guaranteed to match.',
-                    six.text_type(redaction_rule_applying.redaction_expression.pattern),
-                    six.text_type(e.message),  # pylint: disable=no-member
+                    str(redaction_rule_applying.redaction_expression.pattern),
+                    str(e.message),  # pylint: disable=no-member
                     limit_once_per_x_secs=300,
                     limit_key="redaction_unmatched_group",
                 )
             else:
                 log.error(
                     'Error while applying redaction rule "%s": %s',
-                    six.text_type(redaction_rule_applying.redaction_expression.pattern),
-                    six.text_type(e.message),  # pylint: disable=no-member
+                    str(redaction_rule_applying.redaction_expression.pattern),
+                    str(e.message),  # pylint: disable=no-member
                     limit_once_per_x_secs=300,
                     limit_key="redaction_generic_re_error",
                 )
@@ -3455,7 +3451,7 @@ class LogLineRedacter(object):
         return result, matches > 0
 
 
-class RedactionRule(object):
+class RedactionRule:
     """Encapsulates all data for one redaction rule."""
 
     def __init__(self, redaction_expression, replacement_text, hash_salt=""):
@@ -3472,7 +3468,7 @@ class RedactionRule(object):
         ) in self.replacement_text
 
 
-class LogMatcher(object):
+class LogMatcher:
     """Performs all matching and processing logic to handle a single log entry in the configuration file.
 
     The single log entry specifies the path for the log file that should be collected (where the path is
@@ -3803,7 +3799,7 @@ class LogMatcher(object):
                         new_processor.add_redacter(
                             rule["match_expression"],
                             rule["replacement"],
-                            six.text_type(rule.get("hash_salt", default_value="")),
+                            str(rule.get("hash_salt", default_value="")),
                         )
                     for rule in self.__log_entry_config["sampling_rules"]:
                         new_processor.add_sampler(
@@ -3859,7 +3855,7 @@ class LogMatcher(object):
         if "rename_logfile" in log_config:
             rename = log_config["rename_logfile"]
 
-            if isinstance(rename, six.string_types):
+            if isinstance(rename, str):
                 pattern = string.Template(rename)
                 try:
                     values = {}
@@ -3878,7 +3874,7 @@ class LogMatcher(object):
                         #  But as we use "unicode_literals",
                         #  we need to use six.text_type insted of str to be able to do formatting with unicode.
                         "Invalid substition pattern in 'rename_logfile'. %s"
-                        % six.text_type(e)
+                        % str(e)
                         # [end of 2->TOD0]
                     )
             elif isinstance(rename, JsonObject):
@@ -3903,7 +3899,7 @@ class LogMatcher(object):
                             % (
                                 rename["match"],
                                 rename["replacement"],
-                                six.text_type(e),
+                                str(e),
                             ),
                             # [end of 2->TOD0]
                             limit_once_per_x_secs=600,
@@ -3947,7 +3943,7 @@ class LogMatcher(object):
         self._processors = new_list
 
 
-class FileSystem(object):
+class FileSystem:
     """A facade through which file system calls can be made.
 
     This abstraction is really in place for future testing.  It centralizes all
@@ -4087,7 +4083,7 @@ class FileSystem(object):
             # We really shouldn't ever get errors since you don't need permissions.  So, only if the file doesn't
             # exist will we get this error.
             return None
-        except IOError:
+        except OSError:
             return None
 
     def can_read(self, file_path):
@@ -4100,9 +4096,9 @@ class FileSystem(object):
         @rtype: bool
         """
         try:
-            fp = open(file_path, "r")
+            fp = open(file_path)
             fp.close()
-        except IOError as error:
+        except OSError as error:
             if error.errno == 13:
                 return False
         return True

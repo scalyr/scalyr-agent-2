@@ -15,8 +15,6 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
@@ -35,7 +33,7 @@ from scalyr_agent.__scalyr__ import INSTALL_TYPE
 PLATFORM_INSTANCE = None
 
 
-class PlatformController(object):
+class PlatformController:
     def __init__(self):
         """Initializes a platform instance."""
         self._install_type = INSTALL_TYPE
@@ -366,7 +364,7 @@ class PlatformController(object):
         pass
 
 
-class DefaultPaths(object):
+class DefaultPaths:
     """Holds the values for the default paths for several key files and directories.
 
     The default values are platform specific so must be created by a PlatformController instance.

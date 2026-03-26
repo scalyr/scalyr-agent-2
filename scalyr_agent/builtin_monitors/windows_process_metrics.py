@@ -62,8 +62,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ------------------------------------------------------------------------
 """
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 __author__ = "Scott Sullivan <guy.hoozdis@gmail.com>"
 __version__ = "0.0.1"
@@ -100,7 +98,7 @@ CONFIG_OPTIONS = [
     dict(
         option_name="module",
         option_description="Always `scalyr_agent.builtin_monitors.windows_process_metrics`",
-        convert_to=six.text_type,
+        convert_to=str,
         required_option=True,
     ),
     dict(
@@ -111,7 +109,7 @@ CONFIG_OPTIONS = [
         "has a separate `{...}` stanza in the configuration file "
         r"(`C:\Program Files (x86)\Scalyr\config\agent.json`).",
         required_option=True,
-        convert_to=six.text_type,
+        convert_to=str,
     ),
     dict(
         option_name="commandline",
@@ -119,14 +117,14 @@ CONFIG_OPTIONS = [
         "of `tasklist`, or `wmic process list`. Selects the process of interest. "
         "If multiple processes match, only metrics from the first match are imported.",
         default=None,
-        convert_to=six.text_type,
+        convert_to=str,
     ),
     dict(
         option_name="pid",
         option_description="Process identifier (PID). An alternative to `commandline` "
         "to select a process. If `commandline` is set, this property is ignored.",
         default=None,
-        convert_to=six.text_type,
+        convert_to=str,
     ),
 ]
 
@@ -600,7 +598,7 @@ class ProcessMonitor(ScalyrMonitor):
                 "  pip install psutil",
             )
 
-        super(ProcessMonitor, self).__init__(
+        super().__init__(
             monitor_config=monitor_config,
             logger=logger,
             sample_interval_secs=sample_interval_secs,
@@ -610,7 +608,7 @@ class ProcessMonitor(ScalyrMonitor):
 
     def _initialize(self):
         self.__id = self._config.get(
-            "id", required_field=True, convert_to=six.text_type
+            "id", required_field=True, convert_to=str
         )
 
         if not self._config.get("commandline") and not self._config.get("pid"):

@@ -15,8 +15,6 @@
 #
 #
 # author: Edward Chee <echee@scalyr.com>
-from __future__ import unicode_literals
-from __future__ import absolute_import
 from scalyr_agent import compat
 
 __author__ = "echee@scalyr.com"
@@ -28,7 +26,6 @@ import os
 import shutil
 import tempfile
 import threading
-from io import open
 
 import scalyr_agent.util as scalyr_util
 import scalyr_agent.scalyr_logging as scalyr_logging
@@ -41,7 +38,7 @@ from scalyr_agent.scalyr_logging import AgentLogger
 LOG = scalyr_logging.getLogger(__name__)
 
 
-class ScalyrTestUtils(object):
+class ScalyrTestUtils:
     @staticmethod
     def create_configuration(extra_toplevel_config=None):
         """Creates a blank configuration file with default values. Optionally overwrites top-level key/values.
@@ -134,14 +131,14 @@ class NullHandler(logging.Handler):
         pass
 
 
-class FakeAgentLogger(AgentLogger, object):
+class FakeAgentLogger(AgentLogger):
     def __init__(self, name):
-        super(FakeAgentLogger, self).__init__(name)
+        super().__init__(name)
         if not len(self.handlers):
             self.addHandler(NullHandler())
 
 
-class FakePlatform(object):
+class FakePlatform:
     """Fake implementation of PlatformController.
 
     Only implements the one method required for testing MonitorsManager.

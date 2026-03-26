@@ -21,7 +21,6 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
@@ -35,7 +34,7 @@ from scalyr_agent.util import StoppableThread
 log = scalyr_logging.getLogger(__name__)
 
 
-class SocketWrapper(object):
+class SocketWrapper:
     """Wraps a socket in order to implement the necessary functions to be as a stdin.
 
     This is necessary to cast the socket as stdin to be used by the code.iteract method.
@@ -70,7 +69,7 @@ class SocketWrapper(object):
                 return self.__socket.recv(max_bytes)
             except socket.timeout:
                 continue
-            except socket.error as e:
+            except OSError as e:
                 if e.errno == 35:
                     continue
                 raise e
@@ -199,7 +198,7 @@ class DebugServer(StoppableThread):
             try:
                 self.__server_socket.shutdown(socket.SHUT_RDWR)
                 self.__server_socket = None
-            except socket.error:
+            except OSError:
                 self.__server_socket = None
 
 

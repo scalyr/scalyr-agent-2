@@ -14,8 +14,6 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 if False:  # NOSONAR
     from typing import List
@@ -391,8 +389,7 @@ class MonitorsManager(StoppableThread):
             #
             # Long term and correct solution is making sure we don't create any threads
             # before we fork
-            if six.PY3:
-                monitor._is_stopped = False
+            monitor._is_stopped = False
 
             monitor.start()
 
@@ -530,7 +527,7 @@ class MonitorsManager(StoppableThread):
         # Instantiate and initialize it.
         return monitor_class(
             monitor_config,
-            scalyr_logging.getLogger("%s(%s)" % (module_name, monitor_id)),
+            scalyr_logging.getLogger("{}({})".format(module_name, monitor_id)),
             global_config=global_config,
         )
 

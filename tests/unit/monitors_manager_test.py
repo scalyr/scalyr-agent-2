@@ -38,7 +38,7 @@ class MonitorsManagerTest(ScalyrTestCase):
             [{"module": "scalyr_agent.builtin_monitors.test_monitor", "gauss_mean": 0}],
             [],
         )
-        self.assertEquals(len(test_manager.monitors), 1)
+        self.assertEqual(len(test_manager.monitors), 1)
 
     def test_multiple_modules_and_platform_monitors(self):
         test_manager, _ = ScalyrTestUtils.create_test_monitors_manager(
@@ -60,10 +60,10 @@ class MonitorsManagerTest(ScalyrTestCase):
             ],
         )
 
-        self.assertEquals(len(test_manager.monitors), 3)
-        self.assertEquals(test_manager.monitors[0].monitor_name, "test_monitor(1)")
-        self.assertEquals(test_manager.monitors[1].monitor_name, "test_monitor(2)")
-        self.assertEquals(test_manager.monitors[2].monitor_name, "test_monitor(3)")
+        self.assertEqual(len(test_manager.monitors), 3)
+        self.assertEqual(test_manager.monitors[0].monitor_name, "test_monitor(1)")
+        self.assertEqual(test_manager.monitors[1].monitor_name, "test_monitor(2)")
+        self.assertEqual(test_manager.monitors[2].monitor_name, "test_monitor(3)")
 
     def test_stopping_monitor(self):
         test_manager, _ = ScalyrTestUtils.create_test_monitors_manager(
@@ -85,10 +85,10 @@ class MonitorsManagerTest(ScalyrTestCase):
 
         test_manager.set_user_agent_augment_callback(augment_user_agent)
         test_manager.start_manager()
-        self.assertEquals(test_manager.generate_status().total_alive_monitors, 2)
+        self.assertEqual(test_manager.generate_status().total_alive_monitors, 2)
 
         test_manager.stop_manager(wait_on_join=True)
-        self.assertEquals(test_manager.generate_status().total_alive_monitors, 0)
+        self.assertEqual(test_manager.generate_status().total_alive_monitors, 0)
 
     def test_generate_status(self):
         test_manager, _ = ScalyrTestUtils.create_test_monitors_manager(
@@ -105,7 +105,7 @@ class MonitorsManagerTest(ScalyrTestCase):
             [],
         )
         status = test_manager.generate_status()
-        self.assertEquals(status.total_alive_monitors, 0)
+        self.assertEqual(status.total_alive_monitors, 0)
         self.assertFalse(any([ms.is_alive for ms in status.monitors_status]))
 
         def augment_user_agent(fragments):
@@ -115,13 +115,13 @@ class MonitorsManagerTest(ScalyrTestCase):
         test_manager.start_manager()
 
         status = test_manager.generate_status()
-        self.assertEquals(status.total_alive_monitors, 2)
+        self.assertEqual(status.total_alive_monitors, 2)
         self.assertTrue(all([ms.is_alive for ms in status.monitors_status]))
 
         test_manager.stop_manager(wait_on_join=True)
 
         status = test_manager.generate_status()
-        self.assertEquals(status.total_alive_monitors, 0)
+        self.assertEqual(status.total_alive_monitors, 0)
         self.assertFalse(any([ms.is_alive for ms in status.monitors_status]))
 
     def test_with_disabled_monitors(self):
@@ -140,7 +140,7 @@ class MonitorsManagerTest(ScalyrTestCase):
             extra_toplevel_config={"disable_leak_monitors_creation": True},
         )
 
-        self.assertEquals(len(test_manager.monitors), 0)
+        self.assertEqual(len(test_manager.monitors), 0)
 
     def test_with_disabled_monitor_threads(self):
         test_manager, _ = ScalyrTestUtils.create_test_monitors_manager(
@@ -164,7 +164,7 @@ class MonitorsManagerTest(ScalyrTestCase):
         test_manager.set_user_agent_augment_callback(augment_user_agent)
         test_manager.start_manager()
         status = test_manager.generate_status()
-        self.assertEquals(status.total_alive_monitors, 0)
+        self.assertEqual(status.total_alive_monitors, 0)
 
     def test_module_with_id(self):
         test_manager, _ = ScalyrTestUtils.create_test_monitors_manager(
@@ -181,9 +181,9 @@ class MonitorsManagerTest(ScalyrTestCase):
             ],
             [],
         )
-        self.assertEquals(len(test_manager.monitors), 2)
-        self.assertEquals(test_manager.monitors[0].monitor_name, "test_monitor(first)")
-        self.assertEquals(test_manager.monitors[1].monitor_name, "test_monitor(2)")
+        self.assertEqual(len(test_manager.monitors), 2)
+        self.assertEqual(test_manager.monitors[0].monitor_name, "test_monitor(first)")
+        self.assertEqual(test_manager.monitors[1].monitor_name, "test_monitor(2)")
 
     def test_user_agent_polling(self):
         """Test polling of user-agent fragments and invocation of the callback (only on change)
@@ -225,10 +225,10 @@ class MonitorsManagerTest(ScalyrTestCase):
             null_logger=True,
             fake_clock=fake_clock,
         )
-        self.assertEquals(
+        self.assertEqual(
             test_manager._user_agent_refresh_interval, 30
         )  # ensure config setting works
-        self.assertEquals(len(test_manager.monitors), 3)
+        self.assertEqual(len(test_manager.monitors), 3)
         patched_monitor_0 = test_manager.monitors[0]
         patched_monitor_1 = test_manager.monitors[1]
         unpatched_monitor = test_manager.monitors[2]
@@ -244,10 +244,10 @@ class MonitorsManagerTest(ScalyrTestCase):
 
         for mon in [patched_monitor_0, patched_monitor_1]:
             mon.get_user_agent_fragment = mock_get_user_agent_fragment
-            self.assertEquals(
+            self.assertEqual(
                 mon.get_user_agent_fragment(), test_frag
             )  # monkey patched
-        self.assertEquals(
+        self.assertEqual(
             unpatched_monitor.get_user_agent_fragment(), None
         )  # not patched
 
@@ -255,7 +255,7 @@ class MonitorsManagerTest(ScalyrTestCase):
         # Check that the exact fragment returned by the 2 patched monitors are deduplicated.
         def augment_user_agent(fragments):
             counter["callback_invocations"] += 1
-            self.assertEquals(fragments, [test_frag])
+            self.assertEqual(fragments, [test_frag])
 
         test_manager.set_user_agent_augment_callback(augment_user_agent)
 
@@ -268,7 +268,7 @@ class MonitorsManagerTest(ScalyrTestCase):
         self.assertTrue(
             fragment_polls.sleep_until_count_or_maxwait(20, poll_interval, 1)
         )
-        self.assertEquals(counter["callback_invocations"], 1)
+        self.assertEqual(counter["callback_invocations"], 1)
 
         # Rerun the above test but this time have monitors return changing fragments.
         # This will cause the user agent callback to be invoked during each round of polling.
@@ -315,7 +315,7 @@ class MonitorsManagerTest(ScalyrTestCase):
             [],
         )
         status = test_manager.generate_status()
-        self.assertEquals(status.total_alive_monitors, 0)
+        self.assertEqual(status.total_alive_monitors, 0)
 
         def augment_user_agent(fragments):
             pass
@@ -333,7 +333,7 @@ class MonitorsManagerTest(ScalyrTestCase):
             )
 
             status = test_manager.generate_status()
-            self.assertEquals(status.total_alive_monitors, 1)
+            self.assertEqual(status.total_alive_monitors, 1)
             self.assertTrue(all([ms.is_alive for ms in status.monitors_status]))
 
             monitors = test_manager.find_monitors(
@@ -360,7 +360,7 @@ class MonitorsManagerTest(ScalyrTestCase):
             )
 
             status = test_manager.generate_status()
-            self.assertEquals(status.total_alive_monitors, 2)
+            self.assertEqual(status.total_alive_monitors, 2)
             self.assertTrue(all([ms.is_alive for ms in status.monitors_status]))
 
             monitors = test_manager.find_monitors(
@@ -390,7 +390,7 @@ class MonitorsManagerTest(ScalyrTestCase):
             )
 
             status = test_manager.generate_status()
-            self.assertEquals(status.total_alive_monitors, 3)
+            self.assertEqual(status.total_alive_monitors, 3)
             self.assertTrue(all([ms.is_alive for ms in status.monitors_status]))
 
             monitors = test_manager.find_monitors(
@@ -429,7 +429,7 @@ class MonitorsManagerTest(ScalyrTestCase):
             )
 
             status = test_manager.generate_status()
-            self.assertEquals(status.total_alive_monitors, 2)
+            self.assertEqual(status.total_alive_monitors, 2)
             self.assertTrue(all([ms.is_alive for ms in status.monitors_status]))
 
             monitors = test_manager.find_monitors(
@@ -440,7 +440,7 @@ class MonitorsManagerTest(ScalyrTestCase):
             test_manager.stop_manager(wait_on_join=True)
 
             status = test_manager.generate_status()
-            self.assertEquals(status.total_alive_monitors, 0)
+            self.assertEqual(status.total_alive_monitors, 0)
             self.assertFalse(any([ms.is_alive for ms in status.monitors_status]))
 
             # Stop will stop the monitors, but won't remove any of them (including dynamically added

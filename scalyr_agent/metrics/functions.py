@@ -52,7 +52,7 @@ LOG = getLogger(__name__)
 RATE_METRIC_CALCULATE_RUNTIME_STATS = get_empty_stats_dict()
 
 
-class MetricFunction(six.with_metaclass(ABCMeta)):
+class MetricFunction(metaclass=ABCMeta):
     # Suffix which get's added to the derived metric name. For example, if metric name is
     # "cpu.seconds_total", derived rate metric would be named "cpu.seconds_total_rate"
     METRIC_SUFFIX = ""  # type: str
@@ -337,7 +337,7 @@ could add overhead in terms of CPU and memory usage.
             ),
         )
 
-        rate_metric_name = "%s%s" % (metric_name, cls.METRIC_SUFFIX)
+        rate_metric_name = "{}{}".format(metric_name, cls.METRIC_SUFFIX)
         # TODO: Use dataclass once we only support Python 3
         result = [(rate_metric_name, rate_value)]
 
@@ -394,7 +394,7 @@ could add overhead in terms of CPU and memory usage.
         monitor_calculate_rate_metric_names = monitor.get_calculate_rate_metric_names()
 
         # Partial entry key without extra fields suffix
-        config_entry_key = "%s:%s" % (monitor.monitor_module_name, metric_name)
+        config_entry_key = "{}:{}".format(monitor.monitor_module_name, metric_name)
 
         for config_value in chain(
             config_calculate_rate_metric_names, monitor_calculate_rate_metric_names
@@ -434,7 +434,7 @@ could add overhead in terms of CPU and memory usage.
         # For example: openmetrics_monitor:docker.cpu_usage_seconds_total:mode=kernel
 
         # Partial entry key without extra fields suffix
-        config_entry_key = "%s:%s" % (monitor.monitor_module_name, metric_name)
+        config_entry_key = "{}:{}".format(monitor.monitor_module_name, metric_name)
 
         for config_value in chain(
             config_calculate_rate_metric_names, monitor_calculate_rate_metric_names

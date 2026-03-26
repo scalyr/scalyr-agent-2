@@ -55,7 +55,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         request = AddEventsRequest(self.__body)
         request.set_client_time(1)
 
-        self.assertEquals(request.total_events, 0)
+        self.assertEqual(request.total_events, 0)
 
         self.assertTrue(
             request.add_event(Event().set_message(b"eventOne"), timestamp=1)
@@ -64,12 +64,12 @@ class AddEventsRequestTest(ScalyrTestCase):
             request.add_event(Event().set_message(b"eventTwo"), timestamp=2)
         )
 
-        self.assertEquals(
+        self.assertEqual(
             request.get_payload(),
             b"""{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"1"},{attrs:{message:`s\x00\x00\x00\x08eventTwo},ts:"2"}]"""
             b""", logs: [], threads: [], client_time: 1 }""",
         )
-        self.assertEquals(request.total_events, 2)
+        self.assertEqual(request.total_events, 2)
         request.close()
 
     def test_multiple_calls_to_get_payload(self):
@@ -83,14 +83,14 @@ class AddEventsRequestTest(ScalyrTestCase):
             request.add_event(Event().set_message(b"eventTwo"), timestamp=2)
         )
 
-        self.assertEquals(request.get_payload(), request.get_payload())
+        self.assertEqual(request.get_payload(), request.get_payload())
         request.close()
 
     def test_add_log_and_thread(self):
         request = AddEventsRequest(self.__body)
         request.set_client_time(1)
 
-        self.assertEquals(request.total_events, 0)
+        self.assertEqual(request.total_events, 0)
 
         self.assertTrue(
             request.add_event(Event().set_message(b"eventOne"), timestamp=1)
@@ -101,13 +101,13 @@ class AddEventsRequestTest(ScalyrTestCase):
         )
         self.assertTrue(request.add_log_and_thread("t2", "n2", {"l2": "L2"}))
 
-        self.assertEquals(
+        self.assertEqual(
             request.get_payload(),
             b"""{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"1"},{attrs:{message:`s\x00\x00\x00\x08eventTwo},ts:"2"}]"""
             b""", logs: [{"attrs":{"l1":"L1"},"id":"t1"},{"attrs":{"l2":"L2"},"id":"t2"}], threads: [{"id":"t1","name":"n1"},{"id":"t2","name":"n2"}], client_time: 1 }""",
         )
 
-        self.assertEquals(request.total_events, 2)
+        self.assertEqual(request.total_events, 2)
         request.close()
 
     def test_maximum_bytes_exceeded(self):
@@ -119,7 +119,7 @@ class AddEventsRequestTest(ScalyrTestCase):
             request.add_event(Event().set_message("eventTwo"), timestamp=2)
         )
 
-        self.assertEquals(
+        self.assertEqual(
             request.get_payload(),
             b"""{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"1"}], logs: [], threads: [], client_time: 1 }""",
         )
@@ -132,7 +132,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertTrue(request.add_log_and_thread("t1", "name1", {}))
         self.assertFalse(request.add_log_and_thread("t2", "name2", {}))
 
-        self.assertEquals(
+        self.assertEqual(
             request.get_payload(),
             b"""{"token":"fakeToken", events: [], logs: [{"attrs":{},"id":"t1"}], threads: [{"id":"t1","name":"name1"}], client_time: 1 }""",
         )
@@ -155,7 +155,7 @@ class AddEventsRequestTest(ScalyrTestCase):
             request.add_event(Event().set_message(b"eventThree"), timestamp=3)
         )
 
-        self.assertEquals(
+        self.assertEqual(
             request.get_payload(),
             b"""{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\neventThree},ts:"3"}], logs: [], threads: [], client_time: 1 }""",
         )
@@ -176,7 +176,7 @@ class AddEventsRequestTest(ScalyrTestCase):
             request.add_event(Event().set_message("eventThree"), timestamp=3)
         )
 
-        self.assertEquals(
+        self.assertEqual(
             request.get_payload(),
             b"""{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\neventThree},ts:"3"}], """
             b"""logs: [{"attrs":{},"id":"log2"}], threads: [{"id":"log2","name":"Log two"}], client_time: 1 }""",
@@ -194,7 +194,7 @@ class AddEventsRequestTest(ScalyrTestCase):
 
         self.assertTrue(request.add_event(event_one, timestamp=1))
 
-        self.assertEquals(
+        self.assertEqual(
             request.get_payload(),
             b"""{"token":"fakeToken", events: [{attrs:{"source":"stdout",message:`s\x00\x00\x00\x08eventOne},ts:"1"}], """
             b"""logs: [{"attrs":{},"id":"log2"}], threads: [{"id":"log2","name":"Log two"}], client_time: 1 }""",
@@ -220,7 +220,7 @@ class AddEventsRequestTest(ScalyrTestCase):
 
         self.assertTrue(request.add_event(event_one, timestamp=1))
 
-        self.assertEquals(
+        self.assertEqual(
             request.get_payload(),
             b"""{"token":"fakeToken", events: [{attrs:{"event":"event","source":"stdin",message:`s\x00\x00\x00\x08eventOne},ts:"1"}], """
             b"""logs: [{"attrs":{},"id":"log2"}], threads: [{"id":"log2","name":"Log two"}], client_time: 1 }""",
@@ -234,14 +234,14 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertTrue(request.add_event(Event().set_message("eventOne"), timestamp=1))
         self.assertTrue(request.add_event(Event().set_message("eventTwo"), timestamp=2))
 
-        self.assertEquals(
+        self.assertEqual(
             request.get_payload(),
             b"""{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"1"},{attrs:{message:`s\x00\x00\x00\x08eventTwo},ts:"2"}]"""
             b""", logs: [], threads: [], client_time: 100 }""",
         )
 
         request.set_client_time(2)
-        self.assertEquals(
+        self.assertEqual(
             request.get_payload(),
             b"""{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"1"},{attrs:{message:`s\x00\x00\x00\x08eventTwo},ts:"2"}]"""
             b""", logs: [], threads: [], client_time: 2 }""",
@@ -263,7 +263,7 @@ class AddEventsRequestTest(ScalyrTestCase):
 
         json = test_util.parse_scalyr_request(request.get_payload())
         event = json["events"][1]
-        self.assertEquals(event["ts"], expected)
+        self.assertEqual(event["ts"], expected)
 
     def test_no_monotonically_increasing_timestamp(self):
         request = AddEventsRequest(self.__body)
@@ -277,7 +277,7 @@ class AddEventsRequestTest(ScalyrTestCase):
 
         json = test_util.parse_scalyr_request(request.get_payload())
         event = json["events"][1]
-        self.assertEquals(event["ts"], "1")
+        self.assertEqual(event["ts"], "1")
 
     def test_timestamp_none(self):
         request = AddEventsRequest(self.__body)
@@ -306,7 +306,7 @@ class AddEventsRequestTest(ScalyrTestCase):
                 Event().set_message("eventOne"), timestamp=1, sequence_id=1234
             )
         )
-        self.assertEquals(request.total_events, 1)
+        self.assertEqual(request.total_events, 1)
 
         json = test_util.parse_scalyr_request(request.get_payload())
         event = json["events"][0]
@@ -324,7 +324,7 @@ class AddEventsRequestTest(ScalyrTestCase):
                 Event().set_message("eventOne"), timestamp=1, sequence_number=1234
             )
         )
-        self.assertEquals(request.total_events, 1)
+        self.assertEqual(request.total_events, 1)
 
         json = test_util.parse_scalyr_request(request.get_payload())
         event = json["events"][0]
@@ -347,13 +347,13 @@ class AddEventsRequestTest(ScalyrTestCase):
                 sequence_number=expected_number,
             )
         )
-        self.assertEquals(request.total_events, 1)
+        self.assertEqual(request.total_events, 1)
 
         json = test_util.parse_scalyr_request(request.get_payload())
         event = json["events"][0]
 
-        self.assertEquals(expected_id, event["si"])
-        self.assertEquals(expected_number, event["sn"])
+        self.assertEqual(expected_id, event["si"])
+        self.assertEqual(expected_number, event["sn"])
         self.assertFalse("sd" in event)
         request.close()
 
@@ -379,14 +379,14 @@ class AddEventsRequestTest(ScalyrTestCase):
                 sequence_number=expected_number + expected_delta,
             )
         )
-        self.assertEquals(request.total_events, 2)
+        self.assertEqual(request.total_events, 2)
 
         json = test_util.parse_scalyr_request(request.get_payload())
         event = json["events"][1]
 
         self.assertFalse("si" in event)
         self.assertFalse("sn" in event)
-        self.assertEquals(expected_delta, event["sd"])
+        self.assertEqual(expected_delta, event["sd"])
         request.close()
 
     def test_different_sequence_id(self):
@@ -420,13 +420,13 @@ class AddEventsRequestTest(ScalyrTestCase):
                 sequence_number=second_number,
             )
         )
-        self.assertEquals(request.total_events, 3)
+        self.assertEqual(request.total_events, 3)
 
         json = test_util.parse_scalyr_request(request.get_payload())
         event = json["events"][2]
 
-        self.assertEquals(second_id, event["si"])
-        self.assertEquals(second_number, event["sn"])
+        self.assertEqual(second_id, event["si"])
+        self.assertEqual(second_number, event["sn"])
         self.assertFalse("sd" in event)
         request.close()
 
@@ -464,13 +464,13 @@ class AddEventsRequestTest(ScalyrTestCase):
                 sequence_number=first_number + expected_delta,
             )
         )
-        self.assertEquals(request.total_events, 2)
+        self.assertEqual(request.total_events, 2)
 
         json = test_util.parse_scalyr_request(request.get_payload())
         event = json["events"][1]
 
         self.assertFalse("si" in event)
-        self.assertEquals(expected_delta, event["sd"])
+        self.assertEqual(expected_delta, event["sd"])
         self.assertFalse("sn" in event)
         request.close()
 
@@ -507,12 +507,12 @@ class AddEventsRequestTest(ScalyrTestCase):
                 sequence_number=second_number,
             )
         )
-        self.assertEquals(request.total_events, 2)
+        self.assertEqual(request.total_events, 2)
 
         json = test_util.parse_scalyr_request(request.get_payload())
         event = json["events"][1]
 
-        self.assertEquals(second_number, event["sn"])
+        self.assertEqual(second_number, event["sn"])
         self.assertFalse("sd" in event)
         request.close()
 
@@ -522,7 +522,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         request.increment_timing_data(foo=5)
 
         # can't rely on stable order in "get_timing_data()" return value
-        self.assertEquals(sorted(request.get_timing_data()), sorted("foo=6.0 bar=2.0"))
+        self.assertEqual(sorted(request.get_timing_data()), sorted("foo=6.0 bar=2.0"))
 
 
 class EventTest(ScalyrTestCase):
@@ -538,12 +538,12 @@ class EventTest(ScalyrTestCase):
         output_buffer = BytesIO()
         x.serialize(output_buffer)
 
-        self.assertEquals(
+        self.assertEqual(
             b'{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
             output_buffer.getvalue(),
         )
 
-        self.assertEquals(
+        self.assertEqual(
             {
                 "log": "foo",
                 "thread": "foo",
@@ -565,7 +565,7 @@ class EventTest(ScalyrTestCase):
         output_buffer = BytesIO()
         x.serialize(output_buffer)
 
-        self.assertEquals(
+        self.assertEqual(
             b'{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message},sd:3,ts:"42"}',
             output_buffer.getvalue(),
         )
@@ -579,7 +579,7 @@ class EventTest(ScalyrTestCase):
         output_buffer = BytesIO()
         x.serialize(output_buffer)
 
-        self.assertEquals(
+        self.assertEqual(
             b'{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message},sd:3}',
             output_buffer.getvalue(),
         )
@@ -592,7 +592,7 @@ class EventTest(ScalyrTestCase):
         output_buffer = BytesIO()
         x.serialize(output_buffer)
 
-        self.assertEquals(
+        self.assertEqual(
             b'{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message},ts:"42"}',
             output_buffer.getvalue(),
         )
@@ -605,7 +605,7 @@ class EventTest(ScalyrTestCase):
         output_buffer = BytesIO()
         x.serialize(output_buffer)
 
-        self.assertEquals(
+        self.assertEqual(
             b'{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message,sample_rate:0.5}}',
             output_buffer.getvalue(),
         )
@@ -618,7 +618,7 @@ class EventTest(ScalyrTestCase):
         output_buffer = BytesIO()
         x.serialize(output_buffer)
 
-        self.assertEquals(
+        self.assertEqual(
             b'{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message},si:"hi"}',
             output_buffer.getvalue(),
         )
@@ -631,7 +631,7 @@ class EventTest(ScalyrTestCase):
         output_buffer = BytesIO()
         x.serialize(output_buffer)
 
-        self.assertEquals(
+        self.assertEqual(
             b'{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message},sn:5}',
             output_buffer.getvalue(),
         )
@@ -643,7 +643,7 @@ class EventTest(ScalyrTestCase):
         output_buffer = BytesIO()
         x.serialize(output_buffer)
 
-        self.assertEquals(
+        self.assertEqual(
             b"{attrs:{message:`s\x00\x00\x00\nmy_message}}", output_buffer.getvalue()
         )
 
@@ -659,7 +659,7 @@ class EventTest(ScalyrTestCase):
         output_buffer = BytesIO()
         x.serialize(output_buffer)
 
-        self.assertEquals(
+        self.assertEqual(
             b'{attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
             output_buffer.getvalue(),
         )
@@ -676,7 +676,7 @@ class EventTest(ScalyrTestCase):
         output_buffer = BytesIO()
         x.serialize(output_buffer)
 
-        self.assertEquals(
+        self.assertEqual(
             b'{thread:"biz", log:"biz", attrs:{message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
             output_buffer.getvalue(),
         )
@@ -694,7 +694,7 @@ class EventTest(ScalyrTestCase):
         output_buffer = BytesIO()
         x.serialize(output_buffer)
 
-        self.assertEquals(
+        self.assertEqual(
             b'{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
             output_buffer.getvalue(),
         )
@@ -714,7 +714,7 @@ class EventTest(ScalyrTestCase):
         output_buffer = BytesIO()
         x.serialize(output_buffer)
 
-        self.assertEquals(
+        self.assertEqual(
             b'{thread:"foo", log:"foo", attrs:{"trigger_update":"yes",message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
             output_buffer.getvalue(),
         )
@@ -747,8 +747,8 @@ class EventSequencerTest(ScalyrTestCase):
         event = Event()
         self.event_sequencer.add_sequence_fields(event, expected_id, expected_number)
 
-        self.assertEquals(expected_id.encode("utf-8"), event.sequence_id)
-        self.assertEquals(expected_number, event.sequence_number)
+        self.assertEqual(expected_id.encode("utf-8"), event.sequence_id)
+        self.assertEqual(expected_number, event.sequence_number)
         self.assertIsNone(event.sequence_number_delta)
 
     def test_same_sequence_id(self):
@@ -783,8 +783,8 @@ class EventSequencerTest(ScalyrTestCase):
         event = Event()
         self.event_sequencer.add_sequence_fields(event, second_id, second_number)
 
-        self.assertEquals(second_id.encode("utf-8"), event.sequence_id)
-        self.assertEquals(second_number, event.sequence_number)
+        self.assertEqual(second_id.encode("utf-8"), event.sequence_id)
+        self.assertEqual(second_number, event.sequence_number)
         self.assertIsNone(event.sequence_number_delta)
 
     def test_memento(self):
@@ -841,7 +841,7 @@ class PostFixBufferTest(ScalyrTestCase):
         test_buffer.set_client_timestamp(1)
 
         test_buffer.add_log_and_thread_entry("log_5", "histogram_builder", {})
-        self.assertEquals(
+        self.assertEqual(
             test_buffer.content(),
             b"""], logs: [{"attrs":{},"id":"log_5"}], threads: [{"id":"log_5","name":"histogram_builder"}], client_time: 1 }""",
         )
@@ -855,8 +855,8 @@ class PostFixBufferTest(ScalyrTestCase):
 
         content = test_buffer.content(cache_size=False)
 
-        self.assertEquals(content, b"], logs: [], threads: [], client_time: 433423 }")
-        self.assertEquals(expected_length, len(content))
+        self.assertEqual(content, b"], logs: [], threads: [], client_time: 433423 }")
+        self.assertEqual(expected_length, len(content))
 
     def test_set_client_time_fail(self):
         test_buffer = PostFixBuffer(self.__format)
@@ -873,8 +873,8 @@ class PostFixBufferTest(ScalyrTestCase):
 
         content = test_buffer.content(cache_size=False)
 
-        self.assertEquals(content, b"], logs: [], threads: [], client_time: 1 }")
-        self.assertEquals(expected_length, len(content))
+        self.assertEqual(content, b"], logs: [], threads: [], client_time: 1 }")
+        self.assertEqual(expected_length, len(content))
 
     def test_add_thread(self):
         test_buffer = PostFixBuffer(self.__format)
@@ -888,7 +888,7 @@ class PostFixBufferTest(ScalyrTestCase):
         content = test_buffer.content(cache_size=True)
         length = test_buffer.length
 
-        self.assertEquals(
+        self.assertEqual(
             length,
             len(content),
             "Buffer content: %s" % (test_buffer.content(cache_size=False)),
@@ -901,7 +901,7 @@ class PostFixBufferTest(ScalyrTestCase):
         content = test_buffer.content(cache_size=True)
         length = test_buffer.length
 
-        self.assertEquals(
+        self.assertEqual(
             length,
             len(content),
             "Buffer content: %s" % (test_buffer.content(cache_size=False)),
@@ -914,13 +914,13 @@ class PostFixBufferTest(ScalyrTestCase):
         content = test_buffer.content(cache_size=True)
         length = test_buffer.length
 
-        self.assertEquals(
+        self.assertEqual(
             length,
             len(content),
             "Buffer content: %s" % (test_buffer.content(cache_size=False)),
         )
 
-        self.assertEquals(
+        self.assertEqual(
             test_buffer.content(),
             b"""], logs: [{"attrs":{},"id":"log_5"},{"attrs":{},"id":"log_12"},{"attrs":{},"id":"log"}], """
             b"""threads: [{"id":"log_5","name":"histogram_builder"},"""
@@ -942,7 +942,7 @@ class PostFixBufferTest(ScalyrTestCase):
         content = test_buffer.content(cache_size=True)
         length = test_buffer.length
 
-        self.assertEquals(
+        self.assertEqual(
             length,
             len(content),
             "Buffer content: %s" % (test_buffer.content(cache_size=False)),
@@ -957,13 +957,13 @@ class PostFixBufferTest(ScalyrTestCase):
         content = test_buffer.content(cache_size=True)
         length = test_buffer.length
 
-        self.assertEquals(
+        self.assertEqual(
             length,
             len(content),
             "Buffer content: %s" % (test_buffer.content(cache_size=False)),
         )
 
-        self.assertEquals(
+        self.assertEqual(
             test_buffer.content(),
             b"""], logs: [{"attrs":{},"id":"log_5"}], """
             b"""threads: [{"id":"log_5","name":"histogram_builder"}], client_time: 1 }""",
@@ -988,13 +988,13 @@ class PostFixBufferTest(ScalyrTestCase):
         content = test_buffer.content(cache_size=True)
         length = test_buffer.length
 
-        self.assertEquals(
+        self.assertEqual(
             length,
             len(content),
             "Buffer content: %s" % (test_buffer.content(cache_size=False)),
         )
 
-        self.assertEquals(
+        self.assertEqual(
             test_buffer.content(),
             b"""], logs: [{"attrs":{},"id":"log_5"}], threads: [{"id":"log_5","name":"histogram_builder"}], """
             b"""client_time: 1 }""",
@@ -1013,7 +1013,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
         base_ua = get_user_agent()
         frags = ["frag1", "frag2", "frag3"]
         session.augment_user_agent(frags)
-        self.assertEquals(get_user_agent(), base_ua + ";" + ";".join(frags))
+        self.assertEqual(get_user_agent(), base_ua + ";" + ";".join(frags))
 
     @skipIf(sys.version_info < (3, 7), "Only for Python >= 3.7")
     def test_get_user_agent_includes_requests_version(self):
@@ -1200,7 +1200,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
 
         json = test_util.parse_scalyr_request(add_events_request.get_payload())
         event = json["events"][1]
-        self.assertEquals(event["ts"], "1")
+        self.assertEqual(event["ts"], "1")
 
     @mock.patch("scalyr_agent.scalyr_client.time.time", mock.Mock(return_value=0))
     def test_send_request_timestamp_increases_monotonically(self):
@@ -1225,7 +1225,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
 
         json = test_util.parse_scalyr_request(add_events_request.get_payload())
         event = json["events"][1]
-        self.assertEquals(event["ts"], expected)
+        self.assertEqual(event["ts"], expected)
 
     @mock.patch("scalyr_agent.scalyr_client.time.time", mock.Mock(return_value=0))
     def test_send_request_body_is_logged_raw_uncompressed_long_body_is_truncated(self):

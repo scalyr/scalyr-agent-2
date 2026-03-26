@@ -351,9 +351,9 @@ class DockerMonitorTest(ScalyrTestCase):
                 manager.stop_manager(wait_on_join=False)
                 fake_clock.advance_time(increment_by=manager_poll_interval)
 
-                self.assertEquals(fragment_polls.count(), 60)
-                self.assertEquals(counter["callback_invocations"], 4)
-                self.assertEquals(
+                self.assertEqual(fragment_polls.count(), 60)
+                self.assertEqual(counter["callback_invocations"], 4)
+                self.assertEqual(
                     detected_fragment_changes,
                     [
                         "docker=true",

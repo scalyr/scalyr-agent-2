@@ -14,8 +14,6 @@
 # ------------------------------------------------------------------------
 # author: scalyr-cloudtech@scalyr.com
 
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 import copy
 import collections
@@ -60,7 +58,7 @@ define_config_option(
     __monitor__,
     "module",
     "Always `scalyr_agent.builtin_monitors.windows_event_log_monitor`",
-    convert_to=six.text_type,
+    convert_to=str,
     required_option=True,
 )
 
@@ -70,7 +68,7 @@ define_config_option(
     "Optional (defaults to `Application, Security, System`). A comma separated list "
     "of sources to import events from. (Not valid for Vista and later; use `channels` "
     "instead.)",
-    convert_to=six.text_type,
+    convert_to=str,
     default=DEFAULT_SOURCES,
 )
 
@@ -81,7 +79,7 @@ define_config_option(
     "Valid values are: `All`, `Error`, `Warning`, `Information`, `AuditSuccess`, and "
     "`AuditFailure`. (Not valid for Vista and later; use `channels` instead.)",
     default=DEFAULT_EVENTS,
-    convert_to=six.text_type,
+    convert_to=str,
 )
 
 define_config_option(
@@ -114,7 +112,7 @@ define_config_option(
     "server_name",
     "Optional (defaults to `localhost`). The remote server to import events from.",
     default="localhost",
-    convert_to=six.text_type,
+    convert_to=str,
 )
 
 define_config_option(
@@ -123,7 +121,7 @@ define_config_option(
     "Optional (defaults to `none`). Username for authentication on the remote server. "
     "This option is only valid on Windows Vista and above.",
     default=None,
-    convert_to=six.text_type,
+    convert_to=str,
 )
 
 define_config_option(
@@ -132,7 +130,7 @@ define_config_option(
     "Optional (defaults to `none`). Password to use for authentication on the remote server.  "
     "This option is only valid on Windows Vista and above.",
     default=None,
-    convert_to=six.text_type,
+    convert_to=str,
 )
 
 define_config_option(
@@ -141,7 +139,7 @@ define_config_option(
     "Optional (defaults to `none`). The domain for the remote user account. "
     "This option is only valid on Windows Vista and above.",
     default=None,
-    convert_to=six.text_type,
+    convert_to=str,
 )
 
 define_config_option(
@@ -267,7 +265,7 @@ define_log_field(
 )
 
 
-class Api(object):
+class Api:
     def __init__(self, config, logger):
         self._checkpoints = {}
         self._logger = logger
@@ -295,7 +293,7 @@ class Api(object):
 
 class OldApi(Api):
     def __init__(self, config, logger, source_list, event_filter):
-        super(OldApi, self).__init__(config, logger)
+        super().__init__(config, logger)
 
         self.__log_critical = False
         self.__event_types = {}
@@ -318,7 +316,7 @@ class OldApi(Api):
         self.__sources = source_list
 
     def load_checkpoints(self, checkpoints, config):
-        for source, record_number in six.iteritems(checkpoints):
+        for source, record_number in checkpoints.items():
             self._checkpoints[source] = record_number
 
     def read_event_log(self):
@@ -380,7 +378,7 @@ class OldApi(Api):
         except Exception as error:
             self._logger.error(
                 "Error reading from event log: %s",
-                six.text_type(error),
+                str(error),
                 limit_once_per_x_secs=self._error_repeat_interval,
                 limit_key="EventLogError",
             )
@@ -427,7 +425,7 @@ def event_callback(reason, context, event):
 
 class NewApi(Api):
     def __init__(self, config, logger, channels):
-        super(NewApi, self).__init__(config, logger)
+        super().__init__(config, logger)
         self.__eventHandles = []
         if not channels:
             channels = [
@@ -554,7 +552,7 @@ class NewApi(Api):
         if "bookmarks" not in checkpoints:
             checkpoints["bookmarks"] = {}
 
-        for channel, bookmarkXml in six.iteritems(checkpoints["bookmarks"]):
+        for channel, bookmarkXml in checkpoints["bookmarks"].items():
             self._bookmarks[channel] = win32evtlog.EvtCreateBookmark(bookmarkXml)
 
         # subscribe to the events
@@ -569,7 +567,7 @@ class NewApi(Api):
 
         self._bookmark_lock.acquire()
         try:
-            for channel, bookmark in six.iteritems(self._bookmarks):
+            for channel, bookmark in self._bookmarks.items():
                 self._checkpoints["bookmarks"][channel] = win32evtlog.EvtRender(
                     bookmark, win32evtlog.EvtRenderBookmark
                 )
@@ -584,7 +582,7 @@ class NewApi(Api):
             res = windll.wevtapi.EvtClose(handle.handle)
             if not res:
                 self._logger.error(
-                    "Can not close event subscription handle '{0}'.".format(
+                    "Can not close event subscription handle '{}'.".format(
                         handle.handle
                     )
                 )
@@ -715,7 +713,7 @@ class NewApi(Api):
             self.log_event(event)
         except Exception as e:
             try:
-                self._logger.info("%s", six.text_type(e))
+                self._logger.info("%s", str(e))
             except Exception:
                 self._logger.info("Error printing exception information")
 
@@ -729,13 +727,13 @@ class NewApi(Api):
             provider = vals["ProviderName"]
 
         if "ProviderGuid" in vals:
-            vals["ProviderGuid"] = six.text_type(vals["ProviderGuid"])
+            vals["ProviderGuid"] = str(vals["ProviderGuid"])
 
         if "ActivityId" in vals:
-            vals["ActivityId"] = six.text_type(vals["ActivityId"])
+            vals["ActivityId"] = str(vals["ActivityId"])
 
         if "RelatedActivityId" in vals:
-            vals["RelatedActivityId"] = six.text_type(vals["RelatedActivityId"])
+            vals["RelatedActivityId"] = str(vals["RelatedActivityId"])
 
         if "TimeCreated" in vals:
             time_format = "%Y-%m-%d %H:%M:%SZ"
@@ -745,10 +743,10 @@ class NewApi(Api):
             if isinstance(vals["Keywords"], list):
                 vals["Keywords"] = ",".join(vals["Keywords"])
             else:
-                vals["Keywords"] = six.text_type(vals["Keywords"])
+                vals["Keywords"] = str(vals["Keywords"])
 
         if "UserId" in vals:
-            user_id = six.text_type(vals["UserId"])
+            user_id = str(vals["UserId"])
             if user_id.startswith("PySID:"):
                 user_id = user_id[6:]
             vals["UserId"] = user_id
@@ -768,7 +766,7 @@ class NewApi(Api):
 
 class NewJsonApi(NewApi):
     def __init__(self, config, logger, channels):
-        super(NewJsonApi, self).__init__(config, logger, channels)
+        super().__init__(config, logger, channels)
 
         self._render_context = win32evtlog.EvtCreateRenderContext(
             win32evtlog.EvtRenderContextSystem
@@ -862,11 +860,11 @@ class NewJsonApi(NewApi):
         if channel == "Security":
             provider = "Security"
 
-        param_key = "%s-%s-%s" % (channel, provider, param)
+        param_key = "{}-{}-{}".format(channel, provider, param)
         if param_key in self._param_cache:
             return self._param_cache[param_key]
 
-        dll_key = "%s-%s" % (channel, provider)
+        dll_key = "{}-{}".format(channel, provider)
         if dll_key in self._dll_cache:
             if not isinstance(self._dll_cache[dll_key], _DLL):
                 return param
@@ -895,7 +893,7 @@ class NewJsonApi(NewApi):
                 except Exception as e:
                     self._dll_cache[dll_key] = e
                     self._logger.error(
-                        "win32api.LoadLibraryEx exception: %s" % six.text_type(e),
+                        "win32api.LoadLibraryEx exception: %s" % str(e),
                         limit_once_per_x_secs=self._error_repeat_interval,
                         limit_key="win32api.LoadLibraryEx",
                     )
@@ -913,7 +911,7 @@ class NewJsonApi(NewApi):
         except Exception as e:
             self._param_cache[param_key] = param
             self._logger.error(
-                "win32api.FormatMessageW exception: %s" % six.text_type(e),
+                "win32api.FormatMessageW exception: %s" % str(e),
                 limit_once_per_x_secs=self._error_repeat_interval,
                 limit_key="win32api.FormatMessageW",
             )
@@ -1005,7 +1003,7 @@ def _strip_xmltodict_prefixes(x):
 class _DLL:
     @staticmethod
     def dllpath(channel, provider):
-        keyname = "SYSTEM\\CurrentControlSet\\Services\\EventLog\\%s\\%s" % (
+        keyname = "SYSTEM\\CurrentControlSet\\Services\\EventLog\\{}\\{}".format(
             channel,
             provider,
         )
@@ -1352,10 +1350,10 @@ Log into DataSet and query [monitor = 'windows_process_metrics'](https://app.sca
                 # If the rate limit is disabled, formatting is not applied by RateLimitLogFilter.
                 # Ref: scalyr_logging.MetricLoggingHandler.__init__
                 if not hasattr(record, "message"):
-                    super(DummyFormatter, self).format(record)
+                    super().format(record)
                 return record.message[len("unused ") + 1 : -1].replace('\\"', '"')
 
-        rv = super(WindowEventLogMonitor, self).open_metric_log()
+        rv = super().open_metric_log()
         if not rv:
             return rv
 

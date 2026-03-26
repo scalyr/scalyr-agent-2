@@ -60,7 +60,7 @@ from scalyr_agent.test_base import skipIf
 
 import six
 from six import unichr
-from six.moves import range
+#from six.moves import range
 
 
 class Timestamp:
@@ -666,7 +666,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.log_file.scan_for_new_bytes()
 
         expected_msg = "invalid start byte"
-        self.assertRaisesRegexp(
+        self.assertRaisesRegex(
             UnicodeDecodeError, expected_msg, lambda: self.readline().line
         )
 
@@ -674,7 +674,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.assertEqual(result, line_data[1])
 
         expected_msg = "invalid start byte"
-        self.assertRaisesRegexp(
+        self.assertRaisesRegex(
             UnicodeDecodeError, expected_msg, lambda: self.readline().line
         )
 
@@ -1388,8 +1388,8 @@ class TestLogFileIterator(ScalyrTestCase):
         self.scan_for_new_bytes()
         self.append_file(self.__path, b'{"log": "L001"}\n{"log": "L002"}\n')
         self.scan_for_new_bytes()
-        self.assertEquals(self.readline().line, b"L001")
-        self.assertEquals(self.readline().line, b"L002")
+        self.assertEqual(self.readline().line, b"L001")
+        self.assertEqual(self.readline().line, b"L002")
 
     def test_parse_as_json_with_merged_lines(self):
         self.log_file.close()
@@ -1405,8 +1405,8 @@ class TestLogFileIterator(ScalyrTestCase):
             b'{"log": "L001"}\n{"log": "L002\\n"}\n{"log": "L003"}\n{"log": "L004\\n"}\n',
         )
         self.scan_for_new_bytes()
-        self.assertEquals(self.readline().line, b"L001L002\n")
-        self.assertEquals(self.readline().line, b"L003L004\n")
+        self.assertEqual(self.readline().line, b"L001L002\n")
+        self.assertEqual(self.readline().line, b"L003L004\n")
 
     def test_parse_as_json_with_merged_lines_above_max_size(self):
         self.log_file.close()
@@ -1424,10 +1424,10 @@ class TestLogFileIterator(ScalyrTestCase):
             b'{"log": "L001"}\n{"log": "L002\\n"}\n{"log": "L003"}\n{"log": "L004\\n"}\n',
         )
         self.scan_for_new_bytes()
-        self.assertEquals(self.readline().line, b"L001L")
-        self.assertEquals(self.readline().line, b"002\n")
-        self.assertEquals(self.readline().line, b"L003L")
-        self.assertEquals(self.readline().line, b"004\n")
+        self.assertEqual(self.readline().line, b"L001L")
+        self.assertEqual(self.readline().line, b"002\n")
+        self.assertEqual(self.readline().line, b"L003L")
+        self.assertEqual(self.readline().line, b"004\n")
 
     def test_parse_as_json_with_merged_lines_timeout(self):
         self.log_file.close()
@@ -1443,9 +1443,9 @@ class TestLogFileIterator(ScalyrTestCase):
             b'{"log": "L001"}\n{"log": "L002\\n"}\n{"log": "L003"}\n{"log": "L004"}\n',
         )
         self.scan_for_new_bytes()
-        self.assertEquals(self.readline().line, b"L001L002\n")
-        self.assertEquals(self.readline().line, b"")
-        self.assertEquals(self.readline(time_advance=6 * 60).line, b"L003L004")
+        self.assertEqual(self.readline().line, b"L001L002\n")
+        self.assertEqual(self.readline().line, b"")
+        self.assertEqual(self.readline(time_advance=6 * 60).line, b"L003L004")
 
     def test_parse_as_json_timestamp_field(self):
         self.log_file.close()
@@ -1463,7 +1463,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.scan_for_new_bytes()
 
         record = self.readline()
-        self.assertEquals(record.line, b"L004")
+        self.assertEqual(record.line, b"L004")
         self.assertEqual(record.timestamp, 1438593163000000000)
         self.assertEqual(record.attrs["raw_timestamp"], "2015-08-03T09:12:43Z")
         self.assertEqual(record.attrs["foo"], "bar")
@@ -1487,7 +1487,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.scan_for_new_bytes()
 
         record = self.readline()
-        self.assertEquals(record.line, b"L004")
+        self.assertEqual(record.line, b"L004")
         self.assertEqual(record.timestamp, 1438593163000000000)
         self.assertTrue("raw_timestamp" not in record.attrs)
         self.assertEqual(record.attrs["foo"], "bar")
@@ -1507,7 +1507,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.scan_for_new_bytes()
 
         record = self.readline()
-        self.assertEquals(record.line, b"message\n")
+        self.assertEqual(record.line, b"message\n")
         self.assertEqual(record.timestamp, 1438593163560647430)
         self.assertEqual(record.attrs["raw_timestamp"], 1438593163560647430)
         self.assertEqual(record.attrs["stream"], "stdout")
@@ -1530,7 +1530,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.scan_for_new_bytes()
 
         record = self.readline()
-        self.assertEquals(record.line, b"message\n")
+        self.assertEqual(record.line, b"message\n")
         self.assertEqual(record.timestamp, 1438593163560647430)
         self.assertTrue("raw_timestamp" not in record.attrs)
         self.assertEqual(record.attrs["stream"], "stdout")
@@ -1546,8 +1546,8 @@ class TestLogFileIterator(ScalyrTestCase):
         self.scan_for_new_bytes()
         self.append_file(self.__path, b'{"log": "L001"}\n{"log": "L002"}\n')
         self.scan_for_new_bytes()
-        self.assertEquals(self.readline().line, b"L001")
-        self.assertEquals(self.readline().line, b"L002")
+        self.assertEqual(self.readline().line, b"L001")
+        self.assertEqual(self.readline().line, b"L002")
 
     def test_extend_log_line_parsing_with_line_splitting(self):
         self.log_file.close()
@@ -1563,18 +1563,18 @@ class TestLogFileIterator(ScalyrTestCase):
         )
         self.scan_for_new_bytes()
         for i in range(1, 5):
-            self.assertEquals(self.readline().line, b"L00%d" % i)
+            self.assertEqual(self.readline().line, b"L00%d" % i)
             if i < 4:
-                self.assertEquals(
+                self.assertEqual(
                     self.log_file.tell().fragment_offset.bytes_from_start, 12 + 4 * i
                 )
             else:
                 self.assertIsNone(self.log_file.tell().fragment_offset)
 
         for i in range(5, 8):
-            self.assertEquals(self.readline().line, b"L00%d" % i)
+            self.assertEqual(self.readline().line, b"L00%d" % i)
             if i < 7:
-                self.assertEquals(
+                self.assertEqual(
                     self.log_file.tell().fragment_offset.bytes_from_start,
                     12 + 4 * (i - 4),
                 )
@@ -1594,12 +1594,12 @@ class TestLogFileIterator(ScalyrTestCase):
             self.__path, b'{"log": "L001L002L003L004"}\n{"log": "L005L006L007"}\n'
         )
         self.scan_for_new_bytes()
-        self.assertEquals(self.readline().line, b"L001")
-        self.assertEquals(self.readline().line, b"L002")
+        self.assertEqual(self.readline().line, b"L001")
+        self.assertEqual(self.readline().line, b"L002")
         position = self.log_file.tell()
-        self.assertEquals(self.readline().line, b"L003")
+        self.assertEqual(self.readline().line, b"L003")
         self.log_file.seek(position)
-        self.assertEquals(self.readline().line, b"L003")
+        self.assertEqual(self.readline().line, b"L003")
 
     def test_extended_log_line_tell_and_seek_across_lines(self):
         self.log_file.close()
@@ -1612,12 +1612,12 @@ class TestLogFileIterator(ScalyrTestCase):
         self.scan_for_new_bytes()
         self.append_file(self.__path, b'{"log": "L001L002"}\n{"log": "L003L004"}\n')
         self.scan_for_new_bytes()
-        self.assertEquals(self.readline().line, b"L001")
+        self.assertEqual(self.readline().line, b"L001")
         position = self.log_file.tell()
-        self.assertEquals(self.readline().line, b"L002")
-        self.assertEquals(self.readline().line, b"L003")
+        self.assertEqual(self.readline().line, b"L002")
+        self.assertEqual(self.readline().line, b"L003")
         self.log_file.seek(position)
-        self.assertEquals(self.readline().line, b"L002")
+        self.assertEqual(self.readline().line, b"L002")
 
     def test_extended_log_line_tell_and_seek_with_marking(self):
         self.log_file.close()
@@ -1630,16 +1630,16 @@ class TestLogFileIterator(ScalyrTestCase):
         self.scan_for_new_bytes()
         self.append_file(self.__path, b'{"log": "L001L002"}\n{"log": "L003L004L005"}\n')
         self.scan_for_new_bytes()
-        self.assertEquals(self.readline().line, b"L001")
-        self.assertEquals(self.readline().line, b"L002")
-        self.assertEquals(self.readline().line, b"L003")
+        self.assertEqual(self.readline().line, b"L001")
+        self.assertEqual(self.readline().line, b"L002")
+        self.assertEqual(self.readline().line, b"L003")
         position_a = self.log_file.tell()
-        self.assertEquals(self.readline().line, b"L004")
+        self.assertEqual(self.readline().line, b"L004")
         position_b = self.log_file.tell()
-        self.assertEquals(self.readline().line, b"L005")
+        self.assertEqual(self.readline().line, b"L005")
         self.log_file.mark(position_a)
         self.log_file.seek(position_b)
-        self.assertEquals(self.readline().line, b"L005")
+        self.assertEqual(self.readline().line, b"L005")
 
     def test_extended_log_line_checkpoint(self):
         self.log_file.close()
@@ -1653,9 +1653,9 @@ class TestLogFileIterator(ScalyrTestCase):
         self.append_file(self.__path, b'{"log": "L001L002"}\n{"log": "L003L004L005"}\n')
         self.scan_for_new_bytes()
 
-        self.assertEquals(self.readline().line, b"L001")
-        self.assertEquals(self.readline().line, b"L002")
-        self.assertEquals(self.readline().line, b"L003")
+        self.assertEqual(self.readline().line, b"L001")
+        self.assertEqual(self.readline().line, b"L002")
+        self.assertEqual(self.readline().line, b"L003")
         self.log_file.mark(self.log_file.tell())
 
         saved_checkpoint = self.log_file.get_mark_checkpoint()
@@ -1670,7 +1670,7 @@ class TestLogFileIterator(ScalyrTestCase):
             max_line_length=4, page_size=5, max_extended_line_length=100
         )
         self.scan_for_new_bytes()
-        self.assertEquals(self.readline().line, b"L004")
+        self.assertEqual(self.readline().line, b"L004")
 
     def test_extended_log_line_bytes_between_positions(self):
         self.log_file.close()
@@ -1684,14 +1684,14 @@ class TestLogFileIterator(ScalyrTestCase):
         self.append_file(self.__path, b'{"log": "L001L002L003"}\n')
         self.scan_for_new_bytes()
         start_position = self.log_file.tell()
-        self.assertEquals(self.readline().line, b"L001")
+        self.assertEqual(self.readline().line, b"L001")
         second_position = self.log_file.tell()
-        self.assertEquals(
+        self.assertEqual(
             self.log_file.bytes_between_positions(start_position, second_position), 16
         )
-        self.assertEquals(self.readline().line, b"L002")
+        self.assertEqual(self.readline().line, b"L002")
         third_position = self.log_file.tell()
-        self.assertEquals(
+        self.assertEqual(
             self.log_file.bytes_between_positions(second_position, third_position), 4
         )
 
@@ -1706,9 +1706,9 @@ class TestLogFileIterator(ScalyrTestCase):
         self.scan_for_new_bytes()
         self.append_file(self.__path, b'{"log": "L001L002L003"}\n')
         self.scan_for_new_bytes()
-        self.assertEquals(self.readline().line, b"L001")
+        self.assertEqual(self.readline().line, b"L001")
         _, first_sequence_number = self.log_file.get_sequence()
-        self.assertEquals(self.readline().line, b"L002")
+        self.assertEqual(self.readline().line, b"L002")
         _, second_sequence_number = self.log_file.get_sequence()
         self.assertGreater(second_sequence_number, first_sequence_number)
 

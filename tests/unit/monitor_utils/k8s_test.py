@@ -30,7 +30,7 @@ import time
 import mock
 from mock import Mock, patch, call
 import six
-from six.moves import range
+#from six.moves import range
 
 
 class Test_K8sCache(ScalyrTestCase):
@@ -72,7 +72,7 @@ class Test_K8sCache(ScalyrTestCase):
         cache.purge_unused(current_time)
 
         objects = cache._objects.get("default", {})
-        self.assertEquals(1, len(objects))
+        self.assertEqual(1, len(objects))
         self.assertTrue("obj2" in objects)
         self.assertTrue(objects["obj2"] is obj2)
 
@@ -507,7 +507,7 @@ class TestKubernetesApi(ScalyrTestCase):
         """Assert that the log() method was not called on the mock_logger (with expected params)"""
         expected_call = self._get_debug_call(expected_log_msg)
         for mock_call in mock_logger.mock_calls:
-            self.assertNotEquals(mock_call, expected_call)
+            self.assertNotEqual(mock_call, expected_call)
 
     @patch("scalyr_agent.monitor_utils.k8s.global_log")
     @patch("traceback.format_stack")
@@ -732,7 +732,7 @@ class TestDockerMetricFetcher(ScalyrTestCase):
         """Tests the typical prefetch and then get_metrics path.. just for one container."""
         self._fetcher.prefetch_metrics("foo")
         self.assertTrue(self._faker.wait_for_requests(1))
-        self.assertEquals(0, self._fetcher.idle_workers())
+        self.assertEqual(0, self._fetcher.idle_workers())
         self._faker.resolve_metric("foo", 10)
         value = self._fetcher.get_metrics("foo")
         self.assertEqual(1, self._fetcher.idle_workers())
@@ -743,16 +743,16 @@ class TestDockerMetricFetcher(ScalyrTestCase):
         self._fetcher.prefetch_metrics("foo")
         self._fetcher.prefetch_metrics("bar")
         self.assertTrue(self._faker.wait_for_requests(2))
-        self.assertEquals(0, self._fetcher.idle_workers())
+        self.assertEqual(0, self._fetcher.idle_workers())
 
         self._faker.resolve_metric("foo", 10)
         value = self._fetcher.get_metrics("foo")
-        self.assertEquals(1, self._fetcher.idle_workers())
+        self.assertEqual(1, self._fetcher.idle_workers())
         self.assertEqual(10, value)
 
         self._faker.resolve_metric("bar", 5)
         value = self._fetcher.get_metrics("bar")
-        self.assertEquals(2, self._fetcher.idle_workers())
+        self.assertEqual(2, self._fetcher.idle_workers())
         self.assertEqual(5, value)
 
     def test_limit_by_concurrency(self):
@@ -765,20 +765,20 @@ class TestDockerMetricFetcher(ScalyrTestCase):
 
         # Since we have concurrency as 5, we should only have at most 5 requests in flight.
         self.assertTrue(self._faker.wait_for_requests(5))
-        self.assertEquals(0, self._fetcher.idle_workers())
+        self.assertEqual(0, self._fetcher.idle_workers())
 
         for i in range(0, 5):
             self._faker.resolve_metric(container_names[i], i)
 
         self.assertTrue(self._faker.wait_for_requests(5))
-        self.assertEquals(0, self._fetcher.idle_workers())
+        self.assertEqual(0, self._fetcher.idle_workers())
 
         for i in range(0, 5):
             value = self._fetcher.get_metrics(container_names[i])
-            self.assertEquals(i, value)
+            self.assertEqual(i, value)
 
         self.assertTrue(self._faker.wait_for_requests(5))
-        self.assertEquals(0, self._fetcher.idle_workers())
+        self.assertEqual(0, self._fetcher.idle_workers())
 
         # Once the first batch have been resolved, we should see the other 5 fetches get issued.
         for i in range(5, 10):
@@ -786,9 +786,9 @@ class TestDockerMetricFetcher(ScalyrTestCase):
 
         for i in range(5, 10):
             value = self._fetcher.get_metrics(container_names[i])
-            self.assertEquals(i, value)
+            self.assertEqual(i, value)
 
-        self.assertEquals(5, self._fetcher.idle_workers())
+        self.assertEqual(5, self._fetcher.idle_workers())
 
     def test_stopped(self):
         """Tests that stopping the abstraction terminates any calls blocked on `get_metrics`."""
@@ -910,25 +910,25 @@ class TestK8sNamespaceFilter(ScalyrTestCase):
 
     def test_str(self):
         test_filter = K8sNamespaceFilter(global_include=["*"], global_ignore=["kube"])
-        self.assertEquals("exclude=kube", six.text_type(test_filter))
+        self.assertEqual("exclude=kube", six.text_type(test_filter))
 
         test_filter = K8sNamespaceFilter(
             global_include=["*"], global_ignore=["kube,foo"]
         )
-        self.assertEquals("exclude=kube,foo", six.text_type(test_filter))
+        self.assertEqual("exclude=kube,foo", six.text_type(test_filter))
 
         test_filter = K8sNamespaceFilter(global_include=["scalyr"], global_ignore=[])
-        self.assertEquals("include_only=scalyr", six.text_type(test_filter))
+        self.assertEqual("include_only=scalyr", six.text_type(test_filter))
 
         test_filter = K8sNamespaceFilter(
             global_include=["scalyr", "foo"], global_ignore=["bar"]
         )
-        self.assertEquals("include_only=foo,scalyr", six.text_type(test_filter))
+        self.assertEqual("include_only=foo,scalyr", six.text_type(test_filter))
 
         test_filter = K8sNamespaceFilter(
             global_include=["scalyr", "foo"], global_ignore=["foo"]
         )
-        self.assertEquals("include_only=scalyr", six.text_type(test_filter))
+        self.assertEqual("include_only=scalyr", six.text_type(test_filter))
 
     def test_eq(self):
         blacklist_filter_a = K8sNamespaceFilter(

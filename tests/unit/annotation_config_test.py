@@ -38,7 +38,7 @@ class TestAnnotationConfig(ScalyrTestCase):
 
         result = process_annotations(annotations)
 
-        self.assertEquals(0, len(list(result.keys())))
+        self.assertEqual(0, len(list(result.keys())))
 
     def test_annotation_object(self):
         annotations = {
@@ -48,10 +48,10 @@ class TestAnnotationConfig(ScalyrTestCase):
         }
 
         result = process_annotations(annotations)
-        self.assertEquals(3, len(list(result.keys())))
-        self.assertEquals("item1", result["item1"])
-        self.assertEquals("item2", result["item2"])
-        self.assertEquals("item3", result["item3"])
+        self.assertEqual(3, len(list(result.keys())))
+        self.assertEqual("item1", result["item1"])
+        self.assertEqual("item2", result["item2"])
+        self.assertEqual("item3", result["item3"])
 
     def test_annotation_object_random_order_array(self):
         annotations = {
@@ -65,10 +65,10 @@ class TestAnnotationConfig(ScalyrTestCase):
         }
 
         result = process_annotations(annotations)
-        self.assertEquals(4, len(list(result.keys())))
-        self.assertEquals(JsonObject({"parser": "test-parser-1"}), result["attributes"])
-        self.assertEquals(3, len(list(result["teams"])))
-        self.assertEquals(
+        self.assertEqual(4, len(list(result.keys())))
+        self.assertEqual(JsonObject({"parser": "test-parser-1"}), result["attributes"])
+        self.assertEqual(3, len(list(result["teams"])))
+        self.assertEqual(
             JsonArray(
                 JsonObject({"secret": "scalyr-api-key-team-1"}),
                 JsonObject({"secret": "scalyr-api-key-team-2"}),
@@ -76,11 +76,11 @@ class TestAnnotationConfig(ScalyrTestCase):
             ),
             result["teams"],
         )
-        self.assertEquals(
+        self.assertEqual(
             JsonArray(JsonObject({"secret": "scalyr-api-key-team-2"})),
             result["cont1"]["teams"],
         )
-        self.assertEquals(
+        self.assertEqual(
             JsonArray(
                 JsonObject({"secret": "scalyr-api-key-team-1"}),
                 JsonObject({"secret": "scalyr-api-key-team-2"}),
@@ -100,18 +100,18 @@ class TestAnnotationConfig(ScalyrTestCase):
         }
 
         result = process_annotations(annotations)
-        self.assertEquals(2, len(list(result.keys())))
-        self.assertEquals(3, len(result["item1"]))
-        self.assertEquals(4, len(result["item2"]))
+        self.assertEqual(2, len(list(result.keys())))
+        self.assertEqual(3, len(result["item1"]))
+        self.assertEqual(4, len(result["item2"]))
 
-        self.assertEquals("item1 nest1", result["item1"]["nest1"])
-        self.assertEquals("item1 nest2", result["item1"]["nest2"])
-        self.assertEquals("item1 nest3", result["item1"]["nest3"])
+        self.assertEqual("item1 nest1", result["item1"]["nest1"])
+        self.assertEqual("item1 nest2", result["item1"]["nest2"])
+        self.assertEqual("item1 nest3", result["item1"]["nest3"])
 
-        self.assertEquals("item2 nest1", result["item2"]["nest1"])
-        self.assertEquals("item2 nest2", result["item2"]["nest2"])
-        self.assertEquals("item2 nest3", result["item2"]["nest3"])
-        self.assertEquals("item2 nest4", result["item2"]["nest4"])
+        self.assertEqual("item2 nest1", result["item2"]["nest1"])
+        self.assertEqual("item2 nest2", result["item2"]["nest2"])
+        self.assertEqual("item2 nest3", result["item2"]["nest3"])
+        self.assertEqual("item2 nest4", result["item2"]["nest4"])
 
     def test_annotation_array(self):
         annotations = {
@@ -125,18 +125,18 @@ class TestAnnotationConfig(ScalyrTestCase):
         }
 
         result = process_annotations(annotations)
-        self.assertEquals(2, len(list(result.keys())))
-        self.assertEquals(3, len(result["item1"]))
-        self.assertEquals(4, len(result["item2"]))
+        self.assertEqual(2, len(list(result.keys())))
+        self.assertEqual(3, len(result["item1"]))
+        self.assertEqual(4, len(result["item2"]))
 
-        self.assertEquals("item1 element 0", result["item1"][0])
-        self.assertEquals("item1 element 1", result["item1"][1])
-        self.assertEquals("item1 element 2", result["item1"][2])
+        self.assertEqual("item1 element 0", result["item1"][0])
+        self.assertEqual("item1 element 1", result["item1"][1])
+        self.assertEqual("item1 element 2", result["item1"][2])
 
-        self.assertEquals("item2 element 0", result["item2"][0])
-        self.assertEquals("item2 element 1", result["item2"][1])
-        self.assertEquals("item2 element 2", result["item2"][2])
-        self.assertEquals("item2 element 3", result["item2"][3])
+        self.assertEqual("item2 element 0", result["item2"][0])
+        self.assertEqual("item2 element 1", result["item2"][1])
+        self.assertEqual("item2 element 2", result["item2"][2])
+        self.assertEqual("item2 element 3", result["item2"][3])
 
     def test_annotation_keys_with_hyphens(self):
         annotations = {
@@ -154,9 +154,9 @@ class TestAnnotationConfig(ScalyrTestCase):
             hyphens_as_underscores=True,
         )
 
-        self.assertEquals("item1 element 1", result["item1_1"]["element_1"])
-        self.assertEquals("item1 element 2", result["item1_2"]["element_2"])
-        self.assertEquals("item1 element 3", result["item1_3"]["element_3"])
-        self.assertEquals("item2 element 1", result["item2_1"]["element_1"])
-        self.assertEquals("item2 element 2", result["item2_2"]["element_2"])
-        self.assertEquals("item2 element 3", result["item2_3"]["element_3"])
+        self.assertEqual("item1 element 1", result["item1_1"]["element_1"])
+        self.assertEqual("item1 element 2", result["item1_2"]["element_2"])
+        self.assertEqual("item1 element 3", result["item1_3"]["element_3"])
+        self.assertEqual("item2 element 1", result["item2_1"]["element_1"])
+        self.assertEqual("item2 element 2", result["item2_2"]["element_2"])
+        self.assertEqual("item2 element 3", result["item2_3"]["element_3"])

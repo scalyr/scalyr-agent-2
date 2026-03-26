@@ -20,7 +20,6 @@
 #
 # author:  Steven Czerwinski <czerwin@scalyr.com>
 
-from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 

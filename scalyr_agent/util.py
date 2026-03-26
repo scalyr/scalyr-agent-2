@@ -15,10 +15,6 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-from __future__ import unicode_literals
-from __future__ import division
-from __future__ import absolute_import
-from __future__ import print_function
 
 import re
 import socket
@@ -40,7 +36,6 @@ import locale
 import collections
 import subprocess
 import signal
-from io import open
 
 if sys.version_info < (3, 5):
     # We use a third party library for pre-Python 3.5 to get recursive glob support (**)
@@ -49,10 +44,9 @@ else:
     # Python 3.5 and higher supports `**`
     import glob
 
-import six
 import functools
-import six.moves._thread
-from six.moves import range
+import six
+#from six.moves import range
 from scalyr_agent import compat
 
 
@@ -329,10 +323,7 @@ def set_json_lib(lib_name):
 # efficient library as a fallback.
 # We default to orjson under Python 3 (if available), since it's substantially faster than ujson for
 # encoding
-if six.PY3:
-    JSON_LIBS_TO_USE = ["orjson", "json"]
-else:
-    JSON_LIBS_TO_USE = ["json"]
+JSON_LIBS_TO_USE = ["orjson", "json"]
 
 last_error = None
 for json_lib_to_use in JSON_LIBS_TO_USE:
@@ -416,7 +407,7 @@ def json_scalyr_config_decode(text):
     return json_lib.parse(text)
 
 
-_NUMERIC_TYPES = six.integer_types + (float,)
+_NUMERIC_TYPES = (int,) + (float,)
 
 
 def value_to_bool(value):
@@ -434,14 +425,14 @@ def value_to_bool(value):
             return False
         if abs(1 - value) < 1e-10:
             return True
-    elif value_type is six.text_type:
+    elif value_type is str:
         return not value == "" and not value == "f" and not value.lower() == "false"
     elif value is None:
         return False
 
     raise ValueError(
         "Cannot convert %s value to bool: %s"
-        % (six.text_type(value_type), six.text_type(value))
+        % (str(value_type), str(value))
     )
 
 
@@ -469,12 +460,12 @@ def _read_file_as_json(file_path, json_parser, strict_utf8=False):
             if strict_utf8:
                 f = codecs.open(file_path, "r", encoding="utf-8")
             else:
-                f = open(file_path, "r")
+                f = open(file_path)
             data = f.read()
             return json_parser(data)
-        except IOError as e:
+        except OSError as e:
             raise JsonReadFileException(
-                file_path, "Read error occurred: " + six.text_type(e)
+                file_path, "Read error occurred: " + str(e)
             )
         except JsonParseException as e:
             raise JsonReadFileException(
@@ -483,7 +474,7 @@ def _read_file_as_json(file_path, json_parser, strict_utf8=False):
                 % (e.raw_message, e.line_number, e.position),
             )
         except UnicodeDecodeError as e:
-            raise JsonReadFileException(file_path, "Invalid UTF-8: " + six.text_type(e))
+            raise JsonReadFileException(file_path, "Invalid UTF-8: " + str(e))
     finally:
         if f is not None:
             f.close()
@@ -531,7 +522,7 @@ def read_file_as_json(file_path, strict_utf8=False):
             return json_decode(text)
         except Exception as err:
             raise JsonParseException(
-                "JSON parsing failed due to: %s" % six.text_type(err)
+                "JSON parsing failed due to: %s" % str(err)
             )
 
     return _read_file_as_json(file_path, parse_standard_json, strict_utf8=strict_utf8)
@@ -561,13 +552,13 @@ def atomic_write_dict_as_json_file(file_path, tmp_path, info):
 
         scalyr_agent.scalyr_logging.getLogger(__name__).exception(
             "Could not write checkpoint file.\n"
-            + "File path: '{0}', type: {1}.\n".format(file_path, type(file_path))
-            + "Temporary file path: '{0}', type: {1}.\n".format(
+            + "File path: '{}', type: {}.\n".format(file_path, type(file_path))
+            + "Temporary file path: '{}', type: {}.\n".format(
                 tmp_path, type(tmp_path)
             )
-            + "File exists: {0}.\n".format(os.path.isfile(file_path))
-            + "Temporary file exists: {0}.\n".format(os.path.isfile(tmp_path))
-            + "File system encoding: {0}.\n".format(sys.getfilesystemencoding())
+            + "File exists: {}.\n".format(os.path.isfile(file_path))
+            + "Temporary file exists: {}.\n".format(os.path.isfile(tmp_path))
+            + "File system encoding: {}.\n".format(sys.getfilesystemencoding())
             + "Error:",
             error_code="failedCheckpointWrite",
         )
@@ -605,7 +596,7 @@ def md5_hexdigest(data):
     @rtype: six.text_type
     """
 
-    if not (data and isinstance(data, six.text_type)):
+    if not (data and isinstance(data, str)):
         raise Exception("invalid data to be hashed: %s", repr(data))
 
     encoded_data = data.encode("utf-8")
@@ -694,7 +685,7 @@ def format_time(time_value):
         # which uses a space in place of the leading 0.  For tests, we need this to behave the same, so we spend
         # the small effort here to make it work.  At least, that leading 0 is always in the same place.
         if result[8] == "0":
-            result = "%s %s" % (result[:8], result[9:])
+            result = "{} {}".format(result[:8], result[9:])
         return result
 
 
@@ -705,12 +696,12 @@ def get_pid_tid():
     """
     # noinspection PyBroadException
     try:
-        return "(pid=%s) (tid=%s)" % (
-            six.text_type(os.getpid()),
-            six.text_type(six.moves._thread.get_ident()),
+        return "(pid={}) (tid={})".format(
+            str(os.getpid()),
+            str(six.moves._thread.get_ident()),
         )
     except Exception:
-        return "(pid=%s) (tid=Unknown)" % (six.text_type(os.getpid()))
+        return "(pid=%s) (tid=Unknown)" % (str(os.getpid()))
 
 
 def is_list_of_strings(vals):
@@ -718,7 +709,7 @@ def is_list_of_strings(vals):
     try:
         # check if everything is a string
         for val in vals:
-            if not isinstance(val, six.string_types):
+            if not isinstance(val, str):
                 return False
     except Exception:
         # vals is not enumerable
@@ -822,11 +813,11 @@ class JsonReadFileException(Exception):
         self.raw_message = message
 
         Exception.__init__(
-            self, "Failed while reading file '%s': %s" % (file_path, message)
+            self, "Failed while reading file '{}': {}".format(file_path, message)
         )
 
 
-class RunState(object):
+class RunState:
     """Keeps track of whether or not some process, such as the agent or a monitor, should be running.
 
     This abstraction can be used by multiple threads to efficiently monitor whether or not the process should
@@ -973,7 +964,7 @@ class FakeRunState(RunState):
         return self.__total_times_slept
 
 
-class FakeClock(object):
+class FakeClock:
     """Used to simulate time and control threads waking up for sleep for tests."""
 
     def __init__(self):
@@ -1099,7 +1090,7 @@ class RealFakeClock(FakeClock):
         self._time_condition.release()
 
 
-class FakeClockCounter(object):
+class FakeClockCounter:
     """Helper class for multithreaded testing. Provides a method for a thread to block until a count has reached target
     value.  Moreover, for every successfully observed increment, it will advance the fake_clock and wait for all
     other threads (driven by the fake clock) to wait on the clock.  For example usage, see MonitorsManagerTest.
@@ -1202,7 +1193,7 @@ class StoppableThread(threading.Thread):
         name_prefix = StoppableThread._get_name_prefix()
         if name_prefix is not None:
             if name is not None:
-                name = "%s%s" % (name_prefix, name)
+                name = "{}{}".format(name_prefix, name)
             else:
                 name = name_prefix
         # NOTE: We explicitly don't pass target= argument to the parent constructor since this
@@ -1262,7 +1253,7 @@ class StoppableThread(threading.Thread):
             self.__exception_info = sys.exc_info()
             logging.getLogger().warn(
                 "Received exception from run method in StoppableThread %s"
-                % six.text_type(e)
+                % str(e)
             )
             return None
 
@@ -1320,11 +1311,7 @@ class StoppableThread(threading.Thread):
             pass
 
         if not self.isAlive() and self.__exception_info is not None:
-            six.reraise(
-                self.__exception_info[0],
-                self.__exception_info[1],
-                self.__exception_info[2],
-            )
+            raise self.__exception_info[1].with_traceback(self.__exception_info[2])
 
     def isAlive(self):
         """
@@ -1342,18 +1329,18 @@ class StoppableThread(threading.Thread):
         # "_is_running" to False and then set it to True inside "run()" and only check that value
         # here.
         if six.PY2:
-            return super(StoppableThread, self).isAlive()
+            return super().isAlive()
 
         if (
             not self._run_state.is_running()
-            or not super(StoppableThread, self).is_alive()
+            or not super().is_alive()
         ):
             return False
 
         return True
 
 
-class RateLimiter(object):
+class RateLimiter:
     """An abstraction that can be used to enforce some sort of rate limit, expressed as a maximum number
     of bytes to be consumed over a period of time.
 
@@ -1456,7 +1443,7 @@ class RateLimiter(object):
             return (num_bytes - self.__bucket_contents) / self.__bucket_fill_rate
 
 
-class ScriptEscalator(object):
+class ScriptEscalator:
     """Utility that helps re-execute the current script using the user account that owns the
     configuration file.
 
@@ -1566,7 +1553,7 @@ class ScriptEscalator(object):
             return 1
 
 
-class RedirectorServer(object):
+class RedirectorServer:
     """Utility class that accepts incoming client connections and redirects the output being written to
     stdout and stderr to it.
 
@@ -1657,7 +1644,7 @@ class RedirectorServer(object):
         """
         # We have to be careful about how we encode the bytes.  It's better to assume it is utf-8 and just
         # serialize it that way.
-        encoded_content = six.text_type(content).encode("utf-8")
+        encoded_content = str(content).encode("utf-8")
         # When we send over a chunk of bytes to the client, we prefix it with a code that identifies which
         # stream it should go to (stdout or stderr) and how many bytes we are sending.  To encode this information
         # into a single integer, we just shift the len of the bytes over by one and set the lower bit to 0 if it is
@@ -1678,7 +1665,7 @@ class RedirectorServer(object):
         finally:
             self.__channel_lock.release()
 
-    class ServerChannel(object):
+    class ServerChannel:
         """The base class for the channel that is used by the server to accept an incoming connection from the
         client and then write bytes to it.
 
@@ -1713,7 +1700,7 @@ class RedirectorServer(object):
             """Closes the channel to the client."""
             pass
 
-    class Redirector(object):
+    class Redirector:
         """Simple class that is used to set references to `sys.stdout` and `sys.stderr`.
 
         This provides the `write` method necessary for `stdout` and `stderr` such that all bytes written will
@@ -1953,7 +1940,7 @@ class RedirectorClient(StoppableThread):
         else:
             return self.__fake_clock.time()
 
-    class ClientChannel(object):
+    class ClientChannel:
         """The base class for client channels, which are used to connect to the server and read the sent bytes.
 
         Derived classes must provide the actual communication implementation.
@@ -2204,7 +2191,7 @@ def run_command_popen(args, shell=False, log_errors=False, logger_func=None):
     if process.returncode != 0 and log_errors:
         command = " ".join(args)
         logger_func(
-            'Command "%s" returned exit code %s.' % (command, process.returncode)
+            'Command "{}" returned exit code {}.'.format(command, process.returncode)
         )
         logger_func("Stdout: %s" % (stdout.decode("utf-8")))
         logger_func("Stderr: %s" % (stderr.decode("utf-8")))
@@ -2235,7 +2222,7 @@ def win_remove_user_file_path_permissions(file_path, username):
     run_command_popen(args=args, shell=False, log_errors=True, logger_func=print)
 
 
-class RateLimiterToken(object):
+class RateLimiterToken:
     def __init__(self, token_id):
         self._token_id = token_id
 
@@ -2248,7 +2235,7 @@ class RateLimiterToken(object):
         return "Token #%s" % self._token_id
 
 
-class HistogramTracker(object):
+class HistogramTracker:
     """Track as an approximate histogram for a set of values.  The approximation is created by
     counting the number of values that fall into a predefined set of ranges.  The caller sets
     the ranges so can control the granularity of the approximation.
@@ -2482,7 +2469,7 @@ class ProcessWatchDog(threading.Thread):
         :param target_pid: target process PID
         :param poll_interval: The polling interval in seconds.
         """
-        super(ProcessWatchDog, self).__init__(name="watchdog thread.")
+        super().__init__(name="watchdog thread.")
 
         self.daemon = True
 
@@ -2517,7 +2504,7 @@ class ProcessWatchDog(threading.Thread):
         out.
         """
         self._on_stop_callback = on_stop_callback
-        super(ProcessWatchDog, self).start()
+        super().start()
 
 
 class ParentProcessAwareSyncManager(multiprocessing.managers.SyncManager):
@@ -2543,7 +2530,7 @@ class ParentProcessAwareSyncManager(multiprocessing.managers.SyncManager):
         """
         Arguments are eventually passed to the superclass, and may vary from the python versions,
         """
-        super(ParentProcessAwareSyncManager, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         # the instance of the ProcessWatchDog class which is responsible for the detection of the killed parent process.
         self._watchdog = None
 
@@ -2618,7 +2605,7 @@ class ParentProcessAwareSyncManager(multiprocessing.managers.SyncManager):
             )
 
         # start a manager with the combined initializer function.
-        super(ParentProcessAwareSyncManager, self).start(
+        super().start(
             initializer=final_initializer, initargs=initargs
         )
 
@@ -2659,7 +2646,7 @@ class ParentProcessAwareSyncManager(multiprocessing.managers.SyncManager):
         error = None
         try:
             # pylint: disable=E1101
-            super(ParentProcessAwareSyncManager, cls)._run_server(*args, **kwargs)
+            super()._run_server(*args, **kwargs)
             # pylint: enable=E1101
         except cls.SharedObjectManagerExit:
             # this is a special error which has been called intentionally
@@ -2751,7 +2738,7 @@ def get_hash_for_flat_dictionary(data):
     # we only store this hash in memory of a single process (and we never serialize / write it out
     # to disk or similar). With hash() function, there is also a larger chance of a collision, but
     # that's fine here.
-    return six.text_type(hash(frozenset(data.items())))
+    return str(hash(frozenset(data.items())))
 
 
 def get_flat_dictionary_memory_usage(data):

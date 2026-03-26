@@ -28,7 +28,6 @@ The classes exported by this package are:
                                of the usual logger version for performance reasons when a formatted log message is not needed
 """
 
-from __future__ import absolute_import
 
 __author__ = "Steven Czerwinski <czerwin@scalyr.com>"
 
