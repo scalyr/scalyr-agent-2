@@ -206,7 +206,7 @@ def build_win32_installer_package(variant, version):
 
     @return: The file name of the built package.
     """
-    if not shutil.which('candle') or not shutil.which('light') is None:
+    if not shutil.which('candle') or not shutil.which('light'):
         print(
             "Error, the WIX toolset does not appear to be installed.", file=sys.stderr
         )
