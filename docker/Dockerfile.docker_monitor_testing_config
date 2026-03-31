@@ -34,6 +34,6 @@
 FROM python:3.13.3-slim as build-image
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
-ADD print-to-stdout-stderr.sh /app/print-to-stdout-stderr.sh
+COPY print-to-stdout-stderr.sh /app/print-to-stdout-stderr.sh
 
 ENTRYPOINT ["bash", "/app/print-to-stdout-stderr.sh"]
