@@ -21,9 +21,6 @@
 #
 
 
-from __future__ import absolute_import
-from __future__ import print_function
-from __future__ import unicode_literals
 import atexit
 import errno
 import fcntl
@@ -39,14 +36,13 @@ import threading
 import time
 from logging.handlers import RotatingFileHandler
 from optparse import OptionParser
-from io import open
 
-from six.moves.queue import Queue
-from six.moves.queue import Empty
-from six.moves.queue import Full
+from queue import Queue
+from queue import Empty
+from queue import Full
 
 import six
-from six.moves import range
+#from six.moves import range
 from six.moves import reload_module
 
 
@@ -65,7 +61,7 @@ MAX_UNCAUGHT_EXCEPTIONS = 100
 def register_collector(collector):
     """Register a collector with the COLLECTORS global"""
 
-    assert isinstance(collector, Collector), "collector=%r" % (collector,)
+    assert isinstance(collector, Collector), "collector={!r}".format(collector)
     # store it in the global list and initiate a kill for anybody with the
     # same name that happens to still be hanging around
     if collector.name in COLLECTORS:
@@ -95,7 +91,7 @@ class ReaderQueue(Queue):
         return True
 
 
-class Collector(object):
+class Collector:
     """A Collector is a script that is run that gathers some data
        and prints it out in standard TSD format on STDOUT.  This
        class maintains all of the state information for a given
@@ -146,7 +142,7 @@ class Collector(object):
                 LOG.debug("reading %s got %d bytes on stderr", self.name, len(out))
                 for line in out.splitlines():
                     LOG.warning("%s: %s", self.name, six.ensure_text(line))
-        except IOError as error:
+        except OSError as error:
             (err, msg) = error.args
             if err != errno.EAGAIN:
                 raise
@@ -164,7 +160,7 @@ class Collector(object):
                 LOG.debug(
                     "reading %s, buffer now %d bytes", self.name, len(self.buffer)
                 )
-        except IOError as error:
+        except OSError as error:
             (err, msg) = error.args
             if err != errno.EAGAIN:
                 raise
@@ -257,7 +253,7 @@ class StdinCollector(Collector):
        will be blocking."""
 
     def __init__(self):
-        super(StdinCollector, self).__init__("stdin", 0, "<stdin>")
+        super().__init__("stdin", 0, "<stdin>")
 
         # hack to make this work.  nobody else will rely on self.proc
         # except as a test in the stdin mode.
@@ -303,11 +299,11 @@ class ReaderThread(threading.Thread):
               run_state: A RunState instance that is used to signal when this
                 thread should be stopped.
         """
-        assert evictinterval > dedupinterval, "%r <= %r" % (
+        assert evictinterval > dedupinterval, "{!r} <= {!r}".format(
             evictinterval,
             dedupinterval,
         )
-        super(ReaderThread, self).__init__()
+        super().__init__()
 
         self.readerq = ReaderQueue(100000)
         self.lines_collected = 0
@@ -463,7 +459,7 @@ class SenderThread(threading.Thread):
             been read from a collector.
           tags: A string containing tags to append at for every data point.
         """
-        super(SenderThread, self).__init__()
+        super().__init__()
 
         self.dryrun = dryrun
         self.host = host
@@ -502,13 +498,7 @@ class SenderThread(threading.Thread):
 
                 self.send_data()
                 errors = 0  # We managed to do a successful iteration.
-            except (
-                ArithmeticError,
-                EOFError,
-                EnvironmentError,
-                LookupError,
-                ValueError,
-            ):
+            except (ArithmeticError, EOFError, OSError, LookupError, ValueError):
                 errors += 1
                 if errors > MAX_UNCAUGHT_EXCEPTIONS:
                     shutdown()
@@ -536,7 +526,7 @@ class SenderThread(threading.Thread):
         LOG.debug("verifying our TSD connection is alive")
         try:
             self.tsd.sendall("version\n")
-        except socket.error:
+        except OSError:
             self.tsd = None
             return False
 
@@ -547,7 +537,7 @@ class SenderThread(threading.Thread):
             # connection
             try:
                 buf = self.tsd.recv(bufsize)
-            except socket.error:
+            except OSError:
                 self.tsd = None
                 return False
 
@@ -642,7 +632,7 @@ class SenderThread(threading.Thread):
                     self.tsd.connect(sockaddr)
                     # if we get here it connected
                     break
-                except socket.error as msg:
+                except OSError as msg:
                     LOG.warning(
                         "Connection attempt failed to %s:%d: %s",
                         self.host,
@@ -676,11 +666,11 @@ class SenderThread(threading.Thread):
             else:
                 self.tsd.sendall(out)
             self.sendq = []
-        except socket.error as msg:
+        except OSError as msg:
             LOG.error("failed to send data: %s", msg)
             try:
                 self.tsd.close()
-            except socket.error:
+            except OSError:
                 pass
             self.tsd = None
 
@@ -887,7 +877,7 @@ def main(argv):
     # prebuild the tag string from our tags dict
     tagstr = ""
     if tags:
-        tagstr = " ".join("%s=%s" % (k, v) for k, v in six.iteritems(tags))
+        tagstr = " ".join("{}={}".format(k, v) for k, v in tags.items())
         tagstr = " " + tagstr.strip()
 
     # gracefully handle death for normal termination paths and abnormal
@@ -972,14 +962,14 @@ def main_loop(
     """
     # Scalyr edit: Set the environment variable to override the sample intervals when the collectors are spawned.
     # This relies on the individual collectors checking this variable.
-    os.environ["TCOLLECTOR_SAMPLE_INTERVAL"] = six.text_type(sample_interval_secs)
+    os.environ["TCOLLECTOR_SAMPLE_INTERVAL"] = str(sample_interval_secs)
     # Scalyr edit: Set the environment variable used by ifstat.py to determine different network interface names.
     os.environ["TCOLLECTOR_INTERFACE_PREFIX"] = ",".join(
         options.network_interface_prefixes
     )
     os.environ["TCOLLECTOR_INTERFACE_SUFFIX"] = options.network_interface_suffix
     # Scalyr edit: Set the environment variable for dfstat.py
-    os.environ["TCOLLECTOR_LOCAL_DISKS_ONLY"] = six.text_type(options.local_disks_only)
+    os.environ["TCOLLECTOR_LOCAL_DISKS_ONLY"] = str(options.local_disks_only)
     # Scayr edit: Support for ignore mounts options
     os.environ["TCOLLECTOR_IGNORE_MOUNTS"] = ",".join(options.ignore_mounts or [])
 
@@ -1046,7 +1036,7 @@ def load_config_module(name, options, tags):
     Returns: the reference to the module loaded.
     """
 
-    if isinstance(name, six.text_type):
+    if isinstance(name, str):
         LOG.info("Loading %s", name)
         d = {}
         # Strip the trailing .py
@@ -1076,11 +1066,11 @@ def reload_changed_config_modules(modules, options, sender, tags):
 
     etcdir = os.path.join(options.cdir, "etc")
     current_modules = set(list_config_modules(etcdir))
-    current_paths = set(os.path.join(etcdir, name) for name in current_modules)
+    current_paths = {os.path.join(etcdir, name) for name in current_modules}
     changed = False
 
     # Reload any module that has changed.
-    for path, (module, timestamp) in six.iteritems(modules):
+    for path, (module, timestamp) in modules.items():
         if path not in current_paths:  # Module was removed.
             continue
         mtime = os.path.getmtime(path)
@@ -1106,7 +1096,7 @@ def reload_changed_config_modules(modules, options, sender, tags):
 
     # Scalyr edit:  Added and not sender is None
     if changed and sender is not None:
-        sender.tagstr = " ".join("%s=%s" % (k, v) for k, v in six.iteritems(tags))
+        sender.tagstr = " ".join("{}={}".format(k, v) for k, v in tags.items())
         sender.tagstr = " " + sender.tagstr.strip()
     return changed
 
@@ -1115,7 +1105,7 @@ def write_pid(pidfile):
     """Write our pid to a pidfile."""
     f = open(pidfile, "w")
     try:
-        f.write(six.text_type(os.getpid()))
+        f.write(str(os.getpid()))
     finally:
         f.close()
 
@@ -1123,7 +1113,7 @@ def write_pid(pidfile):
 def all_collectors():
     """Generator to return all collectors."""
 
-    return six.itervalues(COLLECTORS)
+    return COLLECTORS.values()
 
 
 # collectors that are not marked dead
@@ -1247,7 +1237,7 @@ def spawn_collector(col):
             args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True
         )
     except OSError as e:
-        LOG.error("Failed to spawn collector %s: %s" % (col.filename, e))
+        LOG.error("Failed to spawn collector {}: {}".format(col.filename, e))
         return
     # The following line needs to move below this line because it is used in
     # other logic and it makes no sense to update the last spawn time if the
