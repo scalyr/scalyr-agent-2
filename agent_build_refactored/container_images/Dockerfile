@@ -5,6 +5,8 @@ FROM requirement_libs_${TARGETOS}_${TARGETARCH}_${TARGETVARIANT}_context as requ
 FROM base as final-common
 COPY --from=requirement_libs /requirements /
 COPY --from=agent_filesystem / /
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
 
 # Optional stage for docker-json.
 FROM final-common as final-docker-json
