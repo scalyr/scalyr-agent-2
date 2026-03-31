@@ -92,7 +92,8 @@ class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
 
         try:
             if sys.version_info >= (3, 7, 0):
-                expected_msg = r"Original error: .*Hostname mismatch.*"  # NOQA
+                # NOTE: Error message varies based on OpenSSL version
+                expected_msg = r"(Original error: .*Hostname mismatch.*|name 'CertificateError' is not defined|UNEXPECTED_EOF_WHILE_READING|EOF occurred in violation of protocol)"  # NOQA
             else:
                 expected_msg = (
                     r"Original error: hostname 'agent.invalid.scalyr.com' doesn't match either "
@@ -187,7 +188,8 @@ class ScalyrRequestsHttpConnectionTestCase(ScalyrTestCase):
             self.assertIsNone(connection._RequestsConnection__session)
             # pylint: enable=no-member
 
-            expected_msg = r"(hostname 'agent.invalid.scalyr.com' doesn't match either of '\*.scalyr.com', 'scalyr.com'|Hostname mismatch, certificate is not valid for 'agent.invalid.scalyr.com')"
+            # NOTE: The error message can be different based on the Python version
+            expected_msg = r"(hostname 'agent.invalid.scalyr.com' doesn't match either of '\*.scalyr.com', 'scalyr.com'|Hostname mismatch, certificate is not valid for 'agent.invalid.scalyr.com'|UNEXPECTED_EOF_WHILE_READING|EOF occurred in violation of protocol)"
             self.assertRaisesRegex(
                 Exception,
                 expected_msg,

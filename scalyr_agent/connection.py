@@ -479,12 +479,12 @@ class HTTPSConnectionWithTimeoutAndVerification(six.moves.http_client.HTTPSConne
                 sock = socket.create_connection((self.host, self.port), self.__timeout)
 
                 if py_post_equal_279:
-                    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+                    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2) # NOSONAR See above
                     ssl_context.options |= ssl.OP_NO_SSLv2
                     ssl_context.options |= ssl.OP_NO_SSLv3
                     ssl_context.options |= ssl.OP_NO_TLSv1
                     ssl_context.options |= ssl.OP_NO_TLSv1_1
-                    ssl_context.verify_mode = ssl.CERT_NONE
+                    ssl_context.verify_mode = ssl.CERT_NONE # NOSONAR See above
                     ssl_context.check_hostname = False
 
                     sock = ssl_context.wrap_socket(
