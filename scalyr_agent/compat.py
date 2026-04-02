@@ -47,11 +47,13 @@ if PY2_pre_279 or PY3_pre_32:
             "Missing backports.ssl_match_hostname module, hostname verification can't "
             "be performed"
         )
-elif sys.version_info <= (3, 11):
-    # ssl module in Python 2 >= 2.7.9 and Python 3 >= 3.2 includes match hostname function
-    from ssl import match_hostname as ssl_match_hostname  # NOQA
+else:  # Python 3.2+
     from ssl import CertificateError  # type: ignore # NOQA
-
+    if sys.version_info <= (3, 11):
+        from ssl import match_hostname as ssl_match_hostname  # NOQA
+    else:
+        # Python 3.12+ removed match_hostname, but SSLContext.check_hostname handles it
+        ssl_match_hostname = None
 
 def custom_any(iterable):
     if sys.version_info[:2] > (2, 4):
