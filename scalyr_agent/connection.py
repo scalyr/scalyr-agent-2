@@ -28,9 +28,9 @@ import six
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
+from scalyr_agent.compat import CertificateError
 if sys.version_info <= (3, 11):
     from scalyr_agent.compat import ssl_match_hostname
-    from scalyr_agent.compat import CertificateError
 from scalyr_agent.compat import PY_post_equal_279
 from scalyr_agent.compat import PY3_post_equal_37
 
@@ -80,7 +80,6 @@ class ConnectionFactory:
         @rtype: Connection
 
         """
-        print(sys.version)
 
         result = None
         if use_requests:
@@ -137,7 +136,6 @@ class Connection:
         # Whether or not the connection uses SSL.  For production use, this should always be true.  We only
         # use non-SSL when testing against development versions of the Scalyr server.
         self._use_ssl = parsed_server.group(1) == "https://"
-        print(self._use_ssl)
         # Determine the port, defaulting to the right one based on protocol if not given.
         if parsed_server.group(3) != "":
             self._port = int(parsed_server.group(3)[1:])
@@ -176,7 +174,6 @@ class Connection:
 
     def get(self, request_path):
         """Get requests"""
-        print("does this get called?")
         self.__check_ssl()
         self._get(request_path)
 
@@ -233,7 +230,6 @@ class ScalyrHttpConnection(Connection):
         log.info("HttpConnection uses native os ssl")
 
     def _init_connection(self):
-        print("hello2")
         try:
             if self._use_ssl:
                 self.__connection = HTTPSConnectionWithTimeoutAndVerification(
@@ -360,7 +356,6 @@ class ScalyrHttpConnection(Connection):
 
     def _get(self, request_path):
         self.__http_response = None
-        print("what about this one")
         self.__connection.request(
             "GET",
             six.ensure_str(request_path),

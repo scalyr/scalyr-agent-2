@@ -51,7 +51,7 @@ zstandard==0.14.1; python_version < '3.5'
 lz4==4.0.2; python_version >= '3.7'
 lz4==3.1.1; python_version >= '3.5' and python_version <= '3.6'
 lz4==2.2.1; python_version < '3.5'
-pywin32==304; platform_system == 'Windows'
+pywin32==311; platform_system == 'Windows'
 xmltodict==0.13.0; platform_system == 'Windows'
 
 
