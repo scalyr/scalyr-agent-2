@@ -310,6 +310,7 @@ class ContainerisedAgentBuilder(Builder):
             f"-f={bake_file}",
             "--progress=plain",
             f"--allow=fs.read={str(self.work_dir)}",
+            f"--set {target}.platform=linux/amd64,linux/arm64,linux/arm/v7",
         ]
 
         if output:
