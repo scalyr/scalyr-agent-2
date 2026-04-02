@@ -1,5 +1,4 @@
-ARG BASE_IMAGE
-FROM ${BASE_IMAGE} as base
+FROM artifactory.eng.sentinelone.tech/docker-release/common/ubuntu-base/python311:2.0.48 as base
 
 FROM base as dependencies_build_base
 ENV DEBIANFRONTEND=noninteractive

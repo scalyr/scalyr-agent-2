@@ -15,6 +15,7 @@
 
 import enum
 import logging
+import os
 import pathlib as pl
 import shutil
 import subprocess
@@ -270,7 +271,78 @@ class ContainerisedAgentBuilder(Builder):
         agent_main_path.write_text(new_agent_main_content)
         return agent_filesystem_dir
 
-    def _build(
+    def _build(self,
+        image_type: ImageType,
+        output: BuildOutput,
+       architectures: List[CpuArch] = None,
+    ):
+        architectures = architectures or self.get_supported_architectures()
+
+        agent_filesystem_dir = self.create_agent_filesystem(image_type=image_type)
+        requirements_dir = self.create_requirements_specifications()
+
+        self.buildx_bake(
+            bake_file=_PARENT_DIR / "docker-bake.hcl",
+            target="container_images_k8s",
+            build_vars = {
+                "AGENT_FILESYSTEM_DIR": str(agent_filesystem_dir),
+                "REQUIREMENTS_DIR": str(requirements_dir)
+            },
+            output=output)
+
+
+    def create_requirements_specifications(self):
+        requirements_specifications_dir = self.work_dir / "requirements_specifications"
+        requirements_specifications_dir.mkdir()
+        with open(requirements_specifications_dir / "requirements.txt", "w") as requirements_file:
+            requirements_file.write(self.__agent_requirements())
+
+        with open(requirements_specifications_dir / "test_requirements.txt", "w") as test_requirements_file:
+            test_requirements_file.write(REQUIREMENTS_DEV_COVERAGE)
+
+        return requirements_specifications_dir
+
+
+    def buildx_bake(self, bake_file: pl.Path, target: str, build_vars: Dict[str, str], output: BuildOutput):
+        build_vars = build_vars or {}
+
+        cmd_options = [
+            f"-f={bake_file}",
+            "--progress=plain",
+        ]
+
+        if output:
+            cmd_options.append(
+                f"--set {target}.output={output.to_docker_output_option()}"
+            )
+
+        cmd_vars = []
+        for arg_name, arg_value in build_vars.items():
+            cmd_vars.append(f"{arg_name}={arg_value}")
+
+        cmd = [ *cmd_vars, "docker", "buildx", "bake", *cmd_options, target]
+        print(f"Command is {' '.join(cmd)}")
+        process = subprocess.Popen(
+            " ".join(cmd),
+            cwd=bake_file.parent,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,  # Redirect stderr to stdout
+            text=True,                 # Return strings instead of bytes
+            bufsize=1                  # Line buffered
+        )
+
+        captured_output = []
+
+        # Read output line by line as it happens
+        for line in iter(process.stdout.readline, ""):
+            print(line, end="")        # Print to console in real-time
+            captured_output.append(line)
+
+        process.stdout.close()
+        return_code = process.wait()
+
+    def _build_old(
         self,
         image_type: ImageType,
         output: BuildOutput,

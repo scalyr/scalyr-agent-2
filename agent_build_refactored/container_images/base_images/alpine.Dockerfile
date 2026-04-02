@@ -1,5 +1,4 @@
-ARG BASE_IMAGE
-FROM ${BASE_IMAGE} as base
+FROM alpine:3.19.4 as base
 
 FROM base as dependencies_build_base
 RUN apk update && apk add --no-cache \
