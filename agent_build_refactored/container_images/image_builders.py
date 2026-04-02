@@ -309,7 +309,7 @@ class ContainerisedAgentBuilder(Builder):
         cmd_options = [
             f"-f={bake_file}",
             "--progress=plain",
-            f"----allow=fs.read={str(self.work_dir)}",
+            f"--allow=fs.read={str(self.work_dir)}",
         ]
 
         if output:
