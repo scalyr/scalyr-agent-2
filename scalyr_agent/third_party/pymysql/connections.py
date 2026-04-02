@@ -2,7 +2,6 @@
 # http://dev.mysql.com/doc/internals/en/client-server-protocol.html
 # Error codes:
 # http://dev.mysql.com/doc/refman/5.5/en/error-messages-client.html
-from __future__ import print_function
 from ._compat import PY2, range_type, text_type, str_type, JYTHON, IRONPYTHON
 
 import errno
@@ -39,7 +38,7 @@ try:
     import getpass
     DEFAULT_USER = getpass.getuser()
     del getpass
-except (ImportError, KeyError):
+except (ImportError, KeyError, OSError):
     # KeyError occurs when there's no entry in OS database for a current user.
     DEFAULT_USER = None
 
@@ -110,10 +109,10 @@ def lenenc_int(i):
     elif (i < (1 << 64)):
         return b'\xfe' + struct.pack('<Q', i)
     else:
-        raise ValueError("Encoding %x is larger than %x - no representation in LengthEncodedInteger" % (i, (1 << 64)))
+        raise ValueError("Encoding {:x} is larger than {:x} - no representation in LengthEncodedInteger".format(i, (1 << 64)))
 
 
-class Connection(object):
+class Connection:
     """
     Representation of a socket with a mysql server.
 
@@ -475,7 +474,7 @@ class Connection(object):
     def _quote_bytes(self, s):
         if (self.server_status &
                 SERVER_STATUS.SERVER_STATUS_NO_BACKSLASH_ESCAPES):
-            return "'%s'" % (_fast_surrogateescape(s.replace(b"'", b"''")),)
+            return "'{}'".format(_fast_surrogateescape(s.replace(b"'", b"''")))
         return converters.escape_bytes(s)
 
     def cursor(self, cursor=None):
@@ -582,7 +581,7 @@ class Connection(object):
                                 (self.host, self.port), self.connect_timeout,
                                 **kwargs)
                             break
-                        except (OSError, IOError) as e:
+                        except OSError as e:
                             if e.errno == errno.EINTR:
                                 continue
                             raise
@@ -621,7 +620,7 @@ class Connection(object):
             if isinstance(e, (OSError, IOError, socket.error)):
                 exc = err.OperationalError(
                         2003,
-                        "Can't connect to MySQL server on %r (%s)" % (
+                        "Can't connect to MySQL server on {!r} ({})".format(
                             self.host, e))
                 # Keep original exception and traceback to investigate error.
                 exc.original_exception = e
@@ -690,13 +689,13 @@ class Connection(object):
             try:
                 data = self._rfile.read(num_bytes)
                 break
-            except (IOError, OSError) as e:
+            except OSError as e:
                 if e.errno == errno.EINTR:
                     continue
                 self._force_close()
                 raise err.OperationalError(
                     CR.CR_SERVER_LOST,
-                    "Lost connection to MySQL server during query (%s)" % (e,))
+                    "Lost connection to MySQL server during query ({})".format(e))
             except BaseException:
                 # Don't convert unknown exception to MySQLError.
                 self._force_close()
@@ -711,11 +710,11 @@ class Connection(object):
         self._sock.settimeout(self._write_timeout)
         try:
             self._sock.sendall(data)
-        except IOError as e:
+        except OSError as e:
             self._force_close()
             raise err.OperationalError(
                 CR.CR_SERVER_GONE_ERROR,
-                "MySQL server has gone away (%r)" % (e,))
+                "MySQL server has gone away ({!r})".format(e))
 
     def _read_query_result(self, unbuffered=False):
         self._result = None
@@ -929,7 +928,7 @@ class Connection(object):
                         raise err.OperationalError(2061, "Authentication plugin '%s'" \
                                   " %r didn't respond with string. Returned '%r' to prompt %r" % (plugin_name, handler, resp, prompt))
                 else:
-                    raise err.OperationalError(2059, "Authentication plugin '%s' (%r) not configured" % (plugin_name, handler))
+                    raise err.OperationalError(2059, "Authentication plugin '{}' ({!r}) not configured".format(plugin_name, handler))
                 pkt = self._read_packet()
                 pkt.check_error()
                 if pkt.is_ok_packet() or last:
@@ -1048,7 +1047,7 @@ class Connection(object):
     NotSupportedError = err.NotSupportedError
 
 
-class MySQLResult(object):
+class MySQLResult:
 
     def __init__(self, connection):
         """
@@ -1253,7 +1252,7 @@ class MySQLResult(object):
         self.description = tuple(description)
 
 
-class LoadLocalFile(object):
+class LoadLocalFile:
     def __init__(self, filename, connection):
         self.filename = filename
         self.connection = connection
@@ -1272,8 +1271,8 @@ class LoadLocalFile(object):
                     if not chunk:
                         break
                     conn.write_packet(chunk)
-        except IOError:
-            raise err.OperationalError(1017, "Can't find file '{0}'".format(self.filename))
+        except OSError:
+            raise err.OperationalError(1017, "Can't find file '{}'".format(self.filename))
         finally:
             # send the empty packet to signify we are done sending data
             conn.write_packet(b'')
