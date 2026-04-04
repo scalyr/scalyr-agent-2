@@ -10,56 +10,56 @@ variable "AGENT_FILESYSTEM_DIR" {
   default = "."
 }
 
-target "ubuntu_runtime_base" {
+target "ubuntu-runtime-base" {
   context = "base_images"
   dockerfile = "ubuntu.Dockerfile"
-  target = "runtime_base"
+  target = "runtime-base"
   output = ["type=cacheonly"]
 }
 
-target "ubuntu_dependencies_builder_base" {
+target "ubuntu-dependencies-builder-base" {
   context = "base_images"
   dockerfile = "ubuntu.Dockerfile"
-  target = "dependencies_builder_base"
+  target = "dependencies-builder-base"
   output = ["type=cacheonly"]
 }
 
-target "requirements_libs" {
+target "requirements-libs" {
   context = "."
   dockerfile = "dependencies.Dockerfile"
   contexts = {
-    base = "target:${BASE_DISTRO}_dependencies_builder_base"
+    base = "target:${BASE_DISTRO}-dependencies-builder-base"
     requirements = "${REQUIREMENTS_DIR}"
   }
   output = ["type=cacheonly"]
 }
 
-target "container_images" {
+target "container-images" {
   context = "."
   dockerfile = "Dockerfile"
   contexts = {
-    requirements_libs = "target:requirements_libs"
-    agent_filesystem = "${AGENT_FILESYSTEM_DIR}"
-    base = "target:${BASE_DISTRO}_runtime_base"
+    requirements-libs = "target:requirements-libs"
+    agent-filesystem = "${AGENT_FILESYSTEM_DIR}"
+    base = "target:${BASE_DISTRO}-runtime-base"
   }
 }
 
-target "container_images_docker_syslog" {
-  inherits = ["container_images"]
+target "container-images-docker-syslog" {
+  inherits = ["container-images"]
   target = "final-docker-syslog"
 }
 
-target "container_images_docker_api" {
-  inherits = ["container_images"]
+target "container-images-docker-api" {
+  inherits = ["container-images"]
   target = "final-docker-api"
 }
 
-target "container_images_docker_json" {
-  inherits = ["container_images"]
+target "container-images-docker-json" {
+  inherits = ["container-images"]
   target = "final-docker-json"
 }
 
-target "container_images_k8s" {
-  inherits = ["container_images"]
+target "container-images-k8s" {
+  inherits = ["container-images"]
   target = "final-k8s"
 }

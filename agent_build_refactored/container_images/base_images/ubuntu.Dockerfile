@@ -17,7 +17,7 @@ RUN apt-get update \
 # This sets Python 3.13 as the default 'python3' command
 RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.13 1
 
-FROM base as dependencies_builder_base
+FROM base as dependencies-builder-base
 ENV DEBIANFRONTEND=noninteractive
 RUN apt-get update  \
     && apt-get install -y python3.13-dev python3.13-venv rustc cargo \
@@ -26,7 +26,7 @@ RUN apt-get update  \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-FROM base as runtime_base
+FROM base as runtime-base
 # We upgrade current packages in order to keep everything up to date, including security updates.
 # Installing ca-certificates populates /etc/ssl/certs but requires openssl (only libssl installed by default).
 RUN DEBIANFRONTEND=noninteractive apt-get update \

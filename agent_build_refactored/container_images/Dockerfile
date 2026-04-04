@@ -1,8 +1,8 @@
 ARG IMAGE_TYPE=k8s
 
 FROM base as final-common
-COPY --from=requirements_libs /requirements /
-COPY --from=agent_filesystem / /
+COPY --from=requirements-libs /requirements /
+COPY --from=agent-filesystem / /
 
 MAINTAINER Scalyr Inc <support@scalyr.com>
 CMD ["python3", "/usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py","--no-fork", "--no-change-user", "start"]
