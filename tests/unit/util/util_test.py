@@ -718,7 +718,8 @@ class TestScriptEscalator(ScalyrTestCase):
     def test_change_user_and_rerun_script(self):
         # NOTE: __main__.__file__ might not be set when running tests under pytests or nosetests
         mock_main = mock.Mock()
-        mock_main.__file__ = "/tmp/file.py"
+        test_script_path = os.path.join(tempfile.gettempdir(), "file.py")
+        mock_main.__file__ = test_script_path
         sys.modules["__main__"] = mock_main
 
         (test_instance, controller) = self.create_instance("czerwin", "fileA", "steve")
@@ -726,7 +727,7 @@ class TestScriptEscalator(ScalyrTestCase):
 
         self.assertEqual(controller.call_count, 1)
         self.assertEqual(controller.last_call["user"], "steve")
-        self.assertEqual(controller.last_call["script_file"], "/tmp/file.py")
+        self.assertEqual(controller.last_call["script_file"], test_script_path)
 
     def create_instance(self, current_user, config_file, config_owner):
         controller = TestScriptEscalator.ControllerMock(
