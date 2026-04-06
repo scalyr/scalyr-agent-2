@@ -95,6 +95,7 @@ from typing import List, Dict, Type, Union, Set
 
 
 from agent_build_refactored.utils.builder import Builder
+from agent_build_refactored.utils.common import latest_commit
 
 from agent_build_refactored.utils.constants import (
     SOURCE_ROOT,
@@ -195,12 +196,14 @@ class LinuxPackageBuilder(Builder):
         by package managers such as apt and yum.
     """
 
-    @property
-    def common_agent_package_build_args(self) -> List[str]:
+    def common_agent_package_build_args(self, release_candidate: bool = False) -> List[str]:
         """
         Set of common arguments for the final fpm command.
         """
         version = (SOURCE_ROOT / "VERSION").read_text().strip()
+        if release_candidate:
+            version += f"~{latest_commit(SOURCE_ROOT)}"
+
         return [
                 # fmt: off
                 "--license", "Apache 2.0",
@@ -283,6 +286,7 @@ class LinuxPackageBuilder(Builder):
     def _get_fpm_build_cmd_args(
         self,
         package_type: str,
+        release_candidate: bool = False,
     ) -> List[str]:
         """
         Get list of command line arguments that are used to build resulting package.
@@ -332,6 +336,7 @@ class LinuxPackageBuilder(Builder):
     def _build_package(
         self,
         package_type: str,
+        release_candidate: bool = False,
     ):
 
         result_package_dir = self.result_dir / package_type
@@ -339,6 +344,7 @@ class LinuxPackageBuilder(Builder):
 
         cmd_args = self._get_fpm_build_cmd_args(
             package_type=package_type,
+            release_candidate=release_candidate,
         )
 
         self.run_fpm_command_in_docker(
@@ -357,6 +363,7 @@ class LinuxPackageBuilder(Builder):
         self,
         package_type: str,
         output_dir: pl.Path = None,
+        release_candidate: bool = False,
     ):
 
         self._build_package_root()
@@ -367,6 +374,7 @@ class LinuxPackageBuilder(Builder):
 
         self._build_package(
             package_type=package_type,
+            release_candidate=release_candidate,
         )
 
         logger.info(f"The {package_type} package build is finished.")
@@ -472,6 +480,7 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
     def _get_fpm_build_cmd_args(
         self,
         package_type: str,
+        release_candidate: bool = False,
     ) -> List[str]:
         in_docker_package_root = self._to_in_docker_work_dir_path(self._package_root)
 
@@ -499,7 +508,7 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
             "--deb-changelog", str(in_docker_changelogs_dir / "changelog-deb"),
             "--rpm-changelog", str(in_docker_changelogs_dir / "changelog-rpm"),
             "--conflicts", AGENT_AIO_PACKAGE_NAME,
-            *self.common_agent_package_build_args,
+            *self.common_agent_package_build_args(release_candidate),
             # fmt: on
         ]
 
@@ -865,6 +874,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
     def _get_fpm_build_cmd_args(
         self,
         package_type: str,
+        release_candidate: bool = False,
     ) -> List[str]:
 
         description = (
@@ -896,7 +906,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
             "--deb-changelog", str(in_docker_changelogs_dir / "changelog-deb"),
             "--rpm-changelog", str(in_docker_changelogs_dir / "changelog-rpm"),
             "--conflicts", AGENT_NON_AIO_AIO_PACKAGE_NAME,
-            *self.common_agent_package_build_args,
+            *self.common_agent_package_build_args(release_candidate),
             # fmt: on
         ]
 

@@ -189,7 +189,8 @@ class ContainerisedAgentBuilder(Builder):
     def _build(self,
         image_type: ImageType,
         output: BuildOutput,
-       architectures: List[CpuArch] = None,
+        architectures: List[CpuArch] = None,
+        release_candidate: bool = False,
     ):
         architectures = architectures or self.get_supported_architectures()
 
@@ -275,6 +276,7 @@ class ContainerisedAgentBuilder(Builder):
         image_type: ImageType,
         architectures: List[CpuArch] = None,
         output_dir: pl.Path = None,
+        release_candidate: bool = False,
     ):
         """
         Build image in the form of the OCI tarball
@@ -291,6 +293,7 @@ class ContainerisedAgentBuilder(Builder):
                 extract=False,
             ),
             architectures=architectures,
+            release_candidate=release_candidate,
         )
 
         if output_dir:

@@ -101,6 +101,9 @@ def _add_image_parsers():
     image_build_parser.add_argument(
         "--output-dir", required=True, help="Output directory with tarball"
     )
+    image_build_parser.add_argument(
+        "--release-candidate", required=False, help="Supplied if this is a release candidate, which impacts chosen version number"
+    )
 
     cache_requirements_image_parser = image_parser_action_subparsers.add_parser(
         "cache-requirements",
@@ -168,6 +171,9 @@ def _add_package_parsers():
 
     build_parser.add_argument("--output-dir", default=str(SOURCE_ROOT / "build"))
 
+    build_parser.add_argument(
+        "--release-candidate", required=False, help="Supplied if this is a release candidate, which impacts chosen version number"
+    )
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -201,7 +207,9 @@ if __name__ == "__main__":
                 output_dir = None
 
             builder.build_oci_tarball(
-                image_type=ImageType(args.image_type), output_dir=output_dir
+                image_type=ImageType(args.image_type),
+                output_dir=output_dir,
+                release_candidate=args.release_candidate,
             )
             exit(0)
         elif args.action == "cache-requirements":
@@ -249,5 +257,6 @@ if __name__ == "__main__":
             builder.build(
                 package_type=args.package_type,
                 output_dir=pl.Path(args.output_dir),
+                release_candidate=args.release_candidate,
             )
             exit(0)
