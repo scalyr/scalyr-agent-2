@@ -700,11 +700,14 @@ class TestStoppableThread(ScalyrTestCase):
 
 
 class TestScriptEscalator(ScalyrTestCase):
+    def setUp(self):
+        super(TestScriptEscalator, self).setUp()
+        self._original_main = sys.modules.get("__main__")
+
     def tearDown(self):
         super(TestScriptEscalator, self).tearDown()
-
-        if "__main__" in sys.modules:
-            del sys.modules["__main__"]
+        if self._original_main is not None:
+            sys.modules["__main__"] = self._original_main
 
     def test_is_user_change_required(self):
         (test_instance, controller) = self.create_instance("czerwin", "fileA", "steve")
