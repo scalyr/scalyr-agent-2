@@ -52,8 +52,8 @@ FROM download_base as download_ncurses
 RUN gpg2 --import /tmp/public_keys/gnu-keyring.gpg
 ARG NCURSES_VERSION
 # Avoid https://ftp.gnu.org/pub/gnu/ncurses/ because it tends to be slow
-RUN curl -L "https://mirrors.dotsrc.org/gnu/ncurses/ncurses-${NCURSES_VERSION}.tar.gz" > ncurses.tar.gz
-RUN curl -L "https://mirrors.dotsrc.org/gnu/ncurses/ncurses-${NCURSES_VERSION}.tar.gz.sig" > ncurses.tar.gz.sig
+RUN curl -L "https://mirrors.ibiblio.org/gnu/ncurses/ncurses-${NCURSES_VERSION}.tar.gz" > ncurses.tar.gz
+RUN curl -L "https://mirrors.ibiblio.org/gnu/ncurses/ncurses-${NCURSES_VERSION}.tar.gz.sig" > ncurses.tar.gz.sig
 RUN gpg2 --verify  ncurses.tar.gz.sig ncurses.tar.gz
 RUN tar -xf "ncurses.tar.gz"
 RUN mv ncurses-${NCURSES_VERSION} /tmp/source
