@@ -124,12 +124,13 @@ class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
             Exception,
             expected_msg,
             self._get_connection_cls,
-            server="https://example.com:443",
+            # Use untrusted-root.badssl.com which has a certificate signed by an untrusted CA.
+            server="https://untrusted-root.badssl.com:443",
         )
         self.assertEqual(mock_log.log.call_count, 1)
         self.assertEqual(mock_log.log.call_args_list[0][0][0], logging.WARN)
         self.assertTrue(
-            "SSL certificate for example.com" in mock_log.log.call_args_list[0][0][1]
+            "SSL certificate for untrusted-root.badssl.com" in mock_log.log.call_args_list[0][0][1]
         )
 
     def _get_connection_cls(self, server):
@@ -208,7 +209,8 @@ class ScalyrRequestsHttpConnectionTestCase(ScalyrTestCase):
     def test_connect_invalid_cert_failure(self):
         expected_msg = r"\[SSL: CERTIFICATE_VERIFY_FAILED\]"
 
-        connection = self._get_connection_cls(server="https://example.com:443")
+        # Use untrusted-root.badssl.com which has a certificate signed by an untrusted CA.
+        connection = self._get_connection_cls(server="https://untrusted-root.badssl.com:443")
         self.assertRaisesRegex(
             Exception,
             expected_msg,
