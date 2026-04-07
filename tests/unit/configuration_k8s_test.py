@@ -186,12 +186,12 @@ class TestConfigurationK8s(TestConfigurationBase):
         k8s_events_monitor = monitors_manager.monitors[1]
 
         # All environment-aware params defined in the k8s and k8s_events monitors must be tested
-        self.assertEquals(
+        self.assertEqual(
             set(k8s_testmap.keys()),
             set(k8s_monitor._config._environment_aware_map.keys()),
         )
 
-        self.assertEquals(
+        self.assertEqual(
             set(k8s_events_testmap.keys()),
             set(k8s_events_monitor._config._environment_aware_map.keys()),
         )
@@ -220,18 +220,18 @@ class TestConfigurationK8s(TestConfigurationBase):
                 test_val, convert_to = value[1:]
                 if key in ["report_k8s_metrics", "api_key"]:
                     # Keys were defined in config files so should not have changed
-                    self.assertNotEquals(
+                    self.assertNotEqual(
                         test_val, monitor._config.get(key, convert_to=convert_to)
                     )
                 else:
                     # Keys were empty in config files so they take on environment values
                     materialized_value = monitor._config.get(key, convert_to=convert_to)
                     if hasattr(test_val, "__iter__"):
-                        self.assertEquals(
+                        self.assertEqual(
                             [x1 for x1 in test_val], [x2 for x2 in materialized_value]
                         )
                     else:
-                        self.assertEquals(test_val, materialized_value)
+                        self.assertEqual(test_val, materialized_value)
 
     def test_k8s_event_object_filter_from_config(self):
         self._write_file_with_separator_conversion(
@@ -254,8 +254,8 @@ class TestConfigurationK8s(TestConfigurationBase):
         k8s_event_monitor = test_manager.monitors[0]
         event_object_filter = k8s_event_monitor._config.get("event_object_filter")
         elems = ["CronJob", "DaemonSet", "Deployment"]
-        self.assertNotEquals(elems, event_object_filter)  # list != JsonArray
-        self.assertEquals(elems, [x for x in event_object_filter])
+        self.assertNotEqual(elems, event_object_filter)  # list != JsonArray
+        self.assertEqual(elems, [x for x in event_object_filter])
 
     def test_k8s_event_object_filter_from_environment_0(self):
         self._test_k8s_event_object_filter_from_environment(
@@ -298,9 +298,9 @@ class TestConfigurationK8s(TestConfigurationBase):
         test_manager = MonitorsManager(config, FakePlatform([]))
         k8s_event_monitor = test_manager.monitors[0]
         event_object_filter = k8s_event_monitor._config.get("event_object_filter")
-        self.assertNotEquals(elems, event_object_filter)  # list != ArrayOfStrings
-        self.assertEquals(type(event_object_filter), ArrayOfStrings)
-        self.assertEquals(elems, list(event_object_filter))
+        self.assertNotEqual(elems, event_object_filter)  # list != ArrayOfStrings
+        self.assertEqual(type(event_object_filter), ArrayOfStrings)
+        self.assertEqual(elems, list(event_object_filter))
 
     @skipIf(sys.version_info < (3, 6, 0), "Skipping under Python 2")
     def test_k8s_explorer_enable(self):
@@ -323,7 +323,7 @@ class TestConfigurationK8s(TestConfigurationBase):
 
             test_manager = MonitorsManager(config, FakePlatform([]))
             k8s_openmetrics_monitor = test_manager.monitors[0]
-            self.assertEquals(
+            self.assertEqual(
                 expected_value,
                 k8s_openmetrics_monitor._KubernetesOpenMetricsMonitor__enable_monitor,
             )
@@ -359,7 +359,7 @@ class TestConfigurationK8s(TestConfigurationBase):
 
             test_manager = MonitorsManager(config, FakePlatform([]))
             k8s_event_monitor = test_manager.monitors[0]
-            self.assertEquals(
+            self.assertEqual(
                 expected_value,
                 k8s_event_monitor._KubernetesEventsMonitor__disable_monitor,
             )
@@ -388,7 +388,7 @@ class TestConfigurationK8s(TestConfigurationBase):
                 global_include=["*"], global_ignore=expected_ignore_list
             )
             result = k8s_monitor._get_namespaces_to_include()
-            self.assertEquals(expected, result)
+            self.assertEqual(expected, result)
 
         def _test_k8s_ignore_namespaces_local(test_str, expected):
             k8s_config_line = ""

@@ -3,8 +3,6 @@
 # Note, this can be run in standalone mode by:
 # python -m scalyr_agent.run_monitor
 # scalyr_agent.builtin_monitors.apache_monitor
-from __future__ import absolute_import
-from __future__ import unicode_literals
 
 import six
 import six.moves.http_client
@@ -28,7 +26,7 @@ define_config_option(
     __monitor__,
     "module",
     "Always `scalyr_agent.builtin_monitors.apache_monitor`",
-    convert_to=six.text_type,
+    convert_to=str,
     required_option=True,
 )
 define_config_option(
@@ -40,7 +38,7 @@ define_config_option(
     "useful if you are running multiple Apache instances on a single server; you can monitor each "
     "instance with separate `{...}` stanzas in the configuration "
     "file (`/etc/scalyr-agent-2/agent.json`).",
-    convert_to=six.text_type,
+    convert_to=str,
 )
 define_config_option(
     __monitor__,
@@ -343,7 +341,7 @@ See [Analyze Access Logs](https://app.scalyr.com/solutions/analyze-access-logs) 
         except six.moves.urllib.error.URLError as err:
             message = (
                 "The was an error attempting to reach the server.  Make sure the server is running and properly configured.  The error reported is: %s"
-                % (six.text_type(err))
+                % (str(err))
             )
             if err.reason.errno == 111:
                 message = (

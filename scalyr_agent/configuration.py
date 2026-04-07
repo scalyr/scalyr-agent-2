@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 from scalyr_agent.scalyr_monitor import MonitorInformation
 
@@ -34,8 +32,6 @@ import stat
 import platform
 
 import six
-import six.moves.urllib.parse
-from six.moves import range
 
 try:
     import win32file
@@ -89,7 +85,7 @@ def ensure_https_url(server):
         return server
 
 
-class Configuration(object):
+class Configuration:
     """Encapsulates the results of a single read of the configuration file.
 
     An instance of this object can be used to read and validate the configuration file.  It supports
@@ -188,11 +184,11 @@ class Configuration(object):
                     msg = FILE_WRONG_OWNER_ERROR_MSG % (
                         self.__file_path,
                         current_user,
-                        six.text_type(e),
+                        str(e),
                     )
                     raise BadConfiguration(msg, None, "fileParseError")
 
-                raise BadConfiguration(six.text_type(e), None, "fileParseError")
+                raise BadConfiguration(str(e), None, "fileParseError")
 
             # Import any requested variables from the shell and use them for substitutions.
             self.__perform_substitutions(self.__config)
@@ -284,7 +280,7 @@ class Configuration(object):
                 self.__verify_main_config(content, self.__file_path)
                 self.__verify_logs_and_monitors_configs_and_apply_defaults(content, fp)
 
-                for key, value in six.iteritems(content):
+                for key, value in content.items():
                     if key not in allowed_multiple_keys:
                         self.__config.put(key, value)
 
@@ -363,7 +359,7 @@ class Configuration(object):
                     )
                 except ValueError as e:
                     raise BadConfiguration(
-                        six.text_type(e), "max_send_rate_enforcement", "notDataRate"
+                        str(e), "max_send_rate_enforcement", "notDataRate"
                     )
 
             # Add in 'serverHost' to server_attributes if it is not set.  We must do this after merging any
@@ -593,7 +589,7 @@ class Configuration(object):
                         raise BadConfiguration(
                             "The log entry '%s' refers to a non-existing worker with id '%s'. Valid worker ids: %s."
                             % (
-                                six.text_type(log_file_config),
+                                str(log_file_config),
                                 worker_id,
                                 valid_worker_ids,
                             ),
@@ -802,7 +798,7 @@ class Configuration(object):
             # case the value is set to "auto"
             if option == "json_library" and value == "auto":
                 json_lib = scalyr_util.get_json_lib()
-                value = "%s (%s)" % (value, json_lib)
+                value = "{} ({})".format(value, json_lib)
             elif option == "docker_py_version":
                 try:
                     import docker
@@ -826,9 +822,9 @@ class Configuration(object):
 
                 if isinstance(value, (list, dict)):
                     # We remove u"" prefix to ensure consistent output between Python 2 and 3
-                    value = six.text_type(value).replace("u'", "'")
+                    value = str(value).replace("u'", "'")
 
-                self.__logger.info("\t%s: %s" % (option, value))
+                self.__logger.info("\t{}: {}".format(option, value))
 
         # Print additional useful Windows specific information on Windows
         win32_max_open_fds_previous_value = getattr(
@@ -911,7 +907,7 @@ class Configuration(object):
         result = []
         for i in range(worker_config["sessions"]):
             # combine the id of the worker and session's position in the list to get a session id.
-            worker_session_id = "%s-%s" % (worker_config["id"], i)
+            worker_session_id = "{}-{}".format(worker_config["id"], i)
             result.append(worker_session_id)
         return result
 
@@ -937,7 +933,7 @@ class Configuration(object):
         """
         return os.path.join(
             self.agent_log_path,
-            "%s%s.log" % (AGENT_WORKER_SESSION_LOG_NAME_PREFIX, worker_session_id),
+            "{}{}.log".format(AGENT_WORKER_SESSION_LOG_NAME_PREFIX, worker_session_id),
         )
 
     def parse_log_config(
@@ -1987,7 +1983,7 @@ class Configuration(object):
         If multiple sessions / workers functionality is not enabled (*, 1, 1) is returned.
         """
         sessions_count = 0
-        api_keys_set = set([])
+        api_keys_set = set()
         for worker_config in self.__worker_configs:
             api_keys_set.add(worker_config["api_key"])
             sessions_count += worker_config["sessions"]
@@ -3681,7 +3677,7 @@ class Configuration(object):
             config_val = config_object.get_bool(param_name, none_if_missing=True)
         elif param_type == float:
             config_val = config_object.get_float(param_name, none_if_missing=True)
-        elif param_type == six.text_type:
+        elif param_type == str:
             config_val = config_object.get_string(param_name, none_if_missing=True)
         elif param_type == JsonObject:
             config_val = config_object.get_json_object(param_name, none_if_missing=True)
@@ -3745,7 +3741,7 @@ class Configuration(object):
                     del config_object[name]
                     if self.__logger and self.__log_warnings:
                         self.__logger.warning(
-                            "The configuration option {0} is deprecated, use {1} instead.".format(
+                            "The configuration option {} is deprecated, use {} instead.".format(
                                 name, param_name
                             ),
                             limit_once_per_x_secs=86400,
@@ -4214,10 +4210,10 @@ class Configuration(object):
             # validate the worker id. It should consist only from this set of characters.
             allowed_worker_id_characters_pattern = "a-zA-Z0-9_"
             if re.search(
-                r"[^{0}]+".format(allowed_worker_id_characters_pattern), worker_id
+                r"[^{}]+".format(allowed_worker_id_characters_pattern), worker_id
             ):
                 raise BadConfiguration(
-                    "The worker id '{0}' contains an invalid character. Please use only '{1}'".format(
+                    "The worker id '{}' contains an invalid character. Please use only '{}'".format(
                         worker_id, allowed_worker_id_characters_pattern
                     ),
                     "workers",
@@ -4259,7 +4255,7 @@ class Configuration(object):
         )
         source = config_fragment["server_attributes"]
         destination = config["server_attributes"]
-        for k in source:
+        for k in source.keys():
             destination[k] = source[k]
 
     def __verify_required_string(self, config_object, field, config_description):
@@ -4320,14 +4316,14 @@ class Configuration(object):
         if count == 0:
             raise BadConfiguration(
                 'A required field is missing.  Object must contain one of "%s".  Error is in %s'
-                % (six.text_type(fields), config_description),
+                % (str(fields), config_description),
                 field,
                 "missingRequired",
             )
         elif count > 1:
             raise BadConfiguration(
                 'A required field has too many options.  Object must contain only one of "%s".  Error is in %s'
-                % (six.text_type(fields), config_description),
+                % (str(fields), config_description),
                 field,
                 "missingRequired",
             )
@@ -4368,7 +4364,7 @@ class Configuration(object):
             value = self.__get_config_or_environment_val(
                 config_object,
                 field,
-                six.text_type,
+                str,
                 env_aware,
                 env_name,
                 deprecated_names=deprecated_names,
@@ -4685,7 +4681,7 @@ class Configuration(object):
                     raise BadConfiguration(
                         "The element at index=%i is not a json object as required in the array "
                         'field "%s (%s, %s)".  Error is in %s'
-                        % (index, field, type(x), six.text_type(x), config_description),
+                        % (index, field, type(x), str(x), config_description),
                         field,
                         "notJsonObject",
                     )
@@ -4753,7 +4749,7 @@ class Configuration(object):
 
             index = 0
             for x in array_of_strings:
-                if not isinstance(x, six.string_types):
+                if not isinstance(x, str):
                     raise BadConfiguration(
                         "The element at index=%i is not a string or unicode object as required in the array "
                         'field "%s".  Error is in %s'
@@ -4953,7 +4949,7 @@ def perform_generic_substitution(value, substitutions):
     result = None
     value_type = type(value)
 
-    if value_type is six.text_type and "$" in value:
+    if value_type is str and "$" in value:
         result = perform_str_substitution(value, substitutions=substitutions)
     elif isinstance(value, JsonObject):
         perform_object_substitution(value, substitutions=substitutions)
@@ -4970,12 +4966,12 @@ def perform_object_substitution(object_value, substitutions):
     """
     # We collect the new values and apply them later to avoid messing up the iteration.
     new_values = {}
-    for key, value in six.iteritems(object_value):
+    for key, value in object_value.items():
         replace_value = perform_generic_substitution(value, substitutions=substitutions)
         if replace_value is not None:
             new_values[key] = replace_value
 
-    for key, value in six.iteritems(new_values):
+    for key, value in new_values.items():
         object_value[key] = value
 
 

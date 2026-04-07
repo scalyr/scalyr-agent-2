@@ -14,8 +14,6 @@
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
 
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 __author__ = "imron@scalyr.com"
 
@@ -31,7 +29,6 @@ import socket
 import stat
 import time
 import threading
-from io import open
 
 # Work around with a striptime race we see every now and then with docker monitor run() method.
 # That race would occur very rarely, since it depends on the order threads are started and when
@@ -42,6 +39,7 @@ from io import open
 import _strptime  # NOQA
 
 import six
+
 from urllib3.exceptions import (  # pylint: disable=import-error
     ProtocolError,
 )
@@ -81,7 +79,7 @@ define_config_option(
     __monitor__,
     "module",
     "Always ``scalyr_agent.builtin_monitors.docker_monitor``",
-    convert_to=six.text_type,
+    convert_to=str,
     required_option=True,
 )
 
@@ -91,7 +89,7 @@ define_config_option(
     "Optional (defaults to None). Defines a regular expression that matches the name given to the "
     "container running the scalyr-agent."
     "If this is None, the scalyr agent will look for a container running /usr/sbin/scalyr-agent-2 as the main process.",
-    convert_to=six.text_type,
+    convert_to=str,
     default=None,
 )
 
@@ -112,7 +110,7 @@ define_config_option(
     "`docker_api_socket` configuration option in the syslog monitor to this same value."
     "Note:  You need to map the host's /run/docker.sock to the same value as specified here, using the -v parameter, e.g."
     "\tdocker run -v /run/docker.sock:/var/scalyr/docker.sock ...",
-    convert_to=six.text_type,
+    convert_to=str,
     default="/var/scalyr/docker.sock",
 )
 
@@ -122,7 +120,7 @@ define_config_option(
     "Optional (defaults to 'auto'). The version of the Docker API to use.  WARNING, if you have "
     "`mode` set to `syslog`, you must also set the `docker_api_version` configuration option in the "
     "syslog monitor to this same value.",
-    convert_to=six.text_type,
+    convert_to=str,
     default="auto",
     env_aware=True,
 )
@@ -131,7 +129,7 @@ define_config_option(
     __monitor__,
     "docker_log_prefix",
     "Optional (defaults to docker). Prefix added to the start of all docker logs.",
-    convert_to=six.text_type,
+    convert_to=str,
     default="docker",
     env_aware=True,
 )
@@ -174,7 +172,7 @@ define_config_option(
     'to push logs to this one using the Docker syslog logging driver.  Currently, "syslog" is the '
     "preferred method due to bugs/issues found with the docker API (To protect legacy behavior, "
     'the default method is "docker_api").',
-    convert_to=six.text_type,
+    convert_to=str,
     default="docker_api",
     env_aware=True,
     env_name="SCALYR_DOCKER_LOG_MODE",
@@ -272,7 +270,7 @@ define_config_option(
     "label_prefix",
     'Optional (defaults to ""). If `labels_as_attributes` is true, then append this prefix to the start of each label before '
     "adding it to the log attributes",
-    convert_to=six.text_type,
+    convert_to=str,
     default="",
     env_aware=True,
 )
@@ -639,7 +637,7 @@ class WrappedStreamResponse(CancellableStream):
         stream = super(DockerClient, self.client)._stream_helper(
             response=self.response, decode=decode
         )
-        super(WrappedStreamResponse, self).__init__(stream=stream, response=response)
+        super().__init__(stream=stream, response=response)
 
 
 class WrappedRawResponse(CancellableStream):
@@ -657,7 +655,7 @@ class WrappedRawResponse(CancellableStream):
         stream = super(DockerClient, self.client)._stream_raw_result(
             response=self.response, chunk_size=self.chunk_size
         )
-        super(WrappedRawResponse, self).__init__(stream=stream, response=response)
+        super().__init__(stream=stream, response=response)
 
 
 class WrappedMultiplexedStreamResponse(CancellableStream):
@@ -674,7 +672,7 @@ class WrappedMultiplexedStreamResponse(CancellableStream):
         stream = super(DockerClient, self.client)._multiplexed_response_stream_helper(
             response=self.response
         )
-        super(WrappedMultiplexedStreamResponse, self).__init__(
+        super().__init__(
             stream=stream, response=response
         )
 
@@ -697,7 +695,7 @@ class DockerClient(docker.APIClient):  # pylint: disable=no-member
 
     def _get_raw_response_socket(self, response):
         if response.raw._fp.fp:
-            return super(DockerClient, self)._get_raw_response_socket(response)
+            return super()._get_raw_response_socket(response)
 
         return None
 
@@ -819,7 +817,7 @@ def _get_containers(
     except Exception as e:  # container querying failed
         logger.exception(
             "Error querying running containers: %s, filters=%s, only_running_containers=%s"
-            % (six.text_type(e), filters, only_running_containers),
+            % (str(e), filters, only_running_containers),
             limit_once_per_x_secs=300,
             limit_key="docker-api-running-containers",
         )
@@ -850,14 +848,14 @@ def get_attributes_and_config_from_labels(labels, docker_options):
 
             included = {}
             # apply include globs
-            for key, value in six.iteritems(labels):
+            for key, value in labels.items():
                 for glob in docker_options.label_include_globs:
                     if fnmatch.fnmatch(key, glob):
                         included[key] = value
                         break
 
             # filter excluded labels
-            for key, value in six.iteritems(included):
+            for key, value in included.items():
                 add_label = True
                 for glob in docker_options.label_exclude_globs:
                     if fnmatch.fnmatch(key, glob):
@@ -1034,7 +1032,7 @@ class ContainerChecker(StoppableThread):
                 logger.stop(wait_on_join, join_timeout)
                 self._logger.log(
                     scalyr_logging.DEBUG_LEVEL_1,
-                    "Stopping %s - %s" % (logger.name, logger.stream),
+                    "Stopping {} - {}".format(logger.name, logger.stream),
                 )
 
         self.__update_checkpoints()
@@ -1076,7 +1074,7 @@ class ContainerChecker(StoppableThread):
                 # get the containers that have started since the last sample
                 starting = {}
 
-                for cid, info in six.iteritems(running_containers):
+                for cid, info in running_containers.items():
                     if cid not in self.containers:
                         self._logger.log(
                             scalyr_logging.DEBUG_LEVEL_1,
@@ -1086,7 +1084,7 @@ class ContainerChecker(StoppableThread):
 
                 # get the containers that have stopped
                 stopping = {}
-                for cid, info in six.iteritems(self.containers):
+                for cid, info in self.containers.items():
                     if cid not in running_containers:
                         self._logger.log(
                             scalyr_logging.DEBUG_LEVEL_1,
@@ -1109,7 +1107,7 @@ class ContainerChecker(StoppableThread):
             except Exception as e:
                 self._logger.warn(
                     "Exception occurred when checking containers %s\n%s"
-                    % (six.text_type(e), traceback.format_exc())
+                    % (str(e), traceback.format_exc())
                 )
 
             run_state.sleep_but_awaken_if_stopped(self.__delay)
@@ -1197,7 +1195,7 @@ class ContainerChecker(StoppableThread):
             checkpoints = {}
 
         if checkpoints:
-            for name, last_request in six.iteritems(checkpoints):
+            for name, last_request in checkpoints.items():
                 self.__checkpoints[name] = last_request
 
     def __stop_loggers(self, stopping):
@@ -1313,19 +1311,19 @@ class ContainerChecker(StoppableThread):
                 dt, _ = _split_datetime_from_line(line)
                 if dt:
                     result = dt
-        except IOError as e:
+        except OSError as e:
             # If file doesn't exist, this simple means that the new container has been started and
             # the log file doesn't exist on disk yet.
             if e.errno == 2:
                 global_log.info(
                     "File %s doesn't exist on disk. This likely means a new container "
                     "has been started and no existing logs are available for it on "
-                    "disk. Original error: %s" % (full_path, six.text_type(e))
+                    "disk. Original error: %s" % (full_path, str(e))
                 )
             else:
-                global_log.info("%s", six.text_type(e))
+                global_log.info("%s", str(e))
         except Exception as e:
-            global_log.info("%s", six.text_type(e))
+            global_log.info("%s", str(e))
         finally:
             if fp:
                 fp.close()
@@ -1388,7 +1386,7 @@ class ContainerChecker(StoppableThread):
 
         prefix = self.__log_prefix + "-"
 
-        for cid, info in six.iteritems(containers):
+        for cid, info in containers.items():
             container_attributes = attributes.copy()
             container_attributes["containerName"] = info["name"]
             container_attributes["containerId"] = cid
@@ -1491,7 +1489,7 @@ class ContainerChecker(StoppableThread):
         return logger
 
 
-class DockerLogger(object):
+class DockerLogger:
     """Abstraction for logging either stdout or stderr from a given container
 
     Logging is performed on a separate thread because each log is read from a continuous stream
@@ -1596,7 +1594,7 @@ class DockerLogger(object):
 
             self.__logger.log(
                 scalyr_logging.DEBUG_LEVEL_3,
-                "Starting to retrieve logs for cid=%s" % six.text_type(self.cid),
+                "Starting to retrieve logs for cid=%s" % str(self.cid),
             )
             self.__client = DockerClient(
                 base_url=("unix:/%s" % self.__socket_file),
@@ -1607,7 +1605,7 @@ class DockerLogger(object):
             while run_state.is_running():
                 self.__logger.log(
                     scalyr_logging.DEBUG_LEVEL_3,
-                    "Attempting to retrieve logs for cid=%s" % six.text_type(self.cid),
+                    "Attempting to retrieve logs for cid=%s" % str(self.cid),
                 )
                 sout = False
                 serr = False
@@ -1629,7 +1627,7 @@ class DockerLogger(object):
                 # self.__logs is a generator so don't call len( self.__logs )
                 self.__logger.log(
                     scalyr_logging.DEBUG_LEVEL_3,
-                    "Found log lines for cid=%s" % (six.text_type(self.cid)),
+                    "Found log lines for cid=%s" % (str(self.cid)),
                 )
                 try:
                     for line in self.__logs:
@@ -1670,13 +1668,13 @@ class DockerLogger(object):
                             self.__logger.log(
                                 scalyr_logging.DEBUG_LEVEL_3,
                                 "Exiting out of container log for cid=%s"
-                                % six.text_type(self.cid),
+                                % str(self.cid),
                             )
                             break
                 except ProtocolError as e:
                     if run_state.is_running():
                         global_log.warning(
-                            "Stream closed due to protocol error: %s" % six.text_type(e)
+                            "Stream closed due to protocol error: %s" % str(e)
                         )
 
                 if run_state.is_running():
@@ -1717,13 +1715,13 @@ class DockerLogger(object):
                 global_log.log(
                     scalyr_logging.DEBUG_LEVEL_1,
                     "Unhandled non-fatal exception in DockerLogger.process_request for %s:\n\t%s.\n\n%s"
-                    % (self.name, six.text_type(e), traceback.format_exc()),
+                    % (self.name, str(e), traceback.format_exc()),
                 )
                 return
 
             global_log.warn(
                 "Unhandled exception in DockerLogger.process_request for %s:\n\t%s.\n\n%s"
-                % (self.name, six.text_type(e), traceback.format_exc())
+                % (self.name, str(e), traceback.format_exc())
             )
 
 
@@ -1989,7 +1987,7 @@ class ContainerIdResolver:
             self.__last_access_time = access_time
 
 
-class DockerOptions(object):
+class DockerOptions:
     """
     A class representing label configuration options from the docker monitor
     """
@@ -2035,11 +2033,11 @@ class DockerOptions(object):
         return (
             "\n\tLabels as Attributes:%s\n\tLabel Prefix: '%s'\n\tLabel Include Globs: %s\n\tLabel Exclude Globs: %s\n\tUse Labels for Log Config: %s"
             % (
-                six.text_type(self.labels_as_attributes),
+                str(self.labels_as_attributes),
                 self.label_prefix,
-                six.text_type(self.label_include_globs),
-                six.text_type(self.label_exclude_globs),
-                six.text_type(self.use_labels_for_log_config),
+                str(self.label_include_globs),
+                str(self.label_exclude_globs),
+                str(self.use_labels_for_log_config),
             )
         )
 
@@ -2069,7 +2067,7 @@ class DockerOptions(object):
             # fall back to the default configuration
             global_log.warning(
                 "Error getting docker config from docker monitor - %s.  Using defaults"
-                % six.text_type(e)
+                % str(e)
             )
             self.label_exclude_globs = label_exclude_globs
             self.label_include_globs = label_include_globs
@@ -2269,14 +2267,14 @@ TODO:  Back fill the instructions here.
         if not scalyr_util.is_list_of_strings(self.label_include_globs):
             raise BadMonitorConfiguration(
                 "label_include_globs contains a non-string value: %s"
-                % six.text_type(self.label_include_globs),
+                % str(self.label_include_globs),
                 "label_include_globs",
             )
 
         if not scalyr_util.is_list_of_strings(self.label_exclude_globs):
             raise BadMonitorConfiguration(
                 "label_exclude_globs contains a non-string value: %s"
-                % six.text_type(self.label_exclude_globs),
+                % str(self.label_exclude_globs),
                 "label_exclude_globs",
             )
 
@@ -2372,14 +2370,14 @@ TODO:  Back fill the instructions here.
     def __build_metric_dict(self, prefix, names):
         result = {}
         for name in names:
-            result["%s%s" % (prefix, name)] = name
+            result["{}{}".format(prefix, name)] = name
         return result
 
     def __log_metrics(self, container, metrics_to_emit, metrics, extra=None):
         if metrics is None:
             return
 
-        for key, value in six.iteritems(metrics_to_emit):
+        for key, value in metrics_to_emit.items():
             if value in metrics:
                 # Note, we do a bit of a hack to pretend the monitor's name include the container's name.  We take this
                 # approach because the Scalyr servers already have some special logic to collect monitor names and ids
@@ -2433,12 +2431,12 @@ TODO:  Back fill the instructions here.
             )
 
     def __log_json_metrics(self, container, metrics):
-        for key, value in six.iteritems(metrics):
+        for key, value in metrics.items():
             if value is None:
                 continue
 
             if key == "networks":
-                for interface, network_metrics in six.iteritems(value):
+                for interface, network_metrics in value.items():
                     self.__log_network_interface_metrics(
                         container, network_metrics, interface
                     )
@@ -2461,14 +2459,14 @@ TODO:  Back fill the instructions here.
         except Exception as e:
             self._logger.warning(
                 "Error readings stats for '%s': %s\n%s"
-                % (container, six.text_type(e), traceback.format_exc()),
+                % (container, str(e), traceback.format_exc()),
                 limit_once_per_x_secs=300,
                 limit_key="api-stats-%s" % container,
             )
 
     def __gather_metrics_from_api(self, containers):
 
-        for cid, info in six.iteritems(containers):
+        for cid, info in containers.items():
             self.__gather_metrics_from_api_for_container(info["name"])
 
     def get_user_agent_fragment(self):
@@ -2484,7 +2482,7 @@ TODO:  Back fill the instructions here.
                 extra = ""
             else:
                 extra = "|raw" if self._config.get("docker_raw_logs") else "|api"
-            return "docker=%s|%s%s" % (ver, log_mode, extra)
+            return "docker={}|{}{}".format(ver, log_mode, extra)
 
         self.__version_lock.acquire()
         try:

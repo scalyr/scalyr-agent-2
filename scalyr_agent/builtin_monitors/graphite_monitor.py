@@ -21,8 +21,6 @@
 #
 # author:  Steven Czerwinski <czerwin@scalyr.com>
 
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
@@ -30,7 +28,7 @@ import six
 
 try:
     # noinspection PyPep8Naming
-    import six.moves.cPickle as pickle
+    import pickle as pickle
 except ImportError:
     import pickle  # type: ignore
 
@@ -57,7 +55,7 @@ define_config_option(
     __monitor__,
     "module",
     "Always `scalyr_agent.builtin_monitors.graphite_monitor`",
-    convert_to=six.text_type,
+    convert_to=str,
     required_option=True,
 )
 define_config_option(
@@ -402,7 +400,7 @@ class GraphiteTextServer(ServerProcessor):
     def report_connection_problem(self, exception):
         self.__logger.exception(
             "Exception seen while processing Graphite connect on text port, "
-            'closing connection: "%s"' % six.text_type(exception)
+            'closing connection: "%s"' % str(exception)
         )
 
 
@@ -484,5 +482,5 @@ class GraphitePickleServer(ServerProcessor):
     def report_connection_problem(self, exception):
         self.__logger.exception(
             'Exception seen while processing Graphite connect on pickle port, closing connection: "%s"'
-            % six.text_type(exception)
+            % str(exception)
         )

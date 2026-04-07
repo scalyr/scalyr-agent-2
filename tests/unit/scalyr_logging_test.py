@@ -57,19 +57,19 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         self.assertLogFileContainsLineRegex(expression="Hello world")
 
     def test_component_name(self):
-        self.assertEquals(self.__logger.component, "core")
-        self.assertEquals(scalyr_logging.getLogger("scalyr_agent").component, "core")
-        self.assertEquals(
+        self.assertEqual(self.__logger.component, "core")
+        self.assertEqual(scalyr_logging.getLogger("scalyr_agent").component, "core")
+        self.assertEqual(
             scalyr_logging.getLogger("scalyr_agent.foo").component, "core"
         )
-        self.assertEquals(
+        self.assertEqual(
             scalyr_logging.getLogger("scalyr_agent.foo.bar").component, "core"
         )
-        self.assertEquals(
+        self.assertEqual(
             scalyr_logging.getLogger("scalyr_agent.builtin_monitors.foo").component,
             "monitor:foo",
         )
-        self.assertEquals(
+        self.assertEqual(
             scalyr_logging.getLogger("scalyr_agent.builtin_monitors.foo(ok)").component,
             "monitor:foo(ok)",
         )
@@ -172,7 +172,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         monitor_logger.openMetricLogForMonitor(metric_file_path, monitor_instance)
         monitor_logger.emit_value("test_name", 5, {"foo": 5})
 
-        self.assertEquals(monitor_instance.reported_lines, 1)
+        self.assertEqual(monitor_instance.reported_lines, 1)
 
         # The value should only appear in the metric log file and not the main one.
         self.assertLogFileContainsLineRegex(
@@ -214,7 +214,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
             timestamp=timestamp_ms1,
         )
 
-        self.assertEquals(monitor_instance.reported_lines, 5)
+        self.assertEqual(monitor_instance.reported_lines, 5)
 
         # The value should only appear in the metric log file and not the main one.
         self.assertLogFileContainsLineRegex(
@@ -262,7 +262,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         monitor_logger.openMetricLogForMonitor(metric_file_path, monitor_instance)
         monitor_logger.emit_value("test_name", 5, extra_fields)
 
-        self.assertEquals(monitor_instance.reported_lines, 1)
+        self.assertEqual(monitor_instance.reported_lines, 1)
 
         # The value should only appear in the metric log file and not the main one.
         self.assertLogFileContainsLineRegex(
@@ -289,7 +289,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         monitor_logger.openMetricLogForMonitor(metric_file_path, monitor_instance)
         monitor_logger.emit_value("test_name", 5, {"g": 9, "c": 5, "a": 7, "b": 8})
 
-        self.assertEquals(monitor_instance.reported_lines, 1)
+        self.assertEqual(monitor_instance.reported_lines, 1)
 
         # The value should only appear in the metric log file and not the main one.
         self.assertLogFileContainsLineRegex(
@@ -322,7 +322,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         monitor_logger.emit_value("name3", 7, {"foo": 7})
         monitor_logger.emit_value("name4", 8, {"foo": 8})
 
-        self.assertEquals(monitor_instance.reported_lines, 2)
+        self.assertEqual(monitor_instance.reported_lines, 2)
 
         # The value should only appear in the metric log file and not the main one.
         self.assertLogFileContainsLineRegex(
@@ -445,7 +445,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         monitor_logger.openMetricLogForMonitor(metric_file_path, monitor_instance)
         monitor_logger.info("foobaz is fine", emit_to_metric_log=True)
 
-        self.assertEquals(monitor_instance.reported_lines, 1)
+        self.assertEqual(monitor_instance.reported_lines, 1)
 
         # The value should only appear in the metric log file and not the main one.
         expression = "foobaz is fine"
@@ -502,7 +502,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         monitor_logger.openMetricLogForMonitor(metric_file_path, monitor_instance)
         monitor_logger.error("Foo")
 
-        self.assertEquals(monitor_instance.errors, 1)
+        self.assertEqual(monitor_instance.errors, 1)
 
         monitor_logger.closeMetricLog()
 
@@ -838,7 +838,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
 
         # NOTE: Actual reported metrics should be * 3 since we emit two metrics and for each metric
         # expect the first one, rate is calculated and emited
-        self.assertEquals(
+        self.assertEqual(
             monitor_instance.reported_lines,
             (RateMetricFunction.MAX_RATE_METRICS_COUNT_WARN * 3) + 2,
         )
@@ -876,7 +876,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
             "test_name_2", "nan3", extra_fields, timestamp=30 * 1000
         )
 
-        self.assertEquals(monitor_instance.reported_lines, 3)
+        self.assertEqual(monitor_instance.reported_lines, 3)
         self.assertLogFileContainsLineRegex(
             file_path=metric_file_path, expression='test_name_2 "nan1" foo1="bar1"'
         )
@@ -925,7 +925,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
             timestamp=(RateMetricFunction.MAX_RATE_TIMESTAMP_DELTA_SECONDS + 60) * 1000,
         )
 
-        self.assertEquals(monitor_instance.reported_lines, 4)
+        self.assertEqual(monitor_instance.reported_lines, 4)
 
     @skipIf(sys.version_info < (2, 8, 0), "Skipping tests under Python <= 2.7")
     def test_emit_value_metric_rate_calculation_new_metric_smaller_than_previous(self):
@@ -950,7 +950,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         # Current metric value is < previous metric value (100)
         monitor_logger.emit_value("test_name_2", 99, extra_fields, timestamp=20 * 1000)
 
-        self.assertEquals(monitor_instance.reported_lines, 2)
+        self.assertEqual(monitor_instance.reported_lines, 2)
         self.assertLogFileDoesntContainsLineRegex(
             file_path=metric_file_path, expression="test_name_1_rate"
         )
@@ -978,7 +978,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         monitor_logger.emit_value("test_name_1", 20, extra_fields)
         monitor_logger.emit_value("test_name_1", 30, extra_fields)
 
-        self.assertEquals(monitor_instance.reported_lines, 3)
+        self.assertEqual(monitor_instance.reported_lines, 3)
 
         self.assertLogFileDoesntContainsLineRegex(
             file_path=metric_file_path, expression="test_name_1_rate"
@@ -1048,7 +1048,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         self.assertLogFileContainsLineRegex(
             file_path=metric_file_path, expression='test_name_2_rate 1.0 foo2="bar2"'
         )
-        self.assertEquals(monitor_instance.reported_lines, 4 + 3)
+        self.assertEqual(monitor_instance.reported_lines, 4 + 3)
 
     @skipIf(sys.version_info < (2, 8, 0), "Skipping tests under Python <= 2.7")
     def test_emit_value_metric_rate_calculation_metric_with_unique_extra_fields_success(
@@ -1188,7 +1188,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
             expression='test_name_2_rate 0.08333 foo2="bar2" mode="kernel"',
         )
 
-        self.assertEquals(monitor_instance.reported_lines, 4 + 4 + 4 + 3 + 3)
+        self.assertEqual(monitor_instance.reported_lines, 4 + 4 + 4 + 3 + 3)
 
     @skipIf(sys.version_info < (2, 8, 0), "Skipping tests under Python <= 2.7")
     def test_emit_value_metric_rate_calculation_metric_with_unique_extra_fields_with_timestamp_success(
@@ -1350,7 +1350,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
             expression='test_name_2_rate 0.08333 foo2="bar2" mode="kernel" timestamp=190',
         )
 
-        self.assertEquals(monitor_instance.reported_lines, 4 + 4 + 4 + 3 + 3)
+        self.assertEqual(monitor_instance.reported_lines, 4 + 4 + 4 + 3 + 3)
 
     @skipIf(sys.version_info < (2, 8, 0), "Skipping tests under Python <= 2.7")
     def test_emit_value_metric_rate_calculation_no_collision_two_monitors_same_metric_name(
@@ -1409,7 +1409,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
             "test_name_2", 30, extra_fields, timestamp=ts2 * 1000
         )
 
-        self.assertEquals(monitor_instance_1.reported_lines, 2 + 1)
+        self.assertEqual(monitor_instance_1.reported_lines, 2 + 1)
 
         self.assertLogFileContainsLineRegex(
             file_path=metric_file_path_1,
@@ -1433,7 +1433,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
             "test_name_2", 81, extra_fields, timestamp=ts2 * 1000
         )
 
-        self.assertEquals(monitor_instance_2.reported_lines, 2 + 1)
+        self.assertEqual(monitor_instance_2.reported_lines, 2 + 1)
 
         self.assertLogFileContainsLineRegex(
             file_path=metric_file_path_2,

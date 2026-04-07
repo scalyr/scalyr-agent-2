@@ -344,7 +344,7 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
     def __extract_lines(self, request):
         return self._extract_lines(request)
 
-    def assertEquals(self, expected, actual):
+    def assertEqual(self, expected, actual):
         assert expected == actual
 
     def assertTrue(self, expr):
@@ -417,9 +417,9 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         (request, responder_callback) = manager.wait_for_rpc()
 
         lines = self.__extract_lines(request)
-        self.assertEquals(2, len(lines))
-        self.assertEquals("First line", lines[0])
-        self.assertEquals("Second line", lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual("First line", lines[0])
+        self.assertEqual("Second line", lines[1])
 
         responder_callback("success")
 
@@ -429,9 +429,9 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         (request, responder_callback) = controller.wait_for_rpc()
 
         lines = self.__extract_lines(request)
-        self.assertEquals(2, len(lines))
-        self.assertEquals("First line", lines[0])
-        self.assertEquals("Second line", lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual("First line", lines[0])
+        self.assertEqual("Second line", lines[1])
 
         responder_callback("success")
 
@@ -439,8 +439,8 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         (request, responder_callback) = controller.wait_for_rpc()
 
         lines = self.__extract_lines(request)
-        self.assertEquals(1, len(lines))
-        self.assertEquals("Third line", lines[0])
+        self.assertEqual(1, len(lines))
+        self.assertEqual("Third line", lines[0])
 
     def test_normal_error(self):
         controller = self.__create_test_instance()
@@ -448,9 +448,9 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         (request, responder_callback) = controller.wait_for_rpc()
 
         lines = self.__extract_lines(request)
-        self.assertEquals(2, len(lines))
-        self.assertEquals("First line", lines[0])
-        self.assertEquals("Second line", lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual("First line", lines[0])
+        self.assertEqual("Second line", lines[1])
 
         responder_callback("error")
 
@@ -458,9 +458,9 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         (request, responder_callback) = controller.wait_for_rpc()
 
         lines = self.__extract_lines(request)
-        self.assertEquals(2, len(lines))
-        self.assertEquals("First line", lines[0])
-        self.assertEquals("Second line", lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual("First line", lines[0])
+        self.assertEqual("Second line", lines[1])
 
     def test_drop_request_due_to_error(self):
         controller = self.__create_test_instance()
@@ -468,9 +468,9 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         (request, responder_callback) = controller.wait_for_rpc()
 
         lines = self.__extract_lines(request)
-        self.assertEquals(2, len(lines))
-        self.assertEquals("First line", lines[0])
-        self.assertEquals("Second line", lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual("First line", lines[0])
+        self.assertEqual("Second line", lines[1])
 
         responder_callback("discardBuffer")
 
@@ -478,8 +478,8 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         (request, responder_callback) = controller.wait_for_rpc()
 
         lines = self.__extract_lines(request)
-        self.assertEquals(1, len(lines))
-        self.assertEquals("Third line", lines[0])
+        self.assertEqual(1, len(lines))
+        self.assertEqual("Third line", lines[0])
 
     def test_retry_request_due_to_parse_failure(self):
         controller = self.__create_test_instance()
@@ -487,18 +487,18 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         (request, responder_callback) = controller.wait_for_rpc()
 
         lines = self.__extract_lines(request)
-        self.assertEquals(2, len(lines))
-        self.assertEquals("First line", lines[0])
-        self.assertEquals("Second line", lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual("First line", lines[0])
+        self.assertEqual("Second line", lines[1])
 
         responder_callback("parseResponseFailed")
 
         (request, responder_callback) = controller.wait_for_rpc()
 
         lines = self.__extract_lines(request)
-        self.assertEquals(2, len(lines))
-        self.assertEquals("First line", lines[0])
-        self.assertEquals("Second line", lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual("First line", lines[0])
+        self.assertEqual("Second line", lines[1])
 
     def test_request_too_large_error(self):
         controller = self.__create_test_instance()
@@ -506,9 +506,9 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         (request, responder_callback) = controller.wait_for_rpc()
 
         lines = self.__extract_lines(request)
-        self.assertEquals(2, len(lines))
-        self.assertEquals("First line", lines[0])
-        self.assertEquals("Second line", lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual("First line", lines[0])
+        self.assertEqual("Second line", lines[1])
 
         responder_callback("requestTooLarge")
 
@@ -516,10 +516,10 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         (request, responder_callback) = controller.wait_for_rpc()
 
         lines = self.__extract_lines(request)
-        self.assertEquals(3, len(lines))
-        self.assertEquals("First line", lines[0])
-        self.assertEquals("Second line", lines[1])
-        self.assertEquals("Third line", lines[2])
+        self.assertEqual(3, len(lines))
+        self.assertEqual("First line", lines[0])
+        self.assertEqual("Second line", lines[1])
+        self.assertEqual("Third line", lines[2])
 
     def test_pipelined_requests(self):
         if self.worker_sessions_count * self.workers_count > 1:
@@ -537,9 +537,9 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
 
         lines = self.__extract_lines(request)
 
-        self.assertEquals(2, len(lines))
-        self.assertEquals("First line", lines[0])
-        self.assertEquals("Second line", lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual("First line", lines[0])
+        self.assertEqual("Second line", lines[1])
 
         responder_callback("success")
 
@@ -548,8 +548,8 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         self.assertTrue(self.__was_pipelined(request))
 
         lines = self.__extract_lines(request)
-        self.assertEquals(1, len(lines))
-        self.assertEquals("Third line", lines[0])
+        self.assertEqual(1, len(lines))
+        self.assertEqual("Third line", lines[0])
 
         responder_callback("success")
 
@@ -568,9 +568,9 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
 
         lines = self.__extract_lines(request)
 
-        self.assertEquals(2, len(lines))
-        self.assertEquals("First line", lines[0])
-        self.assertEquals("Second line", lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual("First line", lines[0])
+        self.assertEqual("Second line", lines[1])
 
         responder_callback("error")
 
@@ -579,9 +579,9 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
 
         lines = self.__extract_lines(request)
 
-        self.assertEquals(2, len(lines))
-        self.assertEquals("First line", lines[0])
-        self.assertEquals("Second line", lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual("First line", lines[0])
+        self.assertEqual("Second line", lines[1])
 
         responder_callback("success")
 
@@ -590,8 +590,8 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         self.assertTrue(self.__was_pipelined(request))
 
         lines = self.__extract_lines(request)
-        self.assertEquals(1, len(lines))
-        self.assertEquals("Third line", lines[0])
+        self.assertEqual(1, len(lines))
+        self.assertEqual("Third line", lines[0])
 
         responder_callback("success")
 
@@ -610,9 +610,9 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
 
         lines = self.__extract_lines(request)
 
-        self.assertEquals(2, len(lines))
-        self.assertEquals("First line", lines[0])
-        self.assertEquals("Second line", lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual("First line", lines[0])
+        self.assertEqual("Second line", lines[1])
 
         responder_callback("requestTooLarge")
 
@@ -621,10 +621,10 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
 
         lines = self.__extract_lines(request)
 
-        self.assertEquals(3, len(lines))
-        self.assertEquals("First line", lines[0])
-        self.assertEquals("Second line", lines[1])
-        self.assertEquals("Third line", lines[2])
+        self.assertEqual(3, len(lines))
+        self.assertEqual("First line", lines[0])
+        self.assertEqual("Second line", lines[1])
+        self.assertEqual("Third line", lines[2])
 
         responder_callback("success")
 
@@ -636,9 +636,9 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         (request, responder_callback) = controller.wait_for_rpc()
         lines = self.__extract_lines(request)
 
-        self.assertEquals(2, len(lines))
-        self.assertEquals("First line", lines[0])
-        self.assertEquals("Second line", lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual("First line", lines[0])
+        self.assertEqual("Second line", lines[1])
 
         # stop thread on manager to write checkouts to file.
         controller.stop_manager()
@@ -658,9 +658,9 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         lines = self.__extract_lines(request)
 
         # thread should continue from saved checkpoint
-        self.assertEquals(2, len(lines))
-        self.assertEquals("Third line", lines[0])
-        self.assertEquals("Fourth line", lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual("Third line", lines[0])
+        self.assertEqual("Fourth line", lines[1])
 
         # stopping one more time, but now emulating that checkpoint files are stale.
         controller.stop_manager()
@@ -694,7 +694,7 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         # and has skipped "fifth" and "sixth" lines.
         (request, responder_callback) = controller.wait_for_rpc()
         lines = self.__extract_lines(request)
-        self.assertEquals(0, len(lines))
+        self.assertEqual(0, len(lines))
 
     def test_start_from_active_checkpoint(self):
         controller = self.__create_test_instance()
@@ -704,9 +704,9 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         (request, responder_callback) = controller.wait_for_rpc()
         lines = self.__extract_lines(request)
 
-        self.assertEquals(2, len(lines))
-        self.assertEquals("First line", lines[0])
-        self.assertEquals("Second line", lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual("First line", lines[0])
+        self.assertEqual("Second line", lines[1])
 
         controller.stop_manager()
 
@@ -737,9 +737,9 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
 
         (request, responder_callback) = controller.wait_for_rpc()
         lines = self.__extract_lines(request)
-        self.assertEquals(2, len(lines))
-        self.assertEquals("Third line", lines[0])
-        self.assertEquals("Fourth line", lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual("Third line", lines[0])
+        self.assertEqual("Fourth line", lines[1])
 
     def test_start_without_active_checkpoint(self):
         controller = self.__create_test_instance()
@@ -749,9 +749,9 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         (request, responder_callback) = controller.wait_for_rpc()
         lines = self.__extract_lines(request)
 
-        self.assertEquals(2, len(lines))
-        self.assertEquals("First line", lines[0])
-        self.assertEquals("Second line", lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual("First line", lines[0])
+        self.assertEqual("Second line", lines[1])
 
         controller.stop_manager()
 
@@ -773,9 +773,9 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         self._manager.start_manager()
         (request, responder_callback) = controller.wait_for_rpc()
         lines = self.__extract_lines(request)
-        self.assertEquals(2, len(lines))
-        self.assertEquals("Third line", lines[0])
-        self.assertEquals("Fourth line", lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual("Third line", lines[0])
+        self.assertEqual("Fourth line", lines[1])
 
     def test_start_with_bad_checkpoint(self):
         # Check totally mangled checkpoint file in the form of invalid JSON, should be treated as not having one at all
@@ -787,9 +787,9 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         (request, responder_callback) = controller.wait_for_rpc()
         lines = self.__extract_lines(request)
 
-        self.assertEquals(2, len(lines))
-        self.assertEquals("First line", lines[0])
-        self.assertEquals("Second line", lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual("First line", lines[0])
+        self.assertEqual("Second line", lines[1])
         controller.stop_manager()
 
         self.__append_log_lines("Third line", "Fourth line")
@@ -805,7 +805,7 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
 
         # In the case of a bad checkpoint file, the agent should just pretend the checkpoint file does not exist and
         # start reading the logfiles from the end. In this case, that means lines three and four will be skipped.
-        self.assertEquals(0, len(lines))
+        self.assertEqual(0, len(lines))
 
     def test_start_with_non_utf8_checkpoint(self):
         # Check checkpoint file with invalid UTF-8 in it, should be treated the same as not having one at all
@@ -816,9 +816,9 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         (request, responder_callback) = controller.wait_for_rpc()
         lines = self.__extract_lines(request)
 
-        self.assertEquals(2, len(lines))
-        self.assertEquals("First line", lines[0])
-        self.assertEquals("Second line", lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual("First line", lines[0])
+        self.assertEqual("Second line", lines[1])
         controller.stop_manager()
 
         self.__append_log_lines("Third line", "Fourth line")
@@ -834,7 +834,7 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
 
         # In the case of a bad checkpoint file, the agent should just pretend the checkpoint file does not exist and
         # start reading the logfiles from the end. In this case, that means lines three and four will be skipped.
-        self.assertEquals(0, len(lines))
+        self.assertEqual(0, len(lines))
 
     def test_generate_status(self):
         controller = self.__create_test_instance()
@@ -843,13 +843,13 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
         (request, responder_callback) = controller.wait_for_rpc()
         lines = self.__extract_lines(request)
 
-        self.assertEquals(2, len(lines))
-        self.assertEquals("First line", lines[0])
-        self.assertEquals("Second line", lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual("First line", lines[0])
+        self.assertEqual("Second line", lines[1])
 
         status = self._manager.generate_status()
 
-        self.assertEquals(
+        self.assertEqual(
             self._env_builder.MAX_NON_GLOB_TEST_LOGS + 1, len(status.log_matchers)
         )
 
@@ -880,7 +880,7 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
 
         lines = self.__extract_lines(request)
 
-        self.assertEquals(["5", "6", "7", "8", "9"], lines)
+        self.assertEqual(["5", "6", "7", "8", "9"], lines)
 
     def test_whole_response_is_logged_on_non_success(self):
         statuses = ["discardBuffer", "requestTooLarge", "parseResponseFailed"]
@@ -908,9 +908,9 @@ class TestCopyingManagerEnd2End(CopyingManagerTest):
                 (request, responder_callback) = controller.wait_for_rpc()
 
                 lines = self.__extract_lines(request)
-                self.assertEquals(2, len(lines))
-                self.assertEquals("First line", lines[0])
-                self.assertEquals("Second line", lines[1])
+                self.assertEqual(2, len(lines))
+                self.assertEqual("First line", lines[0])
+                self.assertEqual("Second line", lines[1])
 
                 responder_callback(status)
 

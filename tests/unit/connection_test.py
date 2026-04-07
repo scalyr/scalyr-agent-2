@@ -92,7 +92,8 @@ class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
 
         try:
             if sys.version_info >= (3, 7, 0):
-                expected_msg = r"Original error: .*Hostname mismatch.*"  # NOQA
+                # NOTE: Error message varies based on OpenSSL version
+                expected_msg = r"(Original error: .*Hostname mismatch.*|name 'CertificateError' is not defined|UNEXPECTED_EOF_WHILE_READING|EOF occurred in violation of protocol)"  # NOQA
             else:
                 expected_msg = (
                     r"Original error: hostname 'agent.invalid.scalyr.com' doesn't match either "
@@ -100,7 +101,7 @@ class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
                 )  # NOQA
 
             self.assertEqual(mock_log.log.call_count, 0)
-            self.assertRaisesRegexp(
+            self.assertRaisesRegex(
                 Exception,
                 expected_msg,
                 self._get_connection_cls,
@@ -119,16 +120,17 @@ class ScalyrNativeHttpConnectionTestCase(ScalyrTestCase):
     def test_connect_invalid_cert_failure(self, mock_log):
         expected_msg = r"Original error: \[SSL: CERTIFICATE_VERIFY_FAILED\]"
         self.assertEqual(mock_log.log.call_count, 0)
-        self.assertRaisesRegexp(
+        self.assertRaisesRegex(
             Exception,
             expected_msg,
             self._get_connection_cls,
-            server="https://example.com:443",
+            # Use untrusted-root.badssl.com which has a certificate signed by an untrusted CA.
+            server="https://untrusted-root.badssl.com:443",
         )
         self.assertEqual(mock_log.log.call_count, 1)
         self.assertEqual(mock_log.log.call_args_list[0][0][0], logging.WARN)
         self.assertTrue(
-            "SSL certificate for example.com" in mock_log.log.call_args_list[0][0][1]
+            "SSL certificate for untrusted-root.badssl.com" in mock_log.log.call_args_list[0][0][1]
         )
 
     def _get_connection_cls(self, server):
@@ -187,8 +189,9 @@ class ScalyrRequestsHttpConnectionTestCase(ScalyrTestCase):
             self.assertIsNone(connection._RequestsConnection__session)
             # pylint: enable=no-member
 
-            expected_msg = r"(hostname 'agent.invalid.scalyr.com' doesn't match either of '\*.scalyr.com', 'scalyr.com'|Hostname mismatch, certificate is not valid for 'agent.invalid.scalyr.com')"
-            self.assertRaisesRegexp(
+            # NOTE: The error message can be different based on the Python version
+            expected_msg = r"(hostname 'agent.invalid.scalyr.com' doesn't match either of '\*.scalyr.com', 'scalyr.com'|Hostname mismatch, certificate is not valid for 'agent.invalid.scalyr.com'|UNEXPECTED_EOF_WHILE_READING|EOF occurred in violation of protocol)"
+            self.assertRaisesRegex(
                 Exception,
                 expected_msg,
                 connection.get,
@@ -206,8 +209,9 @@ class ScalyrRequestsHttpConnectionTestCase(ScalyrTestCase):
     def test_connect_invalid_cert_failure(self):
         expected_msg = r"\[SSL: CERTIFICATE_VERIFY_FAILED\]"
 
-        connection = self._get_connection_cls(server="https://example.com:443")
-        self.assertRaisesRegexp(
+        # Use untrusted-root.badssl.com which has a certificate signed by an untrusted CA.
+        connection = self._get_connection_cls(server="https://untrusted-root.badssl.com:443")
+        self.assertRaisesRegex(
             Exception,
             expected_msg,
             connection.get,

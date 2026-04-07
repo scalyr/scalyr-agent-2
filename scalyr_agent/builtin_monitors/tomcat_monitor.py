@@ -17,9 +17,6 @@
 #
 # Note, this can be run in standalone mode by:
 #     python -m scalyr_agent.run_monitor scalyr_agent.builtin_monitors.tomcat_monitor
-from __future__ import unicode_literals
-from __future__ import absolute_import
-from __future__ import print_function
 
 import socket
 import base64
@@ -56,13 +53,13 @@ define_config_option(
     "Allows you to distinguish between values recorded by different monitors. This is especially "
     "useful if you are running multiple PostgreSQL instances on a single server; you can monitor each "
     "instance with a separate tomcatql_monitor record in the Scalyr Agent configuration.",
-    convert_to=six.text_type,
+    convert_to=str,
 )
 define_config_option(
     __monitor__,
     "monitor_url",
     "Name of host machine the agent will connect to PostgreSQL to retrieve monitoring data.",
-    convert_to=six.text_type,
+    convert_to=str,
     required_option=True,
     allow_http=False,
 )
@@ -70,13 +67,13 @@ define_config_option(
     __monitor__,
     "monitor_user",
     "The username required to access the monitor URL.",
-    convert_to=six.text_type,
+    convert_to=str,
 )
 define_config_option(
     __monitor__,
     "monitor_password",
     "The pasword associated with the monitor_user required to access the monitor URL.",
-    convert_to=six.text_type,
+    convert_to=str,
 )
 define_config_option(
     __monitor__,
@@ -261,10 +258,7 @@ class BindableHTTPConnection(six.moves.http_client.HTTPConnection):
 def BindableHTTPConnectionFactory(source_ip):
     def _get(host, port=None, strict=None, timeout=0):
         # pylint: disable=unexpected-keyword-arg
-        if six.PY2:
-            kwargs = {"strict": strict}
-        else:
-            kwargs = {}
+        kwargs = {}
         bhc = BindableHTTPConnection(host, port=port, timeout=timeout, **kwargs)
         bhc.source_ip = source_ip
         return bhc
@@ -439,7 +433,7 @@ instance."""
             request = six.moves.urllib.request.Request(self._monitor_url)
             if self._monitor_user is not None:
                 b64cred = base64.encodestring(
-                    "%s:%s" % (self._monitor_user, self._monitor_password)
+                    "{}:{}".format(self._monitor_user, self._monitor_password)
                 ).replace("\n", "")
                 request.add_header("Authorization", "Basic %s" % b64cred)
             opener = six.moves.urllib.request.build_opener(BindableHTTPHandler)

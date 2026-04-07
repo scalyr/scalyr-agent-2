@@ -165,7 +165,6 @@ monitor instance will only discover metrics endpoints which are local to the nod
 running on.
 """
 
-from __future__ import absolute_import
 
 from typing import Dict
 from typing import List
@@ -232,7 +231,7 @@ define_config_option(
     __monitor__,
     "module",
     "Always ``scalyr_agent.builtin_monitors.kubernetes_openmetrics_monitor``",
-    convert_to=six.text_type,
+    convert_to=str,
     required_option=True,
 )
 
@@ -241,7 +240,7 @@ define_config_option(
     __monitor__,
     "k8s_kubelet_host_ip",
     "Optional (defaults to None). Defines the host IP address for the Kubelet API. If None, the Kubernetes API will be queried for it",
-    convert_to=six.text_type,
+    convert_to=str,
     default=None,
     env_aware=True,
 )
@@ -251,7 +250,7 @@ define_config_option(
     "k8s_kubelet_api_url_template",
     "Optional (defaults to https://${host_ip}:10250). Defines the port and protocol to use when talking to the kubelet API. "
     "Allowed template variables are `node_name` and `host_ip`.",
-    convert_to=six.text_type,
+    convert_to=str,
     default="https://${host_ip}:10250",
     env_aware=True,
     allow_http=False,
@@ -458,7 +457,7 @@ TEMPLATE_RE = re.compile(r"\${[^}]+}")
 
 
 @dataclass
-class K8sPod(object):
+class K8sPod:
     uid: str
     name: str
     namespace: str
@@ -469,7 +468,7 @@ class K8sPod(object):
 
 
 @dataclass
-class OpenMetricsMonitorConfig(object):
+class OpenMetricsMonitorConfig:
     scrape_url: str
     scrape_interval: int
     scrape_timeout: int
@@ -514,7 +513,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         module_name = self._config.get("module")
         if self.__logger_include_node_name:
             self._logger = scalyr_logging.getLogger(
-                "%s(%s)" % (module_name, self.__get_node_name())
+                "{}({})".format(module_name, self.__get_node_name())
             )
 
         self.__scrape_interval = self._config.get(
@@ -587,7 +586,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
             )
             return None
 
-        return super(KubernetesOpenMetricsMonitor, self).run()
+        return super().run()
 
     @property
     def k8s(self):
@@ -1183,8 +1182,8 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         """
         Method which validates that all the key and values in teh dictionary are of a string type.
         """
-        return all(isinstance(key, six.text_type) for key in data.keys()) and all(
-            isinstance(value, six.text_type) for value in data.values()
+        return all(isinstance(key, str) for key in data.keys()) and all(
+            isinstance(value, str) for value in data.values()
         )
 
     def __get_attributes_template_context(self, pod: K8sPod) -> Dict[str, str]:
@@ -1392,7 +1391,7 @@ class KubernetesOpenMetricsMonitor(ScalyrMonitor):
         # configuration a bit nicer since the user doesn't need to specify the monitor name itself
         # there
         calculate_rate_metric_names = [
-            "%s:%s" % ("openmetrics_monitor", metric_name)
+            "{}:{}".format("openmetrics_monitor", metric_name)
             for metric_name in calculate_rate_metric_names
         ]
 

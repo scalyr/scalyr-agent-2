@@ -18,8 +18,6 @@
 Module which contains classes and abstractions for CPU and memory profiling.
 """
 
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 __author__ = "imron@scalyr.com"
 
@@ -33,11 +31,11 @@ import os
 import random
 import time
 import traceback
-from io import open
 from abc import ABCMeta
 from abc import abstractmethod
 
 import six
+
 
 
 try:
@@ -89,7 +87,7 @@ else:
     DEFAULT_TRACES_FILTERS = []
 
 
-class ScalyrProfiler(object):
+class ScalyrProfiler:
     """
     Profiler class for CPU and memory profiling.
     """
@@ -109,7 +107,7 @@ class ScalyrProfiler(object):
         self.__memory_profiler.update(config=config, current_time=current_time)
 
 
-class BaseProfiler(six.with_metaclass(ABCMeta)):
+class BaseProfiler(metaclass=ABCMeta):
     """
     Base class to be inherited by various profilers.
     """
@@ -168,7 +166,7 @@ class BaseProfiler(six.with_metaclass(ABCMeta)):
             global_log.log(
                 scalyr_logging.DEBUG_LEVEL_0,
                 "Failed to update profiler: %s, %s"
-                % (six.text_type(e), traceback.format_exc()),
+                % (str(e), traceback.format_exc()),
                 limit_once_per_x_secs=300,
                 limit_key="profiler-update",
             )
@@ -217,7 +215,7 @@ class CPUProfiler(BaseProfiler):
     """
 
     def __init__(self, config):
-        super(CPUProfiler, self).__init__(config=config)
+        super().__init__(config=config)
 
         enable_profiling = self.is_profiling_enabled(config=config)
 
@@ -341,7 +339,7 @@ class PymplerPeriodicMemorySummaryCaptureThread(StoppableThread):
         :param capture_interval: How often to capture memory usage snapshot.
         :type capture_interval: ``int``
         """
-        super(PymplerPeriodicMemorySummaryCaptureThread, self).__init__(
+        super().__init__(
             name="PymplerPeriodicMemorySummaryCaptureThread"
         )
 
@@ -433,7 +431,7 @@ class TracemallocPeriodicMemorySummaryCaptureThread(StoppableThread):
         :param capture_interval: How often to capture memory usage snapshot.
         :type capture_interval: ``int``
         """
-        super(TracemallocPeriodicMemorySummaryCaptureThread, self).__init__(
+        super().__init__(
             name="TracemallocPeriodicMemorySummaryCaptureThread"
         )
 
@@ -476,7 +474,7 @@ class TracemallocPeriodicMemorySummaryCaptureThread(StoppableThread):
 
     def stop(self):
         tracemalloc.stop()
-        super(TracemallocPeriodicMemorySummaryCaptureThread, self).stop()
+        super().stop()
 
     def get_profiling_data(self):
         # type: () -> List[Dict[str, Any]]
@@ -591,7 +589,7 @@ class MemoryProfiler(BaseProfiler):
     """
 
     def __init__(self, config):
-        super(MemoryProfiler, self).__init__(config=config)
+        super().__init__(config=config)
 
         enable_profiling = self.is_profiling_enabled(config=config)
 
@@ -701,7 +699,7 @@ class MemoryProfiler(BaseProfiler):
                 else:
                     raise ValueError("Invalid type: %s" % (item["type"]))
 
-                line = "timestamp: %s, total lines: %s %s\n%s\n\n" % (
+                line = "timestamp: {}, total lines: {} {}\n{}\n\n".format(
                     item["timestamp"],
                     len(item["data"]),
                     type_string,

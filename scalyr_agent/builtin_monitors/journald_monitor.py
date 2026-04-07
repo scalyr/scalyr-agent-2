@@ -14,8 +14,6 @@
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
 
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 __author__ = "imron@scalyr.com"
 
@@ -54,7 +52,7 @@ define_config_option(
     __monitor__,
     "journal_path",
     "Optional (defaults to `/var/log/journal`). Location of the journald logs in the filesystem.",
-    convert_to=six.text_type,
+    convert_to=str,
     default="/var/log/journal",
 )
 
@@ -90,7 +88,7 @@ define_config_option(
     "Useful if you are running multiple instances of this plugin, "
     "and you want to save unique checkpoints for each monitor. You can add "
     "a separate `{...}` stanza for each instance the configuration file (`/etc/scalyr-agent-2/agent.json`).",
-    convert_to=six.text_type,
+    convert_to=str,
     default="",
 )
 
@@ -189,7 +187,7 @@ def load_checkpoints(filename):
     return result
 
 
-class Checkpoint(object):
+class Checkpoint:
     """
     This class atomically gets and sets a series of checkpoints, where
     a checkpoint is a key=value pair, and handles writing the checkpoints
@@ -496,7 +494,7 @@ The contents of the `journald_logs` JSON array will be computed by appending all
 
         self._extra_fields = self._config.get("journal_fields")
         if self._extra_fields is not None:
-            for field_name in self._extra_fields:
+            for field_name in self._extra_fields.keys():
                 fixed_field_name = (
                     scalyr_logging.AgentLogger.force_valid_metric_or_field_name(
                         field_name, is_metric=False
@@ -598,7 +596,7 @@ The contents of the `journald_logs` JSON array will be computed by appending all
                 except Exception as e:
                     global_log.warn(
                         "Error loading checkpoint: %s. Skipping to end."
-                        % six.text_type(e)
+                        % str(e)
                     )
 
             if skip_to_end:
@@ -615,7 +613,7 @@ The contents of the `journald_logs` JSON array will be computed by appending all
         except Exception as e:
             global_log.warn(
                 "Failed to reset journal %s\n%s"
-                % (six.text_type(e), traceback.format_exc())
+                % (str(e), traceback.format_exc())
             )
 
     def _get_extra_fields(self, entry):
@@ -625,9 +623,9 @@ The contents of the `journald_logs` JSON array will be computed by appending all
         """
         result = {}
 
-        for key, value in six.iteritems(self._extra_fields):
+        for key, value in self._extra_fields.items():
             if key in entry:
-                result[value] = six.text_type(entry[key])
+                result[value] = str(entry[key])
 
         if self._id and "monitor_id" not in result:
             result["monitor_id"] = self._id
@@ -654,7 +652,7 @@ The contents of the `journald_logs` JSON array will be computed by appending all
         except Exception as e:
             # early return if there was an error
             global_log.warn(
-                "Error processing journal entries: %s" % six.text_type(e),
+                "Error processing journal entries: %s" % str(e),
                 limit_once_per_x_secs=60,
                 limit_key="journald-process-error",
             )
@@ -687,7 +685,7 @@ The contents of the `journald_logs` JSON array will be computed by appending all
                 self._last_cursor = entry.get("__CURSOR", None)
             except Exception as e:
                 global_log.warn(
-                    "Error getting journal entries: %s" % six.text_type(e),
+                    "Error getting journal entries: %s" % str(e),
                     limit_once_per_x_secs=60,
                     limit_key="journald-entry-error",
                 )
@@ -750,7 +748,7 @@ The contents of the `journald_logs` JSON array will be computed by appending all
 
         if self._last_cursor is not None:
             self._checkpoint.update_checkpoint(
-                self._checkpoint_name, six.text_type(self._last_cursor)
+                self._checkpoint_name, str(self._last_cursor)
             )
 
     def stop(self, wait_on_join=True, join_timeout=5):

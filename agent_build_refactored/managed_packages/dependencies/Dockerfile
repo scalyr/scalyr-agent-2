@@ -1,16 +1,16 @@
 ARG ARCH
 
 FROM centos:7 as base_x86_64
-ADD agent_build_refactored/managed_packages/dependencies/centos7_x86_64/*.repo /etc/yum.repos.d/
-ADD agent_build_refactored/managed_packages/dependencies/centos7_rpm-gpg/* /etc/pki/rpm-gpg/
+COPY agent_build_refactored/managed_packages/dependencies/centos7_x86_64/*.repo /etc/yum.repos.d/
+COPY agent_build_refactored/managed_packages/dependencies/centos7_rpm-gpg/* /etc/pki/rpm-gpg/
 RUN yum install -y devtoolset-9 perl-core
 RUN echo -e "source /opt/rh/devtoolset-9/enable" >> /root/.bash_env
 ENV BASH_ENV="/root/.bash_env"
 ARG d=1
 
 FROM centos:7 as base_aarch64
-ADD agent_build_refactored/managed_packages/dependencies/centos7_aarch64/*.repo /etc/yum.repos.d/
-ADD agent_build_refactored/managed_packages/dependencies/centos7_rpm-gpg/* /etc/pki/rpm-gpg/
+COPY agent_build_refactored/managed_packages/dependencies/centos7_aarch64/*.repo /etc/yum.repos.d/
+COPY agent_build_refactored/managed_packages/dependencies/centos7_rpm-gpg/* /etc/pki/rpm-gpg/
 RUN yum install -y devtoolset-9 perl-core
 RUN echo -e "source /opt/rh/devtoolset-9/enable" >> /root/.bash_env
 ENV BASH_ENV="/root/.bash_env"
@@ -28,7 +28,7 @@ RUN DEBIAN_FRONTEND="noninteractive" \
     tar \
     curl
 
-ADD agent_build_refactored/managed_packages/dependencies/public_keys /tmp/public_keys
+COPY agent_build_refactored/managed_packages/dependencies/public_keys /tmp/public_keys
 WORKDIR /tmp/download
 
 
@@ -215,7 +215,7 @@ RUN mv openssl-${OPENSSL_1_VERSION} /tmp/source
 FROM base as build_openssl_1
 COPY --from=download_openssl_1 /tmp/source /tmp/source
 WORKDIR /tmp/source/build
-ADD agent_build_refactored/managed_packages/dependencies/configure_openssl.sh configure_openssl.sh
+COPY agent_build_refactored/managed_packages/dependencies/configure_openssl.sh configure_openssl.sh
 ARG DEPENDENCIES_INSTALL_PREFIX
 ARG ARCH
 RUN ARCH="${ARCH}" MAJOR_VERSION="1" \
@@ -236,7 +236,7 @@ RUN mv openssl-${OPENSSL_3_VERSION} /tmp/source
 FROM base as build_openssl_3
 COPY --from=download_openssl_3 /tmp/source /tmp/source
 WORKDIR /tmp/source/build
-ADD agent_build_refactored/managed_packages/dependencies/configure_openssl.sh configure_openssl.sh
+COPY agent_build_refactored/managed_packages/dependencies/configure_openssl.sh configure_openssl.sh
 ARG DEPENDENCIES_INSTALL_PREFIX
 ARG ARCH
 RUN ARCH="${ARCH}" MAJOR_VERSION="3" \
@@ -329,7 +329,7 @@ RUN find "/tmp/root${PYTHON_INSTALL_PREFIX}" -name "__pycache__" -type d -prune 
 FROM download_base as download_rust
 ARG RUST_VERSION
 ARG RUST_PLATFORM
-ADD agent_build_refactored/managed_packages/dependencies/public_keys/rust-key.gpg.ascii /tmp/public_keys/rust-key.gpg.ascii
+COPY agent_build_refactored/managed_packages/dependencies/public_keys/rust-key.gpg.ascii /tmp/public_keys/rust-key.gpg.ascii
 RUN gpg2 --import /tmp/public_keys/rust-key.gpg.ascii
 RUN curl --tlsv1.2 "https://static.rust-lang.org/dist/rust-${RUST_VERSION}-${RUST_PLATFORM}.tar.gz" > rust.tar.gz
 RUN curl --tlsv1.2 "https://static.rust-lang.org/dist/rust-${RUST_VERSION}-${RUST_PLATFORM}.tar.gz.asc" > rust.tar.gz.asc
@@ -354,7 +354,7 @@ COPY --from=download_rust /tmp/rust /tmp/rust
 WORKDIR /tmp/rust
 RUN ./install.sh
 
-ADD dev-requirements-new.txt /tmp/requirements.txt
+COPY dev-requirements-new.txt /tmp/requirements.txt
 RUN python3 -m pip wheel \
     -r /tmp/requirements.txt \
     --wheel-dir /tmp/wheels
@@ -399,7 +399,7 @@ ARG PORTABLE_RUNNER_NAME
 
 WORKDIR /tmp/source
 
-ADD agent_build_refactored/managed_packages/dependencies/portable_pytest_runner/pytest_runner_main.py pytest_runner_main.py
+COPY agent_build_refactored/managed_packages/dependencies/portable_pytest_runner/pytest_runner_main.py pytest_runner_main.py
 
 RUN python3 -m PyInstaller \
     --onefile \

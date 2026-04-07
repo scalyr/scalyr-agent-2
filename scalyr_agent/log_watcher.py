@@ -14,12 +14,11 @@
 # ------------------------------------------------------------------------
 #
 # author: Imron Alston <imron@scalyr.com>
-from __future__ import unicode_literals
 
 __author__ = "imron@scalyr.com"
 
 
-class LogWatcher(object):
+class LogWatcher:
     """An interface class that contains methods allowing the caller
     to add/remove a set of log paths
     """

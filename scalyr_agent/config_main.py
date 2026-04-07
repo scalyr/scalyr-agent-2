@@ -20,9 +20,6 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-from __future__ import unicode_literals
-from __future__ import absolute_import
-from __future__ import print_function
 
 __author__ = "czerwin@scalyr.com"
 
@@ -39,7 +36,6 @@ import traceback
 import errno
 import itertools
 import argparse
-from io import open
 
 # TODO: The following two imports have been modified to facilitate Windows platforms
 if not sys.platform.startswith("win"):
@@ -71,10 +67,6 @@ scalyr_init()
 # Check for suitability.
 # Important. Import six as any other dependency from "third_party" libraries after "__scalyr__.scalyr_init"
 import six
-from six.moves import input
-import six.moves.urllib.request
-import six.moves.urllib.parse
-import six.moves.urllib.error
 
 # [end of 2->TOD0]
 
@@ -171,7 +163,7 @@ def set_api_key(config, config_file_path, new_api_key):
             # does not matter since if this command is only run as part of the install process, the file should
             # be owned by root already.
             os.rename(tmp_file_path, config_file_path)
-        except IOError as error:
+        except OSError as error:
             if error.errno == 13:
                 print(
                     "You do not have permission to write to the file and directory required ",
@@ -187,14 +179,14 @@ def set_api_key(config, config_file_path, new_api_key):
                 )
             else:
                 print(
-                    "Error attempting to update the key: %s" % six.text_type(error),
+                    "Error attempting to update the key: %s" % str(error),
                     file=sys.stderr,
                 )
                 print(traceback.format_exc(), file=sys.stderr)
             sys.exit(1)
         except Exception as err:
             print(
-                "Error attempting to update the key: %s" % six.text_type(err),
+                "Error attempting to update the key: %s" % str(err),
                 file=sys.stderr,
             )
             print(traceback.format_exc(), file=sys.stderr)
@@ -269,7 +261,7 @@ def write_config_fragment(config, file_name, field_description, config_json):
                 os.unlink(host_path)
 
             os.rename(tmp_host_path, host_path)
-        except IOError as error:
+        except OSError as error:
             if error.errno == 13:
                 print(
                     "You do not have permission to write to the file and directory required ",
@@ -289,7 +281,7 @@ def write_config_fragment(config, file_name, field_description, config_json):
                     "Error attempting to update the %s: %s"
                     % (
                         field_description,
-                        six.text_type(error),
+                        str(error),
                     ),
                     file=sys.stderr,
                 )
@@ -300,7 +292,7 @@ def write_config_fragment(config, file_name, field_description, config_json):
                 "Error attempting to update the %s: %s"
                 % (
                     field_description,
-                    six.text_type(err),
+                    str(err),
                 ),
                 file=sys.stderr,
             )
@@ -325,7 +317,7 @@ def update_user_id(file_path, new_uid):
             'Error attempting to update permission on file "%s": %s'
             % (
                 file_path,
-                six.text_type(err),
+                str(err),
             ),
             file=sys.stderr,
         )
@@ -352,7 +344,7 @@ def update_user_id_recursively(path, new_uid):
             'Error attempting to update permissions on files in dir "%s": %s'
             % (
                 path,
-                six.text_type(err),
+                str(err),
             ),
             file=sys.stderr,
         )
@@ -785,10 +777,10 @@ def upgrade_windows_install(
                 )
 
                 return 0
-            except IOError as error:
+            except OSError as error:
                 raise UpgradeFailure(
                     "Could not download the installer, returned error %s"
-                    % six.text_type(error)
+                    % str(error)
                 )
 
         finally:
@@ -850,7 +842,7 @@ def run_command(command_str, exit_on_fail=True, command_name=None, grep_for=None
         # Read the output back into a string.  We cannot use a cStringIO.StringIO buffer directly above with
         # subprocess.call because that method expects fileno support which StringIO doesn't support.
         output_buffer = six.StringIO()
-        input_fp = open(output_file, "r")
+        input_fp = open(output_file)
         for line in input_fp:
             output_buffer.write(line)
         input_fp.close()
@@ -1068,10 +1060,7 @@ def export_config(config_dest, config_file_path, configuration):
         if config_dest != "-":
             out_tar = tarfile.open(config_dest, mode="w:gz")
         else:
-            if sys.version_info < (3,):
-                file_obj = sys.stdout
-            else:
-                file_obj = sys.stdout.buffer
+            file_obj = sys.stdout.buffer
 
             out_tar = tarfile.open(fileobj=file_obj, mode="w|gz")
         out_tar.add(os.path.basename(config_file_path))
@@ -1141,10 +1130,7 @@ def import_config(config_src, config_file_path, configuration):
         if config_src != "-":
             in_tar = tarfile.open(config_src, "r:gz")
         else:
-            if sys.version_info < (3,):
-                file_obj = sys.stdin
-            else:
-                file_obj = sys.stdin.buffer
+            file_obj = sys.stdin.buffer
 
             in_tar = tarfile.open(fileobj=file_obj, mode="r|gz")
 
@@ -1158,10 +1144,7 @@ def import_config(config_src, config_file_path, configuration):
         # current config.
         for x in in_tar.getmembers():
             used_files[get_canonical_name(x.name)] = True
-            if sys.version_info < (3, 0):
-                in_tar.chown(existing_config_tarinfo, x.name)
-            else:
-                in_tar.chown(existing_config_tarinfo, x.name, False)
+            in_tar.chown(existing_config_tarinfo, x.name, False)
 
         in_tar.close()
 
@@ -1197,10 +1180,7 @@ def create_custom_dockerfile(
     if tarball_path != "-":
         out_tar = tarfile.open(tarball_path, mode="w:gz")
     else:
-        if sys.version_info < (3,):
-            file_obj = sys.stdout
-        else:
-            file_obj = sys.stdout.buffer
+        file_obj = sys.stdout.buffer
         out_tar = tarfile.open(fileobj=file_obj, mode="w|gz")
 
     # Read the Dockerfile.custom_agent_config out of the misc directory and replace :latest with the version used
@@ -1211,7 +1191,7 @@ def create_custom_dockerfile(
     )
     fp = open(dockerfile_path)
     dockerfile_contents = fp.read().replace(
-        "/scalyr%s-agent:latest" % label, "/scalyr%s-agent:%s" % (label, SCALYR_VERSION)
+        "/scalyr%s-agent:latest" % label, "/scalyr{}-agent:{}".format(label, SCALYR_VERSION)
     )
     fp.close()
 
@@ -1286,7 +1266,7 @@ def set_python_version(version):
     make_symlink(agent_main_source, scalyr_agent_2_target)
     # make_symlink(config_main_source, scalyr_agent_2_config_target)
 
-    print("Switched agent to {0}".format(version))
+    print("Switched agent to {}".format(version))
     print(
         "If you have an existing instance of scalyr-agent-2 process running, "
         "you need to restart it for this change to take an affect.\n"
@@ -1630,7 +1610,7 @@ def parse_config_options(argv):
     options = parser.parse_args(args=argv)
     if options.set_python is not None:
         set_python_version(options.set_python)
-        print("Agent switched to {0}.".format(options.set_python))
+        print("Agent switched to {}.".format(options.set_python))
         sys.exit(0)
 
     # NOTE: This option is also intentionally at the top for the same reasons as `set_python`.
@@ -1703,7 +1683,7 @@ def parse_config_options(argv):
         config_file.parse()
     except Exception as e:
         print(
-            "Error reading configuration file: %s" % six.text_type(e), file=sys.stderr
+            "Error reading configuration file: %s" % str(e), file=sys.stderr
         )
         print(traceback.format_exc(), file=sys.stderr)
         print(

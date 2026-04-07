@@ -19,7 +19,6 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-from __future__ import absolute_import
 from scalyr_agent import compat
 
 __author__ = "czerwin@scalyr.com"
@@ -27,10 +26,10 @@ __author__ = "czerwin@scalyr.com"
 import io
 import errno
 import socket
-import six.moves.socketserver
 import struct
 import time
 
+import six
 import scalyr_agent.scalyr_logging as scalyr_logging
 
 global_log = scalyr_logging.getLogger(__name__)
@@ -149,7 +148,7 @@ class ServerProcessor(
         pass
 
 
-class LineRequestParser(object):
+class LineRequestParser:
     """Simple abstraction that implements a 'parse_request' that can be used to parse incoming requests
     that are terminated by either '\n' or '\r\n'.
     """
@@ -213,7 +212,7 @@ class LineRequestParser(object):
                 input_buffer.seek(original_position)
 
 
-class Int32RequestParser(object):
+class Int32RequestParser:
     """Simple abstraction that implements a 'parse_request' that can be used to parse incoming requests
     that are sent using an integer prefix format.
 
@@ -295,7 +294,7 @@ class RequestSizeExceeded(Exception):
         )
 
 
-class ConnectionProcessor(object):
+class ConnectionProcessor:
     """An internal abstraction that reads requests from an incoming request_stream and executes them.
 
     This manages an individual connection, including raising a 'ConnectionIdleTooLong' exception when a
@@ -389,7 +388,7 @@ class ConnectionHandler(six.moves.socketserver.BaseRequestHandler):
             self.server.report_connection_problem(e)
 
 
-class RequestStream(object):
+class RequestStream:
     """Provides a specialized buffered interface for reading requests from a socket.
 
     This essentially puts a memory buffer in front of an incoming socket to efficiently read requests from
@@ -541,7 +540,7 @@ class RequestStream(object):
             except socket.timeout:
                 self.__socket_error = True
                 return None
-            except socket.error as e:
+            except OSError as e:
                 if e.errno == errno.EAGAIN:
                     return None
                 else:

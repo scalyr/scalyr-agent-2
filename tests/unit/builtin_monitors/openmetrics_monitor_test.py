@@ -683,7 +683,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
             "metric_component_value_include_list": ["foo"],
         }
         mock_logger = mock.Mock()
-        self.assertRaisesRegexp(
+        self.assertRaisesRegex(
             BadMonitorConfiguration,
             "Prohibited conversion",
             OpenMetricsMonitor,
@@ -697,7 +697,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
             "metric_component_value_include_list": JsonObject({"metric": "bar"}),
         }
         mock_logger = mock.Mock()
-        self.assertRaisesRegexp(
+        self.assertRaisesRegex(
             BadMonitorConfiguration,
             "Value must be a dictionary",
             OpenMetricsMonitor,
@@ -713,7 +713,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
             ),
         }
         mock_logger = mock.Mock()
-        self.assertRaisesRegexp(
+        self.assertRaisesRegex(
             BadMonitorConfiguration,
             "Value must be a list of strings",
             OpenMetricsMonitor,
@@ -729,7 +729,7 @@ class OpenMetricsMonitorTestCase(ScalyrTestCase):
             ),
         }
         mock_logger = mock.Mock()
-        self.assertRaisesRegexp(
+        self.assertRaisesRegex(
             BadMonitorConfiguration,
             "Value must be a list of strings",
             OpenMetricsMonitor,

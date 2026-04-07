@@ -28,13 +28,13 @@ from scalyr_agent.test_base import ScalyrTestCase
 
 class SerializeTests(ScalyrTestCase):
     def test_length_prefixed_strings(self):
-        self.assertEquals(
+        self.assertEqual(
             b"`s\x00\x00\x00\x0cHowdy folks!",
             self.serialize_string("Howdy folks!"),
         )
 
     def test_length_prefixed_strings_with_unicode(self):
-        self.assertEquals(
+        self.assertEqual(
             b"`s\x00\x00\x00\x10Howdy \xe8\x92\xb8 folks!",
             self.serialize_string("Howdy \u84b8 folks!"),
         )

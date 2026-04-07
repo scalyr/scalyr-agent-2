@@ -34,7 +34,7 @@ from scalyr_agent.copying_manager.worker import (
 
 
 import six
-from six.moves import range
+
 
 if six.PY3:
     import pathlib

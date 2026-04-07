@@ -736,7 +736,7 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
 
         expected_msg = r"Could not wait for written lines because the timeout \(2 seconds\) has occurred"
 
-        self.assertRaisesRegexp(
+        self.assertRaisesRegex(
             OSError,
             expected_msg,
             self.send_and_wait_for_lines,

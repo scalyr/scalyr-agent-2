@@ -32,9 +32,6 @@
 # "/foo/bar/" and "/foo_bar/".
 
 
-from __future__ import absolute_import
-from __future__ import print_function
-from __future__ import unicode_literals
 import os
 import subprocess
 import sys
@@ -144,7 +141,7 @@ def main():
                 )
         else:
             print(
-                "df %s returned %r" % (df_options, df_proc.returncode), file=sys.stderr
+                "df {} returned {!r}".format(df_options, df_proc.returncode), file=sys.stderr
             )
 
         ts = int(time.time())
@@ -186,7 +183,7 @@ def main():
                 )
         else:
             print(
-                "df %s returned %r" % (df_inodes_options, df_proc.returncode),
+                "df {} returned {!r}".format(df_inodes_options, df_proc.returncode),
                 file=sys.stderr,
             )
 

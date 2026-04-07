@@ -16,14 +16,12 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-from __future__ import unicode_literals
-from __future__ import absolute_import
-from __future__ import print_function
+
+import six
 
 if False:  # NOSONAR
     from typing import Optional
 
-from io import open
 
 __author__ = "czerwin@scalyr.com"
 
@@ -40,8 +38,6 @@ import random
 from pprint import pprint
 
 import scalyr_agent.scalyr_logging as scalyr_logging
-
-import six
 
 from scalyr_agent.util import StoppableThread
 from scalyr_agent import util as scalyr_util
@@ -125,7 +121,7 @@ def _thread_watcher():
             # Exclude itself and main thread
             continue
 
-        print("Active thread %s daemon=%s" % (t.getName(), six.text_type(t.isDaemon())))
+        print("Active thread {} daemon={}".format(t.getName(), str(t.isDaemon())))
         pprint(t.__dict__)
     print("Done")
     # NOTE: We exit with non-zero here to fail early in Circle CI instead of waiting on build
@@ -181,7 +177,7 @@ class BaseScalyrTestCase(unittest.TestCase):
 
     def run(self, result=None):
         _start_thread_watcher_if_necessary()
-        StoppableThread.set_name_prefix("TestCase %s: " % six.text_type(self))
+        StoppableThread.set_name_prefix("TestCase %s: " % str(self))
         return unittest.TestCase.run(self, result=result)
 
     def verify_setup_invoked(self):
@@ -189,6 +185,14 @@ class BaseScalyrTestCase(unittest.TestCase):
             self.__setup_invoked,
             msg="Inherited setUp method was not invoked by class derived from ScalyrTestCase",
         )
+
+    def assertEquals(self, first, second, msg = None):
+        self.assertEqual(first, second, msg)
+
+    def assertAlmostEquals(self, first, second, places=None, msg=None,
+                           delta=None):
+        self.assertAlmostEqual(first, second, places, msg, delta)
+
 
 
 if sys.version_info[:2] < (2, 7):
@@ -213,7 +217,7 @@ if sys.version_info[:2] < (2, 7):
             """Just like self.assertTrue(a is b), but with a nicer default message."""
             if obj1 is not obj2:
                 if msg is None:
-                    msg = "%s is not %s" % (obj1, obj2)
+                    msg = "{} is not {}".format(obj1, obj2)
                 self.fail(msg)
 
         def assertIsNone(self, obj, msg=None):
@@ -221,14 +225,14 @@ if sys.version_info[:2] < (2, 7):
             if msg is not None:
                 self.assertTrue(obj is None, msg)
             else:
-                self.assertTrue(obj is None, "%s is not None" % (six.text_type(obj)))
+                self.assertTrue(obj is None, "%s is not None" % (str(obj)))
 
         def assertIsNotNone(self, obj, msg=None):
             """Included for symmetry with assertIsNone."""
             if msg is not None:
                 self.assertTrue(obj is not None, msg)
             else:
-                self.assertTrue(obj is not None, "%s is None" % (six.text_type(obj)))
+                self.assertTrue(obj is not None, "%s is None" % (str(obj)))
 
         def assertGreater(self, a, b, msg=None):
             if msg is not None:
@@ -236,7 +240,7 @@ if sys.version_info[:2] < (2, 7):
             else:
                 self.assertTrue(
                     a > b,
-                    "%s is greater than %s" % (six.text_type(a), six.text_type(b)),
+                    "{} is greater than {}".format(str(a), str(b)),
                 )
 
         def assertLess(self, a, b, msg=None):
@@ -245,7 +249,7 @@ if sys.version_info[:2] < (2, 7):
             else:
                 self.assertTrue(
                     a < b,
-                    "%s is greater than %s" % (six.text_type(a), six.text_type(b)),
+                    "{} is greater than {}".format(str(a), str(b)),
                 )
 
         def assertRaisesRegexp(self, exc_cls, expected_msg, func, *args, **kwargs):
@@ -263,7 +267,7 @@ if sys.version_info[:2] < (2, 7):
 
                 if not re.search(expected_msg, str(e)):
                     raise AssertionError(
-                        'Expected "%s" message, got "%s"' % (expected_msg, str(e))
+                        'Expected "{}" message, got "{}"'.format(expected_msg, str(e))
                     )
 
 else:
@@ -330,7 +334,7 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
     __assertion_failed = False  # type: bool
 
     def setUp(self):
-        super(BaseScalyrLogCaptureTestCase, self).setUp()
+        super().setUp()
 
         self.logs_directory = tempfile.mkdtemp(suffix="agent-tests-log")
 
@@ -346,7 +350,7 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
         self.agent_debug_log_path = os.path.join(self.logs_directory, "agent_debug.log")
 
     def tearDown(self):
-        super(BaseScalyrLogCaptureTestCase, self).tearDown()
+        super().tearDown()
 
         # It's important we close all the open FDs used by loggers otherwise tests will fail on
         # Windows because the file will still be opened
@@ -384,7 +388,7 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
         if not self._file_contains_line_regex(
             file_path=file_path, expression=expression
         ):
-            with open(file_path, "r") as fp:
+            with open(file_path) as fp:
                 content = fp.read()
 
             self.__assertion_failed = True
@@ -407,7 +411,7 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
         file_path = file_path or self.agent_log_path
 
         if self._file_contains_line_regex(file_path=file_path, expression=expression):
-            with open(file_path, "r") as fp:
+            with open(file_path) as fp:
                 content = fp.read()
 
             self.__assertion_failed = True
@@ -430,7 +434,7 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
         file_path = file_path or self.agent_log_path
 
         if not self._file_contains_regex(file_path=file_path, expression=expression):
-            with open(file_path, "r") as fp:
+            with open(file_path) as fp:
                 content = fp.read()
 
             self.__assertion_failed = True
@@ -453,7 +457,7 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
         file_path = file_path or self.agent_log_path
 
         if self._file_contains_regex(file_path=file_path, expression=expression):
-            with open(file_path, "r") as fp:
+            with open(file_path) as fp:
                 content = fp.read()
 
             self.__assertion_failed = True
@@ -465,7 +469,7 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
     def _file_contains_line_regex(self, file_path, expression):
         matcher = re.compile(expression)
 
-        with open(file_path, "r") as fp:
+        with open(file_path) as fp:
             for line in fp:
                 if matcher.search(line):
                     return True
@@ -475,7 +479,7 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
     def _file_contains_regex(self, file_path, expression):
         matcher = re.compile(expression)
 
-        with open(file_path, "r") as fp:
+        with open(file_path) as fp:
             content = fp.read()
 
         return bool(matcher.search(content))
@@ -523,7 +527,7 @@ class MockHTTPServer(StoppableThread):
         if not port:
             port = random.randint(5000, 20000)
 
-        super(MockHTTPServer, self).__init__(name="MockHttpServer_%s_%s" % (host, port))
+        super().__init__(name="MockHttpServer_{}_{}".format(host, port))
 
         from flask import Flask
 
@@ -538,11 +542,11 @@ class MockHTTPServer(StoppableThread):
 
     def run(self):
         LOG.info(
-            "Starting mock http server and listening on: %s:%s" % (self.host, self.port)
+            "Starting mock http server and listening on: {}:{}".format(self.host, self.port)
         )
 
         self.app.run(host=self.host, port=self.port)
-        super(MockHTTPServer, self).run()
+        super().run()
 
     def stop(self, wait_on_join=True, join_timeout=2):
         import requests
@@ -550,8 +554,8 @@ class MockHTTPServer(StoppableThread):
         LOG.info("Stopping mock http server...")
 
         # Sadly there is no better way to kill werkzeug server...
-        url = "http://%s:%s/shutdown" % (self.host, self.port)
+        url = "http://{}:{}/shutdown".format(self.host, self.port)
         requests.get(url)
 
         self.app.do_teardown_appcontext()
-        super(MockHTTPServer, self).stop(wait_on_join=True, join_timeout=0.1)
+        super().stop(wait_on_join=True, join_timeout=0.1)

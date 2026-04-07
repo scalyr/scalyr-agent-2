@@ -20,8 +20,6 @@
 # as binary from the beginning, or it should keep in as unicode and convert it to bytes when we gather all data together?
 # Here i tried to keep them as binary.
 # [end of 2->TOD0]
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 import uuid
 
@@ -37,9 +35,6 @@ import ssl
 import os
 
 import six
-from six.moves import map
-from six.moves import range
-import six.moves.http_client
 
 from scalyr_agent.util import verify_and_get_compress_func
 from scalyr_agent.configuration import Configuration
@@ -154,7 +149,7 @@ def create_client(config, quiet=False, api_key=None, server_url=None):
     )
 
 
-class ScalyrClientSessionStatus(object):
+class ScalyrClientSessionStatus:
     def __init__(self):
         self.total_requests_sent = None
         self.total_requests_failed = None
@@ -166,7 +161,7 @@ class ScalyrClientSessionStatus(object):
         self.total_compression_time = None
 
 
-class NewScalyrClientSession(object):
+class NewScalyrClientSession:
     def __init__(self, configuration, api_key=None):
         if configuration.use_new_ingestion:
             from scalyr_ingestion_client.session import (  # pylint: disable=import-error
@@ -206,7 +201,7 @@ class NewScalyrClientSession(object):
         )
 
 
-class ScalyrClientSession(object):
+class ScalyrClientSession:
     """Encapsulates the connection between the agent and the Scalyr servers.
 
     It is a session in that we generally only have one connection open to the Scalyr servers at any given time.
@@ -583,7 +578,7 @@ class ScalyrClientSession(object):
                         "will re-attempt",
                         self.__full_address,
                         error.errno,  # pylint: disable=no-member
-                        six.text_type(error),
+                        str(error),
                         error_code="client/requestFailed",
                     )
                 else:
@@ -669,7 +664,7 @@ class ScalyrClientSession(object):
                         error.errno,  # pylint: disable=no-member
                         self.__full_address,
                         duration_ms,
-                        six.text_type(error),
+                        str(error),
                         error_code="client/requestFailed",
                     )
                 else:
@@ -901,7 +896,7 @@ class ScalyrClientSession(object):
 
         python_version = sys.version_info
         if len(python_version) >= 5:
-            python_version_str = "python-%s.%s.%s" % (
+            python_version_str = "python-{}.{}.{}".format(
                 python_version[0],
                 python_version[1],
                 python_version[2],
@@ -916,7 +911,7 @@ class ScalyrClientSession(object):
         try:
             distribution = platform.dist()  # pylint: disable=no-member
             if len(distribution[0]) > 0:
-                platform_value = "Linux-%s-%s" % (distribution[0], distribution[1])
+                platform_value = "Linux-{}-{}".format(distribution[0], distribution[1])
         except Exception:
             platform_value = None
 
@@ -995,7 +990,7 @@ class ScalyrClientSession(object):
             else:
                 sharded_copy_manager_string = "mw-1|"
 
-            sharded_copy_manager_string += "%s|%s" % (workers_count, api_keys_count)
+            sharded_copy_manager_string += "{}|{}".format(workers_count, api_keys_count)
         else:
             sharded_copy_manager_string = "mw-0"
 
@@ -1021,7 +1016,7 @@ class ScalyrClientSession(object):
 
         if fragments:
             parts.extend(fragments)
-        return ";".join(map(six.text_type, parts))
+        return ";".join(map(str, parts))
 
     def perform_agent_version_check(self, track="stable"):
         """Query the Scalyr API to determine if a newer version is available"""
@@ -1033,7 +1028,7 @@ class ScalyrClientSession(object):
         return self.__send_request(url_path, is_post=False)
 
 
-class EventSequencer(object):
+class EventSequencer:
     """Responsible for keeping track of sequences for an AddEventsRequest
 
     This abstraction keeps track of previously seen sequence_ids and numbers
@@ -1115,7 +1110,7 @@ class EventSequencer(object):
             self.__previous_sequence_number = sequence_number
 
 
-class AddEventsRequest(object):
+class AddEventsRequest:
     """Used to construct an AddEventsRequest to eventually send.
 
     This abstraction has three key features.  First, it uses a generally more efficient scheme to build
@@ -1383,7 +1378,7 @@ class AddEventsRequest(object):
 
         If this is the first time a timing component is being incremented, the initial value is set to zero.
         """
-        for key, value in six.iteritems(key_values):
+        for key, value in key_values.items():
             if key in self.__timing_data:
                 amount = self.__timing_data[key]
             else:
@@ -1402,7 +1397,7 @@ class AddEventsRequest(object):
 
         # sort by key, to get a predictable result.
         for key, value in sorted(
-            six.iteritems(self.__timing_data), key=lambda el: el[0]
+            self.__timing_data.items(), key=lambda el: el[0]
         ):
             if not first_time:
                 output_buffer.write(" ")
@@ -1410,7 +1405,7 @@ class AddEventsRequest(object):
                 first_time = False
             output_buffer.write(key)
             output_buffer.write("=")
-            output_buffer.write(six.text_type(value))
+            output_buffer.write(str(value))
 
         return output_buffer.getvalue()
 
@@ -1461,7 +1456,7 @@ class AddEventsRequest(object):
         # reset previously seen sequence id and numbers
         self.__event_sequencer.reset()
 
-    class Position(object):
+    class Position:
         """Represents a position in the added events."""
 
         def __init__(self, events_added, buffer_size, postfix_buffer_position):
@@ -1553,7 +1548,7 @@ def _calculate_per_log_extra_bytes():
     return result
 
 
-class PostFixBuffer(object):
+class PostFixBuffer:
     # 2->TODO this is binary buffer. Make it work only with binary data.
     """Buffer for the items that must be written after the events JSON array, which typically means
     the client timestamp and the threads JSON array.
@@ -1622,7 +1617,7 @@ class PostFixBuffer(object):
                 b"LOGS", scalyr_util.json_encode(self.__logs, binary=True)
             )
         result = result.replace(
-            b"TIMESTAMP", six.text_type(self.__client_timestamp).encode("utf-8")
+            b"TIMESTAMP", str(self.__client_timestamp).encode("utf-8")
         )
         result = result.replace(
             b"THREADS", scalyr_util.json_encode(self.__threads, binary=True)
@@ -1652,8 +1647,8 @@ class PostFixBuffer(object):
         """
         new_timestamp = int(timestamp)
         # 2->TODO timestamp should contain only ascii characters, so bytes count and characters count should be the same.
-        size_difference = len(six.text_type(new_timestamp)) - len(
-            six.text_type(self.__client_timestamp)
+        size_difference = len(str(new_timestamp)) - len(
+            str(self.__client_timestamp)
         )
 
         if (
@@ -1754,7 +1749,7 @@ class PostFixBuffer(object):
                 self.__logs = self.__logs[0 : position[2]]
 
 
-class Event(object):
+class Event:
     """Encapsulates a single event that will be included in an ``AddEventsRequest``.
 
     This abstraction has many optimizations to improve serialization time.
@@ -1934,7 +1929,7 @@ class Event(object):
             attributes = dict(attributes)
 
         changed = False
-        for key, value in six.iteritems(attributes):
+        for key, value in attributes.items():
             if key not in self.__attrs or overwrite_existing:
                 changed = True
                 self.__attrs[key] = value
@@ -1966,7 +1961,7 @@ class Event(object):
         """
         if self.__message is None and message is not None:
             self.__num_optimal_fields += 1
-        if type(message) is six.text_type:
+        if type(message) is str:
             self.__message = message.encode("utf-8")
         else:
             self.__message = message
@@ -1991,7 +1986,7 @@ class Event(object):
         # The timestamp field is serialized as a string to get around overflow issues, so put it in string form now.
         if self.__timestamp is None and timestamp is not None:
             self.__num_optimal_fields += 1
-        self.__timestamp = b'"%s"' % six.text_type(timestamp).encode("utf-8")
+        self.__timestamp = b'"%s"' % str(timestamp).encode("utf-8")
         return self
 
     @property
@@ -2051,7 +2046,7 @@ class Event(object):
         """
         self.__has_non_optimal_fields = True
         # It is serialized as a number, so just a toString is called for.
-        self.__sequence_number = six.text_type(sequence_number).encode("utf-8")
+        self.__sequence_number = str(sequence_number).encode("utf-8")
         return self
 
     @property
@@ -2078,7 +2073,7 @@ class Event(object):
         # It is serialized as a number, so just a toString is called for.
         if self.__sequence_number_delta is None and sequence_number_delta is not None:
             self.__num_optimal_fields += 1
-        self.__sequence_number_delta = six.text_type(sequence_number_delta).encode(
+        self.__sequence_number_delta = str(sequence_number_delta).encode(
             "utf-8"
         )
         return self
@@ -2104,7 +2099,7 @@ class Event(object):
         @rtype: Event
         """
         self.__has_non_optimal_fields = True
-        self.__sampling_rate = six.text_type(rate).encode("utf-8")
+        self.__sampling_rate = str(rate).encode("utf-8")
         return self
 
     def serialize(self, output_buffer):
@@ -2231,7 +2226,7 @@ def create_connection_helper(host, port, timeout=None, source_address=None):
             sock.connect(sa)
             return sock
 
-        except socket.error as _:
+        except OSError as _:
             err = _
             if sock is not None:
                 sock.close()
@@ -2239,4 +2234,4 @@ def create_connection_helper(host, port, timeout=None, source_address=None):
     if err is not None:
         raise err
     else:
-        raise socket.error("getaddrinfo returns an empty list")
+        raise OSError("getaddrinfo returns an empty list")

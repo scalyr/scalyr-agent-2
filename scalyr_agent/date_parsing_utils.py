@@ -31,7 +31,6 @@ change needed to be implemented for udatetime implementation as well and that ad
 overhead.
 """
 
-from __future__ import absolute_import
 
 if False:  # NOSONAR
     from typing import Optional
@@ -50,7 +49,8 @@ import datetime
 import _strptime  # NOQA
 
 import six
-from six.moves import map
+
+#from six.moves import map
 
 
 try:
@@ -66,16 +66,12 @@ except ImportError:
     isoparse = None
 
 
-if six.PY3:
-    # re.ASCII makes this regex only match ASCII digits which is tiny bit faster than the version
-    # without re.ASCII flag
-    RFC3339_STR_REGEX = re.compile(
-        r"(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})", re.ASCII
-    )
-    RFC3339_STR_NON_UTC_REGEX = re.compile(r"^.*[\+\-](\d{2}):(\d{2})$", re.ASCII)
-else:
-    RFC3339_STR_REGEX = re.compile(r"(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})")
-    RFC3339_STR_NON_UTC_REGEX = re.compile(r"^.*[\+\-](\d{2}):(\d{2})$")
+# re.ASCII makes this regex only match ASCII digits which is tiny bit faster than the version
+# without re.ASCII flag
+RFC3339_STR_REGEX = re.compile(
+    r"(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})", re.ASCII
+)
+RFC3339_STR_NON_UTC_REGEX = re.compile(r"^.*[\+\-](\d{2}):(\d{2})$", re.ASCII)
 
 
 ZERO = datetime.timedelta(0)

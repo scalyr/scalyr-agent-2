@@ -47,7 +47,7 @@ from tests.unit.copying_manager_tests.copying_manager_test import (
     FakeMonitor,
 )
 from tests.unit.copying_manager_tests.test_environment import TestingConfiguration
-from six.moves import range
+
 
 ONE_MIB = 1024 * 1024
 ALMOST_SIX_MB = 5900000
@@ -666,7 +666,6 @@ class TestDynamicLogPathTest(BaseTest):
         self.fake_scan()
 
         self._manager.schedule_log_path_for_removal("unittest", log_config["path"])
-
         self.assertEquals(1, self._manager.logs_pending_removal_count())
 
         self.fake_scan()
@@ -682,6 +681,7 @@ class TestDynamicLogPathTest(BaseTest):
 
     def _get_manager_log_pending_removal(self):
         # pylint: disable=no-member
+        self._manager
         return self._manager._CopyingManager__logs_pending_removal
         # pylint: enable=no-member
 
@@ -739,12 +739,12 @@ class CopyingParamsLegacyTest(ScalyrTestCase):
         self.test_params.current_sleep_interval = 1
 
         self.test_params.update_params("requestTooLarge", 300 * 1024)
-        self.assertAlmostEquals(
+        self.assertAlmostEqual(
             self.test_params.current_bytes_allowed_to_send, 150 * 1024
         )
 
         self.test_params.update_params("requestTooLarge", 150 * 1024)
-        self.assertAlmostEquals(
+        self.assertAlmostEqual(
             self.test_params.current_bytes_allowed_to_send, 100 * 1024
         )
 
@@ -778,10 +778,10 @@ class CopyingParamsLegacyTest(ScalyrTestCase):
         """
         for expected_result in expected_sleep_interval_allowed_bytes:
             self.test_params.update_params(status, bytes_sent)
-            self.assertAlmostEquals(
+            self.assertAlmostEqual(
                 self.test_params.current_sleep_interval, expected_result[0]
             )
-            self.assertAlmostEquals(
+            self.assertAlmostEqual(
                 self.test_params.current_bytes_allowed_to_send, expected_result[1]
             )
 
@@ -823,16 +823,16 @@ class CopyingParamsTest(ScalyrTestCase):
         self.test_params = CopyingParameters(config)
 
     def test_initial_settings(self):
-        self.assertEquals(self.test_params.current_bytes_allowed_to_send, ALMOST_SIX_MB)
-        self.assertEquals(self.test_params.current_sleep_interval, 5.0)
+        self.assertEqual(self.test_params.current_bytes_allowed_to_send, ALMOST_SIX_MB)
+        self.assertEqual(self.test_params.current_sleep_interval, 5.0)
 
     def test_no_events_being_sent(self):
         for i in range(0, 5):
             self.test_params.update_params("success", 0)
-            self.assertEquals(
+            self.assertEqual(
                 self.test_params.current_bytes_allowed_to_send, ALMOST_SIX_MB
             )
-            self.assertEquals(self.test_params.current_sleep_interval, 5.0)
+            self.assertEqual(self.test_params.current_sleep_interval, 5.0)
 
     def test_small_events_being_sent(self):
         self.test_params.current_sleep_interval = 0.1

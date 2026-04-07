@@ -68,14 +68,10 @@
 # %util.  These need to pull in cpu idle counters from /proc.
 
 
-from __future__ import absolute_import
-from __future__ import print_function
-from __future__ import unicode_literals
 
 import os
 import sys
 import time
-from io import open
 
 COLLECTION_INTERVAL = 30  # seconds
 
@@ -112,7 +108,7 @@ FIELDS_PART = (
 
 def main():
     """iostats main loop."""
-    f_diskstats = open("/proc/diskstats", "r")
+    f_diskstats = open("/proc/diskstats")
 
     while True:
         # Scalyr edit to add in check for parent.  A ppid of 1 means our parent has died.
@@ -135,50 +131,52 @@ def parse_and_print_metrics(f_diskstats, output_file_sucess=None, output_file_er
     output_file_sucess = output_file_sucess or sys.stdout
     output_file_error = output_file_error or sys.stderr
 
-    f_diskstats.seek(0)
+    # Reopen file instead of seeking to avoid seekability issues
+    f_diskstats_filename = f_diskstats.name
     ts = int(time.time())
-    for line in f_diskstats:
-        # maj, min, devicename, [list of stats, see above]
-        values = line.split(None)
-        # shortcut the deduper and just skip disks that
-        # haven't done a single read.  This elimiates a bunch
-        # of loopback, ramdisk, and cdrom devices but still
-        # lets us report on the rare case that we actually use
-        # a ramdisk.
-        if values[3] == "0":
-            continue
+    with open(f_diskstats_filename) as f:
+        for line in f:
+            # maj, min, devicename, [list of stats, see above]
+            values = line.split(None)
+            # shortcut the deduper and just skip disks that
+            # haven't done a single read.  This elimiates a bunch
+            # of loopback, ramdisk, and cdrom devices but still
+            # lets us report on the rare case that we actually use
+            # a ramdisk.
+            if values[3] == "0":
+                continue
 
-        if int(values[1]) % 16 == 0 and int(values[0]) > 1:
-            metric = "iostat.disk."
-        else:
-            metric = "iostat.part."
+            if int(values[1]) % 16 == 0 and int(values[0]) > 1:
+                metric = "iostat.disk."
+            else:
+                metric = "iostat.part."
 
-        # Sometimes there can be a slash in the device name, see bug #8.
-        # TODO(tsuna): Remove the substitution once TSD allows `/' in tags.
-        device = values[2].replace("/", "_")
-        # For now we simply ignore values which were added in newer versions of kernel
-        if len(values) >= 14:
-            # full stats line
-            # 14 fields - up to kernel 4.18
-            # 18 fields - kernel >= 4.18 - 5.5
-            # 20 fields - kernel >= 5.5
-            # See https://www.kernel.org/doc/Documentation/ABI/testing/procfs-diskstats for
-            # details
-            for i in range(11):
-                print(
-                    "%s%s %d %s dev=%s"
-                    % (metric, FIELDS_DISK[i], ts, values[i + 3], device), file=output_file_sucess
-                )
-        elif len(values) == 7:
-            # partial stats line
-            for i in range(4):
-                print(
-                    "%s%s %d %s dev=%s"
-                    % (metric, FIELDS_PART[i], ts, values[i + 3], device), file=output_file_sucess
-                )
-        else:
-            print("Cannot parse /proc/diskstats line: ", line, file=output_file_error)
-            continue
+            # Sometimes there can be a slash in the device name, see bug #8.
+            # TODO(tsuna): Remove the substitution once TSD allows `/' in tags.
+            device = values[2].replace("/", "_")
+            # For now we simply ignore values which were added in newer versions of kernel
+            if len(values) >= 14:
+                # full stats line
+                # 14 fields - up to kernel 4.18
+                # 18 fields - kernel >= 4.18 - 5.5
+                # 20 fields - kernel >= 5.5
+                # See https://www.kernel.org/doc/Documentation/ABI/testing/procfs-diskstats for
+                # details
+                for i in range(11):
+                    print(
+                        "%s%s %d %s dev=%s"
+                        % (metric, FIELDS_DISK[i], ts, values[i + 3], device), file=output_file_sucess
+                    )
+            elif len(values) == 7:
+                # partial stats line
+                for i in range(4):
+                    print(
+                        "%s%s %d %s dev=%s"
+                        % (metric, FIELDS_PART[i], ts, values[i + 3], device), file=output_file_sucess
+                    )
+            else:
+                print("Cannot parse /proc/diskstats line: ", line, file=output_file_error)
+                continue
 
 
 if __name__ == "__main__":

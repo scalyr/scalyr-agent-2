@@ -18,8 +18,6 @@ Module responsible for parsing data from build_info file which is available with
 Keep in mind that that file is only available for package and not for dev installs.
 """
 
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 if False:  # NOSONAR
     from typing import Dict

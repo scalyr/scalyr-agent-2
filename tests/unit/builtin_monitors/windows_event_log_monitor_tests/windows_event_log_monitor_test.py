@@ -530,7 +530,7 @@ class WindowsEventLogMonitorTest2(BaseScalyrLogCaptureTestCase):
 
         logger.emit_value("unused", '{"foo":"bar"}')
 
-        self.assertEquals(monitor.reported_lines(), 1)
+        self.assertEqual(monitor.reported_lines(), 1)
         self.assertLogFileContainsLineRegex(
             file_path=metric_file_path, expression="foo"
         )

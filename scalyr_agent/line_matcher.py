@@ -19,8 +19,6 @@
 # https://www.scalyr.com/help/parsing-logs#multiline
 #
 # author: Imron Alston <imron@scalyr.com>
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 __author__ = "imron@scalyr.com"
 
@@ -29,7 +27,7 @@ import re
 import six
 
 
-class LineMatcher(object):
+class LineMatcher:
     """An abstraction for a Line Matcher.
     Reads an entire 'line' from a file like object (e.g. anything implementing Python's
     file interface such as StringIO).  By default it reads just a single line terminated
@@ -98,12 +96,12 @@ class LineMatcher(object):
                 else:
                     raise Exception(
                         "Error, no continuation pattern found for line grouper: %s"
-                        % six.text_type(grouper)
+                        % str(grouper)
                     )
             else:
                 raise Exception(
                     "Error, no start pattern found for line grouper: %s"
-                    % six.text_type(grouper)
+                    % str(grouper)
                 )
         return result
 

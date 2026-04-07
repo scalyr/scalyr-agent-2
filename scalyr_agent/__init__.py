@@ -43,7 +43,6 @@ The packages exported are:
 # I think we should use the same things in python2, to achieve maximal identity of the behaviour.
 # [end of 2->TOD0]
 
-from __future__ import absolute_import
 
 __author__ = "Steven Czerwinski <czerwin@scalyr.com>"
 

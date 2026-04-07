@@ -41,8 +41,6 @@ import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.scalyr_monitor import MonitorInformation
 from scalyr_agent.test_base import skipIf
 
-from six.moves import range
-
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
 FIXTURES_DIR = os.path.join(BASE_DIR, "fixtures")
 
@@ -106,8 +104,8 @@ class TestMetricClass(ScalyrTestCase):
         m = Metric("abc", 123)
 
         # Ensure name and type fields are present
-        self.assertEquals(m.name, "abc")
-        self.assertEquals(m.type, 123)
+        self.assertEqual(m.name, "abc")
+        self.assertEqual(m.type, 123)
 
         # Non-existent
         self.assertRaises(AttributeError, lambda: m.asdf)  # pylint: disable=no-member

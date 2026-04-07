@@ -31,8 +31,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ------------------------------------------------------------------------
 """
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 __author__ = "Scott Sullivan '<guy.hoozdis@gmail.com>'"
 __version__ = "0.0.1"
@@ -62,7 +60,7 @@ CONFIG_OPTIONS = [
     dict(
         option_name="module",
         option_description="Always ``scalyr_agent.builtin_monitors.windows_system_metrics``",
-        convert_to=six.text_type,
+        convert_to=str,
         required_option=True,
     )
 ]
@@ -223,7 +221,7 @@ try:
     METRIC = namedtuple("METRIC", "config dispatch")
 except ImportError:
 
-    class NamedTupleHack(object):
+    class NamedTupleHack:
         def __init__(self, *args):
             self._typename = args[0]
             self._fieldnames = args[1:]
@@ -631,7 +629,7 @@ For help, contact Support.
                 "can be done with the following command:"
                 "  pip install psutil",
             )
-        super(SystemMonitor, self).__init__(
+        super().__init__(
             monitor_config=monitor_config,
             logger=logger,
             sample_interval_secs=sample_interval_secs,

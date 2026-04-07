@@ -5,7 +5,7 @@ RUN apt-get update -y
 RUN apt-get install -y apt-utils build-essential
 RUN apt-get install -y python python-pip python-dev
 
-ADD dev-requirements-new.txt dev-requirements-new.txt
+COPY dev-requirements-new.txt dev-requirements-new.txt
 
 # Upgrade pip so it supports Python version markers we use in our requirements file
 RUN python2 -m pip install --upgrade --force-reinstall "pip==9.0.3"

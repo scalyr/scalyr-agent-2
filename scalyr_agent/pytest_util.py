@@ -16,7 +16,6 @@
 This module includes various re-usable py.test utility functions and hooks.
 """
 
-from __future__ import absolute_import
 
 import decorator
 import pytest

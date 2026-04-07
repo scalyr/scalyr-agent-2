@@ -15,8 +15,6 @@
 #
 # author:  Steven Czerwinski <czerwin@scalyr.com>
 
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 if False:
     from typing import List
@@ -29,7 +27,7 @@ import os
 import re
 
 import six
-from six.moves.queue import Empty
+from queue import Empty
 
 import scalyr_agent.third_party.tcollector.tcollector as tcollector
 
@@ -619,7 +617,7 @@ define_config_option(
 )
 
 
-class TcollectorOptions(object):
+class TcollectorOptions:
     """Bare minimum implementation of an object to represent the tcollector options.
 
     We require this to pass into tcollector to control how it is run.
@@ -670,7 +668,7 @@ class WriterThread(StoppableThread):
         # Strip out the timestamp that is the second token on the line.
         match = self.__timestamp_matcher.match(line)
         if match is not None:
-            line = "%s %s" % (match.group(1), match.group(2))
+            line = "{} {}".format(match.group(1), match.group(2))
 
         # Now rewrite any key/value pairs from foo=bar to foo="bar"
         line = self.__key_value_matcher.sub('\\1="\\2"', line)
@@ -699,13 +697,7 @@ class WriterThread(StoppableThread):
                     self.__logger.info(line, metric_log_for_monitor=self.__monitor)
 
                 errors = 0  # We managed to do a successful iteration.
-            except (
-                ArithmeticError,
-                EOFError,
-                EnvironmentError,
-                LookupError,
-                ValueError,
-            ):
+            except (ArithmeticError, EOFError, OSError, LookupError, ValueError):
                 errors += 1
                 if errors > self.__max_uncaught_exceptions:
                     raise
@@ -804,7 +796,7 @@ For help, contact us at [support@scalyr.com](mailto:support@scalyr.com).
 
         collector_directory = self._config.get(
             "collectors_directory",
-            convert_to=six.text_type,
+            convert_to=str,
             default=SystemMetricsMonitor.__get_collectors_directory(),
         )
 
@@ -822,7 +814,7 @@ For help, contact us at [support@scalyr.com](mailto:support@scalyr.com).
         self.options.network_interface_prefixes = self._config.get(
             "network_interface_prefixes", default="eth"
         )
-        if isinstance(self.options.network_interface_prefixes, six.string_types):
+        if isinstance(self.options.network_interface_prefixes, str):
             self.options.network_interface_prefixes = [
                 self.options.network_interface_prefixes
             ]

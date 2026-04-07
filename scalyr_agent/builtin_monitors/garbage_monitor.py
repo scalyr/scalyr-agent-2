@@ -14,8 +14,6 @@
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
 
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 __author__ = "imron@scalyr.com"
 
@@ -37,7 +35,7 @@ define_config_option(
     __monitor__,
     "module",
     "Always ``scalyr_agent.builtin_monitors.garbage_monitor``",
-    convert_to=six.text_type,
+    convert_to=str,
     required_option=True,
 )
 
@@ -155,10 +153,10 @@ along with dumping up to 20 objects of the types 'list' and 'dict'.
             object_dump_types = []
 
         for t in object_dump_types:
-            if not isinstance(t, six.string_types):
+            if not isinstance(t, str):
                 raise BadMonitorConfiguration(
                     "object_dump_types contains a non-string value: %s"
-                    % six.text_type(t),
+                    % str(t),
                     "object_dump_types",
                 )
 
@@ -192,7 +190,7 @@ along with dumping up to 20 objects of the types 'list' and 'dict'.
         if len(self._object_dump_types):
             self._logger.info(
                 "\tDumping %d objects of type(s) %s"
-                % (self._max_object_dump, six.text_type(self._object_dump_types))
+                % (self._max_object_dump, str(self._object_dump_types))
             )
         else:
             self._logger.info("\tNot dumping individual objects.")
@@ -203,9 +201,9 @@ along with dumping up to 20 objects of the types 'list' and 'dict'.
         if hasattr(rubbish, "__name__"):
             if rubbish.__name__ == "function":
                 return rubbish.__name__
-            return six.text_type(rubbish)
+            return str(rubbish)
         else:
-            return six.text_type(rubbish)
+            return str(rubbish)
 
     def _dump_objects(
         self, all_objects, object_dump_types, max_type_dump, max_object_dump, dump_kind

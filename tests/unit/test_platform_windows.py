@@ -43,7 +43,7 @@ class WindowsPlatformControllerTestCase(ScalyrTestCase):
 
         controller = WindowsPlatformController()
         expected_msg = r".*Unable to set registry entry.*"
-        self.assertRaisesRegexp(
+        self.assertRaisesRegex(
             Exception, expected_msg, controller.start_agent_service, noop, None
         )
 
@@ -57,7 +57,7 @@ class WindowsPlatformControllerTestCase(ScalyrTestCase):
         mock_StopService.side_effect = Exception("Access is denied")
         controller = WindowsPlatformController()
         expected_msg = r".*Unable to stop agent process.*"
-        self.assertRaisesRegexp(
+        self.assertRaisesRegex(
             Exception, expected_msg, controller.stop_agent_service, False
         )
 
@@ -89,7 +89,7 @@ class WindowsPlatformControllerTestCase(ScalyrTestCase):
             platform_controller.run_as_user("Domain\\Admin2", *run_as_user_args)
             self.assertEqual(platform_controller._run_as_administrators.call_count, 3)
 
-            with self.assertRaisesRegexp(
+            with self.assertRaisesRegex(
                 CannotExecuteAsUser, "as an Administrator account"
             ):
                 platform_controller.run_as_user("Domain\\User", *run_as_user_args)

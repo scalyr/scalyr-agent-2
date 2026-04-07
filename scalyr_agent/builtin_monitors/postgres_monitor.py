@@ -18,15 +18,12 @@
 # Note, this can be run in standalone mode by:
 #     python -m scalyr_agent.run_monitor scalyr_agent.builtin_monitors.mysql_monitor
 
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 import sys
 from datetime import datetime
 
 import pg8000  # pylint: disable=import-error
 import six
-from six.moves import zip
 
 from scalyr_agent import (
     ScalyrMonitor,
@@ -57,13 +54,13 @@ define_config_option(
     "between them. This is especially useful if you are running multiple PostgreSQL instances "
     "on a single server. Each instance has a separate `{...}` stanza in the configuration "
     "file (`/etc/scalyr-agent-2/agent.json`).",
-    convert_to=six.text_type,
+    convert_to=str,
 )
 define_config_option(
     __monitor__,
     "database_host",
     "Optional (default to `localhost`). Name of the host on which PostgreSQL is running.",
-    convert_to=six.text_type,
+    convert_to=str,
 )
 define_config_option(
     __monitor__,
@@ -88,19 +85,19 @@ define_config_option(
     __monitor__,
     "database_name",
     "Name of the PostgreSQL database the Scalyr Agent will connect to.",
-    convert_to=six.text_type,
+    convert_to=str,
 )
 define_config_option(
     __monitor__,
     "database_username",
     "Username the Scalyr Agent connects with.",
-    convert_to=six.text_type,
+    convert_to=str,
 )
 define_config_option(
     __monitor__,
     "database_password",
     "Password the Scalyr Agent connects with.",
-    convert_to=six.text_type,
+    convert_to=str,
 )
 
 # Metric definitions.
@@ -257,7 +254,7 @@ define_log_field(__monitor__, "metric", 'Name of the metric, e.g. "postgres.vars
 define_log_field(__monitor__, "value", "Value of the metric.")
 
 
-class PostgreSQLDb(object):
+class PostgreSQLDb:
     """Represents a PopstgreSQL database"""
 
     _database_stats = {
@@ -366,7 +363,7 @@ class PostgreSQLDb(object):
             )
             fields = [desc[0] for desc in self._cursor.description]
             self._cursor.execute(
-                "select * from %s where datname = '%s';" % (table, self._database)
+                "select * from {} where datname = '{}';".format(table, self._database)
             )
             data = self._cursor.fetchone()
         except pg8000.OperationalError as error:
@@ -407,7 +404,7 @@ class PostgreSQLDb(object):
         return size
 
     def __str__(self):
-        return "DB(%r:%r, %r)" % (self._host, self._port, self._version)
+        return "DB({!r}:{!r}, {!r})".format(self._host, self._port, self._version)
 
     def __repr__(self):
         return self.__str__()
@@ -580,7 +577,7 @@ For help, contact us at [support@scalyr.com](mailto:support@scalyr.com).
             self._db.reconnect()
         except Exception as e:
             self._logger.warning(
-                "Unable to gather stats for postgres database - %s" % six.text_type(e)
+                "Unable to gather stats for postgres database - %s" % str(e)
             )
             return
 

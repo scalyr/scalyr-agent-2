@@ -16,8 +16,6 @@
 # This monitor imports the Redis SLOWLOG.
 #
 # author:  Imron Alston <imron@scalyr.com>
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 __author__ = "imron@scalyr.com"
 
@@ -25,7 +23,7 @@ import binascii
 import re
 import time
 
-from six.moves import range
+
 
 from scalyr_agent import ScalyrMonitor, define_config_option
 
@@ -35,7 +33,7 @@ from redis.exceptions import (  # pylint: disable=import-error
     TimeoutError,
 )
 
-MORE_BYTES = re.compile(b"\.\.\. \(\d+ more bytes\)$")  # NOQA
+MORE_BYTES = re.compile(br"\.\.\. \(\d+ more bytes\)$")  # NOQA
 
 __monitor__ = __name__
 
@@ -123,7 +121,7 @@ define_config_option(
 )
 
 
-class RedisHost(object):
+class RedisHost:
     """Class that holds various information about a specific redis connection"""
 
     def __init__(self, host, port, password, connection_timeout):

@@ -23,8 +23,6 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
@@ -37,7 +35,7 @@ if False:  # NOSONAR
     from typing import Any
 
 import six
-from six.moves import range
+
 
 
 from scalyr_agent.json_lib.exceptions import JsonConversionException
@@ -46,7 +44,7 @@ from scalyr_agent.json_lib.exceptions import JsonMissingFieldException
 # 2->TODO remove 'str' where is the type check
 
 
-class JsonObject(object):
+class JsonObject:
     """Represents a JSON object, mapping keys to values.
 
     JsonObject represents a JSON object.  It has methods for
@@ -70,7 +68,7 @@ class JsonObject(object):
         else:
             self.__map = content
         # 2->TODO convert keys to unicode.
-        for key, value in six.iteritems(key_values):
+        for key, value in key_values.items():
             self.__map[six.ensure_text(key)] = value
 
     def to_json(self):
@@ -119,7 +117,7 @@ class JsonObject(object):
         return self
 
     def __iter__(self):
-        return six.iterkeys(self.__map)
+        return self.__map.keys()
 
     def update(self, other):
         """Updates the map with key/value pairs from other.  Overwriting existing keys"""
@@ -127,15 +125,15 @@ class JsonObject(object):
 
     def iteritems(self):
         """Returns an iterator over the items (key/value tuple) for this object."""
-        return six.iteritems(self.__map)
+        return self.__map.items()
 
     def itervalues(self):
         """Returns an iterator over the values for this object."""
-        return six.itervalues(self.__map)
+        return self.__map.values()
 
     def iterkeys(self):
         """Returns an iterator over the keys for this object."""
-        return six.iterkeys(self.__map)
+        return self.__map.keys()
 
     def items(self):
         """Returns a list of items (key/value tuple) for this object."""
@@ -230,11 +228,11 @@ class JsonObject(object):
         value_type = type(value)
         if value_type is bool:
             return value
-        elif value_type in six.integer_types:
+        elif value_type in (int,):
             return self.__num_to_bool(field, float(value))
         elif value_type is float:
             return self.__num_to_bool(field, value)
-        elif value_type is six.text_type:
+        elif value_type is str:
             return not value == "" and not value == "f" and not value == "false"
         else:
             return self.__conversion_error(field, value, "boolean")
@@ -291,15 +289,15 @@ class JsonObject(object):
         value_type = type(value)
 
         if (
-            value_type in six.integer_types
+            value_type in (int,)
             or value_type is float
-            or value_type is six.text_type
+            or value_type is str
         ):
             try:
                 # If it is a string type, then try to convert to a float
                 # first, and then int.. that way we will just truncate the
                 # float.
-                if value_type is six.text_type:
+                if value_type is str:
                     value = float(value)
                 return int(value)
             except ValueError:
@@ -342,15 +340,15 @@ class JsonObject(object):
         value_type = type(value)
 
         if (
-            value_type in six.integer_types
+            value_type in (int,)
             or value_type is float
-            or value_type is six.text_type
+            or value_type is str
         ):
             try:
                 # If it is a string type, then try to convert to a float
                 # first, and then long.. that way we will just truncate the
                 # float.
-                if value_type is six.text_type:
+                if value_type is str:
                     value = float(value)
                 return int(value)
             except ValueError:
@@ -389,9 +387,9 @@ class JsonObject(object):
         value_type = type(value)
 
         if (
-            value_type in six.integer_types
+            value_type in (int,)
             or value_type is float
-            or value_type is six.text_type
+            or value_type is str
         ):
             try:
                 return float(value)
@@ -428,11 +426,11 @@ class JsonObject(object):
         value_type = type(value)
 
         if (
-            value_type in six.integer_types
+            value_type in (int,)
             or value_type is float
-            or value_type is six.text_type
+            or value_type is str
         ):
-            return six.text_type(value)
+            return str(value)
         else:
             return self.__conversion_error(field, value, "str")
 
@@ -523,7 +521,7 @@ class JsonObject(object):
         @raise JsonConversionException: The conversion error."""
         raise JsonConversionException(
             "Failed converting %s of type %s for field %s to desired type %s"
-            % (six.text_type(value), type(value), field_name, desired_type)
+            % (str(value), type(value), field_name, desired_type)
         )
 
     def __compute_missing_value(self, field_name, default_value, none_if_missing):
@@ -560,7 +558,7 @@ class JsonObject(object):
         return not self.__eq__(other)
 
 
-class JsonArray(object):
+class JsonArray:
     """Represents a JSON array.
 
     JSON arrays can be contained by JsonObjects.  They are essentially
@@ -637,8 +635,7 @@ class JsonArray(object):
 
     def __iter__(self):
         """Yields all items in the array"""
-        for element in self._items:
-            yield element
+        yield from self._items
 
     def json_objects(self):
         """Yields all items in the array,
@@ -678,9 +675,9 @@ class ArrayOfStrings(JsonArray):
         self._items = []
         if values:
             for val in values:
-                if type(val) is not six.text_type:
+                if type(val) is not str:
                     raise TypeError(
-                        "A non-string element was found: %s" % six.text_type(val)
+                        "A non-string element was found: %s" % str(val)
                     )
                 self._items.append(val)
 
@@ -696,7 +693,7 @@ def convert_to_builtin_type(value):
     value_type = type(value)
     if value_type == JsonObject or value_type == dict:
         result = dict()
-        for key, value in six.iteritems(value):
+        for key, value in value.items():
             result[key] = convert_to_builtin_type(value)
         return result
     elif value_type == JsonArray or value_type == list:

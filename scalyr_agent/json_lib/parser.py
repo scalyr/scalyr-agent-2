@@ -17,19 +17,17 @@
 # implement custom Scalyr extensions.
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
 import six
 from six import unichr
-from six.moves import range
+
 
 from scalyr_agent.json_lib import JsonArray, JsonObject, JsonParseException
 
 
-class TextScanner(object):
+class TextScanner:
     """Allows for iterating over a unicode input.
 
     TextScanner wraps an incoming unicode string of input and provides
@@ -174,7 +172,7 @@ class TextScanner(object):
             )
 
 
-class JsonParser(object):
+class JsonParser:
     """Parses text input into JsonObjects and supports Scalyr's extensions.
 
     JsonParser is the main abstraction for parsing text input
@@ -557,7 +555,7 @@ class JsonParser(object):
             elif c == "u" and i + 5 <= slen:
                 hex_string = s[i + 1 : i + 5]
                 i += 4
-                sb.append(unichr(int(hex_string, 16)))
+                sb.append(chr(int(hex_string, 16)))
             else:
                 self.__error(
                     "Unexpected backslash escape [" + c + "]", literal_start + i

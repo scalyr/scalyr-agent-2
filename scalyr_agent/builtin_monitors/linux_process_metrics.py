@@ -23,8 +23,6 @@
 # See documentation for other ways to match processes.
 #
 # author:  Steven Czerwinski <czerwin@scalyr.com>
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
@@ -34,10 +32,9 @@ import re
 import sys
 import time
 from subprocess import Popen, PIPE
-from io import open
 
 import six
-from six.moves import range
+
 
 from scalyr_agent.compat import custom_defaultdict as defaultdict
 from scalyr_agent import ScalyrMonitor, BadMonitorConfiguration
@@ -49,7 +46,7 @@ define_config_option(
     __monitor__,
     "module",
     "Always `scalyr_agent.builtin_monitors.linux_process_metrics`",
-    convert_to=six.text_type,
+    convert_to=str,
     required_option=True,
 )
 define_config_option(
@@ -60,7 +57,7 @@ define_config_option(
     "plugin to import metrics from multiple processes. Each instance has a separate "
     "`{...}` stanza in the configuration file (`/etc/scalyr-agent-2/agent.json`).",
     required_option=True,
-    convert_to=six.text_type,
+    convert_to=str,
 )
 define_config_option(
     __monitor__,
@@ -70,7 +67,7 @@ define_config_option(
     "the first will be used by default. See `aggregate_multiple_processes`, "
     "and `include_child_processes` to match on multiple processes.",
     default=None,
-    convert_to=six.text_type,
+    convert_to=str,
 )
 define_config_option(
     __monitor__,
@@ -96,7 +93,7 @@ define_config_option(
     "Process identifier. An alternative to `commandline` to specify a process. "
     "Ignored if `commandline` is set.",
     default=None,
-    convert_to=six.text_type,
+    convert_to=str,
 )
 
 
@@ -235,7 +232,7 @@ define_log_field(__monitor__, "metric", 'Name of the metric, e.g. "app.cpu".')
 define_log_field(__monitor__, "value", "Value of the metric.")
 
 
-class Metric(object):
+class Metric:
     """
     This class is an abstraction for a linux metric that contains the
     metric name eg. CPU and type eg. system/user etc. A combination of the
@@ -259,7 +256,7 @@ class Metric(object):
     def __setattr__(self, name, value):
         if getattr(self, "_frozen", False):
             raise AttributeError("can't set attribute")
-        super(Metric, self).__setattr__(name, value)
+        super().__setattr__(name, value)
 
     @property
     def is_cumulative(self):
@@ -281,7 +278,7 @@ class Metric(object):
         )
 
     def __repr__(self):
-        return "<Metric name=%s,type=%s>" % (self.name, self.type)
+        return "<Metric name={},type={}>".format(self.name, self.type)
 
 
 class MetricPrinter:
@@ -363,8 +360,8 @@ class BaseReader:
             collector = {}
         if self._file is None:
             try:
-                self._file = open(filename, "r")
-            except IOError as e:
+                self._file = open(filename)
+            except OSError as e:
                 # We take a simple approach.  If we don't find the file or
                 # don't have permissions for it, then just don't collect this
                 # stat from now on.  If the user changes the configuration file
@@ -396,13 +393,13 @@ class BaseReader:
 
                 return self.gather_sample(self._file, collector=collector)
 
-            except IOError as e:
+            except OSError as e:
                 # log the error if the errno isn't 'process not found'. Process not found likely means the
                 # process exited, so we ignore that because it's within the realm of expected behaviour
                 if e.errno != errno.ESRCH:
                     self._logger.error(
                         "Error gathering sample for file: '%s'\n\t%s"
-                        % (filename, six.text_type(e))
+                        % (filename, str(e))
                     )
 
                 # close the file. This will cause the file to be reopened next call to run_single_cycle
@@ -500,7 +497,7 @@ class StatReader(BaseReader):
             # We read /proc/uptime once to get the current boot time.
             uptime_file = None
             try:
-                uptime_file = open("/proc/uptime", "r")
+                uptime_file = open("/proc/uptime")
                 # The first number in the file is the number of seconds since
                 # boot time.  So, we just use that to calculate the milliseconds
                 # past epoch.
@@ -860,7 +857,7 @@ class FileDescriptorReader:
         pass
 
 
-class ProcessTracker(object):
+class ProcessTracker:
     """
     This class is responsible for gathering the metrics for a process.
     Given a process id, it procures and stores different metrics using
@@ -922,10 +919,10 @@ class ProcessTracker(object):
         return collector
 
     def __repr__(self):
-        return "<ProcessTracker pid=%s,monitor_id=%s>" % (self.pid, self.monitor_id)
+        return "<ProcessTracker pid={},monitor_id={}>".format(self.pid, self.monitor_id)
 
 
-class ProcessList(object):
+class ProcessList:
     """
     Class that encapsulates the listing of process(es) based on IDs, regular expressions etc.
     """
@@ -1130,10 +1127,10 @@ For help, contact us at [support@scalyr.com](mailto:support@scalyr.com).
         self.__pids = []
 
         self.__id = self._config.get(
-            "id", required_field=True, convert_to=six.text_type
+            "id", required_field=True, convert_to=str
         )
         self.__commandline_matcher = self._config.get(
-            "commandline", default=None, convert_to=six.text_type
+            "commandline", default=None, convert_to=str
         )
         self.__aggregate_multiple_processes = self._config.get(
             "aggregate_multiple_processes", default=False, convert_to=bool
@@ -1153,7 +1150,7 @@ For help, contact us at [support@scalyr.com](mailto:support@scalyr.com).
         )
 
         self.__target_pids = self._config.get(
-            "pid", default=None, convert_to=six.text_type
+            "pid", default=None, convert_to=str
         )
         if self.__target_pids:
             self.__target_pids = self.__target_pids.split(",")

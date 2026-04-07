@@ -1,6 +1,6 @@
 FROM scalyr-agent-testings-fpm_package-builder as fpm_package_build
 
-ADD ./agent_source /agent_source
+COPY ./agent_source /agent_source
 
 RUN /agent_source/tests/image_builder/distributions/base/build_packages.sh rpm
 

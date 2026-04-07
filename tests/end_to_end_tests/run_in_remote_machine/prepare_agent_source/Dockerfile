@@ -1,5 +1,5 @@
 FROM toolset as prepare_source
-ADD . /tmp/source
+COPY . /tmp/source
 RUN rm -r /tmp/source/.git
 
 ARG AGENT_SOURCE_TARBALL_FILENAME

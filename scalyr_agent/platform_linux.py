@@ -15,8 +15,6 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
@@ -138,7 +136,7 @@ class LinuxPlatformController(PosixPlatformController):
                                 # the copying manager start after the declaration of the managers,
                                 # so we can not put the real PID but just mark that it will be set later.
                                 pid="$$TBD",
-                                id="{0}{1}".format(
+                                id="{}{}".format(
                                     WORKER_SESSION_PROCESS_MONITOR_ID_PREFIX,
                                     worker_session_id,
                                 ),

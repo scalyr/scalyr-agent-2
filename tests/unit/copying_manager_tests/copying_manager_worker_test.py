@@ -52,7 +52,6 @@ from scalyr_agent import scalyr_logging
 import six
 
 str = six.text_type
-from six.moves import range
 
 
 log = scalyr_logging.getLogger(__name__)

@@ -20,8 +20,6 @@
 # https://www.scalyr.com/help/creating-a-monitor-plugin
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
@@ -564,7 +562,7 @@ def load_monitor_class(module_name, additional_python_paths):
             value = getattr(module, attr)
             if not inspect.isclass(value):
                 continue
-            if "ScalyrMonitor" in six.text_type(value.__bases__):
+            if "ScalyrMonitor" in str(value.__bases__):
                 description = value.__doc__
                 if description:
                     description = description.strip()
@@ -707,7 +705,7 @@ def define_log_field(monitor_module, field_name, field_description):
     return None
 
 
-class MonitorInformation(object):
+class MonitorInformation:
     """Encapsulates all the descriptive information that can be gather for a particular monitor.
 
     This is generally used to create documentation pages for the monitor.
@@ -751,7 +749,7 @@ class MonitorInformation(object):
         @rtype: list of ConfigOption
         """
         return sorted(
-            six.itervalues(self.__options), key=self.__get_insert_sort_position
+            self.__options.values(), key=self.__get_insert_sort_position
         )
 
     def config_option(self, name):
@@ -773,7 +771,7 @@ class MonitorInformation(object):
         @rtype: list of MetricDescription
         """
         return sorted(
-            six.itervalues(self.__metrics), key=self.__get_insert_sort_position
+            self.__metrics.values(), key=self.__get_insert_sort_position
         )
 
     @property
@@ -784,7 +782,7 @@ class MonitorInformation(object):
         @rtype: list of LogFieldDescription
         """
         return sorted(
-            six.itervalues(self.__log_fields), key=self.__get_insert_sort_position
+            self.__log_fields.values(), key=self.__get_insert_sort_position
         )
 
     def __get_insert_sort_position(self, item):
@@ -845,7 +843,7 @@ class MonitorInformation(object):
                 # If there are extra fields, we use that as part of the key name to store the metric under to
                 # avoid collisions with the same metric but different extra fields registered.
                 info.__metrics[
-                    "%s%s" % (metric.metric_name, six.text_type(metric.extra_fields))
+                    "{}{}".format(metric.metric_name, str(metric.extra_fields))
                 ] = metric
             # Stash a position attribute to capture what the insert order was for the metrics.
             setattr(metric, "sort_pos", info.__counter)
@@ -871,13 +869,13 @@ class MonitorInformation(object):
             return None
 
     def __repr__(self):
-        return "<MonitorInformation monitor_module=%s,metrics=%s>" % (
+        return "<MonitorInformation monitor_module={},metrics={}>".format(
             self.__monitor_module,
             self.__metrics,
         )
 
 
-class ConfigOption(object):
+class ConfigOption:
     """Simple object to hold the fields for a single configuration option."""
 
     def __init__(self):
@@ -903,10 +901,10 @@ class ConfigOption(object):
         self.allow_http = True
 
     def __repr__(self):
-        return "%s %s %s" % (self.option_name, self.env_aware, self.env_name)
+        return "{} {} {}".format(self.option_name, self.env_aware, self.env_name)
 
 
-class MetricDescription(object):
+class MetricDescription:
     """Simple object to hold fields describing a monitor's metric."""
 
     def __init__(self):
@@ -934,7 +932,7 @@ class MetricDescription(object):
         )
 
 
-class LogFieldDescription(object):
+class LogFieldDescription:
     """Simple object to hold fields describing the entries that are parsed from a log line produced by the monitor."""
 
     def __init__(self):
@@ -944,7 +942,7 @@ class LogFieldDescription(object):
         self.description = None
 
 
-class MonitorConfig(object):
+class MonitorConfig:
     """Encapsulates configuration parameters for a single monitor instance and includes helper utilities to
     validate configuration values.
 
@@ -966,7 +964,7 @@ class MonitorConfig(object):
         self._environment_aware_map = {}
 
         if content is not None:
-            for x in content:
+            for x in content.keys():
                 self.__map[x] = content[x]
 
         info = MonitorInformation.get_monitor_info(monitor_module)
@@ -1086,14 +1084,14 @@ class MonitorConfig(object):
             if max_value is not None and result > max_value:
                 raise BadMonitorConfiguration(
                     'Value of %s in field "%s" is invalid; maximum is %s'
-                    % (six.text_type(result), field, six.text_type(max_value)),
+                    % (str(result), field, str(max_value)),
                     field,
                 )
 
             if min_value is not None and result < min_value:
                 raise BadMonitorConfiguration(
                     'Value of %s in field "%s" is invalid; minimum is %s'
-                    % (six.text_type(result), field, six.text_type(min_value)),
+                    % (str(result), field, str(min_value)),
                     field,
                 )
 
@@ -1102,19 +1100,19 @@ class MonitorConfig(object):
             raise BadMonitorConfiguration(message=e.message, field=e.field)
 
     def __iter__(self):
-        return six.iterkeys(self.__map)
+        return self.__map.keys()
 
     def iteritems(self):
         """Returns an iterator over the items (key/value tuple) for this object."""
-        return six.iteritems(self.__map)
+        return self.__map.items()
 
     def itervalues(self):
         """Returns an iterator over the values for this object."""
-        return six.itervalues(self.__map)
+        return self.__map.values()
 
     def iterkeys(self):
         """Returns an iterator over the keys for this object."""
-        return six.iterkeys(self.__map)
+        return self.__map.keys()
 
     def items(self):
         """Returns a list of items (key/value tuple) for this object."""

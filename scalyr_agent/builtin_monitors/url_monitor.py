@@ -15,8 +15,6 @@
 #
 # A ScalyrMonitor which retrieves a specified URL and records the response status and body.
 
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 import re
 import traceback
@@ -43,7 +41,7 @@ define_config_option(
     "module",
     "Always `scalyr_agent.builtin_monitors.url_monitor`",
     required_option=True,
-    convert_to=six.text_type,
+    convert_to=str,
 )
 define_config_option(
     __monitor__,
@@ -276,7 +274,7 @@ For help, contact Support.
 
         request = six.moves.urllib.request.Request(self.url, data=request_data)
 
-        for header_key, header_value in six.iteritems(self._base_headers):
+        for header_key, header_value in self._base_headers.items():
             request.add_header(header_key, header_value)
 
         if self.request_headers:
@@ -359,7 +357,7 @@ For help, contact Support.
         @type error_type: str
         """
         # Convert the exception to a string, truncated to 30 chars.
-        e_to_str = six.text_type(e)
+        e_to_str = str(e)
 
         if len(e_to_str) > 30:
             e_to_str = e_to_str[0:30] + "..."

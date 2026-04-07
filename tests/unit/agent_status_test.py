@@ -129,37 +129,37 @@ class TestOverallStats(ScalyrTestCase):
 
         c = a + b
 
-        self.assertEquals(c.total_bytes_copied, 10)
-        self.assertEquals(c.total_bytes_skipped, 12)
-        self.assertEquals(c.total_bytes_subsampled, 14)
-        self.assertEquals(c.total_bytes_failed, 16)
-        self.assertEquals(c.total_redactions, 18)
-        self.assertEquals(c.total_copy_requests_errors, 20)
-        self.assertEquals(c.total_monitor_reported_lines, 22)
-        self.assertEquals(c.total_monitor_errors, 24)
+        self.assertEqual(c.total_bytes_copied, 10)
+        self.assertEqual(c.total_bytes_skipped, 12)
+        self.assertEqual(c.total_bytes_subsampled, 14)
+        self.assertEqual(c.total_bytes_failed, 16)
+        self.assertEqual(c.total_redactions, 18)
+        self.assertEqual(c.total_copy_requests_errors, 20)
+        self.assertEqual(c.total_monitor_reported_lines, 22)
+        self.assertEqual(c.total_monitor_errors, 24)
 
-        self.assertEquals(c.total_requests_sent, 8)
-        self.assertEquals(c.total_requests_failed, 10)
-        self.assertEquals(c.total_request_bytes_sent, 12)
-        self.assertEquals(c.total_compressed_request_bytes_sent, 5)
-        self.assertEquals(c.total_response_bytes_received, 14)
-        self.assertEquals(c.total_request_latency_secs, 16)
-        self.assertEquals(c.total_connections_created, 18)
+        self.assertEqual(c.total_requests_sent, 8)
+        self.assertEqual(c.total_requests_failed, 10)
+        self.assertEqual(c.total_request_bytes_sent, 12)
+        self.assertEqual(c.total_compressed_request_bytes_sent, 5)
+        self.assertEqual(c.total_response_bytes_received, 14)
+        self.assertEqual(c.total_request_latency_secs, 16)
+        self.assertEqual(c.total_connections_created, 18)
 
-        self.assertEquals(c.total_bytes_pending, 2)
-        self.assertEquals(c.skipped_new_bytes, 4)
-        self.assertEquals(c.skipped_preexisting_bytes, 6)
+        self.assertEqual(c.total_bytes_pending, 2)
+        self.assertEqual(c.skipped_new_bytes, 4)
+        self.assertEqual(c.skipped_preexisting_bytes, 6)
 
-        self.assertEquals(c.total_scan_iterations, 2)
-        self.assertEquals(c.total_read_time, 4)
-        self.assertEquals(c.total_compression_time, 6)
-        self.assertEquals(c.total_waiting_time, 8)
-        self.assertEquals(c.total_blocking_response_time, 10)
-        self.assertEquals(c.total_request_time, 12)
-        self.assertEquals(c.total_pipelined_requests, 14)
-        self.assertEquals(c.avg_bytes_produced_rate, 16)
-        self.assertEquals(c.avg_bytes_copied_rate, 18)
-        self.assertEquals(c.rate_limited_time_since_last_status, 20)
+        self.assertEqual(c.total_scan_iterations, 2)
+        self.assertEqual(c.total_read_time, 4)
+        self.assertEqual(c.total_compression_time, 6)
+        self.assertEqual(c.total_waiting_time, 8)
+        self.assertEqual(c.total_blocking_response_time, 10)
+        self.assertEqual(c.total_request_time, 12)
+        self.assertEqual(c.total_pipelined_requests, 14)
+        self.assertEqual(c.avg_bytes_produced_rate, 16)
+        self.assertEqual(c.avg_bytes_copied_rate, 18)
+        self.assertEqual(c.rate_limited_time_since_last_status, 20)
 
 
 class TestReportStatus(ScalyrTestCase):
@@ -473,7 +473,7 @@ Failed monitors:
                 "sCaLyR_XXX_b", "sCaLyR_XXX_b".upper()
             )
 
-        self.assertEquals(expected_output, output.getvalue())
+        self.assertEqual(expected_output, output.getvalue())
 
     def test_bad_config(self):
 
@@ -555,7 +555,7 @@ Failed monitors:
             os.getpid()
         )
 
-        self.assertEquals(expected_output, output.getvalue())
+        self.assertEqual(expected_output, output.getvalue())
 
     def test_bad_copy_response(self):
         # Set the responses for all workers of the first api key as failed.
@@ -647,7 +647,7 @@ Failed monitors:
             os.getpid()
         )
 
-        self.assertEquals(expected_output, output.getvalue())
+        self.assertEqual(expected_output, output.getvalue())
 
     def test_no_health_check(self):
         output = io.StringIO()
@@ -758,7 +758,7 @@ Failed monitors:
                 "sCaLyR_XXX_b", "sCaLyR_XXX_b".upper()
             )
 
-        self.assertEquals(expected_output, output.getvalue())
+        self.assertEqual(expected_output, output.getvalue())
 
     def test_last_success_is_none(self):
 
@@ -842,7 +842,7 @@ Failed monitors:
             os.getpid()
         )
 
-        self.assertEquals(expected_output, output.getvalue())
+        self.assertEqual(expected_output, output.getvalue())
 
     def test_status_to_dict(self):
         self.make_default()
@@ -1049,7 +1049,7 @@ Failed monitors:
                 "sCaLyR_XXX_b", "sCaLyR_XXX_b".upper()
             )
 
-        self.assertEquals(expected_output, output.getvalue())
+        self.assertEqual(expected_output, output.getvalue())
 
     def test_multi_worker_one_api_key(self):
         output = io.StringIO()
@@ -1161,7 +1161,7 @@ Failed monitors:
                 "sCaLyR_XXX_b", "sCaLyR_XXX_b".upper()
             )
 
-        self.assertEquals(expected_output, output.getvalue())
+        self.assertEqual(expected_output, output.getvalue())
 
     def test_multi_worker_one_worker(self):
         output = io.StringIO()
@@ -1285,7 +1285,7 @@ Failed monitors:
                 "sCaLyR_XXX_b", "sCaLyR_XXX_b".upper()
             )
 
-        self.assertEquals(expected_output, output.getvalue())
+        self.assertEqual(expected_output, output.getvalue())
 
     def test_multi_worker_bad_health_check(self):
         output = io.StringIO()
@@ -1422,7 +1422,7 @@ Failed monitors:
                 "sCaLyR_XXX_b", "sCaLyR_XXX_b".upper()
             )
 
-        self.assertEquals(expected_output, output.getvalue())
+        self.assertEqual(expected_output, output.getvalue())
 
 
 class AgentMainStatusHandlerTestCase(ScalyrTestCase):

@@ -16,8 +16,6 @@
 #
 # Note, this can be run in standalone mode by:
 #     python -m scalyr_agent.run_monitor scalyr_agent.builtin_monitors.mysql_monitor
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 import sys
 import re
@@ -66,19 +64,19 @@ define_config_option(
     "If you are running multiple instances of this plugin, id lets you distinguish between them. "
     "This is especially useful if you are running multiple MySQL instances on a single server. "
     "Each instance has a separate `{...}` stanza in the configuration file (`/etc/scalyr-agent-2/agent.json`).",
-    convert_to=six.text_type,
+    convert_to=str,
 )
 define_config_option(
     __monitor__,
     "database_username",
     "Username to connect to MySQL.",
-    convert_to=six.text_type,
+    convert_to=str,
 )
 define_config_option(
     __monitor__,
     "database_password",
     "Password to connect to MySQL.",
-    convert_to=six.text_type,
+    convert_to=str,
 )
 define_config_option(
     __monitor__,
@@ -86,7 +84,7 @@ define_config_option(
     "Location of the socket file, e.g. `/var/run/mysqld_instance2/mysqld.sock`. "
     "If MySQL is running on the same server as the Scalyr Agent, you can usually "
     'set this to "default", and this plugin will look for the location.',
-    convert_to=six.text_type,
+    convert_to=str,
 )
 define_config_option(
     __monitor__,
@@ -94,7 +92,7 @@ define_config_option(
     "Hostname (or IP address) and port number of the MySQL server, e.g. "
     "`dbserver:3306`, or simply `3306` to connect to the local machine. Set "
     "`database_socket` or `database_hostport`, but not both.",
-    convert_to=six.text_type,
+    convert_to=str,
 )
 define_config_option(
     __monitor__,
@@ -108,19 +106,19 @@ define_config_option(
     "ca_file",
     "Optional (defaults to `None`). Location of the Certificate Authority (CA) ca file "
     "for the SSL connection. Defaults to `None` (no verification of the root certificate).",
-    convert_to=six.text_type,
+    convert_to=str,
 )
 define_config_option(
     __monitor__,
     "key_file",
     "Optional (defaults to `None`). Location of the key file to use for the SSL connection.",
-    convert_to=six.text_type,
+    convert_to=str,
 )
 define_config_option(
     __monitor__,
     "cert_file",
     "Optional (defaults to `None`). Location of the cert file to use for the SSL connection.",
-    convert_to=six.text_type,
+    convert_to=str,
 )
 define_config_option(
     __monitor__,
@@ -399,7 +397,7 @@ __coms_to_report__ = (
 )
 
 
-class MysqlDB(object):
+class MysqlDB:
     """Represents a MySQL database"""
 
     def _connect(self):
@@ -504,9 +502,9 @@ class MysqlDB(object):
                 )
                 raise Exception(
                     "Database error -- "
-                    + six.text_type(errcode)
+                    + str(errcode)
                     + ": "
-                    + six.text_type(msg)
+                    + str(msg)
                 )
             self._reconnect()
             return None
@@ -590,7 +588,7 @@ class MysqlDB(object):
             else:
                 value = int(value)
         except ValueError:
-            value = six.text_type(value)  # string values are possible
+            value = str(value)  # string values are possible
         return value
 
     def _parse_data(self, data, fields):
@@ -743,7 +741,7 @@ class MysqlDB(object):
         if master_host and master_host != "None":
             result = []
             sbm = slave_status.get("seconds_behind_master")
-            if isinstance(sbm, six.integer_types):
+            if isinstance(sbm, int):
                 result.append({"field": "slave.seconds_behind_master", "value": sbm})
             result.append(
                 {
@@ -782,7 +780,7 @@ class MysqlDB(object):
         for row in process_status:
             id, user, host, db_, cmd, time, state = row[:7]
             states[cmd] = states.get(cmd, 0) + 1
-        for state, count in six.iteritems(states):
+        for state, count in states.items():
             state = state.lower().replace(" ", "_")
             result.append({"field": "process.%s" % state, "value": count})
         if len(result) == 0:
@@ -976,15 +974,15 @@ class MysqlDB(object):
             (no, e) = error.args
             if no == errno.ENOENT:
                 return False
-            self._logger.error("warning: couldn't stat(%r): %s" % (path, e))
+            self._logger.error("warning: couldn't stat({!r}): {}".format(path, e))
             return None
         return s.st_mode & stat.S_IFSOCK == stat.S_IFSOCK
 
     def __str__(self):
         if self._type == "socket":
-            return "DB(%r, %r)" % (self._sockfile, self._version)
+            return "DB({!r}, {!r})".format(self._sockfile, self._version)
         else:
-            return "DB(%r:%r, %r)" % (self._host, self._port, self._version)
+            return "DB({!r}:{!r}, {!r})".format(self._host, self._port, self._version)
 
     def __repr__(self):
         return self.__str__()
@@ -1206,7 +1204,7 @@ For help, contact us at [support@scalyr.com](mailto:support@scalyr.com).
             )
         elif "database_socket" in self._config:
             self._database_connect_type = "socket"
-            if type(self._config["database_socket"]) is six.text_type:
+            if type(self._config["database_socket"]) is str:
                 self._database_socket = self._config["database_socket"]
                 if len(self._database_socket) == 0:
                     raise Exception(
@@ -1220,7 +1218,7 @@ For help, contact us at [support@scalyr.com](mailto:support@scalyr.com).
                 )
         elif "database_hostport" in self._config:
             self._database_connect_type = "host:port"
-            if type(self._config["database_hostport"]) is six.text_type:
+            if type(self._config["database_hostport"]) is str:
                 hostport = self._config["database_hostport"]
                 if len(hostport) == 0:
                     raise Exception(
@@ -1313,7 +1311,7 @@ For help, contact us at [support@scalyr.com](mailto:support@scalyr.com).
         except Exception as e:
             self._db = None
             global_log.warning(
-                "Error establishing database connection: %s" % (six.text_type(e)),
+                "Error establishing database connection: %s" % (str(e)),
                 limit_once_per_x_secs=300,
                 limit_key="mysql_connect_to_db",
                 exc_info=e,

@@ -3,8 +3,6 @@
 # Note, this can be run in standalone mode by:
 # python -m scalyr_agent.run_monitor
 # scalyr_agent.builtin_monitors.nginx_monitor
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 import socket
 
@@ -29,7 +27,7 @@ define_config_option(
     __monitor__,
     "module",
     "Always `scalyr_agent.builtin_monitors.nginx_monitor`",
-    convert_to=six.text_type,
+    convert_to=str,
     required_option=True,
     allow_http=False,
 )
@@ -57,7 +55,7 @@ define_config_option(
     "useful if you are running multiple nginx instances on a single server; you can monitor each "
     "instance with separate `{...}` stanzas in the configuration "
     "file (`/etc/scalyr-agent-2/agent.json`).",
-    convert_to=six.text_type,
+    convert_to=str,
 )
 
 define_log_field(__monitor__, "monitor", "Always `nginx_monitor`.")
@@ -127,10 +125,7 @@ def BindableHTTPConnectionFactory(source_ip):
         # pylint: disable=unexpected-keyword-arg
         # NOTE: "strict" argument is not supported by Python 3 class
         # TODO: We should switch to using urllib Request object directly or requests library
-        if six.PY2:
-            kwargs = {"strict": strict}
-        else:
-            kwargs = {}
+        kwargs = {}
         bhc = BindableHTTPConnection(host, port=port, timeout=timeout, **kwargs)
         bhc.source_ip = source_ip
         return bhc

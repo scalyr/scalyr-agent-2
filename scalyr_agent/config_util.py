@@ -15,8 +15,6 @@
 #
 # author:  Edward Chee <echee@scalyr.com>
 
-from __future__ import unicode_literals
-from __future__ import absolute_import
 
 __author__ = "echee@scalyr.com"
 
@@ -90,28 +88,26 @@ def parse_array_of_strings(strlist, separators=[","]):
     return ArrayOfStrings(elems)
 
 
-NUMERIC_TYPES = set(six.integer_types + (float,))
-STRING_TYPES = set([six.text_type])
-PRIMITIVE_TYPES = NUMERIC_TYPES | set([six.text_type, bool])
-SUPPORTED_TYPES = PRIMITIVE_TYPES | set(
-    [JsonArray, JsonObject, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings]
-)
+NUMERIC_TYPES = set((int,) + (float,))
+STRING_TYPES = {str}
+PRIMITIVE_TYPES = NUMERIC_TYPES | {str, bool}
+SUPPORTED_TYPES = PRIMITIVE_TYPES | {
+    JsonArray, JsonObject, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings
+}
 ALLOWED_CONVERSIONS = {
     bool: STRING_TYPES,
-    float: STRING_TYPES | set([int, float]),
-    list: set(
-        [
-            six.text_type,
+    float: STRING_TYPES | {int, float},
+    list: {
+            str,
             JsonArray,
             ArrayOfStrings,
             SpaceAndCommaSeparatedArrayOfStrings,
-        ]
-    ),
-    JsonArray: set(
-        [six.text_type, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings]
-    ),
+    },
+    JsonArray: {
+        str, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings
+    },
     JsonObject: STRING_TYPES,
-    six.text_type: SUPPORTED_TYPES,
+    str: SUPPORTED_TYPES,
 }
 
 # [start of 2->TODO]
@@ -119,7 +115,7 @@ ALLOWED_CONVERSIONS = {
 # In python 2.6, 2.7 long can be converted to int without error,
 # so we can keep only int as allowed conversion for both int and long input values.
 ALLOWED_CONVERSIONS.update(
-    ((int_type, set([six.text_type, int, float])) for int_type in six.integer_types)
+    (int_type, {str, int, float}) for int_type in (int,)
 )
 
 # [end of 2->TOD0]
@@ -141,7 +137,7 @@ def convert_config_param(field_name, value, convert_to, is_environment_variable=
 
     conversion_allowed = False
     if convert_from in ALLOWED_CONVERSIONS:
-        if convert_to in set([convert_from]) | ALLOWED_CONVERSIONS[convert_from]:
+        if convert_to in {convert_from} | ALLOWED_CONVERSIONS[convert_from]:
             conversion_allowed = True
 
     if not conversion_allowed:
@@ -192,7 +188,7 @@ def convert_config_param(field_name, value, convert_to, is_environment_variable=
     if convert_from in STRING_TYPES:
 
         if convert_to == bool:
-            return six.text_type(value).lower() == "true"
+            return str(value).lower() == "true"
 
         elif convert_to in (JsonArray, JsonObject):
             try:
@@ -242,7 +238,7 @@ def convert_config_param(field_name, value, convert_to, is_environment_variable=
 
     if convert_to == bool:
         raise BadConfiguration(
-            'A numeric value %s was given for boolean field "%s"' % (value, field_name),
+            'A numeric value {} was given for boolean field "{}"'.format(value, field_name),
             field_name,
             "notBoolean",
         )
@@ -257,9 +253,9 @@ def convert_config_param(field_name, value, convert_to, is_environment_variable=
 
     # At this point, we are trying to convert a number to another number type.  We only allow int to long
     # and long, int to float.
-    if convert_to == float and convert_from in six.integer_types:
+    if convert_to == float and convert_from in (int,):
         return float(value)
-    if convert_to in six.integer_types:
+    if convert_to in (int,):
         return int(value)
 
     raise BadConfiguration(
@@ -350,7 +346,7 @@ class BadConfiguration(Exception):
         if field is not None:
             Exception.__init__(
                 self,
-                '%s [[badField="%s" errorCode="%s"]]' % (message, field, error_code),
+                '{} [[badField="{}" errorCode="{}"]]'.format(message, field, error_code),
             )
         else:
-            Exception.__init__(self, '%s [[errorCode="%s"]]' % (message, error_code))
+            Exception.__init__(self, '{} [[errorCode="{}"]]'.format(message, error_code))

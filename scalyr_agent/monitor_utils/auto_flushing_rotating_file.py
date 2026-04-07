@@ -15,16 +15,14 @@
 # IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-from __future__ import absolute_import
 
 import threading
 import os
-from io import open
-
-from six.moves import range
 
 
-class AutoFlushingRotatingFile(object):
+
+
+class AutoFlushingRotatingFile:
     def __init__(self, filename, max_bytes=0, backup_count=0, flush_delay=0):
         self._max_bytes = max_bytes
         self._backup_count = backup_count

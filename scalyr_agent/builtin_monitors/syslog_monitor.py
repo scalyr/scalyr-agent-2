@@ -20,9 +20,6 @@
 #
 # author: scalyr@sentinelone.com
 
-from __future__ import absolute_import
-from __future__ import print_function
-from __future__ import unicode_literals
 
 if False:  # NOSONAR
     from typing import Tuple, Optional
@@ -48,16 +45,10 @@ import traceback
 import functools
 import sys
 from string import Template
-from io import open
 
 import six
-from six.moves import range
-import six.moves.socketserver
 
-if six.PY2:
-    from scalyr_agent.builtin_monitors.thread_pool_py2 import BoundedThreadingMixIn
-else:
-    from scalyr_agent.builtin_monitors.thread_pool import BoundedThreadingMixIn
+from scalyr_agent.builtin_monitors.thread_pool import BoundedThreadingMixIn
 
 try:
     # Only available for python >= 3.6
@@ -111,7 +102,7 @@ define_config_option(
     __monitor__,
     "module",
     "Always `scalyr_agent.builtin_monitors.syslog_monitor`",
-    convert_to=six.text_type,
+    convert_to=str,
     required_option=True,
 )
 define_config_option(
@@ -120,7 +111,7 @@ define_config_option(
     'Optional (defaults to `"tcp:601, udp:514"`). A string of `protocol:port`s, separated '
     "by commas. Sets the ports on which the Scalyr Agent will accept messages. We recommend "
     "TCP for reliability and performance, whenever possible.",
-    convert_to=six.text_type,
+    convert_to=str,
     default="tcp",
 )
 
@@ -141,7 +132,7 @@ define_config_option(
     "This is especially useful when running multiple instances of this plugin, to send "
     "dissimilar log types to different files. Add and set a separate `{...}` stanza for "
     "each instance.",
-    convert_to=six.text_type,
+    convert_to=str,
     default="agent_syslog.log",
 )
 
@@ -153,7 +144,7 @@ define_config_option(
     "$APPNAME will be substituted appropriately.  If the path is not absolute, then it is assumed "
     "to be relative to the main Scalyr Agent log directory.  Note that this option is currently "
     "only available via a Dockerized Scalyr Agent due to an external dependency.",
-    convert_to=six.text_type,
+    convert_to=str,
     default=None,
 )
 
@@ -166,7 +157,7 @@ define_config_option(
     "a single parser for each distinct log type, as this improves maintainability and "
     "scalability. More information on configuring parsers can be found "
     "[here](https://app.scalyr.com/parsers).",
-    convert_to=six.text_type,
+    convert_to=str,
     default="agentSyslog",
 )
 
@@ -238,7 +229,7 @@ define_config_option(
     "of multiple write calls. We recommend this setting when you wish to avoid expensive framed "
     "message parsing, and only want to write received data as-is.",
     default="default",
-    convert_to=six.text_type,
+    convert_to=str,
 )
 
 define_config_option(
@@ -259,7 +250,7 @@ define_config_option(
     "Some implementations, such as the Python syslog handler, use the null character `\\ 000`; "
     "messages can have new lines without the use of framing.",
     default="\n",
-    convert_to=six.text_type,
+    convert_to=str,
 )
 define_config_option(
     __monitor__,
@@ -268,7 +259,7 @@ define_config_option(
     "the `docker_monitor`. In particular, the plugin will check for container ids in the tags of "
     "incoming lines, and create log files based on their container names.",
     default="syslog",
-    convert_to=six.text_type,
+    convert_to=str,
 )
 
 define_config_option(
@@ -278,7 +269,7 @@ define_config_option(
     r'has the container id. Defaults to `"^.*([a-z0-9]{12})\[\d+\]: ?"`. If a message matches '
     "this regex, then everything *after* the full matching expression is logged to a file named "
     "`docker-<container-name>.log`.",
-    convert_to=six.text_type,
+    convert_to=str,
     default=r"^.*([a-z0-9]{12})\[\d+\]: ?",
 )
 
@@ -289,7 +280,7 @@ define_config_option(
     r'has the container name and id. Defaults to `"^.*([^/]+)/([^[]+)\[\d+\]: ?"`. If a message '
     "matches this regex, then everything *after* the full matching expression is logged to a file "
     "named `docker-<container-name>.log`.",
-    convert_to=six.text_type,
+    convert_to=str,
     default=r"^.*([^/]+)/([^[]+)\[\d+\]: ?",
 )
 
@@ -319,7 +310,7 @@ define_config_option(
     "ids. You must set the `api_socket` configuration option in the docker monitor to the "
     "same value. You must also map the host's `/run/docker.sock` to the same value as specified here, "
     "with the -v parameter, for example `docker run -v /run/docker.sock:/var/scalyr/docker.sock ...`.",
-    convert_to=six.text_type,
+    convert_to=str,
     default="/var/scalyr/docker.sock",
 )
 
@@ -329,7 +320,7 @@ define_config_option(
     "Optional (defaults to `auto`). Version of the Docker API to use when communicating. "
     "WARNING: you must set the `docker_api_version` configuration option in the docker monitor "
     "to the same value.",
-    convert_to=six.text_type,
+    convert_to=str,
     default="auto",
 )
 
@@ -340,7 +331,7 @@ define_config_option(
     "to save docker logs sent by other containers with syslog. The variables $CNAME and $CID will "
     "be substituted with the name and id of the container that is emitting the logs. If the path "
     "is not absolute, then it is assumed to be relative to the main Scalyr Agent log directory.",
-    convert_to=six.text_type,
+    convert_to=str,
     default="containers/${CNAME}.log",
 )
 
@@ -486,10 +477,10 @@ def _get_default_gateway():
             result = socket.inet_ntoa(
                 compat.struct_pack_unicode("<L", int(fields[2], 16))
             )
-    except IOError as e:
+    except OSError as e:
         global_log.error(
             "Error while getting the default gateway: %s",
-            six.text_type(e),
+            str(e),
             limit_once_per_x_secs=300,
             limit_key="_get_default_gateway_error",
         )
@@ -500,7 +491,7 @@ def _get_default_gateway():
     return result
 
 
-class SyslogFrameParser(object):
+class SyslogFrameParser:
     """Simple abstraction that implements a 'parse_request' that can be used to parse incoming syslog
     messages.  These will either be terminated by a newline (or crlf) sequence, or begin with an
     integer specifying the number of octects in the message.  The parser performs detection of
@@ -603,12 +594,7 @@ class SyslogUDPHandler(six.moves.socketserver.BaseRequestHandler):
     def __init__(self, request, client_address, server):
         # type: (socket.socket, Tuple[str, int], SyslogUDPServer) -> None
 
-        if six.PY3:
-            super(SyslogUDPHandler, self).__init__(request, client_address, server)
-        else:
-            six.moves.socketserver.BaseRequestHandler.__init__(
-                self, request, client_address, server
-            )
+        super().__init__(request, client_address, server)
 
     def handle(self):
         data = six.ensure_text(self.request[0].strip(), "utf-8", errors="ignore")
@@ -634,7 +620,7 @@ class SocketClosed(Exception):
     pass
 
 
-class SyslogRequest(object):
+class SyslogRequest:
     def __init__(self, socket, max_buffer_size):
         self._socket = socket
         self._max_buffer_size = max_buffer_size
@@ -654,13 +640,13 @@ class SyslogRequest(object):
             raise SocketNotReadyException(e)
         except NON_BLOCKING_SOCKET_DATA_NOT_READY_EXCEPTIONS as e:
             raise SocketNotReadyException(e)
-        except socket.error as e:
+        except OSError as e:
             if e.errno == errno.EAGAIN:
                 raise SocketNotReadyException(e)
             else:
                 global_log.warning(
                     "Network error while reading from syslog: %s",
-                    six.text_type(e),
+                    str(e),
                     limit_once_per_x_secs=300,
                     limit_key="syslog-network-error",
                 )
@@ -669,7 +655,7 @@ class SyslogRequest(object):
         return data
 
 
-class SyslogRequestParser(object):
+class SyslogRequestParser:
     """
     Syslog TCP request data parser which supports framed and line delimited syslog messages.
 
@@ -1003,10 +989,7 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
         self.incomplete_frame_timeout = kwargs.pop("incomplete_frame_timeout", None)
         self.message_delimiter = kwargs.pop("message_delimiter", "\n")
 
-        if six.PY3:
-            super(SyslogTCPHandler, self).__init__(*args, **kwargs)
-        else:
-            six.moves.socketserver.BaseRequestHandler.__init__(self, *args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     @staticmethod
     def __request_stream_read(syslog_request, server_is_running_fn):
@@ -1089,13 +1072,13 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
                 except Exception as e:
                     global_log.warning(
                         "Error processing request: %s\n\t%s",
-                        six.text_type(e),
+                        str(e),
                         traceback.format_exc(),
                     )
         except Exception as e:
             global_log.warning(
                 "Error reading request: %s\n\t%s",
-                six.text_type(e),
+                str(e),
                 traceback.format_exc(),
             )
             return
@@ -1110,7 +1093,7 @@ class SyslogUDPServer(BoundedThreadingMixIn, six.moves.socketserver.UDPServer):
         address = (bind_address, port)
         global_log.log(
             scalyr_logging.DEBUG_LEVEL_1,
-            "UDP Server: binding socket to %s" % six.text_type(address),
+            "UDP Server: binding socket to %s" % str(address),
         )
 
         BoundedThreadingMixIn.__init__(self, global_config)
@@ -1146,7 +1129,7 @@ class SyslogTCPServer(BoundedThreadingMixIn, six.moves.socketserver.TCPServer):
         address = (bind_address, port)
         global_log.log(
             scalyr_logging.DEBUG_LEVEL_1,
-            "TCP Server: binding socket to %s" % six.text_type(address),
+            "TCP Server: binding socket to %s" % str(address),
         )
 
         self.allow_reuse_address = True
@@ -1179,7 +1162,7 @@ class SyslogTCPServer(BoundedThreadingMixIn, six.moves.socketserver.TCPServer):
         return False
 
 
-class LogDeleter(object):
+class LogDeleter:
     """Deletes unused log files that match a log_file_template"""
 
     def __init__(
@@ -1237,7 +1220,7 @@ class LogDeleter(object):
                     except OSError as e:
                         global_log.warn(
                             "Unable to read modification time for file '%s', %s"
-                            % (rotated_file, six.text_type(e)),
+                            % (rotated_file, str(e)),
                             limit_once_per_x_secs=300,
                             limit_key="mtime-%s" % rotated_file,
                         )
@@ -1245,7 +1228,7 @@ class LogDeleter(object):
             except OSError as e:
                 global_log.warn(
                     "Unable to read modification time for file '%s', %s"
-                    % (matching_file, six.text_type(e)),
+                    % (matching_file, str(e)),
                     limit_once_per_x_secs=300,
                     limit_key="mtime-%s" % matching_file,
                 )
@@ -1274,13 +1257,13 @@ class LogDeleter(object):
             except OSError as e:
                 global_log.warn(
                     "Error deleting old log file '%s', %s"
-                    % (filename, six.text_type(e)),
+                    % (filename, str(e)),
                     limit_once_per_x_secs=300,
                     limit_key="delete-%s" % filename,
                 )
 
 
-class SyslogHandler(object):
+class SyslogHandler:
     """Protocol neutral class for handling messages that come in from a syslog server
 
     @param line_reporter A function to invoke whenever the server handles lines.  The number of lines
@@ -1512,7 +1495,7 @@ class SyslogHandler(object):
 
         except Exception as e:
             global_log.error(
-                "Unable to open SyslogMonitor log file: %s" % six.text_type(e)
+                "Unable to open SyslogMonitor log file: %s" % str(e)
             )
             result = None
 
@@ -1600,7 +1583,7 @@ class SyslogHandler(object):
         result = None
         if regex_value is not None:
             result = regex_value.pattern
-        return six.text_type(result)
+        return str(result)
 
     def __handle_docker_logs(self, data):
 
@@ -1672,7 +1655,7 @@ class SyslogHandler(object):
                 # expired
                 expired = []
 
-                for key, info in six.iteritems(self.__docker_loggers):
+                for key, info in self.__docker_loggers.items():
                     if current_time - info["last_seen"] > self.__docker_expire_log:
                         expired.append(key)
 
@@ -1687,7 +1670,7 @@ class SyslogHandler(object):
                             )
             self.__expire_count += 1
 
-            for key, info in six.iteritems(self.__docker_loggers):
+            for key, info in self.__docker_loggers.items():
                 current_log_files.append(info["log_config"]["path"])
         finally:
             self.__logger_lock.release()
@@ -1742,14 +1725,14 @@ class SyslogHandler(object):
                             log_config_attribs = log_config["attributes"]
                             global_log.log(
                                 scalyr_logging.DEBUG_LEVEL_1,
-                                "Matched %s to %s" % (path, log_config["path"]),
+                                "Matched {} to {}".format(path, log_config["path"]),
                             )
                             break
 
                     if log_config_attribs is None:
                         global_log.log(
                             scalyr_logging.DEBUG_LEVEL_1,
-                            "No match found for %s" % (path,),
+                            "No match found for {}".format(path),
                         )
 
                     if log_config_attribs is not None:
@@ -1863,7 +1846,7 @@ class SyslogHandler(object):
             # case we see more errors of a specific type or similar
             global_log.log(
                 scalyr_logging.DEBUG_LEVEL_4,
-                "Unable to parse: %s. Error: %s" % (msg, e),
+                "Unable to parse: {}. Error: {}".format(msg, e),
             )
             return rv
 
@@ -1893,7 +1876,7 @@ class SyslogHandler(object):
         self.__line_reporter(data.count("\n") + 1)
 
 
-class RequestVerifier(object):
+class RequestVerifier:
     """Determines whether or not a request should be processed
     based on the state of various config options
     """
@@ -1912,13 +1895,13 @@ class RequestVerifier(object):
         if not result:
             global_log.log(
                 scalyr_logging.DEBUG_LEVEL_4,
-                "Rejecting request from %s" % six.text_type(client_address),
+                "Rejecting request from %s" % str(client_address),
             )
 
         return result
 
 
-class SyslogServer(object):
+class SyslogServer:
     """Abstraction for a syslog server, that creates either a UDP or a TCP server, and
     configures a handler to process messages.
 
@@ -1954,7 +1937,7 @@ class SyslogServer(object):
 
         global_log.log(
             scalyr_logging.DEBUG_LEVEL_2,
-            "Accept ips are: %s" % six.text_type(accept_ips),
+            "Accept ips are: %s" % str(accept_ips),
         )
 
         docker_logging = config.get("mode") == "docker"
@@ -2017,7 +2000,7 @@ class SyslogServer(object):
             elif protocol == "udp":
                 global_log.log(
                     scalyr_logging.DEBUG_LEVEL_0,
-                    "Starting UDP Server (host=%s, port=%s)" % (bind_address, port),
+                    "Starting UDP Server (host={}, port={})".format(bind_address, port),
                 )
                 server = SyslogUDPServer(
                     port,
@@ -2414,7 +2397,7 @@ From Search view, query [monitor = 'syslog_monitor'](https://app.scalyr.com/even
                 success = True
             except Exception as e:
                 global_log.error(
-                    "Unable to open SyslogMonitor log file: %s" % six.text_type(e)
+                    "Unable to open SyslogMonitor log file: %s" % str(e)
                 )
 
         return success

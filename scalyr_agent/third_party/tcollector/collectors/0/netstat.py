@@ -57,16 +57,12 @@ Metrics from /proc/net/netstat (`netstat -s' command):
   - net.stat.tcp.syncookies: SYN cookies (both sent & received).
 """
 
-from __future__ import absolute_import
-from __future__ import print_function
-from __future__ import unicode_literals
 import os
 import pwd
 import re
 import resource
 import sys
 import time
-from io import open
 
 from collections import OrderedDict
 
@@ -270,11 +266,18 @@ def parse_and_print_metrics(f_netstat, f_sockstat, output_file_success=None,
 
     ts = int(time.time())
 
-    f_sockstat.seek(0)
-    f_netstat.seek(0)
+    f_sockstat_filename = f_sockstat.name
+    f_netstat_filename = f_netstat.name
+    with open(f_sockstat_filename) as f:
+        data = f.read()
+    with open(f_netstat_filename) as f:
+        stats = f.read()
 
-    data = f_sockstat.read()
-    stats = f_netstat.read()
+    # f_sockstat.seek(0)
+    # f_netstat.seek(0)
+    #
+    # data = f_sockstat.read()
+    # stats = f_netstat.read()
 
     m = re.match(REGEXP, data)
     if not m:
@@ -351,7 +354,7 @@ def main():
     try:
         f_sockstat = open("/proc/net/sockstat", encoding="utf-8")
         f_netstat = open("/proc/net/netstat", encoding="utf-8")
-    except IOError as e:
+    except OSError as e:
         print("Failed to open /proc/net/sockstat: %s" % e, file=sys.stderr)
         return 13  # Ask tcollector to not re-start us.
 

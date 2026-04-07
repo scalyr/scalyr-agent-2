@@ -1,6 +1,3 @@
-from __future__ import unicode_literals
-from __future__ import absolute_import
-
 import os
 import re
 import copy
@@ -106,13 +103,13 @@ class LogConfigManager:
         match_hash = "monitor"
         regex = None
         if journald_unit is not None:
-            match_hash = six.text_type(hash(journald_unit))
+            match_hash = str(hash(journald_unit))
             if journald_unit == ".*":
                 match_hash = "monitor"
             regex = re.compile(journald_unit)
         elif journald_globs is not None:
-            items = sorted(six.iteritems(journald_globs), key=operator.itemgetter(0))
-            match_hash = six.text_type(hash("%s" % items))
+            items = sorted(journald_globs.items(), key=operator.itemgetter(0))
+            match_hash = str(hash("%s" % items))
 
         file_template = Template("journald_${ID}.log")
         full_path = os.path.join(
@@ -131,7 +128,7 @@ class LogConfigManager:
                 return matched_config
 
             unit = None
-            if isinstance(fields, six.string_types):
+            if isinstance(fields, str):
                 unit = fields
             else:
                 # regex only matches on unit
@@ -149,7 +146,7 @@ class LogConfigManager:
 
             # journald_globs requires all fields
             # to match
-            for key, glob in six.iteritems(journald_globs):
+            for key, glob in journald_globs.items():
                 if key not in fields:
                     return None
 

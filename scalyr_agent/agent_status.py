@@ -25,15 +25,13 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-from __future__ import unicode_literals
-from __future__ import absolute_import
-from __future__ import print_function
 
 __author__ = "czerwin@scalyr.com"
 
 import os
 import copy
 import io
+#import urllib.parse
 
 if False:
     from typing import TextIO
@@ -46,10 +44,9 @@ from scalyr_agent import compat
 
 import six
 
-from six.moves.urllib.parse import quote_plus
+#from six.moves.urllib.parse import quote_plus
 
-
-class BaseAgentStatus(object):
+class BaseAgentStatus:
     """
     Base agent status class which implements "to_dict()" method.
     """
@@ -80,7 +77,7 @@ class BaseAgentStatus(object):
                 result[key] = value.to_dict()
 
             # Ensure each value is text / unicode type since orjson doesn't seem to like bytes
-            if isinstance(value, six.binary_type):
+            if isinstance(value, bytes):
                 value = six.ensure_text(value)
                 result[key] = value
 
@@ -457,8 +454,7 @@ class CopyingManagerStatus(BaseAgentStatus):
         Generator that yields all sessions from all workers.
         """
         for worker_status in self.workers:
-            for session_status in worker_status.sessions:
-                yield session_status
+            yield from worker_status.sessions
 
     def _verify_worker_sessions_health_check(self):
         """
@@ -516,7 +512,7 @@ class CopyingManagerStatus(BaseAgentStatus):
             )
 
     def to_dict(self):  # type: () -> dict
-        result = super(CopyingManagerStatus, self).to_dict()
+        result = super().to_dict()
         if self.is_single_worker_session():
             # In case of default configuration,
             # On previous versions, the copying manager has those stats in its own dict,
@@ -665,7 +661,7 @@ def report_status(output, status, current_time):
         "View data from this agent at: %s/events?filter=$serverHost%%3D%%27%s%%27"
         % (
             server,
-            quote_plus(status.server_host),
+            six.moves.urllib.parse.quote_plus(status.server_host),
         ),
         file=output,
     )
@@ -704,7 +700,7 @@ def report_status(output, status, current_time):
     if status.config_status.last_error is not None:
         print(
             "Parsing error:         %s"
-            % six.text_type(status.config_status.last_error),
+            % str(status.config_status.last_error),
             file=output,
         )
 
@@ -712,8 +708,8 @@ def report_status(output, status, current_time):
 
         # Print scalyr-related env variables in sorted order with critical variables up top. Redact API key.
         main_keys = ["SCALYR_API_KEY", "SCALYR_SERVER"]
-        special_case_keys = set(["K8S_EVENT_DISABLE"])
-        redacted_keys = set(["SCALYR_API_KEY"])
+        special_case_keys = {"K8S_EVENT_DISABLE"}
+        redacted_keys = {"SCALYR_API_KEY"}
 
         # Make a map of uppercase keys -> relevant environment vars (beginning with SCALYR)
         upper2actualkey = {}
@@ -739,9 +735,9 @@ def report_status(output, status, current_time):
                 val = "<Redacted>"
 
             if row == 0:
-                print("Environment variables: %s = %s" % (key, val), file=output)
+                print("Environment variables: {} = {}".format(key, val), file=output)
             else:
-                print("                       %s = %s" % (key, val), file=output)
+                print("                       {} = {}".format(key, val), file=output)
             row += 1
 
     print_environment()

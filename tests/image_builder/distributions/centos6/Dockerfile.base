@@ -21,7 +21,7 @@ RUN ln -sf /usr/bin/python3.5 /usr/bin/python3
 #RUN python_for_tests -m pip install -r dev-requirements-new.txt
 
 COPY py26-unit-tests-requirements.txt py26-unit-tests-requirements.txt
-ADD dev-requirements-new.txt dev-requirements-new.txt
+COPY dev-requirements-new.txt dev-requirements-new.txt
 
 RUN pip install -r py26-unit-tests-requirements.txt
 
