@@ -32,7 +32,6 @@ from scalyr_agent.json_lib.parser import (
 
 from scalyr_agent.test_base import ScalyrTestCase
 
-#from six.moves import range
 
 
 class ByteScannerTests(ScalyrTestCase):

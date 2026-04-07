@@ -29,7 +29,7 @@ import requests
 import requests_mock
 from mock import patch
 from six import StringIO
-#from six.moves import range
+
 from urllib3.exceptions import (  # pylint: disable=import-error
     InsecureRequestWarning,
 )

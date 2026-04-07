@@ -34,7 +34,7 @@ import time
 from subprocess import Popen, PIPE
 
 import six
-#from six.moves import range
+
 
 from scalyr_agent.compat import custom_defaultdict as defaultdict
 from scalyr_agent import ScalyrMonitor, BadMonitorConfiguration

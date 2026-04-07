@@ -60,7 +60,7 @@ from scalyr_agent.compat import os_environ_unicode
 import scalyr_agent.configuration
 
 import six
-#from six.moves import range
+
 from mock import patch, Mock
 
 

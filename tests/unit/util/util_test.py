@@ -702,10 +702,12 @@ class TestStoppableThread(ScalyrTestCase):
 class TestScriptEscalator(ScalyrTestCase):
     def setUp(self):
         super(TestScriptEscalator, self).setUp()
+        # store __main__ for later restoration as it gets mocked in this test suite
         self._original_main = sys.modules.get("__main__")
 
     def tearDown(self):
         super(TestScriptEscalator, self).tearDown()
+        # restore __main__ to the original for use by the pytest-cov plugin
         if self._original_main is not None:
             sys.modules["__main__"] = self._original_main
 

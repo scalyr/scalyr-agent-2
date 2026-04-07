@@ -47,7 +47,7 @@ from tests.unit.copying_manager_tests.copying_manager_test import (
     FakeMonitor,
 )
 from tests.unit.copying_manager_tests.test_environment import TestingConfiguration
-#from six.moves import range
+
 
 ONE_MIB = 1024 * 1024
 ALMOST_SIX_MB = 5900000

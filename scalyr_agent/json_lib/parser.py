@@ -22,7 +22,7 @@ __author__ = "czerwin@scalyr.com"
 
 import six
 from six import unichr
-#from six.moves import range
+
 
 from scalyr_agent.json_lib import JsonArray, JsonObject, JsonParseException
 

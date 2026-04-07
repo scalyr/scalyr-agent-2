@@ -60,7 +60,6 @@ from scalyr_agent.test_base import skipIf
 
 import six
 from six import unichr
-#from six.moves import range
 
 
 class Timestamp:

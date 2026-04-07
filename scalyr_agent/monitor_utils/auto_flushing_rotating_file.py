@@ -19,7 +19,7 @@
 import threading
 import os
 
-#from six.moves import range
+
 
 
 class AutoFlushingRotatingFile:

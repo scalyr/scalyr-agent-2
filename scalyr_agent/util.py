@@ -46,7 +46,7 @@ else:
 
 import functools
 import six
-#from six.moves import range
+
 from scalyr_agent import compat
 
 

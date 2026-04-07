@@ -35,7 +35,7 @@ if False:  # NOSONAR
     from typing import Any
 
 import six
-#from six.moves import range
+
 
 
 from scalyr_agent.json_lib.exceptions import JsonConversionException

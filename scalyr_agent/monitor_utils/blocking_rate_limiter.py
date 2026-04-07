@@ -26,7 +26,7 @@ import threading
 import time
 from collections import deque
 
-#from six.moves import range
+
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 

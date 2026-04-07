@@ -23,7 +23,7 @@ import binascii
 import re
 import time
 
-#from six.moves import range
+
 
 from scalyr_agent import ScalyrMonitor, define_config_option
 

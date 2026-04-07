@@ -30,7 +30,6 @@ import time
 import mock
 from mock import Mock, patch, call
 import six
-#from six.moves import range
 
 
 class Test_K8sCache(ScalyrTestCase):

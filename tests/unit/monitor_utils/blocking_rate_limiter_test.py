@@ -27,7 +27,7 @@ from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
 
 from mock import patch
-##from six.moves import range
+
 import six
 
 

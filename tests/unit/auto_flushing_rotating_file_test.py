@@ -28,8 +28,6 @@ from scalyr_agent.monitor_utils.auto_flushing_rotating_file import (
     AutoFlushingRotatingFile,
 )
 
-#from six.moves import range
-
 LINE_STR = "abcdefghi"
 
 # Actual line which is written to the file when file is opened in text mode
