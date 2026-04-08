@@ -13,6 +13,8 @@
 # limitations under the License.
 
 import logging
+import pathlib as pl
+import subprocess
 
 
 def init_logging():
@@ -20,3 +22,13 @@ def init_logging():
         level=logging.INFO,
         format=f"[%(levelname)s][%(module)s:%(lineno)s] %(message)s",
     )
+
+def latest_commit(source_root: pl.Path) -> str:
+    # 'git rev-parse --short HEAD' is the standard command for this
+    short_hash = subprocess.check_output(
+        ["git", "rev-parse", "--short", "HEAD"],
+        cwd=str(source_root),
+        stderr=subprocess.STDOUT,
+        unicode=True
+    ).strip()
+    return str(short_hash)

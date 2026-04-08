@@ -206,7 +206,7 @@ def build_win32_installer_package(variant, version):
 
     @return: The file name of the built package.
     """
-    if os.getenv("WIX") is None:
+    if not shutil.which('candle') or not shutil.which('light'):
         print(
             "Error, the WIX toolset does not appear to be installed.", file=sys.stderr
         )
@@ -442,9 +442,6 @@ def build_win32_installer_package(variant, version):
     # TODO: Check certificate expiration same as we do as part of tox lint target
     # NOTE: This requires us to update Jenkins pipeline and other places where this script is called
     # to install cryptography library
-
-    # Get ready to run wix.  Add in WIX to the PATH variable.
-    os.environ["PATH"] = "%s;%s\\bin" % (os.getenv("PATH"), os.getenv("WIX"))
 
     if variant is None:
         variant = "main"
