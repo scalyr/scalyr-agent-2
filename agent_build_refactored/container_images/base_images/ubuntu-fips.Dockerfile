@@ -1,7 +1,6 @@
-ARG BASE_IMAGE
-FROM ${BASE_IMAGE} as base
+FROM artifactory.eng.sentinelone.tech/docker-release/common/ubuntu-base/python311:2.0.48 as base
 
-FROM base as dependencies_build_base
+FROM base as dependencies-build-base
 ENV DEBIANFRONTEND=noninteractive
 RUN apt-get update
 RUN apt-get install -y \
@@ -13,7 +12,7 @@ RUN apt-get install -y \
 
 
 
-FROM base as runtime_base
+FROM base as runtime-base
 # We upgrade current packages in order to keep everything up to date, including security updates.
 RUN DEBIANFRONTEND=noninteractive apt-get update && \
     apt-get dist-upgrade --yes --no-install-recommends --no-install-suggests && \

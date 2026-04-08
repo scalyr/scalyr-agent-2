@@ -1,7 +1,6 @@
-ARG BASE_IMAGE
-FROM ${BASE_IMAGE} as base
+FROM alpine:3.22.3 as base
 
-FROM base as dependencies_build_base
+FROM base as dependencies-build-base
 RUN apk update && apk add --no-cache \
     --virtual build-dependencies \
     binutils \
@@ -28,5 +27,5 @@ RUN cp -r /usr/lib/python3.12/site-packages/orjson /tmp/requrements_root/usr/lib
 RUN cp -r /usr/lib/python3.12/site-packages/lz4 /tmp/requrements_root/usr/lib/python3.12/site-packages
 RUN cp -r /usr/lib/python3.12/site-packages/zstandard /tmp/requrements_root/usr/lib/python3.12/site-packages
 
-FROM base as runtime_base
+FROM base as runtime-base
 RUN apk update && apk add --no-cache python3 py3-pip

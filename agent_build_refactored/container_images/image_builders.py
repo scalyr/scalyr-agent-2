@@ -27,14 +27,11 @@ from agent_build_refactored.utils.constants import (
     AGENT_REQUIREMENTS,
     REQUIREMENTS_DEV_COVERAGE,
 )
-from agent_build_refactored.utils.docker.common import delete_container
+
 from agent_build_refactored.utils.builder import Builder
 from agent_build_refactored.utils.docker.buildx.build import (
-    buildx_build,
     OCITarballBuildOutput,
-    BuildOutput,
-    LocalDirectoryBuildOutput,
-    DockerImageBuildOutput,
+    BuildOutput
 )
 
 from agent_build_refactored.prepare_agent_filesystem import (
@@ -50,7 +47,6 @@ _SUPPORTED_ARCHITECTURES = [
 
 logger = logging.getLogger(__name__)
 _PARENT_DIR = pl.Path(__file__).parent
-_BASE_IMAGES_DIR = _PARENT_DIR / "base_images"
 
 
 class ImageType(enum.Enum):
@@ -80,43 +76,16 @@ class ContainerisedAgentBuilder(Builder):
     TAG_SUFFIXES: List[str]
     AGENT_REQUIREMENTS_EXCLUDE = []
 
-    def __init__(self, base_image, buildx_builder_name=None):
+    def __init__(self, base_image_dockerfile, buildx_builder_name=None):
         super(ContainerisedAgentBuilder, self).__init__()
 
         self._already_build_requirements: Set[CpuArch] = set()
-        self.__base_image = base_image
+        self.__base_image_dockerfile = base_image_dockerfile
         self.__buildx_builder_name = buildx_builder_name
-
-    @property
-    def __build_args(self) -> Dict[str, str]:
-        build_args = {"BASE_IMAGE": self.__base_image}
-
-        return build_args
 
     @property
     def _common_cache_name(self):
         return f"agent_image_build_{self.__class__.BASE_DISTRO}"
-
-    def _build_base_image_dockerfile(
-        self,
-        stage: str,
-        architectures: List[CpuArch] = None,
-        cache_name: str = None,
-        output: BuildOutput = None,
-    ):
-
-        buildx_build(
-            dockerfile_path=_BASE_IMAGES_DIR
-            / f"{self.__class__.BASE_DISTRO}.Dockerfile",
-            context_path=_BASE_IMAGES_DIR,
-            architectures=architectures,
-            stage=stage,
-            cache_name=cache_name,
-            output=output,
-            capture_output=True,
-            build_args=self.__build_args,
-            buildx_builder=self.__buildx_builder_name,
-        )
 
     def __agent_requirements(self):
         return "\n".join(
@@ -129,66 +98,6 @@ class ContainerisedAgentBuilder(Builder):
                 )
             ]
         )
-
-    def build_requirement_libs(
-        self,
-        architecture: CpuArch,
-        only_cache: bool = False,
-    ):
-        """
-        Build a special stage in the dependency Dockerfile, which is responsible for
-        building agent requirement libs.
-        """
-
-        work_name = f"requirement_libs_{architecture.value}"
-        result_dir = self.work_dir / work_name
-
-        # do not build requirements for the same architecture if it is already built.
-        if architecture in self._already_build_requirements:
-            return result_dir
-
-        base_image_work_name = f"{work_name}_base_image"
-        base_image_oci_layout_dir = self.work_dir / f"{base_image_work_name}"
-        base_image_cache_name = f"{self._common_cache_name}_{base_image_work_name}"
-
-        self._build_base_image_dockerfile(
-            architectures=[architecture],
-            stage="dependencies_build_base",
-            cache_name=base_image_cache_name,
-            output=OCITarballBuildOutput(dest=base_image_oci_layout_dir),
-        )
-
-        cache_name = f"{self._common_cache_name}_{work_name}"
-
-        if only_cache:
-            output = None
-        else:
-            output = LocalDirectoryBuildOutput(
-                dest=result_dir,
-            )
-
-        test_requirements = f"{REQUIREMENTS_DEV_COVERAGE}"
-
-        buildx_build(
-            dockerfile_path=_PARENT_DIR / "dependencies.Dockerfile",
-            context_path=_PARENT_DIR,
-            architectures=[architecture],
-            build_args={
-                "AGENT_REQUIREMENTS": self.__agent_requirements(),
-                "TEST_REQUIREMENTS": test_requirements,
-            },
-            build_contexts={
-                "extended_base": f"oci-layout:///{base_image_oci_layout_dir}",
-            },
-            output=output,
-            cache_name=cache_name,
-            fallback_to_remote_builder=True,
-            buildx_builder=self.__buildx_builder_name,
-        )
-
-        if not only_cache:
-            self._already_build_requirements.add(architecture)
-            return result_dir
 
     def get_image_registry_names(self, image_type: ImageType):
         """Get list of names that this image has to have in the result registry"""
@@ -270,96 +179,105 @@ class ContainerisedAgentBuilder(Builder):
         agent_main_path.write_text(new_agent_main_content)
         return agent_filesystem_dir
 
-    def _build(
-        self,
+    def _build(self,
         image_type: ImageType,
         output: BuildOutput,
         architectures: List[CpuArch] = None,
     ):
-        """
-        Build final image in the form that is specified in the output argument.
-        :param image_type: Type of the image.
-        :param output: Build output info
-        :param architectures: List of architectures to build.
-        :return:
-        """
-
         architectures = architectures or self.get_supported_architectures()
 
         agent_filesystem_dir = self.create_agent_filesystem(image_type=image_type)
+        requirements_dir = self.create_requirements_specifications()
 
-        runtime_base_image_oci_layer_dir = self.work_dir / "runtime_image_base"
-
-        self._build_base_image_dockerfile(
-            architectures=architectures,
-            stage="runtime_base",
-            output=OCITarballBuildOutput(dest=runtime_base_image_oci_layer_dir),
-        )
-
-        requirements_libs_contexts = {}
-        build_args = {
-            "BASE_DISTRO": self.__class__.BASE_DISTRO,
-            "IMAGE_TYPE": image_type.value,
-        }
-
-        for req_arch in architectures:
-            build_target_name = _arch_to_docker_build_target_name(
-                architecture=req_arch,
-            )
-
-            context_full_name = f"requirement_libs_{build_target_name}_context"
-
-            requirement_libs_dir = self.build_requirement_libs(
-                architecture=req_arch,
-            )
-            requirements_libs_contexts[context_full_name] = str(requirement_libs_dir)
-
-        # If there's only one architecture to build, then docker, inconveniently, does not provide
-        # its build-it arguments, so we have to provide them manually.
-        if len(architectures) == 1:
-            target_arch, target_variant = _arch_to_target_arch_and_variant(
-                architectures[0]
-            )
-            build_args.update(
-                {
-                    "TARGETOS": "linux",
-                    "TARGETARCH": target_arch,
-                    "TARGETVARIANT": target_variant,
-                }
-            )
-
-        buildx_build(
-            dockerfile_path=_PARENT_DIR / "Dockerfile",
-            context_path=_PARENT_DIR,
-            architectures=architectures,
-            build_args=build_args,
-            build_contexts={
-                "base": f"oci-layout:///{runtime_base_image_oci_layer_dir}",
-                "agent_filesystem": str(agent_filesystem_dir),
-                **requirements_libs_contexts,
+        self._buildx_bake(
+            bake_file=_PARENT_DIR / "docker-bake.hcl",
+            target=f"container-images-{image_type.value}",
+            build_vars = {
+                "AGENT_FILESYSTEM_DIR": str(agent_filesystem_dir),
+                "REQUIREMENTS_DIR": str(requirements_dir),
             },
+            architectures = architectures,
             output=output,
-            buildx_builder=self.__buildx_builder_name,
+            dockerfile_overrides= {
+                "runtime-base": self.__base_image_dockerfile,
+                "dependencies-builder-base": self.__base_image_dockerfile,
+            })
+
+    def create_requirements_specifications(self):
+        """Generates the two requirement files needed for the requirements context. The
+        regular `requirements.txt` which contains the Python requirements to run the
+        Scalyr Agent package. The `test_requirements.txt` which contains additional
+        requirements for running the tests package.
+
+        :return: The directory containing the requirements files.
+        """
+        requirements_specifications_dir = self.work_dir / "requirements_specifications"
+        requirements_specifications_dir.mkdir()
+        with open(requirements_specifications_dir / "requirements.txt", "w") as requirements_file:
+            requirements_file.write(self.__agent_requirements())
+
+        with open(requirements_specifications_dir / "test_requirements.txt", "w") as test_requirements_file:
+            test_requirements_file.write(REQUIREMENTS_DEV_COVERAGE)
+
+        return requirements_specifications_dir
+
+
+    def _buildx_bake(self, bake_file: pl.Path, target: str, build_vars: Dict[str, str], architectures: List[CpuArch],
+                     output: BuildOutput, dockerfile_overrides: Dict[str, str]):
+        build_vars = build_vars or {}
+        dockerfile_overrides = dockerfile_overrides or {}
+
+        cmd_options = [
+            f"-f={bake_file}",
+            "--progress=plain",
+            f"--allow=fs.read={str(self.work_dir)}",
+            f"--set \\*.platform={",".join([x.as_docker_platform() for x in architectures])}",
+        ]
+
+        for key, value in dockerfile_overrides.items():
+            dockerfile = pl.Path(value)
+            cmd_options.append(f"--allow=fs.read={str(dockerfile.parent)}")
+            cmd_options.append(f"--set \"{key}.dockerfile={str(dockerfile.name)}\"")
+            cmd_options.append(f"--set \"{key}.context={str(dockerfile.parent)}\"")
+
+        if self.__buildx_builder_name:
+            cmd_options.append(
+                f"--builder={self.__buildx_builder_name}",
+            )
+
+        if output:
+            cmd_options.append(
+                f"--set {target}.output={output.to_docker_output_option()}"
+            )
+
+        cmd_vars = []
+        for arg_name, arg_value in build_vars.items():
+            cmd_vars.append(f"{arg_name}={arg_value}")
+
+        cmd = [ *cmd_vars, "docker", "buildx", "bake", *cmd_options, target]
+        print(f"Executing command: {' '.join(cmd)}")
+        process = subprocess.Popen(
+            " ".join(cmd),
+            cwd=bake_file.parent,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,  # Redirect stderr to stdout
+            text=True,                 # Return strings instead of bytes
+            bufsize=1                  # Line buffered
         )
 
-    def build_and_load_docker_image(
-        self,
-        image_type: ImageType,
-        result_image_name: str,
-    ):
-        """
-        Builds single arch image (architecture matches with system) and load to the current docker images list
-        :param image_type: Type of the image.
-        :param result_image_name: Name of the image.
-        """
-        self._build(
-            image_type=image_type,
-            output=DockerImageBuildOutput(
-                name=result_image_name,
-            ),
-            architectures=[_current_cpu_arch],
-        )
-        return result_image_name
+        captured_output = []
+
+        # Read output line by line as it happens
+        for line in iter(process.stdout.readline, ""):
+            print(line, end="")        # Print to console in real-time
+            captured_output.append(line)
+
+        process.stdout.close()
+        return_code = process.wait()
+        if return_code != 0:
+            raise RuntimeError(f"Build failed with return code: {return_code}")
+
 
     def build_oci_tarball(
         self,
@@ -393,73 +311,6 @@ class ContainerisedAgentBuilder(Builder):
 
         return result_tarball
 
-    def publish(
-        self,
-        image_type: ImageType,
-        tags: List[str],
-        existing_oci_layout_tarball: pl.Path = None,
-        no_verify_tls: bool = False,
-        registry: str = None,
-        registry_username: str = None,
-        registry_password: str = None,
-    ):
-        """
-        Publish an image. Since we can publish image from the OCI layout tarball. We can not use just a normal
-            'docker push' command, and we have to use tools that can also operate with OCI image archives.
-            We use skopeo in this case.
-        :param image_type: Type of image
-        :param tags: list of tags
-        :param existing_oci_layout_tarball: Path to existing image OCI tarball. If exists, it will publish image from this
-            tarball. If not new image will be built inplace.
-        :param no_verify_tls: Disable certificate validation when pushing the image.
-        :return:
-        """
-        if existing_oci_layout_tarball:
-            oci_layout_tarball = existing_oci_layout_tarball
-        else:
-            oci_layout_tarball = self.build_oci_tarball(image_type=image_type)
-
-        if not oci_layout_tarball.exists():
-            raise Exception("OCI layout tarball does not exists.")
-
-        for tag in tags:
-            logger.info(f"Publish image '{tag}'")
-
-            try:
-                subprocess.run(["skopeo", "--version"])
-
-                if registry and registry_username and registry_password:
-                    subprocess.run(
-                        [
-                            "skopeo",
-                            "login",
-                            "--username",
-                            registry_username,
-                            "--password",
-                            registry_password,
-                            registry,
-                        ],
-                        check=True,
-                    )
-
-                cmd_args = [
-                    "skopeo",
-                    "copy",
-                    "--all",
-                    "--dest-tls-verify=" + ("false" if no_verify_tls else "true"),
-                    f"oci-archive:{oci_layout_tarball}",
-                    f"docker://{tag}",
-                ]
-
-                subprocess.run(cmd_args, check=True)
-
-            except subprocess.CalledProcessError as e:
-                logger.exception(
-                    f"Subprocess call failed. Stderr: {(e.stderr or b'').decode()}"
-                )
-                raise
-
-
 def _arch_to_docker_build_target_name(architecture: CpuArch):
 
     target_arch, target_variant = _arch_to_target_arch_and_variant(architecture)
@@ -474,6 +325,25 @@ def _arch_to_target_arch_and_variant(architecture: CpuArch):
     elif architecture == CpuArch.ARMV7:
         return "arm", "v7"
 
+
+# TODO: To promote readability, we should probably eliminate the need for these individual
+# "Builder" classes. Their main function is to allow for slight tweaks to the build process
+# depending on the image base you are working with. For example, with you are using Alpine as
+# your base, then you need to tweak the requirements.txt file a little bit. If you are using
+# FIPs, you need to tweak the resulting tags you add to the image (appending _fips to all the tags).
+#
+# I think it would be somewhat cleaner to just push on the use of overriding a base Dockefile.
+# For each builder type, you already are required to pass a difference Dockerfile as base.
+# Why not just make that the one thing you need to do?
+#
+# To do this, you would need to:
+# - Have the base Dockerfile be responsible for copying the agent requirements file into the
+#   dependency base target -- that way it could modify the requirements list before they
+#   are installed into the dependencies target.
+# - Use a well-known LABEL to store any modification to the image tag (like adding the _fips
+#   suffix) that this system respects.
+#
+# However, that's all too much clean up work for now.
 
 # Create all image builder classes and make them available from this global collection.
 CONTAINERISED_AGENT_BUILDERS: Dict[str, Type[ContainerisedAgentBuilder]] = {}

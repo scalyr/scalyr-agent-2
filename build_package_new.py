@@ -60,7 +60,10 @@ def _add_image_parsers():
     )
 
     image_parser.add_argument(
-        "--base-image", required=True, help="Base image to be used for docker build."
+        "--base-image-dockerfile",
+        required=False,
+        help="Path to Dockerfile used to build base images. Must define two targets: dependencies-builder-base and runtime-base.",
+        default="./base_images/ubuntu.Dockerfile",
     )
 
     image_parser.add_argument(
@@ -168,7 +171,6 @@ def _add_package_parsers():
 
     build_parser.add_argument("--output-dir", default=str(SOURCE_ROOT / "build"))
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
@@ -187,7 +189,7 @@ if __name__ == "__main__":
         image_builder_cls = ALL_CONTAINERISED_AGENT_BUILDERS[args.builder_name]
 
         builder = image_builder_cls(
-            base_image=args.base_image, buildx_builder_name=args.buildx_builder_name
+            base_image_dockerfile=args.base_image_dockerfile, buildx_builder_name=args.buildx_builder_name
         )
         if args.action == "load":
             builder.build_and_load_docker_image(
