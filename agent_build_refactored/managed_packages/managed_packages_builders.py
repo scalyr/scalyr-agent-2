@@ -95,6 +95,7 @@ from typing import List, Dict, Type, Union, Set
 
 
 from agent_build_refactored.utils.builder import Builder
+from agent_build_refactored.utils.common import latest_commit
 
 from agent_build_refactored.utils.constants import (
     SOURCE_ROOT,
@@ -201,6 +202,7 @@ class LinuxPackageBuilder(Builder):
         Set of common arguments for the final fpm command.
         """
         version = (SOURCE_ROOT / "VERSION").read_text().strip()
+
         return [
                 # fmt: off
                 "--license", "Apache 2.0",

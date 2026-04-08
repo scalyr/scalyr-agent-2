@@ -1,12 +1,14 @@
-ARG IMAGE_TYPE
-
-FROM requirement_libs_${TARGETOS}_${TARGETARCH}_${TARGETVARIANT}_context as requirement_libs
+ARG IMAGE_TYPE=k8s
 
 FROM base as final-common
+
 COPY --from=requirement_libs /requirements /
 COPY --from=agent_filesystem / /
 ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
+
+MAINTAINER Scalyr Inc <support@scalyr.com>
+CMD ["python3", "/usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py","--no-fork", "--no-change-user", "start"]
 
 # Optional stage for docker-json.
 FROM final-common as final-docker-json
@@ -29,8 +31,4 @@ EXPOSE 514/udp
 FROM final-common as final-k8s
 ENV SCALYR_STDOUT_SEVERITY ERROR
 
-
 FROM final-${IMAGE_TYPE} as final
-MAINTAINER Scalyr Inc <support@scalyr.com>
-
-CMD ["python3", "/usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py","--no-fork", "--no-change-user", "start"]
