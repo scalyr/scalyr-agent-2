@@ -233,6 +233,7 @@ def _test(
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__)
 def test_mysql_python2(request):
+    pytest.skip("Python 2 is EOL and dependencies no longer support it")
     _test(request, python_version="python2")
 
 
@@ -245,6 +246,7 @@ def test_mysql_python3(request):
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__)
 def test_mysql_python2_host(request):
+    pytest.skip("Python 2 is EOL and dependencies no longer support it")
     _test(request, python_version="python2", use_socket=False)
 
 
@@ -257,6 +259,7 @@ def test_mysql_python3_host(request):
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__)
 def test_mysql_python2_ssl(request):
+    pytest.skip("Python 2 is EOL and dependencies no longer support it")
     _test(request, python_version="python2", use_socket=False, use_ssl=True)
 
 
@@ -269,6 +272,7 @@ def test_mysql_python3_ssl(request):
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__)
 def test_mysql_python2_ssl_bad_cafile(request):
+    pytest.skip("Python 2 is EOL and dependencies no longer support it")
     _test(
         request,
         python_version="python2",
@@ -295,6 +299,7 @@ def test_mysql_python3_ssl_bad_cafile(request):
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__)
 def test_mysql_python2_ssl_bad_hostname(request):
+    pytest.skip("Python 2 is EOL and dependencies no longer support it")
     _test(
         request,
         python_version="python2",
