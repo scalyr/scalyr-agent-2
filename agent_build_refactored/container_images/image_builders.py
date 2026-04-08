@@ -31,7 +31,7 @@ from agent_build_refactored.utils.constants import (
 from agent_build_refactored.utils.builder import Builder
 from agent_build_refactored.utils.docker.buildx.build import (
     OCITarballBuildOutput,
-    BuildOutput
+    BuildOutput, LocalDirectoryBuildOutput
 )
 
 from agent_build_refactored.prepare_agent_filesystem import (
@@ -246,6 +246,11 @@ class ContainerisedAgentBuilder(Builder):
             )
 
         if output:
+            if isinstance(output, (OCITarballBuildOutput, LocalDirectoryBuildOutput)):
+                cmd_options.append(
+                    f"--allow=fs.write={str(output.dest.parent)}"
+                )      
+
             cmd_options.append(
                 f"--set {target}.output={output.to_docker_output_option()}"
             )
