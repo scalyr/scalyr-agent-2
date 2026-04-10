@@ -487,7 +487,13 @@ class HTTPSConnectionWithTimeoutAndVerification(six.moves.http_client.HTTPSConne
                     )
 
                 else:
-                    sock = ssl.wrap_socket(sock, cert_reqs=ssl.CERT_NONE)
+                    if sys.version_info >= (3, 10):
+                        no_verify_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+                        no_verify_context.check_hostname = False
+                        no_verify_context.verify_mode = ssl.CERT_NONE
+                        sock = no_verify_context.wrap_socket(sock, server_hostname=self.host)
+                    else:
+                        sock = ssl.wrap_socket(sock, cert_reqs=ssl.CERT_NONE)
 
                 # NOTE: In case binary_form is False and validation wasn't perform an empty dict
                 # will be returned so we need to use binary_form to still get cert back for logging
@@ -616,7 +622,13 @@ class HTTPSConnectionWithTimeoutAndVerification(six.moves.http_client.HTTPSConne
                 error_code="client/sslverifyoff",
             )
 
-            self.sock = ssl.wrap_socket(self.sock, cert_reqs=ssl.CERT_NONE)
+            if sys.version_info >= (3, 10):
+                ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+                ssl_context.check_hostname = False
+                ssl_context.verify_mode = ssl.CERT_NONE
+                self.sock = ssl_context.wrap_socket(self.sock)
+            else:
+                self.sock = ssl.wrap_socket(self.sock, cert_reqs=ssl.CERT_NONE)
 
 
 def create_connection_helper(host, port, timeout=None, source_address=None):

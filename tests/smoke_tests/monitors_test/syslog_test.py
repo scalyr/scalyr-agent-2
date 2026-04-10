@@ -107,4 +107,5 @@ def test_syslog_python3(request):
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CommonMonitorBuilder, __file__)
 def test_syslog_python2(request):
+    pytest.skip("Python 2 is EOL and dependencies no longer support it")
     _test(python_version="python2")
