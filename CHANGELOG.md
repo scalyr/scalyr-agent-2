@@ -1,6 +1,22 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.2.20 "Xavier" - Apr 16, 2026
+<!---
+Packaged by Steven Czerwinski <stevenc@sentinelone.com> on Apr 16, 2026 09:30 -0800
+--->
+
+Changes:
+* Python 3.13 support was added, primary version for the package is now 3.13.13
+* Python 2.7, Python 3.9 and earlier support has been removed. 
+* Several packages were upgraded to mitigate vulnerabilities, including requests==2.32.4, urllib3==2.6.3, pywin32==311, PyInstaller==6.19.0, cryptography>=46.0.7
+* Alpine base image upgraded to 3.22.3, Ubuntu base image to 24.04
+
+Fixes:
+* Add new Sectigo CA
+* Add LANG and LC_ALL to Alpine image to fix Localization warnings (#1305)
+* Fix ifstat.py and netstat.py failing seek operations (#1358)
+
 ## 2.2.19 "Yvette" - Jul 28, 2025
 <!---
 Packaged by Joseph Makar <joseph.makar@sentinelone.com> on Jul 28, 2025 00:00 -0800
