@@ -13,14 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script check for installed python interpreter with opropriate version.
+# This script check for installed python interpreter with appropriate version.
 # In some distributions, there is no 'python' command even if python interpreter is installed.
 # In this cases script have to exit with an error.
 # This is important because all agent scripts rely on '/usr/bin/env python' command.
 
 # {{ check-python }} # this placeholder has to replaced during the build with a functions that checks python version.
 
-if ! is_python_valid "python" && ! is_python_valid "python2" && ! is_python_valid "python3" ; then
+if ! is_python_valid "python3" && ! is_python_valid "python" && ! is_python_valid "python2" ; then
   echo "! Suitable Python interpreter not found."
   # get 'ID_LIKE' and 'ID' fields from '/etc/os-release' file and then search for distributions key words.
   if [[ -f "/etc/os-release" ]]; then
@@ -28,10 +28,10 @@ if ! is_python_valid "python" && ! is_python_valid "python2" && ! is_python_vali
     found_distros=$(grep -E "^ID_LIKE=|^ID=" /etc/os-release)
     # debian and etc.
     if echo "${found_distros}" | grep -qE "debian|ubuntu"; then
-      echo -e "'apt install python'\nor\n'apt install python3"
+      echo -e "'apt install python3'\nor\n'apt install python"
     # RHEL and etc.
     elif echo "${found_distros}" | grep -qE "rhel|centos|fedora"; then
-      echo -e "'yum install python2'\nor\n'yum install python3'"
+      echo -e "'yum install python3'\nor\n'yum install python'"
     fi
   fi
   exit 1

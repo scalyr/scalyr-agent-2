@@ -54,7 +54,7 @@ check_python_version() {
   echo ". Trying to switch the Python interpreter for the Scalyr Agent."
 
   # Verify that a suitable Python version is available and set up the agent symlinks
-  if switch_python "python" || switch_python "python2" || switch_python "python3" ; then
+  if switch_python "python3" || switch_python "python" || switch_python "python2" ; then
     return 0
   fi
 
