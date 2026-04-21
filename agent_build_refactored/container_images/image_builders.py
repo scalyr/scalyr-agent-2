@@ -234,7 +234,7 @@ class ContainerisedAgentBuilder(Builder):
             f"-f={bake_file}",
             "--progress=plain",
             f"--allow=fs.read={str(self.work_dir)}",
-            f"--set \\*.platform={",".join([x.as_docker_platform() for x in architectures])}",
+            f"--set \\*.platform={','.join([x.as_docker_platform() for x in architectures])}",
         ]
 
         for key, value in dockerfile_overrides.items():
