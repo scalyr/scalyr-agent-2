@@ -227,6 +227,9 @@ class ContainerisedAgentBuilder(Builder):
         build_vars = build_vars or {}
         dockerfile_overrides = dockerfile_overrides or {}
 
+        print(f"Length of architectures: {len(architectures)}")
+        print(f"Same architecture: {architectures[0]}")
+
         cmd_options = [
             f"-f={bake_file}",
             "--progress=plain",
