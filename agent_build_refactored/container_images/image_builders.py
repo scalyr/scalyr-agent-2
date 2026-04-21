@@ -231,7 +231,7 @@ class ContainerisedAgentBuilder(Builder):
         print(f"Same architecture: {architectures[0]}")
 
         cmd_options = [
-            f"-f={bake_file}",
+            f"-f {bake_file}",
             "--progress=plain",
             f"--allow=fs.read={str(self.work_dir)}",
             f"--set \\*.platform={','.join([x.as_docker_platform() for x in architectures])}",
