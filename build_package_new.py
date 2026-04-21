@@ -98,12 +98,13 @@ def _add_image_parsers():
     )
 
     image_build_parser = image_parser_action_subparsers.add_parser(
-        "build-tarball", help="Build image if a form of OCI layout tarball."
+        "build-oci", help="Build image if a form of OCI layout tarball."
     )
     _add_image_type_arg(image_build_parser)
     image_build_parser.add_argument(
-        "--output-dir", required=True, help="Output directory with tarball"
+        "--output-dir", required=True, help="Output directory with OCI tarball"
     )
+    image_build_parser.add_argument('--cpu-architecture', action='append', help="CPU architecture to build for (can be used multiple times for multi-arch builds).")
 
     cache_requirements_image_parser = image_parser_action_subparsers.add_parser(
         "cache-requirements",
@@ -196,14 +197,19 @@ if __name__ == "__main__":
                 image_type=ImageType(args.image_type),
                 result_image_name=args.image_name,
             )
-        if args.action == "build-tarball":
+        if args.action == "build-oci":
             if args.output_dir:
                 output_dir = pl.Path(args.output_dir)
             else:
                 output_dir = None
 
+            if args.cpu_architecture:
+                architectures = [ CpuArch(arch_type) for arch_type in args.cpu_architecture]
+            else:
+                architectures = None
+
             builder.build_oci_tarball(
-                image_type=ImageType(args.image_type), output_dir=output_dir
+                image_type=ImageType(args.image_type), output_dir=output_dir, architectures=architectures
             )
             exit(0)
         elif args.action == "cache-requirements":
