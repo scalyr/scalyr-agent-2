@@ -304,8 +304,9 @@ class ContainerisedAgentBuilder(Builder):
         else:
             architecture_name = architectures[0].value
 
+        agent_version = (SOURCE_ROOT / "VERSION").read_text().strip()
         result_oci_tarball = (
-            self.result_dir / f"{image_type.value}-{self.__class__.NAME}-{architecture_name}.oci"
+            self.result_dir / f"scalyr-agent-2-{image_type.value}-{self.__class__.NAME}-{ agent_version }-{architecture_name}.oci"
         )
 
         self._build(
