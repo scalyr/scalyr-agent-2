@@ -302,7 +302,7 @@ class ContainerisedAgentBuilder(Builder):
         if len(architectures) > 1:
             architecture_name = "multiarch"
         else:
-            architecture_name = architectures[0].name
+            architecture_name = architectures[0].value
 
         result_oci_tarball = (
             self.result_dir / f"{image_type.value}-{self.__class__.NAME}-{architecture_name}.oci"
