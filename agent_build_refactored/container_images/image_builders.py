@@ -297,14 +297,21 @@ class ContainerisedAgentBuilder(Builder):
         Build image in the form of the OCI tarball
         """
 
-        result_tarball = (
-            self.result_dir / f"{image_type.value}-{self.__class__.NAME}.tar"
+        architectures = architectures or self.get_supported_architectures()
+
+        if len(architectures) > 1:
+            architecture_name = "multiarch"
+        else:
+            architecture_name = architectures[0].name
+
+        result_oci_tarball = (
+            self.result_dir / f"{image_type.value}-{self.__class__.NAME}-{architecture_name}.oci"
         )
 
         self._build(
             image_type=image_type,
             output=OCITarballBuildOutput(
-                dest=result_tarball,
+                dest=result_oci_tarball,
                 extract=False,
             ),
             architectures=architectures,
@@ -313,11 +320,11 @@ class ContainerisedAgentBuilder(Builder):
         if output_dir:
             output_dir.mkdir(parents=True, exist_ok=True)
             shutil.copy(
-                result_tarball,
+                result_oci_tarball,
                 output_dir,
             )
 
-        return result_tarball
+        return result_oci_tarball
 
 def _arch_to_docker_build_target_name(architecture: CpuArch):
 
