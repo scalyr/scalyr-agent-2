@@ -204,7 +204,6 @@ if __name__ == "__main__":
                 output_dir = None
 
             if args.cpu_architecture:
-                print("Got some architectures!! TODO remove me")
                 architectures = [ CpuArch(arch_type) for arch_type in args.cpu_architecture]
             else:
                 architectures = None
