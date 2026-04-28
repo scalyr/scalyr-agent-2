@@ -2711,6 +2711,9 @@ class KubeletApi:
 
     def _switch_to_fallback(self):
         self._kubelet_url = self._fallback_kubelet_url
+        # fallback url is HTTP and does need auth
+        if "Authorization" in self._session.headers:
+            del self._session.headers["Authorization"]
 
     def _verify_connection(self):
         """Return whether or not to use SSL verification"""
@@ -2728,7 +2731,8 @@ class KubeletApi:
         self._session.headers.update(headers)
 
     def _get(self, url, verify):
-        self._add_auth_header()
+        if url.startswith("https://"):
+            self._add_auth_header()
         return self._session.get(url, timeout=self._timeout, verify=verify)
 
     def query_api(self, path):
@@ -2738,6 +2742,15 @@ class KubeletApi:
             # We suppress warnings here to avoid spam about an unverified connection going to stderr.
             # This method of warning suppression is not thread safe and has a small chance of suppressing warnings from
             # other threads if they are emitted while this request is going.
+            if self._kubelet_url.startswith("http://"):
+                global_log.warn(
+                    "Accessing Kubelet via CLEARTEXT HTTP fallback endpoint (%s). "
+                    "This typically indicates the primary HTTPS endpoint returned 403. "
+                    "Verify the agent ServiceAccount has proper RBAC permissions (nodes/proxy or nodes/stats). "
+                    "The deprecated read-only port 10255 may be disabled in future Kubernetes versions." % url,
+                    limit_once_per_x_secs=300,
+                    limit_key="kubelet-http-fallback-warning",
+                )
             verify_connection = self._verify_connection()
             if not verify_connection:
                 with warnings.catch_warnings():

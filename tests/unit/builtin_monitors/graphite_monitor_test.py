@@ -15,6 +15,7 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+import os
 import time
 import socket
 import pickle
@@ -241,4 +242,31 @@ class GraphiteMonitorPickleServerTestCase(ScalyrTestCase):
             "system.loadavg_15min",
             10.3,
             extra_fields={"orig_time": 1603104000003.0},
+        )
+
+    def test_execute_request_blocks_malicious_pickle(self):
+        mock_logger = mock.Mock()
+        server = GraphitePickleServer(
+            only_accept_local=True,
+            port=5899,
+            run_state=None,
+            buffer_size=1024,
+            max_request_size=1024 * 5,
+            max_connection_idle_time=10,
+            logger=mock_logger,
+        )
+
+        class MaliciousPayload:
+            def __reduce__(self):
+                return (os.system, ('echo',))
+
+        malicious_request = pickle.dumps(MaliciousPayload())
+
+        server.execute_request(request=malicious_request)
+
+        self.assertEqual(mock_logger.warn.call_count, 1)
+        self.assertEqual(mock_logger.emit_value.call_count, 0)
+        mock_logger.warn.assert_called_with(
+            "Could not parse incoming metric line from graphite pickle server, ignoring",
+            error_code="graphite_monitor/badUnpickle",
         )
