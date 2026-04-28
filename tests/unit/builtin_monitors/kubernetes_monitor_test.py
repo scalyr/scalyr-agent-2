@@ -773,8 +773,21 @@ class TestKubeletApi(BaseScalyrLogCaptureTestCase):
     @mock.patch("scalyr_agent.monitor_utils.k8s.global_log")
     def test_fallback(self, mock_global_log):
         self._fake_get_called = False
+        self._https_had_auth = None
+        self._http_had_auth = None
+        
+        api = KubeletApi(
+            FakeKubernetesApi(),
+            host_ip="127.0.0.1",
+            node_name="FakeNode",
+        )
 
-        def fake_get(self2, url, verify):
+        def fake_session_get(url, timeout, verify):
+            if url.startswith('https://'):
+                self._https_had_auth = 'Authorization' in api._session.headers
+            elif url.startswith('http://'):
+                self._http_had_auth = 'Authorization' in api._session.headers
+            
             resp = FakeResponse()
             if not self._fake_get_called:
                 resp.status_code = 403
@@ -783,13 +796,7 @@ class TestKubeletApi(BaseScalyrLogCaptureTestCase):
                 resp.status_code = 200
             return resp
 
-        with mock.patch.object(KubeletApi, "_get", fake_get):
-            api = KubeletApi(
-                FakeKubernetesApi(),
-                host_ip="127.0.0.1",
-                node_name="FakeNode",
-            )
-
+        with mock.patch.object(api._session, "get", fake_session_get):
             self.assertEqual(mock_global_log.warn.call_count, 0)
             result = api.query_stats()
             self.assertEqual(result, {})
@@ -800,10 +807,13 @@ class TestKubeletApi(BaseScalyrLogCaptureTestCase):
                 "(http://127.0.0.1:10255)."
             )
 
-            self.assertEqual(mock_global_log.warn.call_count, 1)
+            self.assertEqual(mock_global_log.warn.call_count, 2)
             self.assertTrue(
                 expected_msg in mock_global_log.warn.call_args_list[0][0][0]
             )
+            
+            self.assertTrue(self._https_had_auth)
+            self.assertFalse(self._http_had_auth, "Fallback should not have auth header")
 
     def test_host_ip_format(self):
         def fake_get(self2, url, verify):
@@ -1443,7 +1453,7 @@ class TestKubernetesKubeletApiAuthTokenCaching(TestConfigurationBase, ScalyrTest
 
         session = requests.Session()
         adapter = requests_mock.Adapter()
-        session.mount("mock://", adapter)
+        session.mount("https://", adapter)
 
         expected_headers_token = ""
 
@@ -1457,12 +1467,12 @@ class TestKubernetesKubeletApiAuthTokenCaching(TestConfigurationBase, ScalyrTest
 
         adapter.register_uri(
             "GET",
-            "mock://test.com/test?pretty=0",
+            "https://test.com/test?pretty=0",
             text="{}",
             additional_matcher=custom_request_matcher,
         )
 
-        k8s_api_url = "mock://test.com"
+        k8s_api_url = "https://test.com"
 
         k8s = KubernetesApi.create_instance(
             global_config=global_config,
@@ -1509,7 +1519,7 @@ class TestKubernetesKubeletApiAuthTokenCaching(TestConfigurationBase, ScalyrTest
 
         session = requests.Session()
         adapter = requests_mock.Adapter()
-        session.mount("mock://", adapter)
+        session.mount("https://", adapter)
 
         expected_headers_token = ""
 
@@ -1523,12 +1533,12 @@ class TestKubernetesKubeletApiAuthTokenCaching(TestConfigurationBase, ScalyrTest
 
         adapter.register_uri(
             "GET",
-            "mock://test.com:10250/test",
+            "https://test.com:10250/test",
             text="{}",
             additional_matcher=custom_request_matcher,
         )
 
-        k8s_api_url = "mock://test.com"
+        k8s_api_url = "https://test.com"
 
         k8s = KubernetesApi.create_instance(
             global_config=global_config,
@@ -1537,7 +1547,7 @@ class TestKubernetesKubeletApiAuthTokenCaching(TestConfigurationBase, ScalyrTest
         )
         k8s._session = session
 
-        kubelet_url_template = Template("mock://${host_ip}:10250")
+        kubelet_url_template = Template("https://${host_ip}:10250")
 
         kubelet = KubeletApi(
             k8s=k8s,

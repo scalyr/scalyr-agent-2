@@ -714,6 +714,30 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
                     "his monitor.".format(monitor_to_fail.short_hash)
                 )
 
+    @mock.patch("scalyr_agent.agent_main.ScriptEscalator")
+    def test_privilege_escalation_before_config_parse(self, mock_escalator_class):
+        from scalyr_agent.agent_main import ScalyrAgent
+        from scalyr_agent.platform_controller import PlatformController
+
+        # escalator mock for required user change
+        mock_escalator = mock.Mock()
+        mock_escalator.is_user_change_required.return_value = True
+        mock_escalator.change_user_and_rerun_script.return_value = 0
+        mock_escalator_class.return_value = mock_escalator
+
+        self._write_mock_config()
+
+        platform_controller = PlatformController()
+        agent = ScalyrAgent(platform_controller)
+
+        with mock.patch.object(agent, "_ScalyrAgent__read_and_verify_config") as mock_parse:
+            for command in ["start", "restart", "condrestart"]:
+                agent.main(self._config_path, command, mock.Mock())
+                mock_escalator.change_user_and_rerun_script.assert_called_once()
+                mock_escalator.change_user_and_rerun_script.reset_mock()
+                # verify config not parsed as this user
+                mock_parse.assert_not_called()
+
 
 _AGENT_MAIN_PATH = os.path.join(
     __scalyr__.get_install_root(), "scalyr_agent", "agent_main.py"

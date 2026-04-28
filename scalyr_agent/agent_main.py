@@ -341,6 +341,17 @@ class ScalyrAgent:
 
         self.__config_file_path = config_file_path
 
+        self.__escalator = ScriptEscalator(
+            self.__controller,
+            config_file_path,
+            os.getcwd(),
+            command_options.no_change_user,
+        )
+        if command in ["start", "restart", "condrestart"]  and self.__escalator.is_user_change_required():
+            return self.__escalator.change_user_and_rerun_script(
+                "start the scalyr agent"
+            )
+
         no_check_remote = command_options.no_check_remote
 
         try:
@@ -381,12 +392,7 @@ class ScalyrAgent:
 
         self.__controller.consume_config(self.__config, config_file_path)
 
-        self.__escalator = ScriptEscalator(
-            self.__controller,
-            config_file_path,
-            os.getcwd(),
-            command_options.no_change_user,
-        )
+
 
         # noinspection PyBroadException
         try:
@@ -658,12 +664,6 @@ class ScalyrAgent:
         @return:  The exit status code for the process.
         @rtype: int
         """
-        # First, see if we have to change the user that is executing this script to match the owner of the config.
-        if self.__escalator.is_user_change_required():
-            return self.__escalator.change_user_and_rerun_script(
-                "start the scalyr agent"
-            )
-
         # Make sure we do not try to start it up again.
         self.__fail_if_already_running()
 
@@ -1107,12 +1107,6 @@ class ScalyrAgent:
         @return: the exit status code
         @rtype: int
         """
-        # First, see if we have to change the user that is executing this script to match the owner of the config.
-        if self.__escalator.is_user_change_required():
-            return self.__escalator.change_user_and_rerun_script(
-                "restart the scalyr agent"
-            )
-
         if self.__controller.is_agent_running():
             if not quiet:
                 print("Agent is running, restarting now.")
@@ -1147,12 +1141,6 @@ class ScalyrAgent:
             could not be started.
         @rtype: int
         """
-        # First, see if we have to change the user that is executing this script to match the owner of the config.
-        if self.__escalator.is_user_change_required():
-            return self.__escalator.change_user_and_rerun_script(
-                "restart the scalyr agent"
-            )
-
         if self.__controller.is_agent_running():
             if not quiet:
                 print("Agent is running, stopping it now.")
