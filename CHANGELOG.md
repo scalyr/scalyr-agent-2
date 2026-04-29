@@ -3,14 +3,16 @@ Scalyr Agent 2 Changes By Release
 
 ## 2.2.21 "Walter" - Apr 28, 2026
 <!---
-Packaged by Steven Czerwinski <stevenc@sentinelone.com> on Apr 28, 2026 09:00 -0800
+Packaged by Steven Czerwinski <stevenc@sentinelone.com> on Apr 29, 2026 16:00 -0800
 --->
 
 Changes:
 * Update OCI tarball name to use .oci extension
+* Update FIPS base image to use Python 3.13
 
 Fixes:
 * Fix pre/post install scripts to prefer Python 3
+* Fix FIPS base image bad stage name
 
 ## 2.2.20 "Xavier" - Apr 16, 2026
 <!---
