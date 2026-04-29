@@ -1,16 +1,13 @@
-FROM artifactory.eng.sentinelone.tech/docker-release/common/ubuntu-base/python311:2.0.48 as base
+FROM artifactory.eng.sentinelone.tech/docker-release/common/ubuntu-base/python313:2.0.74 as base
 
-FROM base as dependencies-build-base
+FROM base as dependencies-builder-base
 ENV DEBIANFRONTEND=noninteractive
-RUN apt-get update
-RUN apt-get install -y \
-    rustc \
-    cargo && \
-    apt-get autoremove --yes && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-
+RUN apt-get update  \
+    && apt-get install -y rustc cargo \
+    && python3.13 -m ensurepip --upgrade \
+    && apt-get autoremove --yes \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 FROM base as runtime-base
 # We upgrade current packages in order to keep everything up to date, including security updates.
