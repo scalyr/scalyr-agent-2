@@ -90,6 +90,11 @@ except ImportError:
 
     new_md5 = False
 
+try:
+    import regex
+except ImportError:
+    regex = None
+
 
 ORJSON_NOT_AVAILABLE_MSG = """
 orjson library is not available. You can install it using pip.
@@ -2755,3 +2760,53 @@ def get_flat_dictionary_memory_usage(data):
         map(sys.getsizeof, data.keys())
     )
     return size
+
+
+def compile_regex(pattern, flags=0, timeout=5.0):
+    """
+    Compile a regular expression with timeout protection if available.
+    """
+    if regex is not None:
+        return regex.compile(pattern, flags, timeout=timeout)
+    else:
+        return re.compile(pattern, flags)
+
+
+def regex_sub(pattern, repl, string, timeout=5.0):
+    """Executes sub with the appropriate regex module."""
+    if regex is not None:
+        return regex.sub(pattern, repl, string, timeout=timeout)
+    else:
+        return re.sub(pattern, repl, string)
+
+
+def regex_subn(pattern, repl, string, timeout=5.0):
+    """Executes subn with the appropriate regex module."""
+    if regex is not None:
+        return regex.subn(pattern, repl, string, timeout=timeout)
+    else:
+        return re.subn(pattern, repl, string)
+
+
+def regex_finditer(pattern, string, timeout=5.0):
+    """Executes finditer with the appropriate regex module."""
+    if regex is not None:
+        return regex.finditer(pattern, string, timeout=timeout)
+    else:
+        return re.finditer(pattern, string)
+
+
+def regex_search(pattern, string, timeout=5.0):
+    """Executes search with the appropriate regex module."""
+    if regex is not None:
+        return regex.search(pattern, string, timeout=timeout)
+    else:
+        return re.search(pattern, string)
+
+
+def regex_match(pattern, string, timeout=5.0):
+    """Executes match with the appropriate regex module."""
+    if regex is not None:
+        return regex.match(pattern, string, timeout=timeout)
+    else:
+        return re.match(pattern, string)
