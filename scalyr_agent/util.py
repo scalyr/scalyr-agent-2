@@ -2762,12 +2762,12 @@ def get_flat_dictionary_memory_usage(data):
     return size
 
 
-def compile_regex(pattern, flags=0, timeout=5.0):
+def compile_regex(pattern, flags=0):
     """
     Compile a regular expression with timeout protection if available.
     """
     if regex is not None:
-        return regex.compile(pattern, flags, timeout=timeout)
+        return regex.compile(pattern, flags)
     else:
         return re.compile(pattern, flags)
 
