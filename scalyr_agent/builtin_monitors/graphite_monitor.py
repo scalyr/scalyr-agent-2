@@ -25,6 +25,8 @@
 __author__ = "czerwin@scalyr.com"
 
 import six
+import io
+import builtins
 
 try:
     # noinspection PyPep8Naming
@@ -452,7 +454,7 @@ class GraphitePickleServer(ServerProcessor):
         # noinspection PyBroadException
         try:
             # Use pickle to read the binary data.
-            data_object = pickle.loads(request)
+            data_object = SafeGraphiteUnpickler(io.BytesIO(request)).load()
         except (
             Exception
         ):  # pickle.loads is document as raising any type of exception, so have to catch them all.
@@ -483,4 +485,20 @@ class GraphitePickleServer(ServerProcessor):
         self.__logger.exception(
             'Exception seen while processing Graphite connect on pickle port, closing connection: "%s"'
             % str(exception)
+        )
+
+class SafeGraphiteUnpickler(pickle.Unpickler):
+    """
+    Restricted unpickler that only allows primitive types required for Graphite metrics.
+    """
+    ALLOWED_BUILTINS = frozenset({
+        'list', 'tuple', 'str', 'bytes', 'float', 'int', 'dict'
+    })
+
+    def find_class(self, module, name):
+        if module == "builtins" and name in self.ALLOWED_BUILTINS:
+            return getattr(builtins, name)
+        raise pickle.UnpicklingError(
+            f"Forbidden class during unpickling: {module}.{name}. "
+            f"Only primitive types are allowed for Graphite metrics."
         )
