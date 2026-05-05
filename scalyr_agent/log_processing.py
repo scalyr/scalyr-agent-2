@@ -1607,7 +1607,7 @@ class LogFileIterator:
         found_new_line = False
         new_line_checker = None
         if check_for_new_lines:
-            new_line_checker = re.compile(b"[\n\r]")
+            new_line_checker = scalyr_util.compile_regex(b"[\n\r]")
 
         for pending_file in self.__pending_files:
             if read_position < pending_file.position_end:
@@ -1624,7 +1624,7 @@ class LogFileIterator:
 
                 if content is not None:
                     if check_for_new_lines and not found_new_line:
-                        found_new_line = new_line_checker.match(content) is not None
+                        found_new_line = scalyr_util.regex_match(new_line_checker, content) is not None
 
                     buffer_start = self.__buffer.tell()
                     self.__buffer.write(content)
@@ -3220,7 +3220,7 @@ class LogLineSampler:
             match, then returns None.
         """
         for sampling_rule in self.__sampling_rules:
-            if sampling_rule.match_expression.search(line) is not None:
+            if scalyr_util.regex_search(sampling_rule.match_expression, line) is not None:
                 return sampling_rule
         return None
 
@@ -3251,7 +3251,7 @@ class SamplingRule:
     """Encapsulates all data for one sampling rule."""
 
     def __init__(self, match_expression, sampling_rate):
-        self.match_expression = re.compile(match_expression)
+        self.match_expression = scalyr_util.compile_regex(match_expression)
         self.sampling_rate = sampling_rate
         self.total_matches = 0
         self.total_passes = 0
@@ -3354,7 +3354,7 @@ class LogLineRedacter:
 
         def __replace_groups_with_hashed_content(re_ex, replacement_ex, line):
 
-            _matches = re.finditer(re_ex, line)
+            _matches = scalyr_util.regex_finditer(re_ex, line)
 
             replacement_matches = 0
 
@@ -3411,7 +3411,7 @@ class LogLineRedacter:
                     line,
                 )
             else:
-                (result, matches) = re.subn(
+                (result, matches) = scalyr_util.regex_subn(
                     redaction_rule.redaction_expression,
                     redaction_rule.replacement_text,
                     line,
@@ -3430,7 +3430,7 @@ class LogLineRedacter:
                     line.decode("utf-8", "replace"),
                 )
             else:
-                (result, matches) = re.subn(
+                (result, matches) = scalyr_util.regex_subn(
                     redaction_rule.redaction_expression,
                     redaction_rule.replacement_text,
                     line.decode("utf-8", "replace"),
@@ -3455,7 +3455,7 @@ class RedactionRule:
     """Encapsulates all data for one redaction rule."""
 
     def __init__(self, redaction_expression, replacement_text, hash_salt=""):
-        self.redaction_expression = re.compile(redaction_expression)
+        self.redaction_expression = scalyr_util.compile_regex(redaction_expression)
         self.replacement_text = replacement_text
         self.hash_salt = hash_salt
         self.total_lines = 0
@@ -3880,8 +3880,8 @@ class LogMatcher:
             elif isinstance(rename, JsonObject):
                 if "match" in rename and "replacement" in rename:
                     try:
-                        pattern = re.compile(rename["match"])
-                        result = re.sub(pattern, rename["replacement"], matched_file)
+                        pattern = scalyr_util.compile_regex(rename["match"])
+                        result = scalyr_util.regex_sub(pattern, rename["replacement"], matched_file)
                         if result == matched_file:
                             log.warning(
                                 "Regex '%s' used to rename logfile '%s', but logfile name was not changed."
