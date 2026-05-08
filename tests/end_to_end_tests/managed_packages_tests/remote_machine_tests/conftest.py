@@ -23,12 +23,12 @@ import time
 
 import pytest
 
-from agent_build_refactored.utils.constants import (
+from package_builders.utils.constants import (
     AGENT_VERSION,
     SOURCE_ROOT,
     CpuArch,
 )
-from agent_build_refactored.managed_packages.managed_packages_builders import (
+from package_builders.managed_packages.managed_packages_builders import (
     ALL_PACKAGE_BUILDERS,
     AGENT_AIO_PACKAGE_NAME,
     AGENT_NON_AIO_AIO_PACKAGE_NAME,

@@ -21,8 +21,8 @@ import logging
 import pathlib as pl
 from typing import Dict
 
-from agent_build_refactored.utils.constants import CpuArch
-from agent_build_refactored.utils.aws.ami import CustomAMIImage, StockAMIImage
+from package_builders.utils.constants import CpuArch
+from package_builders.utils.aws.ami import CustomAMIImage, StockAMIImage
 
 
 logger = logging.getLogger(__name__)

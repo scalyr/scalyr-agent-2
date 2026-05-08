@@ -15,11 +15,11 @@
 
 import pathlib as pl
 
-from agent_build_refactored.utils.constants import SOURCE_ROOT, CpuArch
-from agent_build_refactored.utils.toolset_image import (
+from package_builders.utils.constants import SOURCE_ROOT, CpuArch
+from package_builders.utils.toolset_image import (
     build_toolset_image_oci_layout,
 )
-from agent_build_refactored.utils.docker.buildx.build import (
+from package_builders.utils.docker.buildx.build import (
     LocalDirectoryBuildOutput,
     buildx_build,
 )

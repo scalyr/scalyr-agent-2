@@ -26,10 +26,10 @@ import pathlib as pl
 # local packages. All such imports also have to be done after that.
 sys.path.append(str(pl.Path(__file__).parent.parent.parent.parent.parent))
 
-from agent_build_refactored.utils.common import init_logging
-from agent_build_refactored.utils.aws.ec2 import terminate_ec2_instances_and_security_groups
-from agent_build_refactored.utils.aws.common import COMMON_TAG_NAME, AWSSettings
-from agent_build_refactored.utils.docker.buildx.remote_builder.remote_builder_ami_image import (
+from package_builders.utils.common import init_logging
+from package_builders.utils.aws.ec2 import terminate_ec2_instances_and_security_groups
+from package_builders.utils.aws.common import COMMON_TAG_NAME, AWSSettings
+from package_builders.utils.docker.buildx.remote_builder.remote_builder_ami_image import (
     REMOTE_DOCKER_ENGINE_IMAGES
 )
 

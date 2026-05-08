@@ -10,7 +10,7 @@ from typing import List
 
 import pytest
 
-from agent_build_refactored.utils.constants import SOURCE_ROOT
+from package_builders.utils.constants import SOURCE_ROOT
 from tests.end_to_end_tests.tools import AgentPaths, AgentCommander
 
 

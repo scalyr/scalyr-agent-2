@@ -26,10 +26,10 @@ import os
 import botocore.exceptions  # pylint:disable=import-error
 import requests
 
-from agent_build_refactored.utils.aws.common import COMMON_TAG_NAME, AWSSettings
+from package_builders.utils.aws.common import COMMON_TAG_NAME, AWSSettings
 
-from agent_build_refactored.utils.docker.common import delete_container, get_docker_container_host_port
-from agent_build_refactored.utils.toolset_image import build_toolset_image
+from package_builders.utils.docker.common import delete_container, get_docker_container_host_port
+from package_builders.utils.toolset_image import build_toolset_image
 
 logger = logging.getLogger(__name__)
 
