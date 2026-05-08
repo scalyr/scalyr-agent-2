@@ -35,7 +35,7 @@ class WindowsBinaryBuilder(Builder):
         os.chdir(self.work_dir)
         self._build_win32_installer_package(AGENT_VERSION, output_dir)
 
-    def _build_win32_installer_package(self, version, output_dir):
+    def _build_win32_installer_package(self, version: str, output_dir: pl.Path):
         """Builds an MSI that will install the agent on a win32 machine in the current working directory.
 
         Note, this can only be run on a Windows machine with the proper binaries and packages installed.
@@ -308,7 +308,7 @@ class WindowsBinaryBuilder(Builder):
 
         run_command(
             "light -nologo -ext WixUtilExtension.dll -ext WixUIExtension -out %s ScalyrAgent.wixobj -v"
-            % output_dir / installer_name,
+            % (output_dir / installer_name),
             exit_on_fail=True,
             command_name="light",
             )
