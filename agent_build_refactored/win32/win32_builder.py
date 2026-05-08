@@ -16,11 +16,8 @@ from agent_build_refactored.utils.old_build_util import (
     get_install_info,
     cat_files,
     glob_files,
-    create_scalyr_uuid3, get_source_root,
+    create_scalyr_uuid3, get_source_root, get_agent_version,
 )
-
-
-AGENT_VERSION = (get_source_root() / "VERSION").read_text().strip()
 
 
 from agent_build_refactored.utils.builder import Builder
@@ -33,9 +30,9 @@ class WindowsBinaryBuilder(Builder):
 
     def build(self, output_dir: pl.Path = None):
         os.chdir(self.work_dir)
-        self._build_win32_installer_package(AGENT_VERSION, output_dir)
+        self._build_win32_installer_package(get_agent_version(), "main", output_dir)
 
-    def _build_win32_installer_package(self, version: str, output_dir: pl.Path):
+    def _build_win32_installer_package(self, version: str, variant: str, output_dir: pl.Path):
         """Builds an MSI that will install the agent on a win32 machine in the current working directory.
 
         Note, this can only be run on a Windows machine with the proper binaries and packages installed.
@@ -281,8 +278,6 @@ class WindowsBinaryBuilder(Builder):
         # TODO: Check certificate expiration same as we do as part of tox lint target
         # NOTE: This requires us to update Jenkins pipeline and other places where this script is called
         # to install cryptography library
-
-        variant = 'main'
 
         # Generate a unique identifier used to identify this version of the Scalyr Agent to windows.
         product_code = create_scalyr_uuid3("ProductID:%s:%s" % (variant, version))
