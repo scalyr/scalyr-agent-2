@@ -49,7 +49,7 @@ class TarballBuilder(Builder):
         # configuration.py.
         write_to_file("1", "scalyr-agent-2/packageless")
 
-        if variant is None:
+        if variant is None or variant == "main":
             base_archive_name = "scalyr-agent-%s" % version
         else:
             base_archive_name = "scalyr-agent-%s.%s" % (version, variant)
@@ -62,6 +62,7 @@ class TarballBuilder(Builder):
             else "scalyr-agent.tar.gz"
         )
         # Tar it up.
+        output_dir.mkdir(parents=True, exist_ok=True)
         tar = tarfile.open(output_dir / output_name, "w:gz")
         tar.add(base_archive_name)
         tar.close()
