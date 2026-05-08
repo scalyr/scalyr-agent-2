@@ -30,6 +30,9 @@ jobs:
           pip install -r dev-requirements-new.txt
 
       - name: Install WiX Toolset 3.11 (Windows)
+        # TODO: Upgrade our use of WiX to use version 3.14. This is the default for the
+        # version 3 branch and is what is pre-installed on the runners. However, it is not
+        # worth the effort right now, so we just downgrade the version of WiX used for the build.
         shell: powershell
         run: |
           choco install -y wixtoolset --allow-downgrade --version 3.11.2
@@ -42,5 +45,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-msi
+          retention-days: 1
           path: build/ScalyrAgentInstaller-*.msi
 
