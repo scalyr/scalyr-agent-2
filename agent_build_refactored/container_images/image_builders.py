@@ -380,9 +380,9 @@ for base_distro in ["ubuntu", "alpine"]:
 
 
 def _get_current_machine_architecture():
-    machine = platform.machine()
+    machine = platform.machine().lower()
 
-    if machine in ["x86_64"]:
+    if machine in ["x86_64", "amd64"]:
         return CpuArch.x86_64
     if machine in ["aarch64", "arm64"]:
         return CpuArch.AARCH64
