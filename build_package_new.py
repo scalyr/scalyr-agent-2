@@ -28,6 +28,7 @@ import argparse
 import sys
 import pathlib as pl
 from agent_build_refactored.prepare_agent_filesystem import parse_change_log
+from agent_build_refactored.tarball.tarball_builder import TarballBuilder
 from agent_build_refactored.win32.win32_builder import WindowsBinaryBuilder
 
 if sys.version_info < (3, 8, 0):
@@ -182,6 +183,16 @@ def _add_win32_parsers():
 
     build_parser.add_argument("--output-dir", default=str(SOURCE_ROOT / "build"))
 
+def _add_tarball_parsers():
+    tarball_parser = subparsers.add_parser("tarball")
+
+    tarball_action_subparsers = tarball_parser.add_subparsers(dest="action")
+
+    build_parser = tarball_action_subparsers.add_parser("build")
+
+    build_parser.add_argument("--output-dir", default=str(SOURCE_ROOT / "build"))
+    build_parser.add_argument("--versioned-file-name", type=bool, default=True)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
@@ -191,6 +202,7 @@ if __name__ == "__main__":
     _add_image_parsers()
     _add_package_parsers()
     _add_win32_parsers()
+    _add_tarball_parsers()
 
     args = parser.parse_args()
 
@@ -274,4 +286,10 @@ if __name__ == "__main__":
         if args.action == "build":
             builder = WindowsBinaryBuilder()
             builder.build(output_dir=pl.Path(args.output_dir))
+            exit(0)
+
+    elif args.command == "tarball":
+        if args.action == "build":
+            builder = TarballBuilder()
+            builder.build(args.versioned_file_name, output_dir=pl.Path(args.output_dir))
             exit(0)

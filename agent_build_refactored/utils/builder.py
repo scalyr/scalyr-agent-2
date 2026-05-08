@@ -40,6 +40,8 @@ class Builder:
         self.work_dir.mkdir(parents=True)
         self.result_dir.mkdir(parents=True)
 
+        print(f"Building {self.root_dir}")
+
     @property
     def root_dir(self) -> pl.Path:
         return AGENT_BUILD_OUTPUT_PATH / "builders" / self.name

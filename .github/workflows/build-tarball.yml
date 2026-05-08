@@ -9,9 +9,6 @@ on:
       - master
   workflow_dispatch:
 
-  schedule:
-    - cron: '0 4 * * *'
-
 permissions:
   contents: read
 
@@ -28,26 +25,19 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Build tarball
+      - name: Install Requirements
         run: |
-          mkdir -p build/tarball/noarch
-          pushd build/tarball/noarch
-          python3 ../../../build_package.py tarball
-          popd
+          python -m ensurepip --upgrade
+          python -m pip install --upgrade pip
+          pip install -r dev-requirements-new.txt
+
+      - name: Build tarball
+        run: python build_package_new.py tarball build
 
       - name: Save tarball as artifact
         uses: actions/upload-artifact@v4
         with:
           name: tarball-noarch
-          path: build
+          path: build/scalyr-agent*.tar.gz
           retention-days: 1
 
-      - name: Notify Slack on Failure
-        if: ${{ failure() && github.ref_name == 'master' }}
-        uses: act10ns/slack@ed1309ab9862e57e9e583e51c7889486b9a00b0f # v2.0.0
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        with:
-          status: ${{ job.status }}
-          steps: ${{ toJson(steps) }}
-          channel: '#eng-dataset-cloud-tech'
