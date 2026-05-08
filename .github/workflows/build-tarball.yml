@@ -38,6 +38,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: tarball-noarch
-          path: build
+          path: build/scalyr-agent*.tar.gz
           retention-days: 1
 
