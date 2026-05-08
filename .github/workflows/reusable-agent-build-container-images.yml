@@ -152,7 +152,7 @@ jobs:
           ALLOW_FALLBACK_TO_REMOTE_BUILDER: "1"
           CACHE_VERSION: ${{ inputs.cache_version }}
         run: |
-          python3 build_package_new.py \
+          python3 build_package.py \
             image \
             ${{ inputs.builder_name }} \
             --base-image ${{ inputs.base_image }} \
@@ -231,7 +231,7 @@ jobs:
           USE_GHA_CACHE: "1"
           CACHE_VERSION: ${{ inputs.cache_version }}
         run: |
-          python3 build_package_new.py \
+          python3 build_package.py \
             image \
             ${{ inputs.builder_name }} \
             --base-image ${{ inputs.base_image }} \
@@ -1082,7 +1082,7 @@ jobs:
       - name: Publish image
         if: steps.verify.outputs.tags != 'empty'
         run: |
-          python3 build_package_new.py \
+          python3 build_package.py \
             image \
             ${{ inputs.builder_name }} \
             --base-image ${{ inputs.base_image }} \

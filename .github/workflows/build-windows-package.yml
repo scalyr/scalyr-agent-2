@@ -39,7 +39,7 @@ jobs:
           echo "C:\Program Files (x86)\WiX Toolset v3.11\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Build agent package and installer
-        run: python build_package_new.py win32 build
+        run: python build_package.py win32 build
 
       - name: Save installer as artifact
         uses: actions/upload-artifact@v4

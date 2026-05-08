@@ -25,4 +25,4 @@ jobs:
 
       - name: Check Changelog
         run: |
-          python3 build_package_new.py parse-changelog
+          python3 build_package.py parse-changelog
