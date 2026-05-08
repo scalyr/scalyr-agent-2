@@ -30,7 +30,6 @@ jobs:
           pip install -r dev-requirements-new.txt
 
       - name: Install WiX Toolset 3.11 (Windows)
-        if: env.ARTIFACT_TYPE == 'win32' && steps.checks.outputs.artifact_already_built == 'false'
         shell: powershell
         run: |
           choco install -y wixtoolset --version 3.11.2
