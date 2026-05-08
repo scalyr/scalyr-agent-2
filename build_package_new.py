@@ -28,6 +28,7 @@ import argparse
 import sys
 import pathlib as pl
 from agent_build_refactored.prepare_agent_filesystem import parse_change_log
+from agent_build_refactored.win32.win32_builder import WindowsBinaryBuilder
 
 if sys.version_info < (3, 8, 0):
     raise ValueError("This script requires Python 3.8 or above")
@@ -172,6 +173,15 @@ def _add_package_parsers():
 
     build_parser.add_argument("--output-dir", default=str(SOURCE_ROOT / "build"))
 
+def _add_win32_parsers():
+    win32_parser = subparsers.add_parser("win32")
+
+    win32_action_subparsers = win32_parser.add_subparsers(dest="action")
+
+    build_parser = win32_action_subparsers.add_parser("build")
+
+    build_parser.add_argument("--output-dir", default=str(SOURCE_ROOT / "build"))
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
@@ -180,6 +190,7 @@ if __name__ == "__main__":
     subparsers.add_parser("parse-changelog")
     _add_image_parsers()
     _add_package_parsers()
+    _add_win32_parsers()
 
     args = parser.parse_args()
 
@@ -258,4 +269,9 @@ if __name__ == "__main__":
                 package_type=args.package_type,
                 output_dir=pl.Path(args.output_dir),
             )
+            exit(0)
+    elif args.command == "win32":
+        if args.action == "build":
+            builder = WindowsBinaryBuilder()
+            builder.build(output_dir=pl.Path(args.output_dir))
             exit(0)
