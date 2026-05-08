@@ -202,6 +202,7 @@ if __name__ == "__main__":
     _add_image_parsers()
     _add_package_parsers()
     _add_win32_parsers()
+    _add_tarball_parsers()
 
     args = parser.parse_args()
 
