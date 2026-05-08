@@ -31,8 +31,8 @@ from typing import List, Dict
 
 import pytest
 
-from agent_build_refactored.utils.constants import SOURCE_ROOT, AGENT_VERSION
-from agent_build_refactored.managed_packages.managed_packages_builders import (
+from package_builders.utils.constants import SOURCE_ROOT, AGENT_VERSION
+from package_builders.managed_packages.managed_packages_builders import (
     AGENT_SUBDIR_NAME,
     AGENT_AIO_PACKAGE_NAME,
     OPENSSL_3_VERSION,

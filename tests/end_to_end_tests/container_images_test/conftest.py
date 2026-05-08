@@ -17,9 +17,9 @@ import pathlib as pl
 
 import pytest
 
-from agent_build_refactored.utils.constants import CpuArch
-from agent_build_refactored.container_images import ALL_CONTAINERISED_AGENT_BUILDERS
-from agent_build_refactored.container_images.image_builders import (
+from package_builders.utils.constants import CpuArch
+from package_builders.container_images import ALL_CONTAINERISED_AGENT_BUILDERS
+from package_builders.container_images.image_builders import (
     ImageType,
 )
 from tests.end_to_end_tests.container_images_test.tools import (

@@ -16,7 +16,7 @@
 import pathlib as pl
 import shutil
 
-from agent_build_refactored.utils.constants import AGENT_BUILD_OUTPUT_PATH
+from package_builders.utils.constants import AGENT_BUILD_OUTPUT_PATH
 
 _PARENT_DIR = pl.Path(__file__).parent
 

@@ -27,9 +27,9 @@ to see those options use build_package.py <name of the package> --help.
 import argparse
 import sys
 import pathlib as pl
-from agent_build_refactored.prepare_agent_filesystem import parse_change_log
-from agent_build_refactored.tarball.tarball_builder import TarballBuilder
-from agent_build_refactored.win32.win32_builder import WindowsBinaryBuilder
+from package_builders.prepare_agent_filesystem import parse_change_log
+from package_builders.tarball.tarball_builder import TarballBuilder
+from package_builders.win32.win32_builder import WindowsBinaryBuilder
 
 if sys.version_info < (3, 8, 0):
     raise ValueError("This script requires Python 3.8 or above")
@@ -38,13 +38,13 @@ if sys.version_info < (3, 8, 0):
 # local packages. All such imports also have to be done after that.
 sys.path.append(str(pl.Path(__file__).parent.absolute()))
 
-from agent_build_refactored.utils.constants import CpuArch, SOURCE_ROOT
-from agent_build_refactored.utils.common import init_logging
-from agent_build_refactored.container_images import ALL_CONTAINERISED_AGENT_BUILDERS
-from agent_build_refactored.container_images.image_builders import (
+from package_builders.utils.constants import CpuArch, SOURCE_ROOT
+from package_builders.utils.common import init_logging
+from package_builders.container_images import ALL_CONTAINERISED_AGENT_BUILDERS
+from package_builders.container_images.image_builders import (
     ImageType,
 )
-from agent_build_refactored.managed_packages.managed_packages_builders import (
+from package_builders.managed_packages.managed_packages_builders import (
     ALL_PACKAGE_BUILDERS,
 )
 

@@ -24,14 +24,14 @@ import subprocess
 import shutil
 from typing import List, Dict, Union
 
-from agent_build_refactored.utils.constants import CpuArch
-from agent_build_refactored.utils.builder import Builder
-from agent_build_refactored.managed_packages.managed_packages_builders import (
+from package_builders.utils.constants import CpuArch
+from package_builders.utils.builder import Builder
+from package_builders.managed_packages.managed_packages_builders import (
     EMBEDDED_OPENSSL_VERSION_NUMBER,
     ALL_AIO_PACKAGE_BUILDERS,
     PORTABLE_PYTEST_RUNNER_NAME,
 )
-from agent_build_refactored.utils.aws.ami import (
+from package_builders.utils.aws.ami import (
     StockAMIImage,
 )
 from tests.end_to_end_tests.conftest import (

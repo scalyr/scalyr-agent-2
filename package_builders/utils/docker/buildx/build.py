@@ -24,7 +24,7 @@ import tarfile
 from typing import List, Dict, Union
 
 
-from agent_build_refactored.utils.constants import AGENT_BUILD_OUTPUT_PATH, CpuArch
+from package_builders.utils.constants import AGENT_BUILD_OUTPUT_PATH, CpuArch
 
 logger = logging.getLogger(__name__)
 
@@ -225,7 +225,7 @@ def buildx_build(
 
         logger.info("Cache is is not enough to perform a local build, repeat the build in a remote builder")
 
-        from agent_build_refactored.utils.docker.buildx.remote_builder import get_remote_builder
+        from package_builders.utils.docker.buildx.remote_builder import get_remote_builder
 
         if len(architectures) != 1:
             raise Exception(

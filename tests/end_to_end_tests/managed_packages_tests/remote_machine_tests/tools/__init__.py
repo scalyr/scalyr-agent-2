@@ -20,13 +20,13 @@ from typing import Union, Type
 
 import requests
 
-from agent_build_refactored.utils.constants import CpuArch
-from agent_build_refactored.utils.docker.buildx.build import (
+from package_builders.utils.constants import CpuArch
+from package_builders.utils.docker.buildx.build import (
     buildx_build,
     LocalDirectoryBuildOutput,
 )
-from agent_build_refactored.utils.toolset_image import build_toolset_image_oci_layout
-from agent_build_refactored.managed_packages.managed_packages_builders import (
+from package_builders.utils.toolset_image import build_toolset_image_oci_layout
+from package_builders.managed_packages.managed_packages_builders import (
     LinuxAIOPackagesBuilder,
     LinuxNonAIOPackageBuilder,
 )

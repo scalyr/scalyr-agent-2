@@ -10,8 +10,8 @@ venv/
 env/
 .env/
 bin/
-!agent_build_refactored/managed_packages/files/bin/
-!agent_build_refactored/managed_packages/non-aio/files/bin/
+!package_builders/managed_packages/files/bin/
+!package_builders/managed_packages/non-aio/files/bin/
 build/
 cover/
 develop-eggs/

@@ -5,7 +5,7 @@ import pathlib as pl
 import subprocess
 import sys
 
-from agent_build_refactored.utils.old_build_util import (
+from package_builders.utils.old_build_util import (
     make_path,
     make_directory,
     run_command,
@@ -20,7 +20,7 @@ from agent_build_refactored.utils.old_build_util import (
 )
 
 
-from agent_build_refactored.utils.builder import Builder
+from package_builders.utils.builder import Builder
 
 class WindowsBinaryBuilder(Builder):
     NAME = "win32"

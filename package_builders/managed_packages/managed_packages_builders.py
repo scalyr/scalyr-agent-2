@@ -94,9 +94,9 @@ import re
 from typing import List, Dict, Type, Union, Set
 
 
-from agent_build_refactored.utils.builder import Builder
+from package_builders.utils.builder import Builder
 
-from agent_build_refactored.utils.constants import (
+from package_builders.utils.constants import (
     SOURCE_ROOT,
     CpuArch,
     REQUIREMENTS_AGENT_COMMON,
@@ -104,19 +104,19 @@ from agent_build_refactored.utils.constants import (
     AGENT_BUILD_OUTPUT_PATH,
 )
 
-from agent_build_refactored.prepare_agent_filesystem import (
+from package_builders.prepare_agent_filesystem import (
     build_linux_fhs_agent_files,
     add_config,
     create_change_logs,
 )
 
-from agent_build_refactored.utils.toolset_image import build_toolset_image_oci_layout
-from agent_build_refactored.utils.docker.buildx.build import (
+from package_builders.utils.toolset_image import build_toolset_image_oci_layout
+from package_builders.utils.docker.buildx.build import (
     BuildOutput,
     LocalDirectoryBuildOutput,
     buildx_build
 )
-from agent_build_refactored.utils.constants import AGENT_REQUIREMENTS
+from package_builders.utils.constants import AGENT_REQUIREMENTS
 
 logger = logging.getLogger(__name__)
 

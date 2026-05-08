@@ -26,7 +26,7 @@ import subprocess
 import time
 from typing import Union, List
 
-from agent_build_refactored.utils.constants import SOURCE_ROOT
+from package_builders.utils.constants import SOURCE_ROOT
 
 _PARENT_DIR = pl.Path(__file__).parent
 

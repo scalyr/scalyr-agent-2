@@ -20,8 +20,8 @@ across the whole codebase.
 import pathlib as pl
 import shutil
 
-from agent_build_refactored.utils.constants import SOURCE_ROOT, CpuArch, OCI_LAYOUTS_DIR
-from agent_build_refactored.utils.docker.buildx.build import DockerImageBuildOutput, buildx_build, OCITarballBuildOutput, BuildOutput
+from package_builders.utils.constants import SOURCE_ROOT, CpuArch, OCI_LAYOUTS_DIR
+from package_builders.utils.docker.buildx.build import DockerImageBuildOutput, buildx_build, OCITarballBuildOutput, BuildOutput
 
 _PARENT_DIR = pl.Path(__file__).parent
 
