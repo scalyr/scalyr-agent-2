@@ -26,6 +26,11 @@ AGENT_VERSION = (get_source_root() / "VERSION").read_text().strip()
 from agent_build_refactored.utils.builder import Builder
 
 class WindowsBinaryBuilder(Builder):
+    NAME = "win32"
+
+    def __init__(self):
+        super().__init__()
+
     def build(self, output_dir: pl.Path = None):
         os.chdir(self.work_dir)
         self._build_win32_installer_package(AGENT_VERSION, output_dir)
