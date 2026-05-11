@@ -28,7 +28,8 @@ class WindowsBinaryBuilder(Builder):
     def __init__(self):
         super().__init__()
 
-    def build(self, output_dir: pl.Path = None):
+    def build(self, output_dir: pl.Path):
+        output_dir = output_dir.absolute()
         os.chdir(self.work_dir)
         self._build_win32_installer_package(get_agent_version(), "main", output_dir)
 

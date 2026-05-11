@@ -17,7 +17,8 @@ class TarballBuilder(Builder):
     def __init__(self):
         super().__init__()
 
-    def build(self, versioned_file_name: bool, output_dir: pl.Path = None):
+    def build(self, versioned_file_name: bool, output_dir: pl.Path):
+        output_dir = output_dir.absolute()
         os.chdir(self.work_dir)
         self._build_tarball_package("main", get_agent_version(), versioned_file_name, output_dir)
 
