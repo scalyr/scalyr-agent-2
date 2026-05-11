@@ -61,7 +61,7 @@ jobs:
       aws_region: ${{ needs.pre_job.outputs.aws_region }}
       cicd_workflow: ${{ needs.pre_job.outputs.cicd_workflow }}
       builder_name: ${{ matrix.builder.builder_name }}
-      base_image: ${{ matrix.builder.base_image }}
+      base_image_dockerfile: ${{ matrix.builder.base_image_dockerfile }}
       architectures: ${{ toJson(matrix.builder.architectures) }}
     secrets:
       CT_AWS_DEV_EC2_PRIVATE_KEY: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
@@ -91,7 +91,9 @@ jobs:
 
   clean-ec2-tests-objects:
     name: Remove ec2 object that were created by this workflow
-    if: ${{ always() }}
+    # TODO: Re-enable this is job iff we re-enable the K8s and Events monitor tests
+    if: false
+    #if: ${{ always() }}
     needs:
       - pre_job
       - build_container_images
