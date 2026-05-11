@@ -103,7 +103,7 @@ jobs:
           CICD_WORKFLOW: ${{ inputs.cicd_workflow }}
           CICD_JOB: ${{ matrix.builder.name }}
         run: |
-          python3 build_package_new.py package ${{ matrix.builder.name }} build-dependencies
+          python3 build_package.py package ${{ matrix.builder.name }} build-dependencies
 
   build_packages:
     name: Build package ${{ matrix.variant.builder_name }}-${{ matrix.variant.package_type }}
@@ -158,7 +158,7 @@ jobs:
           USE_GHA_CACHE: "1"
           CACHE_VERSION: ${{ inputs.cache_version }}
         run: |
-          python3 build_package_new.py package ${{ matrix.variant.builder_name }} build \
+          python3 build_package.py package ${{ matrix.variant.builder_name }} build \
             --package-type ${{ matrix.variant.package_type }}
 
       - name: Save packages as artifact

@@ -168,11 +168,11 @@ packaging systems.
 
 To build the RPM package, execute the following command in the root directory of this repository
 
-    python build_package.py rpm
+    python build_package.py package non-aio build --package-type rpm
 
 To build the Debian package, execute the following command in the root directory of this repository
 
-    python build_package.py deb
+    python build_package.py package non-aio build --package-type deb
 
 ### Pre-Commit Hooks
 

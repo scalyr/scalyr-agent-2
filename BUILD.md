@@ -3,7 +3,7 @@
 In order to work with images, use the next commands of the build script:
 
 ```bash
-python3 build_package_new.py image <builder_name> <action>
+python3 build_package.py image <builder_name> <action>
 ```
 
 where: 
@@ -52,7 +52,7 @@ As an example you can publish image to a local registry in a container.
 ```bash
 docker run -it --rm --name registry -p 5005:5000 registry:2
 
-python3 build_package_new.py image ubuntu publish --image-type k8s --registry localhost:5000 --tags=latest --registry-username user --no-verify-tls
+python3 build_package.py image ubuntu publish --image-type k8s --registry localhost:5000 --tags=latest --registry-username user --no-verify-tls
 ```
 
 NOTE: This builds a multi-arch image with all supported architecture. 
@@ -66,7 +66,7 @@ local Docker image into minikube using ``minikube image load`` command as shown 
 below:
 
 ```bash
-python3 build_package_new.py image ubuntu k8s load --image-type k8s --image-name my-image:latest
+python3 build_package.py image ubuntu k8s load --image-type k8s --image-name my-image:latest
 
 minikube image load my-image:latest
 ```

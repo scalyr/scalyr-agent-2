@@ -32,7 +32,7 @@ jobs:
           pip install -r dev-requirements-new.txt
 
       - name: Build tarball
-        run: python build_package_new.py tarball build
+        run: python build_package.py tarball build
 
       - name: Save tarball as artifact
         uses: actions/upload-artifact@v4
