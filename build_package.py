@@ -285,11 +285,11 @@ if __name__ == "__main__":
     elif args.command == "win32":
         if args.action == "build":
             builder = WindowsBinaryBuilder()
-            builder.build(output_dir=pl.Path(args.output_dir))
+            builder.build(pl.Path(args.output_dir))
             exit(0)
 
     elif args.command == "tarball":
         if args.action == "build":
             builder = TarballBuilder()
-            builder.build(args.versioned_file_name, output_dir=pl.Path(args.output_dir))
+            builder.build(args.versioned_file_name, pl.Path(args.output_dir))
             exit(0)
