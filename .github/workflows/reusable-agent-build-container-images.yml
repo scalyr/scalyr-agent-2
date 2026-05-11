@@ -23,8 +23,8 @@ on:
         description: "Builder name used to build docker images. Accepted values: ubuntu, alpine, ubuntu-fips."
         type: string
 
-      base_image:
-        description: "Base image to be used when bulding the docker image, i.e. ubuntu:22.04, alpine:latest."
+      base_image_dockerfile:
+        description: "Base image dockerfile to be used when building the docker image, i.e. ubuntu:22.04, alpine:latest."
         type: string
 
       architectures:
@@ -154,8 +154,8 @@ jobs:
         run: |
           python3 build_package.py \
             image \
+            --base-image-dockerfile ${{ inputs.base_image_dockerfile }} \
             ${{ inputs.builder_name }} \
-            --base-image ${{ inputs.base_image }} \
             build-oci \
             --image-type ${{  matrix.variant.image_type }} \
             --output-dir ./build
