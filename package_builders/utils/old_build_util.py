@@ -493,7 +493,7 @@ def build_base_files(install_type, base_configs="config"):
     shutil.copy(
         make_path(
             agent_source_root,
-            "agent_build_refactored/files/linux/scalyr-agent-2-config",
+            "package_builders/files/linux/scalyr-agent-2-config",
         ),
         "scalyr-agent-2-config",
     )
@@ -502,7 +502,7 @@ def build_base_files(install_type, base_configs="config"):
     shutil.copy(
         os.path.join(
             agent_source_root,
-            "agent_build_refactored/managed_packages/non-aio/files/bin/scalyr-switch-python.sh",
+            "package_builders/managed_packages/non-aio/files/bin/scalyr-switch-python.sh",
         ),
         "scalyr-switch-python",
     )

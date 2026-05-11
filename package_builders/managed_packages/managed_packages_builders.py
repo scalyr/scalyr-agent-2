@@ -245,7 +245,7 @@ class LinuxPackageBuilder(Builder):
         # Copy init.d folder.
         shutil.copytree(
             SOURCE_ROOT
-            / "agent_build_refactored/managed_packages/files/init.d",
+            / "package_builders/managed_packages/files/init.d",
             package_root_path / "etc/init.d",
             dirs_exist_ok=True,
         )
@@ -392,7 +392,7 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
         These are the preinstall.sh, preuninstall.sh, and postuninstall.sh scripts.
         """
 
-        source_scriptlets_path = SOURCE_ROOT / "agent_build_refactored/managed_packages/non-aio/install-scriptlets"
+        source_scriptlets_path = SOURCE_ROOT / "package_builders/managed_packages/non-aio/install-scriptlets"
 
         self.scriptlets_dir.mkdir(parents=True)
         pre_install_scriptlet = self.scriptlets_dir / "preinstall.sh"
@@ -440,7 +440,7 @@ class LinuxNonAIOPackageBuilder(LinuxPackageBuilder):
         self._build_packages_common_files(package_root_path=self._package_root)
 
         # Copy switch python executable script to package's bin
-        switch_python_source = SOURCE_ROOT / "agent_build_refactored/managed_packages/non-aio/files/bin/scalyr-switch-python.sh"
+        switch_python_source = SOURCE_ROOT / "package_builders/managed_packages/non-aio/files/bin/scalyr-switch-python.sh"
 
         switch_python_executable_name = "scalyr-switch-python"
         package_bin_path = self._package_root / f"usr/share/{AGENT_SUBDIR_NAME}/bin"
@@ -694,7 +694,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         hashlib_binding_path.symlink_to(f"../../../../lib/openssl/current/bindings/{hashlib_binding_path.name}")
 
         # Rename main Python executable to be 'python3-original' and copy our wrapper script instead of it
-        source_bin_dir = SOURCE_ROOT / "agent_build_refactored/managed_packages/files/bin"
+        source_bin_dir = SOURCE_ROOT / "package_builders/managed_packages/files/bin"
         package_python_bin_dir = package_python_dir / "bin"
         package_python_bin_executable_full_name = package_python_bin_dir / f"python{PYTHON_X_Y}"
         package_python_bin_original_executable = package_python_bin_dir / "python3-original"
@@ -779,7 +779,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
 
         package_venv_bin_python3_executable = package_venv_bin_dir / "python3"
         shutil.copy(
-            SOURCE_ROOT / "agent_build_refactored/managed_packages/files/bin/venv-python3",
+            SOURCE_ROOT / "package_builders/managed_packages/files/bin/venv-python3",
             package_venv_bin_python3_executable
         )
 
@@ -795,13 +795,13 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
 
         # Copy additional requirements file.
         shutil.copy(
-            SOURCE_ROOT / "agent_build_refactored/managed_packages/files/additional-requirements.txt",
+            SOURCE_ROOT / "package_builders/managed_packages/files/additional-requirements.txt",
             package_opt_etc_dir
         )
 
         # Copy script that allows configuring of the agent requirements.
         shutil.copy(
-            SOURCE_ROOT / "agent_build_refactored/managed_packages/files/bin/agent-libs-config",
+            SOURCE_ROOT / "package_builders/managed_packages/files/bin/agent-libs-config",
             package_opt_bin_dir
         )
 
@@ -826,7 +826,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         # Add agent's executable script.
         shutil.copy(
             SOURCE_ROOT
-            / "agent_build_refactored/managed_packages/files/bin/scalyr-agent-2",
+            / "package_builders/managed_packages/files/bin/scalyr-agent-2",
             install_root_executable_path,
         )
 
@@ -857,7 +857,7 @@ class LinuxAIOPackagesBuilder(LinuxPackageBuilder):
         self.scriptlets_dir.mkdir(parents=True)
 
         shutil.copytree(
-            SOURCE_ROOT / "agent_build_refactored/managed_packages/install-scriptlets",
+            SOURCE_ROOT / "package_builders/managed_packages/install-scriptlets",
             self.scriptlets_dir,
             dirs_exist_ok=True,
         )
