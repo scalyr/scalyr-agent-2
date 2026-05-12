@@ -151,7 +151,7 @@ jobs:
           USE_GHA_CACHE: "1"
           CACHE_VERSION: ${{ inputs.cache_version }}
         run: |
-          cpu_architecture_options=$(echo '${{ inputs.architectures }}' | | jq -r 'map("--cpu-architecture " + .) | join(" ")')
+          cpu_architecture_options=$(echo '${{ inputs.architectures }}' | jq -r 'map("--cpu-architecture " + .) | join(" ")')
           python3 build_package.py \
             image \
             --base-image-dockerfile ${{ inputs.base_image_dockerfile }} \
