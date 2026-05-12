@@ -16,7 +16,7 @@
 import pathlib as pl
 import shutil
 
-from agent_build_refactored.utils.constants import AGENT_BUILD_OUTPUT_PATH
+from package_builders.utils.constants import AGENT_BUILD_OUTPUT_PATH
 
 _PARENT_DIR = pl.Path(__file__).parent
 
@@ -39,6 +39,8 @@ class Builder:
 
         self.work_dir.mkdir(parents=True)
         self.result_dir.mkdir(parents=True)
+
+        print(f"Building {self.root_dir}")
 
     @property
     def root_dir(self) -> pl.Path:

@@ -20,10 +20,10 @@ from subprocess import TimeoutExpired
 from typing import Optional, Dict
 
 
-from agent_build_refactored.utils.constants import CpuArch
-from agent_build_refactored.utils.aws.ec2 import EC2InstanceWrapper
-from agent_build_refactored.utils.docker.common import get_docker_container_host_port
-from agent_build_refactored.utils.docker.buildx.remote_builder.remote_builder_ami_image import REMOTE_DOCKER_ENGINE_IMAGES
+from package_builders.utils.constants import CpuArch
+from package_builders.utils.aws.ec2 import EC2InstanceWrapper
+from package_builders.utils.docker.common import get_docker_container_host_port
+from package_builders.utils.docker.buildx.remote_builder.remote_builder_ami_image import REMOTE_DOCKER_ENGINE_IMAGES
 
 logger = logging.getLogger(__name__)
 
@@ -204,7 +204,7 @@ def get_remote_builder(
     if builder:
         return builder
 
-    from agent_build_refactored.utils.toolset_image import build_toolset_image
+    from package_builders.utils.toolset_image import build_toolset_image
 
     toolset_image_name = build_toolset_image()
 

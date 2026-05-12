@@ -26,7 +26,7 @@ import pytest
 import psutil
 
 
-from agent_build_refactored.utils.constants import AGENT_VERSION
+from package_builders.utils.constants import AGENT_VERSION
 from tests.end_to_end_tests.tools import TimeoutTracker
 from tests.end_to_end_tests.verify import (
     verify_logs,

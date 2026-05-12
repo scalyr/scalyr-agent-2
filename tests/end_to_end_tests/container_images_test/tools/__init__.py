@@ -17,14 +17,14 @@ import pathlib as pl
 import subprocess
 from typing import Callable
 
-from agent_build_refactored.utils.constants import CpuArch
-from agent_build_refactored.utils.docker.common import delete_container
-from agent_build_refactored.utils.docker.buildx.build import (
+from package_builders.utils.constants import CpuArch
+from package_builders.utils.docker.common import delete_container
+from package_builders.utils.docker.buildx.build import (
     buildx_build,
     DockerImageBuildOutput,
 )
-from agent_build_refactored.container_images import ALL_CONTAINERISED_AGENT_BUILDERS
-from agent_build_refactored.container_images.image_builders import (
+from package_builders.container_images import ALL_CONTAINERISED_AGENT_BUILDERS
+from package_builders.container_images.image_builders import (
     ContainerisedAgentBuilder,
     ImageType,
 )

@@ -21,20 +21,20 @@ import subprocess
 import platform
 from typing import Dict, Type, List, Set
 
-from agent_build_refactored.utils.constants import (
+from package_builders.utils.constants import (
     SOURCE_ROOT,
     CpuArch,
     AGENT_REQUIREMENTS,
     REQUIREMENTS_DEV_COVERAGE,
 )
 
-from agent_build_refactored.utils.builder import Builder
-from agent_build_refactored.utils.docker.buildx.build import (
+from package_builders.utils.builder import Builder
+from package_builders.utils.docker.buildx.build import (
     OCITarballBuildOutput,
     BuildOutput, LocalDirectoryBuildOutput
 )
 
-from agent_build_refactored.prepare_agent_filesystem import (
+from package_builders.prepare_agent_filesystem import (
     build_linux_fhs_agent_files,
     add_config,
 )
@@ -380,9 +380,9 @@ for base_distro in ["ubuntu", "alpine"]:
 
 
 def _get_current_machine_architecture():
-    machine = platform.machine()
+    machine = platform.machine().lower()
 
-    if machine in ["x86_64"]:
+    if machine in ["x86_64", "amd64"]:
         return CpuArch.x86_64
     if machine in ["aarch64", "arm64"]:
         return CpuArch.AARCH64

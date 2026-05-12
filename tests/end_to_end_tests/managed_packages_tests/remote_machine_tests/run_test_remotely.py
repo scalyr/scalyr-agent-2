@@ -25,12 +25,12 @@ from typing import List, Type, Dict
 
 sys.path.append(str(pl.Path(__file__).parent.parent.parent.parent.parent))
 
-from agent_build_refactored.managed_packages.managed_packages_builders import (
+from package_builders.managed_packages.managed_packages_builders import (
     LinuxAIOPackagesBuilder,
     ALL_PACKAGE_BUILDERS,
 )
-from agent_build_refactored.utils.constants import CpuArch
-from agent_build_refactored.utils.common import init_logging
+from package_builders.utils.constants import CpuArch
+from package_builders.utils.common import init_logging
 from tests.end_to_end_tests.run_in_remote_machine import (
     run_test_in_docker,
     run_tests_in_ec2,

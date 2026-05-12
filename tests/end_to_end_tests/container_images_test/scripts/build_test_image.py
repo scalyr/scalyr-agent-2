@@ -24,14 +24,14 @@ import sys
 # local packages. All such imports also have to be done after that.
 sys.path.append(str(pl.Path(__file__).parent.parent.parent.parent.parent.absolute()))
 
-from agent_build_refactored.utils.constants import CpuArch
-from agent_build_refactored.utils.common import init_logging
+from package_builders.utils.constants import CpuArch
+from package_builders.utils.common import init_logging
 from tests.end_to_end_tests.container_images_test.tools import (
     get_image_builder_by_name,
     build_test_version_of_container_image,
     add_command_line_args,
 )
-from agent_build_refactored.container_images.image_builders import (
+from package_builders.container_images.image_builders import (
     ImageType,
 )
 

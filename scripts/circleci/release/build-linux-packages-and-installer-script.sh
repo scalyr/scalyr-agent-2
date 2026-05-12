@@ -69,12 +69,12 @@ echo "Build deb and rpm packages."
 
 pushd "${OUTPUT_PATH}"
 
-python "${AGENT_SOURCE_PATH}/build_package.py" deb
-python "${AGENT_SOURCE_PATH}/build_package.py" rpm
+python "${AGENT_SOURCE_PATH}/build_package.py" package non-aio build --package-type deb
+python "${AGENT_SOURCE_PATH}/build_package.py" package non-aio build --package-type rpm
 
 
-DEB_PACKAGE_PATH="$OUTPUT_PATH/$(ls --color=none *.deb)"
-RPM_PACKAGE_PATH="$OUTPUT_PATH/$(ls --color=none *.rpm)"
+DEB_PACKAGE_PATH="$OUTPUT_PATH/$(ls --color=none ./build/*.deb)"
+RPM_PACKAGE_PATH="$OUTPUT_PATH/$(ls --color=none ./build/*.rpm)"
 
 echo "$DEB_PACKAGE_PATH"
 

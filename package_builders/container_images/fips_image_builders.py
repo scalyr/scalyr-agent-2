@@ -1,10 +1,10 @@
 from typing import Dict, Type
 
-from agent_build_refactored.container_images.image_builders import (
+from package_builders.container_images.image_builders import (
     ContainerisedAgentBuilder,
     ImageType,
 )
-from agent_build_refactored.utils.constants import CpuArch
+from package_builders.utils.constants import CpuArch
 
 _FIPS_IMAGES_SUPPORTED_ARCHITECTURES = [
     CpuArch.x86_64,
