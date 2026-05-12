@@ -4819,7 +4819,7 @@ class Configuration:
             value = config_object.get_string(field, none_if_missing=True)
 
             if value is not None:
-                re.compile(value)
+                scalyr_util.compile_regex(value)
                 return
         except Exception:
             raise BadConfiguration(
