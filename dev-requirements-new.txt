@@ -21,7 +21,7 @@ PyMySQL==0.10.1; python_version < '3.7'
 PyMySQL==1.1.1; python_version >= '3.7'
 
 # Required for postgres monitor
-pg8000==1.10.6
+pg8000==1.31.5
 
 # Required for snmp monitor
 pysnmp==4.4.12; platform_system != 'Windows' and platform_system != 'Darwin'
