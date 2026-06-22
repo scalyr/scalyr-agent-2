@@ -1,6 +1,14 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.2.22 "Victor" - Jun 18, 2026
+<!---
+Not yet packaged
+--->
+
+Changes:
+* Update Windows MSI packaging to extract files at installation
+
 ## 2.2.21 "Walter" - Apr 28, 2026
 <!---
 Packaged by Steven Czerwinski <stevenc@sentinelone.com> on Apr 29, 2026 16:00 -0800
