@@ -157,7 +157,7 @@
             <ComponentRef Id='data_dir' />
             <ComponentRef Id='config_d_dir' />
             <ComponentRef Id='version_file' />
-            <!--<ComponentGroupRef Id='BIN' /> -->
+            <ComponentGroupRef Id='BIN' />
 
         </Feature>
 

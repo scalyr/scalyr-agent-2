@@ -16,7 +16,7 @@
     <xsl:template
             match="/wix:Wix/wix:Fragment/wix:ComponentGroup/wix:Component[wix:File[@Source='$(var.BinFolderSource)\scalyr-agent-2.exe']]"/>
     <xsl:template
-            match="/wix:Wix/wix:Fragment/wix:ComponentGroup/wix:Component[wix:File[@Source='$(var.BinFolderSource)\scalyr-agent-2-config.exe']]"/>
+            match="/wix:Wix/wix:Fragment/wix:ComponentGroup/wix:Component[wix:File[@Source='$(var.BinFolderSource)\scalyr-agent-2-config.cmd']]"/>
     <xsl:template
             match="/wix:Wix/wix:Fragment/wix:ComponentGroup/wix:Component[wix:File[@Source='$(var.BinFolderSource)\ScalyrAgentService.exe']]"/>
     <xsl:template
