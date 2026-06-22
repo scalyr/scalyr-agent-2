@@ -3,7 +3,7 @@ Scalyr Agent 2 Changes By Release
 
 ## 2.2.22 "Victor" - Jun 18, 2026
 <!---
-Not yet packaged
+Packaged by Tristan McCarty <stevenc@sentinelone.com> on Dec 31, 2026 16:00 -0800 
 --->
 
 Changes:
