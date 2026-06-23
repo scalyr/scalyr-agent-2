@@ -221,6 +221,7 @@ class LinuxPackageBuilder(Builder):
                 "--directories", f"/var/lib/{AGENT_SUBDIR_NAME}",
                 "--directories", f"/var/log/{AGENT_SUBDIR_NAME}",
                 "--rpm-use-file-permissions",
+                "--rpm-digest", "sha256",
                 "--deb-use-file-permissions",
                 "--verbose",
                 # fmt: on
