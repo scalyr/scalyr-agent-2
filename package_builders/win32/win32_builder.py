@@ -43,7 +43,7 @@ class WindowsBinaryBuilder(Builder):
         @return: The file name of the built package.
         """
         # Ensure that WIX is installed (toolkit to build Windows installers) by verifying its two main binaries are present.
-        if not shutil.which('candle') or not shutil.which('light'):
+        if not shutil.which('candle') or not shutil.which('light') or not shutil.which('heat'):
             print(
                 "Error, the WIX toolset does not appear to be installed.", file=sys.stderr
             )
@@ -140,6 +140,10 @@ class WindowsBinaryBuilder(Builder):
         shutil.copy(
             os.path.join(agent_source_root, "win32", "scalyr_agent.wxs"), "scalyr_agent.wxs"
         )
+        shutil.copy(
+            os.path.join(agent_source_root, "win32", "wix-heat-bin-transform.xsl"),
+            "wix-heat-bin-transform.xsl",
+        )
 
         agent_package_path = os.path.join(agent_source_root, "scalyr_agent")
 
@@ -190,7 +194,7 @@ class WindowsBinaryBuilder(Builder):
             "-m",
             "PyInstaller",
             os.path.join(agent_package_path, "agent_main.py"),
-            "--onefile",
+            "--onedir",
             "-n",
             "scalyr-agent-2",
         ]
@@ -251,14 +255,15 @@ class WindowsBinaryBuilder(Builder):
 
         shutil.copy(make_path(agent_source_root, "VERSION"), "Scalyr/VERSION")
 
-        # Copy frozen binary.
-        shutil.copy(os.path.join("dist", "scalyr-agent-2.exe"), "Scalyr/bin")
+        # Copy frozen binary directory (PyInstaller >=6.0 --onedir: exe at root, support files in _internal/).
+        dist_dir = os.path.join("dist", "scalyr-agent-2")
+        shutil.copytree(dist_dir, "Scalyr/bin", dirs_exist_ok=True)
         # Also copy the same binary as windows service binary.
         # Even if we use the same binary for everything, I couldn't figure out how to make Wix
         # reuse the same file for multiple components. (TODO: figure out how), but it seems that
         # packager compression handles this well and does now increase package size.
         shutil.copy(
-            os.path.join("dist", "scalyr-agent-2.exe"), "Scalyr/bin/ScalyrAgentService.exe"
+            os.path.join(dist_dir, "scalyr-agent-2.exe"), "Scalyr/bin/ScalyrAgentService.exe"
         )
         shutil.copy(
             os.path.join(agent_source_root, "win32/scalyr-agent-2-config.cmd"), "Scalyr/bin"
@@ -266,6 +271,14 @@ class WindowsBinaryBuilder(Builder):
         shutil.copy(
             make_path(agent_source_root, "win32/ScalyrShell.cmd"),
             "Scalyr/bin/ScalyrShell.cmd",
+        )
+
+        run_command(
+            'heat dir Scalyr\\bin -cg BIN -dr APPLICATIONBINDIR -srd '
+            '-var var.BinFolderSource -t wix-heat-bin-transform.xsl '
+            '-gg -sreg -sfrag -out BinComponents.wxs',
+            exit_on_fail=True,
+            command_name="heat",
         )
 
         # Copy the cert files.
@@ -294,16 +307,17 @@ class WindowsBinaryBuilder(Builder):
             version = ".".join(parts)
 
         run_command(
-            'candle -nologo -out ScalyrAgent.wixobj -dVERSION="%s" -dUPGRADECODE="%s" '
-            '-dPRODUCTCODE="%s" scalyr_agent.wxs' % (version, upgrade_code, product_code),
+            'candle -nologo -dVERSION="%s" -dUPGRADECODE="%s" -dPRODUCTCODE="%s" '
+            '-dBinFolderSource=Scalyr\\bin scalyr_agent.wxs BinComponents.wxs'
+            % (version, upgrade_code, product_code),
             exit_on_fail=True,
             command_name="candle",
-            )
+        )
 
         installer_name = "ScalyrAgentInstaller-%s.msi" % version
 
         run_command(
-            "light -nologo -ext WixUtilExtension.dll -ext WixUIExtension -out %s ScalyrAgent.wixobj -v"
+            "light -nologo -ext WixUtilExtension.dll -ext WixUIExtension -out %s scalyr_agent.wixobj BinComponents.wixobj -v"
             % (output_dir / installer_name),
             exit_on_fail=True,
             command_name="light",
