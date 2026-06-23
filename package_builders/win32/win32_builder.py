@@ -274,7 +274,7 @@ class WindowsBinaryBuilder(Builder):
         )
 
         run_command(
-            'heat dir Scalyr\\bin -cg BIN -dr APPLICATIONBINDIR '
+            'heat dir Scalyr\\bin -cg BIN -dr APPLICATIONBINDIR -srd '
             '-var var.BinFolderSource -t wix-heat-bin-transform.xsl '
             '-gg -sreg -sfrag -out BinComponents.wxs',
             exit_on_fail=True,
