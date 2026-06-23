@@ -13,12 +13,25 @@
         </xsl:copy>
     </xsl:template>
 
-    <xsl:template
-            match="/wix:Wix/wix:Fragment/wix:ComponentGroup/wix:Component[wix:File[@Source='$(var.BinFolderSource)\scalyr-agent-2.exe']]"/>
-    <xsl:template
-            match="/wix:Wix/wix:Fragment/wix:ComponentGroup/wix:Component[wix:File[@Source='$(var.BinFolderSource)\scalyr-agent-2-config.cmd']]"/>
-    <xsl:template
-            match="/wix:Wix/wix:Fragment/wix:ComponentGroup/wix:Component[wix:File[@Source='$(var.BinFolderSource)\ScalyrAgentService.exe']]"/>
-    <xsl:template
-            match="/wix:Wix/wix:Fragment/wix:ComponentGroup/wix:Component[wix:File[@Source='$(var.BinFolderSource)\ScalyrShell.cmd']]"/>
+    <!-- Index components for the 4 explicitly-managed files by their Id so we can also suppress their ComponentRef entries -->
+    <xsl:key name="explicit-file-components"
+        match="wix:Component[
+            wix:File[@Source='$(var.BinFolderSource)\scalyr-agent-2.exe'] or
+            wix:File[@Source='$(var.BinFolderSource)\scalyr-agent-2-config.cmd'] or
+            wix:File[@Source='$(var.BinFolderSource)\ScalyrAgentService.exe'] or
+            wix:File[@Source='$(var.BinFolderSource)\ScalyrShell.cmd']
+        ]"
+        use="@Id"/>
+
+    <!-- Suppress the Component element itself regardless of where heat places it in the document -->
+    <xsl:template match="wix:Component[
+            wix:File[@Source='$(var.BinFolderSource)\scalyr-agent-2.exe'] or
+            wix:File[@Source='$(var.BinFolderSource)\scalyr-agent-2-config.cmd'] or
+            wix:File[@Source='$(var.BinFolderSource)\ScalyrAgentService.exe'] or
+            wix:File[@Source='$(var.BinFolderSource)\ScalyrShell.cmd']
+        ]"/>
+
+    <!-- Suppress any ComponentRef that references one of the suppressed components -->
+    <xsl:template match="wix:ComponentRef[key('explicit-file-components', @Id)]"/>
+
 </xsl:stylesheet>
