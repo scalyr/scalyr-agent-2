@@ -1,6 +1,17 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.2.22 "Victor" - Jun 23, 2026
+<!---
+Packaged by Tristan McCarty <tristan.mccarty@sentinelone.com> on Jun 23, 2026 16:00 -0800
+--->
+
+Changes:
+* Update Windows MSI packaging to extract files at installation
+
+Fixes:
+* Added RPM digest flag to the build process
+
 ## 2.2.21 "Walter" - Apr 28, 2026
 <!---
 Packaged by Steven Czerwinski <stevenc@sentinelone.com> on Apr 29, 2026 16:00 -0800
