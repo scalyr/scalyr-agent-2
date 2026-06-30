@@ -1,13 +1,14 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.2.22 "Victor" - Jun 23, 2026
+## 2.2.22 "Victor" - Jul 1, 2026
 <!---
-Packaged by Tristan McCarty <tristan.mccarty@sentinelone.com> on Jun 23, 2026 16:00 -0800
+Packaged by Tristan McCarty <tristan.mccarty@sentinelone.com> on Jul 1, 2026 16:00 -0800
 --->
 
 Changes:
 * Update Windows MSI packaging to extract files at installation
+* Base Ubuntu Fips image was upgraded to 2.0.77
 
 Fixes:
 * Added RPM digest flag to the build process

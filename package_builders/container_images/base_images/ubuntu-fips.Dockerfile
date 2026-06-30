@@ -1,4 +1,4 @@
-FROM artifactory.eng.sentinelone.tech/docker-release/common/ubuntu-base/python313:2.0.74 as base
+FROM artifactory.eng.sentinelone.tech/docker-release/common/ubuntu-base/python313:2.0.77 as base
 
 FROM base as dependencies-builder-base
 ENV DEBIANFRONTEND=noninteractive
