@@ -103,6 +103,21 @@ class TestUtilCompression(ScalyrTestCase):
 
         self.assertEqual(data, bz2.decompress(compress(data)))
 
+    def test_gzip(self):
+        """Successful gzip compression (RFC 1952 framing, required for HEC)."""
+        data = self._data
+        compress = verify_and_get_compress_func("gzip")
+        self.assertIsNotNone(compress)
+        import gzip
+
+        compressed = compress(data)
+        # gzip framing always starts with the 0x1f 0x8b magic bytes.
+        self.assertEqual(compressed[:2], b"\x1f\x8b")
+        self.assertEqual(data, gzip.decompress(compressed))
+
+        compress_func, decompress_func = get_compress_and_decompress_func("gzip")
+        self.assertEqual(data, decompress_func(compress_func(data)))
+
     @skipIf(sys.version_info < (2, 7, 0), "Skipping Python < 2.7")
     def test_lz4(self):
         data = self._data
