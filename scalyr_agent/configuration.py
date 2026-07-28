@@ -1511,6 +1511,57 @@ class Configuration:
         """Returns the configuration value for 'raw_scalyr_server'."""
         return self.__get_config().get_string("raw_scalyr_server")
 
+    # NOTE: The following options control the "destination" abstraction. When
+    # `destination` is set to "HEC" (case-insensitive), the agent ships log
+    # events to a Splunk HTTP Event Collector endpoint instead of the Scalyr
+    # /addEvents endpoint. These options are intentionally undocumented in
+    # the agent.json example; the default preserves existing behavior.
+
+    @property
+    def destination(self):
+        """Returns the configuration value for 'destination'.
+
+        One of "addEvents" (default) or "HEC". Case-insensitive.
+        """
+        return self.__get_config().get_string(
+            "destination", default_value="addEvents"
+        )
+
+    @property
+    def hec_batch_size(self):
+        """Returns the configuration value for 'hec_batch_size' in bytes."""
+        return self.__get_config().get_int(
+            "hec_batch_size", default_value=1 * 1024 * 1024
+        )
+
+    @property
+    def hec_endpoint(self):
+        """Returns the configuration value for 'hec_endpoint'.
+
+        One of "event" (default; JSON events to /services/collector/event) or
+        "raw" (plain-text lines to /services/collector/raw).
+        """
+        return self.__get_config().get_string(
+            "hec_endpoint", default_value="event"
+        )
+
+    @property
+    def hec_url(self):
+        """Returns the configuration value for 'hec_url'.
+
+        If empty, `scalyr_server` is used as the HEC base URL. If set, this
+        overrides `scalyr_server` for HEC posting only.
+        """
+        return self.__get_config().get_string("hec_url", default_value="")
+
+    # NOTE: HEC event metadata (sourcetype/source/host/index) and custom
+    # fields are configured via each log entry's `attributes: {}` block in
+    # `logs: []`. Reserved keys `sourcetype`, `source`, `host`, `index` are
+    # lifted to HEC top-level event metadata; all other attributes become
+    # entries in the HEC `fields` object. There is no separate global
+    # `hec_attributes` option -- the standard per-log `attributes` mechanism
+    # covers both /addEvents and HEC destinations.
+
     @property
     def syslog_processing_thread_count(self):
         """Returns the configuration value for 'scalyr_server'."""
@@ -2320,6 +2371,45 @@ class Configuration:
             apply_defaults,
             env_aware=True,
         )
+
+        # Hidden "destination" options. Route events either to the default
+        # Scalyr /addEvents endpoint (backwards-compatible) or to a Splunk
+        # HTTP Event Collector. See documentation on the corresponding
+        # Configuration properties for details.
+        self.__verify_or_set_optional_string(
+            config,
+            "destination",
+            "addEvents",
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_int(
+            config,
+            "hec_batch_size",
+            1 * 1024 * 1024,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_string(
+            config,
+            "hec_endpoint",
+            "event",
+            description,
+            apply_defaults,
+            env_aware=True,
+            valid_values=["event", "raw"],
+        )
+        self.__verify_or_set_optional_string(
+            config,
+            "hec_url",
+            "",
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_destination(self.destination)
         self.__verify_or_set_optional_string(
             config,
             "agent_log_path",
@@ -3615,6 +3705,21 @@ class Configuration:
             description,
             apply_defaults,
         )
+
+    def __verify_destination(self, destination):
+        """Verify the configured 'destination' is one of the supported values.
+
+        Accepts case-insensitive "addEvents" or "HEC".
+        """
+        if destination is None:
+            return
+        if destination.lower() not in ("addevents", "hec"):
+            raise BadConfiguration(
+                'Invalid "destination" value "%s". Must be one of '
+                '"addEvents" or "HEC" (case-insensitive).' % destination,
+                "destination",
+                "invalidDestination",
+            )
 
     def __verify_compression_type(self, compression_type):
         """

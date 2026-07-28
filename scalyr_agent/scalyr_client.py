@@ -109,18 +109,19 @@ def verify_server_certificate(config):
 
 
 def create_client(config, quiet=False, api_key=None, server_url=None):
-    # type: (Configuration, bool, six.text_type, six.text_type) -> ScalyrClientSession
-    """Creates and returns a new client to the Scalyr servers.
+    # type: (Configuration, bool, six.text_type, six.text_type) -> Destination
+    """Create and return the destination client for sending events.
+
+    Historically this returned a `ScalyrClientSession` targeting the Scalyr
+    `/addEvents` endpoint. When the hidden `destination` config option is set
+    to "HEC" (case-insensitive), a `HecClientSession` is returned instead.
+
+    Both return types implement the same duck-typed interface used by the
+    copying manager (see `scalyr_agent.destinations.Destination`).
 
     @param quiet: If true, only errors should be written to stdout.
-    @type quiet: bool
-    @param api_key: The Scalyr API key. If None, use default api_key from config
-    @param server_url: The URL to the Scalyr server. If None, use default scalyr_server value from
-                       config
-
-    @return: The client to use for sending requests to Scalyr, using the server address and API write logs
-        key in the configuration file.
-    @rtype: ScalyrClientSession
+    @param api_key: Override for the API key / HEC token; None uses config.
+    @param server_url: Override for the Scalyr server URL; None uses config.
     """
     if config.verify_server_certificate:
         verify_server_certificate(config)
@@ -130,6 +131,29 @@ def create_client(config, quiet=False, api_key=None, server_url=None):
         ca_file = None
         intermediate_certs_file = None
     use_requests_lib = config.use_requests_lib
+
+    destination = (config.destination or "addEvents").lower()
+    if destination == "hec":
+        from scalyr_agent.destinations import HecClientSession
+
+        hec_server = config.hec_url or (server_url or config.scalyr_server)
+        return HecClientSession(
+            hec_server,
+            api_key or config.api_key,
+            __scalyr__.SCALYR_VERSION,
+            endpoint=config.hec_endpoint,
+            batch_size=config.hec_batch_size,
+            quiet=quiet,
+            request_deadline=config.request_deadline,
+            ca_file=ca_file,
+            intermediate_certs_file=intermediate_certs_file,
+            use_requests_lib=use_requests_lib,
+            compression_type=config.compression_type,
+            compression_level=config.compression_level,
+            proxies=config.network_proxies,
+            disable_send_requests=config.disable_send_requests,
+        )
+
     return ScalyrClientSession(
         server_url or config.scalyr_server,
         api_key or config.api_key,
@@ -2235,3 +2259,20 @@ def create_connection_helper(host, port, timeout=None, source_address=None):
         raise err
     else:
         raise OSError("getaddrinfo returns an empty list")
+
+
+# Register `ScalyrClientSession` as a virtual subclass of the destination ABC
+# so `isinstance(client, Destination)` is True without changing the class
+# inheritance chain. Import is done lazily at module bottom to avoid any
+# circular import concerns.
+def _register_destination_virtual_subclasses():
+    try:
+        from scalyr_agent.destinations import Destination
+
+        Destination.register(ScalyrClientSession)
+    except Exception:
+        # Never fail module import if the destinations module has issues.
+        pass
+
+
+_register_destination_virtual_subclasses()
