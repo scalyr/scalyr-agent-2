@@ -4,9 +4,10 @@ on:
   push:
     branches:
       - master
-  pull_request:
-    branches:
-      - master
+  # FIXME Uncomment
+  #pull_request:
+  #  branches:
+  #    - master
 
 jobs:
   # Special job which automatically cancels old runs for the same branch, prevents runs for the

@@ -1,0 +1,145 @@
+name: Upload Release Artifacts
+on:
+  # FIXME Uncomment, for testing
+  #push:
+  #  tags:
+  #    - v*.*.*
+  # FIXME Remove, for testing
+  pull_request:
+    branches:
+      - master
+
+# An alternate approach would use workflow_run and an additional coordinator workflow,
+# because any singular workflow from the workflow_run list would trigger this workflow.
+# As a result this workflow is an amalgamation of portions of several workflows instead.
+
+jobs:
+  build-tarball:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.10"
+      - run: |
+          mkdir -p build/tarball/noarch && cd build/tarball/noarch
+          python3 ../../../build_package.py tarball
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tarball
+          path: build/tarball/noarch/scalyr-agent-*.tar.gz
+
+  # FIXME Uncomment, just to speed up tests
+  #build-linux-packages-dependencies:
+  #  strategy:
+  #    matrix:
+  #      builder:
+  #        - { "name": "aio-aarch64", runner: "ubuntu-24.04-arm" }
+  #        - { "name": "aio-x86_64", runner: "ubuntu-24.04" }
+  #  runs-on: ${{ matrix.builder.runner }}
+  #  steps:
+  #    - uses: actions/checkout@v5
+  #    - uses: actions/setup-python@v6
+  #      with:
+  #        python-version: "3.10"
+  #    - run: python3 -m pip install -r dev-requirements-new.txt
+  #    - uses: docker/setup-qemu-action@v3
+  #      with:
+  #        image: tonistiigi/binfmt:qemu-v6.2.0
+  #        platforms: all
+  #    - run: docker context create builders || true
+  #    - uses: docker/setup-buildx-action@v3
+  #      with:
+  #        driver-opts: network=host
+  #        endpoint: builders
+  #    - env:
+  #        AWS_ACCESS_KEY: ${{ secrets.CT_AWS_DEV_EC2_ACCESS_KEY }}
+  #        AWS_SECRET_KEY: ${{ secrets.CT_AWS_DEV_EC2_SECRET_KEY }}
+  #        AWS_PRIVATE_KEY_NAME: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY_NAME }}
+  #        AWS_PRIVATE_KEY: ${{ secrets.CT_AWS_DEV_EC2_PRIVATE_KEY }}
+  #        AWS_REGION: "us-east-1"
+  #        USE_GHA_CACHE: "1"
+  #        ALLOW_FALLBACK_TO_REMOTE_BUILDER: "1"
+  #        CACHE_VERSION: ${{ github.ref_name }}
+  #        CICD_WORKFLOW: ${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}
+  #        CICD_JOB: ${{ matrix.builder.name }}
+  #      run: python3 build_package_new.py package ${{ matrix.builder.name }} build-dependencies
+  #
+  #build-linux-packages:
+  #  needs:
+  #    - build-linux-packages-dependencies
+  #  strategy:
+  #    matrix:
+  #      variant:
+  #        - { "builder_name": "aio-x86_64",  "package_type": "deb", runner: "ubuntu-24.04" }
+  #        - { "builder_name": "aio-x86_64",  "package_type": "rpm", runner: "ubuntu-24.04" }
+  #        - { "builder_name": "aio-aarch64", "package_type": "deb", runner: "ubuntu-24.04-arm" }
+  #        - { "builder_name": "aio-aarch64", "package_type": "rpm", runner: "ubuntu-24.04-arm" }
+  #        - { "builder_name": "non-aio",     "package_type": "deb", runner: "ubuntu-24.04" }
+  #        - { "builder_name": "non-aio",     "package_type": "rpm", runner: "ubuntu-24.04" }
+  #  runs-on: ${{ matrix.variant.runner }}
+  #  steps:
+  #    - uses: actions/checkout@v5
+  #    - uses: actions/setup-python@v6
+  #      with:
+  #        python-version: "3.10"
+  #    - uses: docker/setup-qemu-action@v3
+  #      with:
+  #        image: tonistiigi/binfmt:qemu-v6.2.0
+  #        platforms: all
+  #    - run: docker context create builders || true
+  #    - uses: docker/setup-buildx-action@v3
+  #      with:
+  #        driver-opts: network=host
+  #        endpoint: builders
+  #    - env:
+  #        USE_GHA_CACHE: "1"
+  #        CACHE_VERSION: ${{ github.ref_name }}
+  #      run: python3 build_package_new.py package ${{ matrix.variant.builder_name }} build --package-type ${{ matrix.variant.package_type }}
+  #    - uses: actions/upload-artifact@v4
+  #      with:
+  #        name: linux-${{ matrix.variant.builder_name }}-${{ matrix.variant.package_type }}
+  #        path: build/*/scalyr-agent-*
+
+  # FIXME Uncomment, just to speed up tests
+  #build-windows-package:
+  #  runs-on: windows-latest
+  #  steps:
+  #    - uses: actions/checkout@v5
+  #    - uses: actions/setup-python@v6
+  #      with:
+  #        python-version: "3.10"
+  #    - run: python3 -m pip install -r dev-requirements-new.txt
+  #    - run: python3 build_package.py win32
+  #    - uses: actions/upload-artifact@v4
+  #      with:
+  #        name: windows-msi
+  #        path: ScalyrAgentInstaller-*.msi
+
+  # Download all the artifacts previously built to prepare the upload to the underlying S3 bucket.
+  # This performs the same operations formerly done in the Jenkins job via agent-release/Jenkinsfile.
+
+  upload-artifacts:
+    needs:
+      - build-tarball
+      # FIXME Uncomment, just to speed up tests
+      #- build-linux-packages
+      #- build-windows-package
+    runs-on: ubuntu-latest
+    steps:
+      # No specified download-artifact name indicates all artifacts are to be downloaded.
+      # NB the files will be in directories with the artifact names, eg windows-msi/ScalyrAgentInstaller-2.2.19.msi
+      - uses: actions/download-artifact@v5
+      - uses: actions/checkout@v5
+      - run: |
+          awk '{
+            sub(/{ % REPLACE_APT_REPOSITORY_URL % }/, "https://scalyr-repo.s3.amazonaws.com/stable/apt");
+            sub(/{ % REPLACE_YUM_REPOSITORY_URL % }/, "https://scalyr-repo.s3.amazonaws.com/stable/yum/binaries/noarch");
+            sub(/{ % REPLACE_PUBLIC_KEY_URL % }/, "https://keyserver.ubuntu.com/pks/lookup?op=get\\&search=0x84AC559B5FB5463885CE0841F70CEEDB4AD7B6C6");
+            print
+          }' agent_build_refactored/managed_packages/convenience_install_script/install_agent_template.sh >install-scalyr-agent-2.sh
+
+      # FIXME STOPPED Ref agent-release/Jenkinsfile and specifically agent-release/scripts/publish_artifacts_to_s3_bucket.sh
+      #               If reusing that script, the artifact files and install-scalyr-agent-2.sh will need to rearranged in the directory structure expected by that script
+      #               Currently blocked on SCALYR_GPG_PASSPHRASE (ref agent-release/Jenkinsfile)
+
