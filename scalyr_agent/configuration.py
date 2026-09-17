@@ -1512,6 +1512,24 @@ class Configuration:
         return self.__get_config().get_string("raw_scalyr_server")
 
     @property
+    def use_ingestion_gateway(self):
+        """Returns the configuration value for 'use_ingestion_gateway'."""
+        return self.__get_config().get_bool("use_ingestion_gateway")
+
+    @property
+    def ingestion_gateway_server(self):
+        """Returns the configuration value for 'ingestion_gateway_server'."""
+        return self.__get_config().get_string("ingestion_gateway_server")
+
+    @property
+    def effective_scalyr_server(self):
+        """The server /addEvents traffic should actually be sent to, accounting for
+        'use_ingestion_gateway'."""
+        if self.use_ingestion_gateway:
+            return self.ingestion_gateway_server
+        return self.scalyr_server
+
+    @property
     def syslog_processing_thread_count(self):
         """Returns the configuration value for 'scalyr_server'."""
         return self.__get_config().get_int(
@@ -3359,6 +3377,24 @@ class Configuration:
             env_aware=True,
         )
 
+        # DTIN-7160: controls whether /addEvents traffic goes to the newer Ingestion Gateway
+        self.__verify_or_set_optional_bool(
+            config,
+            "use_ingestion_gateway",
+            False,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_string(
+            config,
+            "ingestion_gateway_server",
+            "",
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+
         # Debug leak flags
         self.__verify_or_set_optional_bool(
             config, "disable_leak_monitor_threads", False, description, apply_defaults
@@ -4226,7 +4262,7 @@ class Configuration:
         self.__verify_or_set_optional_string(
             worker_entry,
             "server_url",
-            default_value=self.scalyr_server,
+            default_value=self.effective_scalyr_server,
             config_description=description % entry_index,
         )
 

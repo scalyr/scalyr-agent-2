@@ -92,6 +92,8 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
         # 1. file doesn't exist but cert verification is disabled
         config = mock.Mock()
         config.scalyr_server = "foo.bar.com"
+        config.use_ingestion_gateway = False
+        config.effective_scalyr_server = "foo.bar.com"
         config.compression_level = 1
 
         config.verify_server_certificate = False
@@ -149,6 +151,8 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
             # ca_cert_path file doesn't exist
             config = mock.Mock()
             config.scalyr_server = "foo.bar.com"
+            config.use_ingestion_gateway = False
+            config.effective_scalyr_server = "foo.bar.com"
             config.compression_level = 1
 
             config.verify_server_certificate = True
@@ -182,6 +186,8 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
 
             config = mock.Mock()
             config.scalyr_server = "foo.bar.com"
+            config.use_ingestion_gateway = False
+            config.effective_scalyr_server = "foo.bar.com"
             config.compression_level = 1
 
             config.verify_server_certificate = True
@@ -236,6 +242,8 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
 
             config = mock.Mock()
             config.scalyr_server = "foo.bar.com"
+            config.use_ingestion_gateway = False
+            config.effective_scalyr_server = "foo.bar.com"
             config.server_attributes = {"serverHost": "test"}
             config.additional_file_paths = []
             config.compression_level = 1
@@ -288,6 +296,8 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
         with mock.patch("scalyr_agent.__scalyr__.INSTALL_TYPE", __scalyr__.DEV_INSTALL):
             config = mock.Mock()
             config.scalyr_server = "foo.bar.com"
+            config.use_ingestion_gateway = False
+            config.effective_scalyr_server = "foo.bar.com"
             config.server_attributes = {"serverHost": "test"}
             config.additional_file_paths = []
             config.compression_level = 1
@@ -337,6 +347,8 @@ class AgentMainTestCase(BaseScalyrLogCaptureTestCase):
         with mock.patch("scalyr_agent.__scalyr__.INSTALL_TYPE", __scalyr__.DEV_INSTALL):
             config = mock.Mock()
             config.scalyr_server = "foo.bar.com"
+            config.use_ingestion_gateway = False
+            config.effective_scalyr_server = "foo.bar.com"
             config.server_attributes = {"serverHost": "test"}
             config.additional_file_paths = []
             config.compression_level = 1

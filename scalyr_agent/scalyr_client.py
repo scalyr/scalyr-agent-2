@@ -131,7 +131,7 @@ def create_client(config, quiet=False, api_key=None, server_url=None):
         intermediate_certs_file = None
     use_requests_lib = config.use_requests_lib
     return ScalyrClientSession(
-        server_url or config.scalyr_server,
+        server_url or config.effective_scalyr_server,
         api_key or config.api_key,
         __scalyr__.SCALYR_VERSION,
         quiet=quiet,
@@ -146,6 +146,7 @@ def create_client(config, quiet=False, api_key=None, server_url=None):
         disable_logfile_addevents_format=config.disable_logfile_addevents_format,
         enforce_monotonic_timestamps=config.enforce_monotonic_timestamps,
         sessions_api_keys_tuple=config.get_number_of_configured_sessions_and_api_keys(),
+        use_ingestion_gateway=config.use_ingestion_gateway,
     )
 
 
@@ -224,6 +225,7 @@ class ScalyrClientSession:
         disable_logfile_addevents_format=False,
         enforce_monotonic_timestamps=False,
         sessions_api_keys_tuple=None,
+        use_ingestion_gateway=False,
     ):
         """Initializes the connection.
 
@@ -325,6 +327,12 @@ class ScalyrClientSession:
 
         if encoding and encoding != "none":
             self.__standard_headers["Content-Encoding"] = encoding
+
+        if use_ingestion_gateway:
+            self.__standard_headers["Authorization"] = "Bearer %s" % api_key
+            self.__add_events_path = "/api/addEvents"
+        else:
+            self.__add_events_path = "/addEvents"
 
         # Configure compression level
         self.__compression_level = compression_level
@@ -819,7 +827,7 @@ class ScalyrClientSession:
             return add_events_request.get_payload()
 
         return self.__send_request(
-            "/addEvents",
+            self.__add_events_path,
             body_func=generate_body,
             block_on_response=block_on_response,
         )
