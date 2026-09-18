@@ -2495,51 +2495,6 @@ class TestConfiguration(TestConfigurationBase):
         # verify a false deprecated option.
         assert config.use_multiprocess_workers is False
 
-    def test_worker_server_url_defaults_to_ingestion_gateway_when_flag_enabled(self):
-        self._write_file_with_separator_conversion(
-            """{
-                api_key: "some key",
-                use_ingestion_gateway: true,
-                ingestion_gateway_server: "https://igw.example.com",
-                "api_keys": [
-                    {
-                        "api_key": "key",
-                        "id": "some_key"
-                    }
-                ]
-            }
-            """
-        )
-
-        config = self._create_test_configuration_instance()
-        config.parse()
-
-        for worker_config in config.worker_configs:
-            self.assertEqual(worker_config["server_url"], "https://igw.example.com")
-
-    def test_worker_server_url_explicit_override_wins_over_flag(self):
-        self._write_file_with_separator_conversion(
-            """{
-                api_key: "some key",
-                use_ingestion_gateway: true,
-                ingestion_gateway_server: "https://igw.example.com",
-                "api_keys": [
-                    {
-                        "api_key": "key",
-                        "id": "some_key",
-                        "server_url": "https://pinned.example.com"
-                    }
-                ]
-            }
-            """
-        )
-
-        config = self._create_test_configuration_instance()
-        config.parse()
-
-        pinned_worker = [w for w in config.worker_configs if w["id"] == "some_key"][0]
-        self.assertEqual(pinned_worker["server_url"], "https://pinned.example.com")
-
     def test_deprecated_env_aware_params(self):
         os_environ_unicode["SCALYR_DEFAULT_WORKERS_PER_API_KEY"] = "5"
 

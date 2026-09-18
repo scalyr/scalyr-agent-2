@@ -224,14 +224,9 @@ class TestDynamicWorkers:
             self.start_sessions_and_block_until_copying = mock.MagicMock()
 
     class FakeConfig(object):
-        def __init__(self, use_ingestion_gateway=False, ingestion_gateway_server=""):
+        def __init__(self):
             self.default_sessions_per_worker = 1
             self.scalyr_server = "https://www.scalyr.com"
-            self.use_ingestion_gateway = use_ingestion_gateway
-            self.ingestion_gateway_server = ingestion_gateway_server
-            self.effective_scalyr_server = (
-                ingestion_gateway_server if use_ingestion_gateway else self.scalyr_server
-            )
 
     def test_empty(self):
 
@@ -268,7 +263,7 @@ class TestDynamicWorkers:
                 "id": "dynamic_1",
                 "api_key": TestDynamicWorkers.API_KEYS[0],
                 "sessions": mock_config.default_sessions_per_worker,
-                "server_url": mock_config.effective_scalyr_server,
+                "server_url": mock_config.scalyr_server,
             },
         )
 
@@ -282,7 +277,7 @@ class TestDynamicWorkers:
                 "id": "dynamic_2",
                 "api_key": TestDynamicWorkers.API_KEYS[1],
                 "sessions": mock_config.default_sessions_per_worker,
-                "server_url": mock_config.effective_scalyr_server,
+                "server_url": mock_config.scalyr_server,
             },
         )
 
@@ -308,38 +303,6 @@ class TestDynamicWorkers:
         assert dynamic_workers.get_worker("dynamic_2") is worker_2
 
         worker_1.start_sessions_and_block_until_copying.assert_called_once()
-
-    @mock.patch(
-        "scalyr_agent.copying_manager.copying_manager.CopyingManagerWorker",
-        autospec=False,
-    )
-    def test_dynamic_worker_uses_ingestion_gateway_when_flag_enabled(
-        self, MockCopyingManagerWorker
-    ):
-        dynamic_workers = DynamicWorkers()
-
-        MockCopyingManagerWorker.side_effect = [
-            TestDynamicWorkers.FakeWorker("dynamic_1"),
-        ]
-
-        mock_config = TestDynamicWorkers.FakeConfig(
-            use_ingestion_gateway=True,
-            ingestion_gateway_server="https://igw.example.com",
-        )
-
-        dynamic_workers.get_or_create_worker(
-            TestDynamicWorkers.API_KEYS[0], mock_config
-        )
-
-        MockCopyingManagerWorker.assert_called_with(
-            mock_config,
-            {
-                "id": "dynamic_1",
-                "api_key": TestDynamicWorkers.API_KEYS[0],
-                "sessions": mock_config.default_sessions_per_worker,
-                "server_url": "https://igw.example.com",
-            },
-        )
 
 
 class TestCopyingManagerEnd2End(CopyingManagerTest):

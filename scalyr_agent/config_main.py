@@ -670,7 +670,6 @@ def upgrade_windows_install(
             )
 
         # Determine if a newer version is available
-        # NOTE: intentionally config.scalyr_server to hit the legacy version check API
         client = ScalyrClientSession(
             config.scalyr_server,
             config.api_key,

@@ -122,7 +122,7 @@ class DynamicWorkers:
             "api_key": api_key,
             "id": self.__next_id(),
             "sessions": config.default_sessions_per_worker,
-            "server_url": config.effective_scalyr_server,
+            "server_url": config.scalyr_server,
         }
 
         return CopyingManagerWorker(config, worker_config)

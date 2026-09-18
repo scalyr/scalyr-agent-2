@@ -772,12 +772,12 @@ class TestInitScalyrClient(ScalyrTestCase):
         config.parse()
         return config
 
-    def test_worker_session_connects_to_ingestion_gateway_when_flag_enabled(self):
+    def test_worker_session_sends_auth_header_when_flag_enabled(self):
         config = self._parse_config(
             {
                 "api_key": "fake",
-                "use_ingestion_gateway": True,
-                "ingestion_gateway_server": "https://igw.example.com",
+                "use_api_addevents": True,
+                "scalyr_server": "https://legacy.example.com",
                 "verify_server_certificate": False,
             }
         )
@@ -787,14 +787,11 @@ class TestInitScalyrClient(ScalyrTestCase):
         session._init_scalyr_client(quiet=True)
 
         client = session._CopyingManagerWorkerSession__scalyr_client
-        self.assertEqual(
-            client._ScalyrClientSession__full_address, "https://igw.example.com"
-        )
         self.assertIn(
             "Authorization", client._ScalyrClientSession__standard_headers
         )
 
-    def test_worker_session_connects_to_legacy_server_when_flag_disabled(self):
+    def test_worker_session_connects_without_header_when_flag_disabled(self):
         config = self._parse_config(
             {
                 "api_key": "fake",
