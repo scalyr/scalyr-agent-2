@@ -21,6 +21,9 @@ import threading
 import platform
 import mock
 import sys
+import os
+import json
+import tempfile
 
 from scalyr_agent.copying_manager.copying_manager import PathWorkerIdDict
 
@@ -32,7 +35,7 @@ if False:
 
 import pytest
 
-from scalyr_agent.test_base import skipIf
+from scalyr_agent.test_base import skipIf, ScalyrTestCase
 from tests.unit.copying_manager_tests.common import (
     TestableCopyingManagerWorkerSession,
     CopyingManagerCommonTest,
@@ -40,8 +43,12 @@ from tests.unit.copying_manager_tests.common import (
     TestableCopyingManagerWorkerSessionProxy,
 )
 
-from scalyr_agent.copying_manager.worker import create_shared_object_manager
+from scalyr_agent.copying_manager.worker import (
+    create_shared_object_manager,
+    CopyingManagerWorkerSession,
+)
 from scalyr_agent.configuration import Configuration
+from scalyr_agent.platform_controller import DefaultPaths
 from tests.unit.copying_manager_tests.test_environment import TestableLogFile
 
 from scalyr_agent.log_processing import LogMatcher, LogFileProcessor
@@ -745,3 +752,62 @@ class TestCopyingManagerWorkerCheckpoints(CopyingManagerWorkerTest):
             )
 
         assert processor.get_log_path() in closed_files_checkpoints
+
+
+class TestInitScalyrClient(ScalyrTestCase):
+
+    def _parse_config(self, config_data):
+        tmp_dir = tempfile.mkdtemp()
+        config_path = os.path.join(tmp_dir, "agent.json")
+        with open(config_path, "w") as fp:
+            json.dump(config_data, fp)
+
+        default_paths = DefaultPaths(
+            os.path.join(tmp_dir, "log"),
+            config_path,
+            os.path.join(tmp_dir, "data"),
+        )
+
+        config = Configuration(config_path, default_paths, mock.Mock())
+        config.parse()
+        return config
+
+    def test_worker_session_sends_auth_header_when_flag_enabled(self):
+        config = self._parse_config(
+            {
+                "api_key": "fake",
+                "use_api_addevents": True,
+                "scalyr_server": "https://legacy.example.com",
+                "verify_server_certificate": False,
+            }
+        )
+
+        worker_entry = config.worker_configs[0]
+        session = CopyingManagerWorkerSession(config, worker_entry, "1")
+        session._init_scalyr_client(quiet=True)
+
+        client = session._CopyingManagerWorkerSession__scalyr_client
+        self.assertIn(
+            "Authorization", client._ScalyrClientSession__standard_headers
+        )
+
+    def test_worker_session_connects_without_header_when_flag_disabled(self):
+        config = self._parse_config(
+            {
+                "api_key": "fake",
+                "scalyr_server": "https://legacy.example.com",
+                "verify_server_certificate": False,
+            }
+        )
+
+        worker_entry = config.worker_configs[0]
+        session = CopyingManagerWorkerSession(config, worker_entry, "1")
+        session._init_scalyr_client(quiet=True)
+
+        client = session._CopyingManagerWorkerSession__scalyr_client
+        self.assertEqual(
+            client._ScalyrClientSession__full_address, "https://legacy.example.com"
+        )
+        self.assertNotIn(
+            "Authorization", client._ScalyrClientSession__standard_headers
+        )

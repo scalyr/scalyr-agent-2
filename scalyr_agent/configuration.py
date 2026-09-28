@@ -1512,6 +1512,11 @@ class Configuration:
         return self.__get_config().get_string("raw_scalyr_server")
 
     @property
+    def use_api_addevents(self):
+        """Returns the configuration value for 'use_api_addevents'."""
+        return self.__get_config().get_bool("use_api_addevents")
+
+    @property
     def syslog_processing_thread_count(self):
         """Returns the configuration value for 'scalyr_server'."""
         return self.__get_config().get_int(
@@ -3353,6 +3358,16 @@ class Configuration:
         self.__verify_or_set_optional_bool(
             config,
             "disable_logfile_addevents_format",
+            False,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+
+        # DTIN-7160: controls whether to use /addEvents or /api/addEvents
+        self.__verify_or_set_optional_bool(
+            config,
+            "use_api_addevents",
             False,
             description,
             apply_defaults,

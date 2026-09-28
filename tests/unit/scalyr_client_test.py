@@ -36,6 +36,7 @@ from scalyr_agent.scalyr_client import (
     Event,
     ScalyrClientSession,
     MAX_REQUEST_BODY_SIZE_LOG_MSG_LIMIT,
+    create_client,
 )
 
 from scalyr_agent.test_base import ScalyrTestCase
@@ -1002,6 +1003,50 @@ class PostFixBufferTest(ScalyrTestCase):
 
 
 class ClientSessionTest(BaseScalyrLogCaptureTestCase):
+    @mock.patch("scalyr_agent.scalyr_client.time.time", mock.Mock(return_value=0))
+    def test_send_uses_api_addevents_path_and_auth_header_when_enabled(self):
+        session = ScalyrClientSession(
+            "https://dummserver.com",
+            "DUMMY API KEY",
+            SCALYR_VERSION,
+            use_api_addevents=True,
+        )
+
+        self.assertEqual(
+            session._ScalyrClientSession__standard_headers["Authorization"],
+            "Bearer DUMMY API KEY",
+        )
+
+        session._ScalyrClientSession__connection = mock.Mock()
+        session._ScalyrClientSession__receive_response = mock.Mock()
+
+        add_events_request = AddEventsRequest({"foo": "bar"})
+        session.send(add_events_request=add_events_request)
+
+        request_path = session._ScalyrClientSession__connection.post.call_args_list[0][
+            0
+        ][0]
+        self.assertEqual(request_path, "/api/addEvents")
+
+    @mock.patch("scalyr_agent.scalyr_client.time.time", mock.Mock(return_value=0))
+    def test_send_uses_legacy_addevents_path_by_default(self):
+        session = ScalyrClientSession(
+            "https://dummserver.com", "DUMMY API KEY", SCALYR_VERSION
+        )
+        session._ScalyrClientSession__connection = mock.Mock()
+        session._ScalyrClientSession__receive_response = mock.Mock()
+
+        add_events_request = AddEventsRequest({"foo": "bar"})
+        session.send(add_events_request=add_events_request)
+
+        request_path = session._ScalyrClientSession__connection.post.call_args_list[0][
+            0
+        ][0]
+        self.assertEqual(request_path, "/addEvents")
+        self.assertNotIn(
+            "Authorization", session._ScalyrClientSession__standard_headers
+        )
+
     def test_user_agent_callback(self):
         session = ScalyrClientSession(
             "https://dummserver.com", "DUMMY API KEY", SCALYR_VERSION
@@ -1398,4 +1443,44 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
             "https://dummserver.com",
             None,
             error_code="error/client/badParam",
+        )
+
+
+class CreateClientTest(ScalyrTestCase):
+    class FakeConfig(object):
+        def __init__(
+            self, use_api_addevents=False, scalyr_server="https://legacy.example.com"
+        ):
+            self.verify_server_certificate = False
+            self.use_requests_lib = False
+            self.api_key = "DUMMY API KEY"
+            self.request_deadline = 60.0
+            self.compression_type = None
+            self.compression_level = 9
+            self.network_proxies = None
+            self.disable_send_requests = False
+            self.disable_logfile_addevents_format = False
+            self.enforce_monotonic_timestamps = False
+            self.use_api_addevents = use_api_addevents
+            self.scalyr_server = scalyr_server
+
+        def get_number_of_configured_sessions_and_api_keys(self):
+            return None
+
+    def test_connects_to_configured_scalyr_server(self):
+        config = CreateClientTest.FakeConfig()
+
+        client = create_client(config)
+
+        self.assertEqual(
+            client._ScalyrClientSession__full_address, "https://legacy.example.com"
+        )
+
+    def test_explicit_server_url_argument_wins_over_config(self):
+        config = CreateClientTest.FakeConfig(use_api_addevents=True)
+
+        client = create_client(config, server_url="https://pinned.example.com")
+
+        self.assertEqual(
+            client._ScalyrClientSession__full_address, "https://pinned.example.com"
         )
