@@ -1782,6 +1782,10 @@ class TestConfiguration(TestConfigurationBase):
                         fake_env[field] = "legacy"
                     elif field == "memory_profiler":
                         fake_env[field] = "pympler"
+                    elif field == "destination":
+                        fake_env[field] = "addEvents"
+                    elif field == "hec_endpoint":
+                        fake_env[field] = "event"
                     else:
                         self.assertNotEqual(
                             FAKE_STRING,
@@ -2287,6 +2291,62 @@ class TestConfiguration(TestConfigurationBase):
     def test_apply_config_without_parse(self):
         config = self._create_test_configuration_instance()
         config.apply_config()
+
+    def test_destination_defaults_to_addevents(self):
+        self._write_file_with_separator_conversion(
+            """{
+                api_key: "hi there",
+            }
+            """
+        )
+        config = self._create_test_configuration_instance()
+        config.parse()
+        self.assertEqual(config.destination, "addEvents")
+        self.assertEqual(config.hec_endpoint, "event")
+        self.assertEqual(config.hec_batch_size, 1 * 1024 * 1024)
+        self.assertEqual(config.hec_url, "")
+
+    def test_destination_hec_config(self):
+        self._write_file_with_separator_conversion(
+            """{
+                api_key: "hi there",
+                destination: "HEC",
+                hec_batch_size: 524288,
+                hec_endpoint: "raw",
+                hec_url: "https://hec.example.com",
+            }
+            """
+        )
+        config = self._create_test_configuration_instance()
+        config.parse()
+        self.assertEqual(config.destination, "HEC")
+        self.assertEqual(config.hec_batch_size, 524288)
+        self.assertEqual(config.hec_endpoint, "raw")
+        self.assertEqual(config.hec_url, "https://hec.example.com")
+
+    def test_destination_invalid_value_raises(self):
+        self._write_file_with_separator_conversion(
+            """{
+                api_key: "hi there",
+                destination: "syslog",
+            }
+            """
+        )
+        config = self._create_test_configuration_instance()
+        self.assertRaisesRegex(
+            BadConfiguration, 'Invalid "destination"', config.parse
+        )
+
+    def test_hec_endpoint_invalid_value_raises(self):
+        self._write_file_with_separator_conversion(
+            """{
+                api_key: "hi there",
+                hec_endpoint: "invalid",
+            }
+            """
+        )
+        config = self._create_test_configuration_instance()
+        self.assertRaisesRegex(BadConfiguration, "hec_endpoint", config.parse)
 
     def test_parse_valid_compression_type(self):
         # Valid values

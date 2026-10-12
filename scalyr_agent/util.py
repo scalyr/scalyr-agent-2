@@ -120,6 +120,7 @@ SORT_KEYS = False
 # Maps user-friendly string we expose in the configuration to the internal Python module name
 SUPPORTED_COMPRESSION_ALGORITHMS = [
     "deflate",
+    "gzip",
     "bz2",
     "none",
 ]
@@ -132,6 +133,7 @@ if sys.version_info >= (2, 7, 0):
 # Maps compression type (deflate, bz2, lz4, zstandard) to the corresponding Python package name
 COMPRESSION_TYPE_TO_PYTHON_LIBRARY = {
     "deflate": "zlib",
+    "gzip": "gzip",
     "bz2": "bz2",
     "lz4": "lz4",
     "zstandard": "zstandard",
@@ -148,6 +150,7 @@ COMPRESSION_TYPE_TO_PYTHON_LIBRARY = {
 # be different, but relative differences should stay mostly the same).
 COMPRESSION_TYPE_TO_DEFAULT_LEVEL = {
     "deflate": 6,  # 9 offers slight increase over 6 in compression ratio, but uses much more CPU
+    "gzip": 6,  # gzip framing over deflate; matches deflate's tradeoff
     "bz2": 9,
     "lz4": 0,  # the fastest, but not the best compression ratio
     "zstandard": 3,  # good compromise between speed and compression ratio, 5 would also be acceptable
@@ -157,6 +160,7 @@ COMPRESSION_TYPE_TO_DEFAULT_LEVEL = {
 # Maps compression type to valid compression levels minimum and maximum compression level (inclusive)
 COMPRESSION_TYPE_TO_VALID_LEVELS = {
     "deflate": [1, 9],
+    "gzip": [1, 9],
     "bz2": [1, 9],
     "lz4": [0, 16],
     "zstandard": [1, 22],
@@ -2061,6 +2065,15 @@ def get_compress_and_decompress_func(compression_algorithm, compression_level=9)
         else:
             compress_func = functools.partial(zlib.compress, level=compression_level)  # type: ignore
         decompress_func = zlib.decompress  # type: ignore
+    elif compression_algorithm == "gzip":
+        # gzip framing (RFC 1952) over deflate. Required for Splunk HEC and
+        # generally more interoperable with HTTP servers than raw deflate.
+        import gzip as _gzip
+
+        def compress_func(data):
+            return _gzip.compress(data, compresslevel=compression_level)
+
+        decompress_func = _gzip.decompress  # type: ignore
     elif compression_algorithm == "bz2":
         import bz2
 
