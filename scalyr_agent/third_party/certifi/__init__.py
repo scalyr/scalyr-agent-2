@@ -1,3 +1,4 @@
-from .core import where, old_where
+from .core import contents, where
 
-__version__ = "2017.04.17"
+__all__ = ["contents", "where"]
+__version__ = "2026.10.23"
